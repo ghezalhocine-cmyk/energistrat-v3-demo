@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>ENERGISTRAT V3 | Mairie Décisionnelle</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { abysse:'#050505', card:'#0F172A', menu:'#020617', public:'#3B82F6', gas:'#FF8C00', enr:'#10B981', alert:'#EF4444', gold:'#FFD700' }, borderRadius: { 'bento':'2rem' }, boxShadow: { 'neon':'0 0 20px rgba(59, 130, 246, 0.3)' } } } }
+    </script>
+    <style>
+        body { background:#050505; color:white; height:100vh; width:100vw; overflow:hidden; display:flex; }
+        .bento-card { background:#0F172A; border:1px solid rgba(255,255,255,0.05); transition:0.3s; }
+        .bento-card:hover { border-color:rgba(59,130,246,0.5); transform:translateY(-2px); box-shadow:0 10px 40px rgba(0,0,0,0.5); z-index:10; }
+        .nav-item.active { background:rgba(59,130,246,0.1); border-right:3px solid #3B82F6; color:white; }
+        .page-content { display:none; } .page-content.active { display:grid; }
+    </style>
+</head>
+<body class="font-sans">
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-menu border-r border-white/5 flex flex-col justify-between h-full z-50">
+        <div>
+            <div class="p-6 flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full border-2 border-public flex items-center justify-center bg-abysse shadow-neon"><svg class="w-6 h-6 text-public" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg></div>
+                <div><div class="font-black text-xl">MAIRIE<span class="text-public">.OS</span></div><div class="text-[9px] text-gray-400 font-bold tracking-widest">Saint-Lys</div></div>
+            </div>
+            <nav class="mt-4 flex flex-col">
+                <button onclick="navTo('budget')" id="btn-budget" class="nav-item active w-full text-left px-6 py-4 text-xs font-bold uppercase tracking-wider flex items-center gap-3">1. Budget M57</button>
+                <button onclick="navTo('marches')" id="btn-marches" class="nav-item w-full text-left px-6 py-4 text-xs font-bold uppercase tracking-wider flex items-center gap-3">2. Marchés Publics</button>
+                <button onclick="navTo('citoyen')" id="btn-citoyen" class="nav-item w-full text-left px-6 py-4 text-xs font-bold uppercase tracking-wider flex items-center gap-3">3. Viralité Citoyenne</button>
+                <button onclick="navTo('transition')" id="btn-transition" class="nav-item w-full text-left px-6 py-4 text-xs font-bold uppercase tracking-wider flex items-center gap-3">4. Transition & RSE</button>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- CONTENT -->
+    <div class="flex-1 flex flex-col h-full bg-abysse relative">
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur">
+            <h2 id="page-title" class="text-3xl font-black text-white">Pilotage Budgétaire</h2>
+            <div class="flex items-center gap-4 bg-card border border-white/5 px-4 py-2 rounded-full"><span class="text-xs text-gray-400 font-bold uppercase">Budget 2026</span><span class="text-sm font-bold text-white">450 k€</span></div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-8 scroll-smooth">
+            
+            <!-- VUE BUDGET -->
+            <div id="view-budget" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-8 bg-card rounded-bento p-8 bento-card">
+                    <div class="flex justify-between mb-4"><h3 class="font-bold text-xl">Exécution Budgétaire</h3><span class="text-xs bg-public/10 text-public px-2 py-1 rounded">Élec + Gaz</span></div>
+                    <canvas id="publicChart" class="w-full h-64"></canvas>
+                </div>
+                <div class="col-span-4 flex flex-col gap-6">
+                    <div class="flex-1 bg-card border border-alert/30 rounded-bento p-6 bento-card relative overflow-hidden">
+                        <span class="text-[10px] text-alert font-bold uppercase">Alerte Marché</span>
+                        <div class="text-2xl font-bold text-white mt-2">Gaz (Lot 2)</div>
+                        <div class="text-3xl font-black text-success mt-2">-14 200 €</div>
+                        <p class="text-xs text-gray-400 mt-2">Opportunité si achat direct (MAPA) maintenant.</p>
+                        <button class="w-full mt-4 bg-alert/10 text-alert border border-alert/30 py-2 rounded text-xs font-bold">Voir Radar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VUE MARCHÉS -->
+            <div id="view-marches" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-12 bg-card rounded-bento p-8 bento-card border-t-4 border-public">
+                    <h3 class="font-bold text-xl mb-6">Portefeuille Marchés</h3>
+                    <div class="space-y-3">
+                        <div class="bg-abysse border border-white/5 p-4 rounded-2xl flex justify-between items-center"><div><div class="text-xs text-gray-400 uppercase">Lot 1 • Élec</div><div class="font-bold">EDF Collectivités</div></div><span class="bg-green-500/20 text-green-400 text-xs px-2 py-1 rounded">Actif</span></div>
+                        <div class="bg-abysse border border-white/5 p-4 rounded-2xl flex justify-between items-center"><div><div class="text-xs text-gray-400 uppercase">Lot 2 • Gaz</div><div class="font-bold">TotalEnergies</div></div><span class="bg-alert/20 text-alert text-xs px-2 py-1 rounded">Renouv. J-45</span></div>
+                    </div>
+                    <button class="mt-6 bg-public text-white px-6 py-2 rounded-xl text-xs font-bold shadow-neon">Générer DCE / BPU</button>
+                </div>
+            </div>
+
+            <!-- VUE CITOYEN -->
+            <div id="view-citoyen" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-8 bg-gradient-to-r from-card to-abysse border border-enr/30 rounded-bento p-8 bento-card relative overflow-hidden">
+                    <div class="absolute right-0 top-0 w-64 h-64 bg-enr/10 rounded-full blur-3xl"></div>
+                    <div class="relative z-10">
+                        <h3 class="font-bold text-2xl mb-2">Ligue de la Sobriété</h3>
+                        <p class="text-sm text-gray-400 mb-6">Engagement des administrés</p>
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div class="bg-abysse/50 p-4 rounded-2xl"><div class="text-2xl font-black text-white">850</div><div class="text-[9px] text-gray-400">Foyers</div></div>
+                            <div class="bg-abysse/50 p-4 rounded-2xl"><div class="text-2xl font-black text-gold">#1</div><div class="text-[9px] text-gray-400">Classement</div></div>
+                            <div class="bg-abysse/50 p-4 rounded-2xl"><div class="text-2xl font-black text-enr">-18%</div><div class="text-[9px] text-gray-400">Conso</div></div>
+                        </div>
+                        <button class="mt-6 w-full bg-enr text-abysse font-bold py-3 rounded-xl text-xs shadow-lg">Lancer Campagne Parrainage (CCAS)</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- VUE TRANSITION (Placeholder) -->
+             <div id="view-transition" class="page-content grid grid-cols-12 gap-6 auto-rows-min"><div class="col-span-12 text-center text-gray-500 mt-20">Vue Rapport RSE & Conseil Municipal</div></div>
+
+        </main>
+    </div>
+    <script>
+        function navTo(p){document.querySelectorAll('.nav-item').forEach(e=>{e.classList.remove('active');e.classList.add('text-gray-400')});document.getElementById('btn-'+p).classList.add('active');document.getElementById('btn-'+p).classList.remove('text-gray-400');document.querySelectorAll('.page-content').forEach(e=>e.classList.remove('active'));document.getElementById('view-'+p).classList.add('active');}
+        const ctx=document.getElementById('publicChart').getContext('2d');
+        new Chart(ctx,{type:'line',data:{labels:['J','F','M','A','M','J','J','A','S','O','N','D'],datasets:[{label:'Réalisé',data:[42,38,32,20,15,12,null,null,null],borderColor:'#3B82F6'},{label:'Budget',data:[40,38,35,25,15,10,8,8,12,20,30,40],borderColor:'#9CA3AF',borderDash:[5,5]}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{display:false},y:{grid:{color:'#222'}}},plugins:{legend:{display:false}}}});
+    </script>
+</body>
+</html>

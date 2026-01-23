@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>ENERGISTRAT V3 | Industry MasterView</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { abysse:'#050505', card:'#0F172A', menu:'#020617', indus:'#00E5FF', safety:'#F97316', success:'#10B981', alert:'#EF4444', market:'#F59E0B' }, borderRadius: { 'bento':'2rem' }, boxShadow: { 'neon':'0 0 20px rgba(0, 229, 255, 0.25)' } } } }
+    </script>
+    <style>
+        body { background:#050505; color:white; height:100vh; overflow:hidden; display:flex; }
+        .bento-card { background:#0F172A; border:1px solid rgba(255,255,255,0.05); transition:0.3s; }
+        .bento-card:hover { border-color:rgba(0,229,255,0.5); transform:translateY(-2px); box-shadow:0 10px 40px rgba(0,0,0,0.5); z-index:10; }
+        .nav-item.active { background:rgba(0, 229, 255, 0.1); border-right:3px solid #00E5FF; color:white; }
+        .page-content { display:none; } .page-content.active { display:grid; }
+        @keyframes flow { 100% { stroke-dashoffset: -20; } } .energy-flow { stroke-dasharray: 10; animation: flow 1s linear infinite; }
+    </style>
+</head>
+<body class="font-sans">
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-menu border-r border-white/5 flex flex-col justify-between h-full z-50">
+        <div>
+            <div class="p-6 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full border-2 border-indus flex items-center justify-center bg-abysse text-indus font-bold shadow-neon">IND</div>
+                <div><div class="font-black text-lg">FACTORY<span class="text-indus">OS</span></div><div class="text-[9px] text-gray-400">Site Seveso</div></div>
+            </div>
+            <nav class="mt-4 flex flex-col">
+                <button onclick="navTo('prod')" id="btn-prod" class="nav-item active w-full text-left px-6 py-4 text-xs font-bold uppercase tracking-wider flex items-center gap-3">1. Synoptique</button>
+                <button onclick="navTo('perf')" id="btn-perf" class="nav-item w-full text-left px-6 py-4 text-xs font-bold uppercase tracking-wider flex items-center gap-3">2. Performance IPE</button>
+                <button onclick="navTo('trading')" id="btn-trading" class="nav-item w-full text-left px-6 py-4 text-xs font-bold uppercase tracking-wider flex items-center gap-3">3. Trading & Flex</button>
+                <button onclick="navTo('rse')" id="btn-rse" class="nav-item w-full text-left px-6 py-4 text-xs font-bold uppercase tracking-wider flex items-center gap-3">4. RSE & ISO</button>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- CONTENT -->
+    <div class="flex-1 flex flex-col h-full bg-abysse relative">
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur">
+            <h2 id="page-title" class="text-3xl font-black text-white">Synoptique Production</h2>
+            <div class="flex items-center gap-4 bg-card border border-white/5 px-4 py-2 rounded-full"><span class="text-xs text-gray-400 uppercase font-bold">Puissance</span><span class="text-sm font-bold text-indus">2.4 MW</span></div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-8 scroll-smooth">
+            
+            <!-- VUE PROD (TWIN) -->
+            <div id="view-prod" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-8 bg-card rounded-bento p-8 bento-card relative">
+                    <h3 class="font-bold text-xl text-white mb-6">Ligne A</h3>
+                    <div class="relative w-full h-[300px] bg-abysse/50 rounded-2xl border border-white/5 flex items-center justify-between p-4 overflow-hidden">
+                        <div class="z-10 text-center"><div class="w-12 h-12 bg-white/10 rounded flex items-center justify-center font-bold border border-white">TGBT</div></div>
+                        <svg class="absolute w-full h-full pointer-events-none"><line x1="10%" y1="50%" x2="90%" y2="50%" stroke="#00E5FF" stroke-width="2" class="energy-flow"/></svg>
+                        <div class="z-10 text-center"><div class="w-16 h-16 bg-safety/20 rounded border border-safety flex items-center justify-center font-bold text-white shadow-lg">FOUR</div><span class="text-[9px] text-safety animate-pulse">CHAUFFE</span></div>
+                    </div>
+                </div>
+                <div class="col-span-4 flex flex-col gap-6">
+                    <div class="bg-card border-l-4 border-safety rounded-bento p-6 bento-card">
+                        <h3 class="font-bold text-lg text-white mb-2">Maintenance</h3>
+                        <p class="text-xs text-gray-400">Dérive Compresseur n°2 (+12%).</p>
+                        <button class="mt-4 w-full bg-safety/20 text-safety border border-safety py-2 rounded text-xs font-bold">Ouvrir Ticket</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VUE PERF -->
+            <div id="view-perf" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-8 bg-card rounded-bento p-8 bento-card">
+                    <h3 class="font-bold text-xl text-white mb-6">Performance IPE (kWh/Tonne)</h3>
+                    <canvas id="ipeChart" class="w-full h-64"></canvas>
+                </div>
+            </div>
+
+            <!-- VUE TRADING -->
+            <div id="view-trading" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-6 bg-abysse border border-white/5 rounded-bento p-8 bento-card text-center flex flex-col justify-center relative overflow-hidden">
+                    <div class="absolute inset-0 bg-safety/10"></div>
+                    <h3 class="text-2xl font-black text-white relative z-10">Appel Flexibilité RTE</h3>
+                    <p class="text-sm text-gray-400 mb-6 relative z-10">Demain 18h-20h</p>
+                    <button class="relative z-10 w-32 h-32 rounded-full bg-gradient-to-b from-safety to-red-600 border-4 border-red-900 shadow-lg flex items-center justify-center font-black text-white hover:scale-105 transition">STOP</button>
+                    <div class="mt-4 text-success font-bold">+ 4 500 €</div>
+                </div>
+                <div class="col-span-6 bg-card rounded-bento p-8 bento-card">
+                    <h3 class="font-bold text-xl text-white mb-6">Prix Spot EEX</h3>
+                    <canvas id="marketChart" class="w-full h-48"></canvas>
+                </div>
+            </div>
+
+            <!-- VUE RSE -->
+             <div id="view-rse" class="page-content grid grid-cols-12 gap-6 auto-rows-min"><div class="col-span-12 text-center text-gray-500 mt-20">Vue RSE & ISO 50001</div></div>
+        </main>
+    </div>
+    
+    <script>
+        function navTo(p){document.querySelectorAll('.nav-item').forEach(e=>{e.classList.remove('active');e.classList.add('text-gray-400')});document.getElementById('btn-'+p).classList.add('active');document.getElementById('btn-'+p).classList.remove('text-gray-400');document.querySelectorAll('.page-content').forEach(e=>e.classList.remove('active'));document.getElementById('view-'+p).classList.add('active');if(p==='perf')renderIPE();if(p==='trading')renderMarket();}
+        function renderIPE(){const ctx=document.getElementById('ipeChart').getContext('2d');new Chart(ctx,{type:'line',data:{labels:['J','F','M','A','M','J'],datasets:[{label:'Cible',data:[135,135,135,135,135,135],borderColor:'#10B981'},{label:'Réel',data:[145,142,138,140,142,139],borderColor:'#00E5FF'}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{display:false},y:{grid:{color:'#222'}}}}});}
+        function renderMarket(){const ctx=document.getElementById('marketChart').getContext('2d');new Chart(ctx,{type:'line',data:{labels:['J','F','M','A','M','J'],datasets:[{label:'Spot',data:[90,85,80,60,50,45],borderColor:'#F59E0B'}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{display:false},y:{display:false}}}});}
+    </script>
+</body>
+</html>

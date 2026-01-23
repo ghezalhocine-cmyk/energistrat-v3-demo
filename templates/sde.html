@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>ENERGISTRAT V3 | SDE Ultimate</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { theme: { extend: { colors: { abysse:'#050505', card:'#0F172A', sde:'#10B981', cyan:'#00E5FF', market:'#F59E0B' }, borderRadius: { 'bento':'2rem' }, boxShadow: { 'neon':'0 0 20px rgba(16,185,129,0.25)' } } } }</script>
+    <style>body { background: #050505; color: white; height: 100vh; overflow: hidden; display: flex; } .bento-card { background: #0F172A; border: 1px solid rgba(255,255,255,0.05); transition: 0.3s; } .bento-card:hover { border-color: rgba(16, 185, 129, 0.5); transform: translateY(-2px); z-index: 10; } .nav-item.active { background: rgba(16, 185, 129, 0.1); border-right: 3px solid #10B981; color: white; } .page-content { display: none; } .page-content.active { display: grid; }</style>
+</head>
+<body class="font-sans">
+    <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col justify-between h-full z-50">
+        <div>
+            <div class="p-6 flex items-center gap-3"><div class="w-10 h-10 rounded-full border-2 border-sde flex items-center justify-center bg-abysse text-sde font-bold shadow-neon">SDE</div><div><div class="font-black text-lg">TERRITOIRE</div><div class="text-[9px] text-gray-400">20 000 Sites</div></div></div>
+            <nav class="mt-4 flex flex-col">
+                <button onclick="navTo('supervision')" id="btn-supervision" class="nav-item active w-full text-left px-6 py-4 text-xs font-bold uppercase">1. Supervision</button>
+                <button onclick="navTo('etudes')" id="btn-etudes" class="nav-item w-full text-left px-6 py-4 text-xs font-bold uppercase">2. Bureau d'Études</button>
+                <button onclick="navTo('marches')" id="btn-marches" class="nav-item w-full text-left px-6 py-4 text-xs font-bold uppercase">3. Marchés & Trading</button>
+                <button onclick="navTo('data')" id="btn-data" class="nav-item w-full text-left px-6 py-4 text-xs font-bold uppercase">4. Data Factory</button>
+            </nav>
+        </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col h-full bg-abysse relative overflow-hidden">
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20"><h2 id="page-title" class="text-3xl font-black text-white">Supervision</h2><div class="text-xs text-sde font-bold">142 GWh</div></header>
+        <main class="flex-1 overflow-y-auto p-8 scroll-smooth">
+            
+            <!-- SUPERVISION -->
+            <div id="view-supervision" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-8 bg-card rounded-bento p-1 bento-card h-[400px] relative"><div id="map" class="w-full h-full rounded-[1.8rem] opacity-80"></div></div>
+                <div class="col-span-4 bg-gradient-to-r from-card to-abysse border border-sde/30 rounded-bento p-6 bento-card"><h3 class="font-bold text-lg mb-4">🏆 Ligue des Maires</h3><div class="space-y-2"><div class="flex justify-between text-xs p-2 bg-white/5 rounded"><span>#1 Saint-Lys</span><span class="text-sde font-bold">-18%</span></div><div class="flex justify-between text-xs p-2 bg-white/5 rounded"><span>#2 Muret</span><span class="text-sde font-bold">-14%</span></div></div></div>
+            </div>
+
+            <!-- ETUDES -->
+            <div id="view-etudes" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-12 bg-card rounded-bento p-8 bento-card"><h3 class="font-bold text-xl mb-6">Analyse Spectrale (Heatmap)</h3><div class="w-full h-32 bg-gradient-to-r from-green-900 via-yellow-900 to-red-900 rounded-xl"></div><p class="text-xs text-gray-400 mt-2">Détection talons nocturnes</p></div>
+            </div>
+
+            <!-- MARCHES -->
+            <div id="view-marches" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-8 bg-card rounded-bento p-8 bento-card"><h3 class="font-bold text-xl mb-6">Salle de Marchés</h3><canvas id="marketChart" class="w-full h-64"></canvas></div>
+                <div class="col-span-4 bg-card border-t-4 border-market rounded-bento p-6 bento-card text-center flex flex-col justify-center"><h3 class="font-bold text-lg text-white mb-2">Générateur AO</h3><button class="bg-market text-abysse font-bold py-2 rounded-xl text-xs hover:bg-white">Créer DQE / BPU</button></div>
+            </div>
+
+            <!-- DATA -->
+            <div id="view-data" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-12 bg-abysse border border-dashed border-gray-600 rounded-bento p-12 text-center cursor-pointer hover:bg-white/5"><h3 class="font-bold text-white">Import de Masse (20k sites)</h3><p class="text-xs text-gray-500">CSV / XLS</p></div>
+            </div>
+        </main>
+    </div>
+    <script>
+        function navTo(p){document.querySelectorAll('.nav-item').forEach(e=>{e.classList.remove('active');e.classList.add('text-gray-400')});document.getElementById('btn-'+p).classList.add('active');document.getElementById('btn-'+p).classList.remove('text-gray-400');document.querySelectorAll('.page-content').forEach(e=>e.classList.remove('active'));document.getElementById('view-'+p).classList.add('active');if(p==='supervision')setTimeout(()=>map.invalidateSize(),100);if(p==='marches')renderMarket();}
+        const map = L.map('map', {zoomControl: false}).setView([43.6, 1.4], 9); L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map); L.circleMarker([43.6, 1.4], {color:'#10B981',radius:10}).addTo(map);
+        function renderMarket(){const ctx=document.getElementById('marketChart').getContext('2d');new Chart(ctx,{type:'line',data:{labels:['J','F','M','A','M','J'],datasets:[{label:'Spot',data:[90,85,80,60,50,45],borderColor:'#F59E0B'}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{display:false},y:{display:false}}}});}
+    </script>
+</body>
+</html>
