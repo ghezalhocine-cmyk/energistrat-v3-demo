@@ -1,34 +1,366 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Analyse IA</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-    <style>body{background:#050505;color:#00E5FF;font-family:'JetBrains Mono',monospace;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;}</style>
-</head>
-<body>
-    <div class="relative w-32 h-32 mb-8">
-        <div class="absolute inset-0 border-4 border-cyan-900 rounded-full"></div>
-        <div class="absolute inset-0 border-4 border-t-cyan-400 rounded-full animate-spin"></div>
-    </div>
-    <div class="text-xl font-bold mb-2 text-white">CORTEX<span class="text-cyan">.AI</span></div>
-    <div id="log" class="text-xs text-gray-500 h-6">Initialisation...</div>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ENERGISTRAT — Analyse CORTEX</title>
 
-    <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const role = urlParams.get('role') || 'citoyen';
-        const logs = ["Connexion SGE Enedis...", "Récupération 24 mois d'historique...", "Analyse des courbes de charge...", "Détection des anomalies...", "Génération du Dashboard..."];
-        let i = 0;
-        
-        setInterval(() => {
-            if(i < logs.length) {
-                document.getElementById('log').innerText = logs[i];
-                i++;
-            } else {
-                window.location.href = role + '.html';
-            }
-        }, 800);
-    </script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            abyss: "#050505",
+            cyan: {
+              400: "#00E5FF",
+              500: "#00B8CC",
+              900: "#004D55",
+            },
+            surface: "#0B0F14",
+            panel: "rgba(255,255,255,0.06)",
+            panel2: "rgba(255,255,255,0.04)",
+            stroke: "rgba(255,255,255,0.10)",
+          },
+          fontFamily: {
+            sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+          },
+          boxShadow: {
+            glow: "0 0 20px rgba(0, 229, 255, 0.15)",
+            "glow-strong": "0 0 30px rgba(0, 229, 255, 0.28)",
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: #050505;
+      color: #fff;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    /* Subtle grid background */
+    .bg-grid {
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: 44px 44px;
+      opacity: .15;
+      mask-image: radial-gradient(circle at 50% 20%, black 0%, transparent 70%);
+      -webkit-mask-image: radial-gradient(circle at 50% 20%, black 0%, transparent 70%);
+    }
+
+    /* Bento look */
+    .bento-card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      box-shadow:
+        0 10px 30px rgba(0,0,0,0.35),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-radius: 28px;
+    }
+
+    /* Step connector line */
+    .step-connector {
+      position: absolute;
+      left: 15px;
+      top: 2rem;
+      bottom: -1rem;
+      width: 2px;
+      background: rgba(255, 255, 255, 0.10);
+      z-index: 0;
+    }
+    .step-item:last-child .step-connector { display: none; }
+
+    /* CORTEX scanning animation */
+    @keyframes scan {
+      0% { transform: translateY(-120%); opacity: 0; }
+      40% { opacity: 1; }
+      100% { transform: translateY(120%); opacity: 0; }
+    }
+    .cortex-scan {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(to bottom, transparent, rgba(0, 229, 255, 0.22), transparent);
+      animation: scan 2.2s linear infinite;
+      pointer-events: none;
+    }
+
+    .hint { font-size: 11px; color: rgba(255,255,255,0.55); line-height: 1.4; }
+  </style>
+</head>
+
+<body class="flex flex-col items-center justify-center min-h-screen p-4 relative">
+
+  <!-- Background Ambience -->
+  <div class="fixed inset-0 bg-grid pointer-events-none -z-10"></div>
+  <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[900px] h-[520px] bg-cyan-400/10 blur-[130px] rounded-full pointer-events-none -z-10"></div>
+  <div class="fixed bottom-[-20%] right-[-10%] w-[520px] h-[520px] bg-blue-900/20 blur-[120px] rounded-full pointer-events-none -z-10"></div>
+
+  <main class="w-full max-w-lg">
+
+    <!-- CORTEX Identity -->
+    <div class="text-center mb-8">
+      <div class="relative inline-flex items-center justify-center w-20 h-20 mb-4 rounded-full bg-panel2 border border-cyan-500/30 shadow-glow-strong overflow-hidden">
+        <i class="fa-solid fa-brain text-3xl text-cyan-400 z-10"></i>
+        <div class="absolute inset-0 rounded-full border border-cyan-400/20 opacity-20 animate-ping"></div>
+        <div class="absolute inset-0">
+          <div class="cortex-scan"></div>
+        </div>
+      </div>
+
+      <h1 class="text-2xl font-extrabold tracking-tight">
+        CORTEX<span class="text-cyan-400">.AI</span>
+      </h1>
+      <p class="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">
+        Energy Manager IA — Tiers de Confiance
+      </p>
+
+      <p id="cortex-line" class="mt-3 text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
+        CORTEX analyse vos données (GRD, fournisseurs, marché, usages compteurs) pour détecter les anomalies
+        et produire des recommandations claires, éthiques et actionnables.
+      </p>
+    </div>
+
+    <!-- Processing Bento Card -->
+    <div class="bento-card p-8 relative overflow-hidden">
+
+      <!-- Dynamic Header -->
+      <div class="mb-6">
+        <h2 id="status-title" class="text-lg font-semibold text-white mb-1">Initialisation…</h2>
+        <p id="status-desc" class="text-sm text-gray-400">CORTEX établit la connexion sécurisée.</p>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="w-full bg-white/5 rounded-full h-1.5 mb-8 overflow-hidden">
+        <div id="progress-bar" class="bg-cyan-400 h-1.5 rounded-full transition-all duration-500 ease-out shadow-glow" style="width: 5%"></div>
+      </div>
+
+      <!-- Stepper -->
+      <div class="space-y-6 relative" id="stepper-container">
+
+        <div class="step-item relative flex gap-4" id="step-1">
+          <div class="step-connector"></div>
+          <div class="relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center transition-colors duration-300 icon-box">
+            <i class="fa-solid fa-circle text-[8px] text-gray-500"></i>
+          </div>
+          <div class="pt-1">
+            <h3 class="text-sm font-medium text-gray-400 transition-colors duration-300 label">Vérification des informations</h3>
+          </div>
+        </div>
+
+        <div class="step-item relative flex gap-4" id="step-2">
+          <div class="step-connector"></div>
+          <div class="relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center transition-colors duration-300 icon-box">
+            <i class="fa-solid fa-circle text-[8px] text-gray-500"></i>
+          </div>
+          <div class="pt-1">
+            <h3 class="text-sm font-medium text-gray-400 transition-colors duration-300 label">Connexion GRD & Patrimoine</h3>
+          </div>
+        </div>
+
+        <div class="step-item relative flex gap-4" id="step-3">
+          <div class="step-connector"></div>
+          <div class="relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center transition-colors duration-300 icon-box">
+            <i class="fa-solid fa-circle text-[8px] text-gray-500"></i>
+          </div>
+          <div class="pt-1">
+            <h3 class="text-sm font-medium text-gray-400 transition-colors duration-300 label">Analyse CORTEX (NAF / DJU / Marché / Usages)</h3>
+          </div>
+        </div>
+
+        <div class="step-item relative flex gap-4" id="step-4">
+          <div class="relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center transition-colors duration-300 icon-box">
+            <i class="fa-solid fa-circle text-[8px] text-gray-500"></i>
+          </div>
+          <div class="pt-1">
+            <h3 class="text-sm font-medium text-gray-400 transition-colors duration-300 label">Génération du premier audit</h3>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Completion Actions -->
+      <div id="completion-actions" class="hidden mt-8 text-center">
+        <button onclick="goToDashboard()"
+          class="w-full py-3 bg-cyan-400 hover:bg-cyan-500 text-abyss font-extrabold rounded-xl shadow-glow transition-all mb-3 flex items-center justify-center gap-2">
+          <span>Accéder au dashboard maintenant</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+
+        <button onclick="goBackOnboarding()"
+          class="w-full py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all flex items-center justify-center gap-2">
+          <i class="fa-solid fa-arrow-left"></i>
+          <span>Retour onboarding</span>
+        </button>
+
+        <div class="text-xs text-gray-500 mt-3">Redirection automatique dans quelques secondes…</div>
+      </div>
+
+    </div>
+
+    <!-- Reassurance Footer -->
+    <div class="mt-6 text-center px-4">
+      <div class="flex items-center justify-center gap-2 text-gray-500 text-xs mb-2">
+        <i class="fa-solid fa-shield-halved text-cyan-400"></i>
+        <span class="uppercase tracking-wide font-semibold">Sécurité & Confidentialité</span>
+      </div>
+
+      <p id="legal-text" class="text-[11px] text-gray-400 leading-relaxed max-w-md mx-auto"></p>
+
+      <div class="mt-3 grid grid-cols-2 gap-2 max-w-md mx-auto">
+        <div class="bento-card px-3 py-2 text-left">
+          <div class="text-[10px] text-gray-400 uppercase tracking-wider">Réassurance</div>
+          <div class="text-xs text-white font-semibold mt-1">Aucun changement de fournisseur</div>
+          <div class="hint mt-1">ENERGISTRAT n’effectue aucun basculement automatique.</div>
+        </div>
+        <div class="bento-card px-3 py-2 text-left">
+          <div class="text-[10px] text-gray-400 uppercase tracking-wider">Contrôle</div>
+          <div class="text-xs text-white font-semibold mt-1">Consentement révocable</div>
+          <div class="hint mt-1">Vous pouvez le retirer à tout moment.</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // --- 1) Role Detection ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const role = (urlParams.get("role") || "citizen").toLowerCase();
+
+    // --- 2) Role Configuration ---
+    const config = {
+      citizen: {
+        title: "Analyse Résidentielle",
+        step2: "Connexion GRD (Enedis / GRDF) — PDL/PCE",
+        legal:
+          "Conformité RGPD stricte. Vos données sont chiffrées et utilisées uniquement pour l’audit demandé. " +
+          "Aucun changement de fournisseur. Consentement révocable à tout moment.",
+        redirect: "dashboard.html?role=citizen",
+      },
+      pme: {
+        title: "Audit Pro — Industrie & Tertiaire",
+        step2: "Connexion GRD (Enedis / GRDF) + import patrimoine (CSV/XLSX)",
+        legal:
+          "Conformité RGPD stricte. Aucun changement de fournisseur. Consentement révocable à tout moment. " +
+          "Données professionnelles conservées jusqu’à 5 ans afin de garantir la qualité, la traçabilité et la conformité des audits réglementaires.",
+        redirect: "dashboard.html?role=pme",
+      },
+      public: {
+        title: "Audit Collectivité — Patrimoine",
+        step2: "Connexion GRD (Enedis / GRDF) + import patrimoine (CSV/XLSX)",
+        legal:
+          "Conformité RGPD stricte. Aucun changement de fournisseur. Consentement révocable à tout moment. " +
+          "Données publiques conservées jusqu’à 5 ans afin d’assurer la qualité et la traçabilité des audits réglementaires.",
+        redirect: "dashboard.html?role=public",
+      },
+    };
+
+    const currentConfig = config[role] || config.citizen;
+
+    // Apply dynamic texts
+    document.querySelector("#step-2 .label").innerText = currentConfig.step2;
+    document.getElementById("legal-text").innerText = currentConfig.legal;
+
+    // --- 3) Scenario Engine ---
+    const steps = [
+      { id: "step-1", delay: 500,  text: "Vérification des données & cohérence du périmètre…", icon: "fa-check" },
+      { id: "step-2", delay: 3200, text: "Connexion sécurisée aux sources (GRD, fournisseurs, imports)…", icon: "fa-network-wired" },
+      { id: "step-3", delay: 6600, text: "CORTEX détecte anomalies & écarts (usages, marché, NAF/DJU)…", icon: "fa-microchip" },
+      { id: "step-4", delay: 9600, text: "Génération du premier audit & préparation du dashboard…", icon: "fa-file-contract" },
+    ];
+
+    const totalTime = 11000; // 11s total simulation
+    let startTime = Date.now();
+
+    function updateProgress() {
+      const now = Date.now();
+      const elapsed = now - startTime;
+      const percent = Math.min((elapsed / totalTime) * 100, 100);
+      document.getElementById("progress-bar").style.width = percent + "%";
+
+      if (percent < 100) requestAnimationFrame(updateProgress);
+      else finishProcess();
+    }
+
+    function setStepStatus(stepId, status) {
+      const el = document.getElementById(stepId);
+      const iconBox = el.querySelector(".icon-box");
+      const icon = iconBox.querySelector("i");
+      const label = el.querySelector(".label");
+
+      if (status === "active") {
+        iconBox.className =
+          "relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-cyan-900/30 border border-cyan-400 flex items-center justify-center transition-colors duration-300 icon-box shadow-glow";
+        icon.className = "fa-solid fa-circle-notch fa-spin text-cyan-400 text-xs";
+        label.className = "text-sm font-semibold text-white transition-colors duration-300 label";
+      } else if (status === "done") {
+        iconBox.className =
+          "relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-cyan-400 border border-cyan-400 flex items-center justify-center transition-colors duration-300 icon-box";
+        icon.className = "fa-solid fa-check text-abyss text-sm";
+        label.className = "text-sm font-medium text-gray-300 transition-colors duration-300 label";
+      }
+    }
+
+    function runScenario() {
+      requestAnimationFrame(updateProgress);
+
+      steps.forEach((step, index) => {
+        setTimeout(() => {
+          if (index > 0) setStepStatus(steps[index - 1].id, "done");
+          setStepStatus(step.id, "active");
+
+          document.getElementById("status-title").innerText = currentConfig.title;
+          document.getElementById("status-desc").innerText = step.text;
+        }, step.delay);
+      });
+
+      setTimeout(() => {
+        setStepStatus("step-4", "done");
+        document.getElementById("status-title").innerText = "Analyse terminée";
+        document.getElementById("status-desc").innerText = "Votre audit est prêt. Ouverture du dashboard…";
+        document.getElementById("status-desc").classList.add("text-cyan-400");
+      }, totalTime);
+    }
+
+    // --- 4) Finish + Redirect ---
+    function finishProcess() {
+      document.getElementById("stepper-container").classList.add("opacity-60", "blur-[1px]", "transition-all");
+      document.getElementById("completion-actions").classList.remove("hidden");
+
+      // Auto redirect safety net
+      setTimeout(() => {
+        goToDashboard();
+      }, 2500);
+    }
+
+    function goToDashboard() {
+      window.location.href = currentConfig.redirect;
+    }
+
+    function goBackOnboarding() {
+      window.location.href = `onboarding.html?role=${encodeURIComponent(role)}`;
+    }
+
+    window.onload = runScenario;
+  </script>
 </body>
 </html>

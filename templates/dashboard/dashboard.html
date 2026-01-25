@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | Client Dashboard</title>
+    
+    <!-- Link to CSS -->
+    <link rel="stylesheet" href="../static/css/style.css">
+</head>
+<body>
+
+<div id="app-container">
+    <!-- 1. SIDEBAR -->
+    <nav class="sidebar">
+        <div class="logo-area">E3</div>
+        <div class="nav-item active" onclick="app.ui.switchTab('overview')" title="Vue d'ensemble">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        </div>
+        <div class="nav-item" onclick="app.ui.switchTab('conso')" title="Consommation & Budget">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        </div>
+        <div class="nav-item" onclick="app.ui.switchTab('assets')" title="Patrimoine Multi-sites">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4 8 4v14"/><path d="M13 21V11"/></svg>
+        </div>
+        <div class="nav-item" onclick="app.ui.switchTab('broker')" title="Comparatif & Éthique">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8l-4 4-4-4"/><path d="M12 16V8"/></svg>
+        </div>
+        <div class="nav-item" id="nav-rse" onclick="app.ui.switchTab('rse')" title="RSE & Réglementaire">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.74 5.88-5.74 5.88-5.74-5.88z"/><path d="M2 22h20"/></svg>
+        </div>
+        <div class="nav-item" id="nav-game" onclick="app.ui.switchTab('game')" title="Challenges">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        </div>
+    </nav>
+
+    <!-- 2. MAIN CONTENT -->
+    <main class="main-content">
+        <header class="header">
+            <h1 id="page-title">Vue d'ensemble</h1>
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <!-- DEV TOOL: Profile Switcher -->
+                <select id="profile-select" class="profile-switcher" onchange="app.profiles.setProfile(this.value)">
+                    <option value="PME">Profil : PME / Industrie</option>
+                    <option value="OPH">Profil : OPH / Bailleur</option>
+                    <option value="PARTICULIER">Profil : Particulier</option>
+                </select>
+                <div class="user-profile">
+                    <div style="width: 35px; height: 35px; background: #fff; border-radius: 50%;"></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- TAB 1: OVERVIEW -->
+        <div id="tab-overview" class="tab-content active">
+            <div class="bento-grid">
+                <div class="bento-card col-span-1">
+                    <div class="card-title">Volume Annuel</div>
+                    <div class="card-value" id="kpi-volume">482 <span style="font-size:1rem; color:var(--c-text-muted)">MWh</span></div>
+                    <div class="card-sub trend-up">+2.4% vs N-1</div>
+                </div>
+                <div class="bento-card col-span-1">
+                    <div class="card-title" id="lbl-budget">Budget Annuel</div>
+                    <div class="card-value" id="kpi-budget">92.4 <span style="font-size:1rem; color:var(--c-text-muted)">k€</span></div>
+                    <div class="card-sub trend-down">-5% vs Prévisionnel</div>
+                </div>
+                <div class="bento-card col-span-1" style="border:1px solid var(--c-success);">
+                    <div class="card-title">Positionnement Prix</div>
+                    <div class="card-value" style="color:var(--c-success)">Optimal</div>
+                    <div class="card-sub">Sous la moyenne marché</div>
+                </div>
+                <div class="bento-card col-span-1" style="background: linear-gradient(135deg, var(--c-abysse-light) 0%, rgba(0,229,255,0.1) 100%);">
+                    <div class="card-title" id="lbl-compliance">Score RSE</div>
+                    <div class="card-value" id="kpi-compliance">B+</div>
+                    <div class="card-sub" id="sub-compliance">Conforme Décret Tertiaire</div>
+                </div>
+                <div class="bento-card col-span-2 row-span-2">
+                    <div class="card-title">Évolution Consommation</div>
+                    <div class="bar-chart" id="overview-chart"></div>
+                </div>
+                <div class="bento-card col-span-2">
+                    <div class="card-title">Actions Prioritaires</div>
+                    <table class="data-table" id="alerts-table"></table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: CONSO -->
+        <div id="tab-conso" class="tab-content">
+            <div class="bento-grid">
+                <div class="bento-card col-span-4" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 1rem 1.5rem;">
+                    <div style="display:flex; gap:1rem;">
+                        <button class="action-btn" style="padding:0.5rem 1rem; width:auto;">Électricité</button>
+                        <button class="action-btn secondary" style="padding:0.5rem 1rem; width:auto;">Gaz</button>
+                    </div>
+                </div>
+                <div class="bento-card col-span-3 row-span-2">
+                    <div class="card-title">Analyse Budget vs Réel</div>
+                    <div class="bar-chart" id="budget-chart" style="height: 250px;"></div>
+                </div>
+                <div class="bento-card col-span-1">
+                    <div class="card-title">Benchmark Prix</div>
+                    <div style="margin-top:1rem; display:flex; flex-direction:column; gap:0.8rem;" id="benchmark-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: ASSETS -->
+        <div id="tab-assets" class="tab-content">
+            <div class="bento-grid">
+                <div class="bento-card col-span-4">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div class="card-title">Patrimoine (<span id="asset-count">3</span> <span id="asset-label">Sites</span>)</div>
+                        <button class="action-btn secondary" style="width:auto; padding:0.5rem 1rem; font-size:0.8rem;">+ Import CSV</button>
+                    </div>
+                    <table class="data-table" id="assets-table">
+                        <thead><tr id="assets-header"></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: BROKER -->
+        <div id="tab-broker" class="tab-content">
+            <div class="bento-grid">
+                <div class="bento-card col-span-2">
+                    <div class="card-title">Votre Contrat</div>
+                    <div style="font-size:2rem; font-weight:bold; margin:1rem 0;" id="contract-status">Excellente Position</div>
+                    <p style="font-size:0.9rem; color:var(--c-text-muted); line-height:1.5;" id="contract-details">Prix fixe sécurisé.</p>
+                    <div class="action-btn" style="background:rgba(16, 185, 129, 0.1); border:1px solid var(--c-success); color:var(--c-success); pointer-events:none; margin-top:auto;">
+                        RECOMMANDATION : NE PAS CHANGER
+                    </div>
+                </div>
+                <div class="bento-card col-span-2">
+                    <div class="card-title">Transparence Rémunération</div>
+                    <div style="margin-top:1rem; display:flex; justify-content:space-between; padding:1rem; background:rgba(255,255,255,0.05); border-radius:1rem;">
+                        <span>Commission ENERGISTRAT</span>
+                        <span style="font-weight:bold;">0.5 € / MWh</span>
+                    </div>
+                    <div style="text-align:right; font-size:0.8rem; color:var(--c-text-muted); margin-top:0.5rem;">
+                        Modèle rémunéré par le fournisseur, transparent pour vous.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: RSE -->
+        <div id="tab-rse" class="tab-content">
+            <div class="bento-grid">
+                <div class="bento-card col-span-4">
+                    <div class="card-title">Conformité & Carbone</div>
+                    <div style="margin-top:1rem; padding:2rem; text-align:center; border:1px dashed var(--c-text-muted); border-radius:1rem; color:var(--c-text-muted);">
+                        Module Décret Tertiaire / CSRD connecté à OPERAT.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 6: GAMIFICATION -->
+        <div id="tab-game" class="tab-content">
+            <div class="bento-card col-span-4" style="background: linear-gradient(to right, var(--c-abysse-light), #003366);">
+                <div class="card-title" id="game-title">Challenge Inter-Sites</div>
+                <h2 style="margin: 1rem 0;" id="game-desc">Qui baissera le plus sa consommation ?</h2>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 3. CORTEX PANEL -->
+    <aside class="cortex-panel">
+        <div class="cortex-header">
+            <div class="cortex-avatar"></div>
+            <div>
+                <div style="font-weight:bold; color:var(--c-cyan);">CORTEX</div>
+                <div style="font-size:0.75rem; color:var(--c-text-muted);">IA Énergétique Active</div>
+            </div>
+        </div>
+        <div class="cortex-content" id="cortex-messages"></div>
+        <button class="action-btn" id="btn-report">Générer Rapport PDF</button>
+    </aside>
+</div>
+
+<!-- SCRIPTS: Order is critical -->
+<script src="../static/js/data.mock.js"></script>
+<script src="../static/js/profiles.js"></script>
+<script src="../static/js/cortex.js"></script>
+<script src="../static/js/ui.js"></script>
+<script src="../static/js/main.js"></script>
+
+</body>
+</html>
