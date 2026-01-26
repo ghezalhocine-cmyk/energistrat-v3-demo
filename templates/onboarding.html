@@ -1,127 +1,730 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>ENERGISTRAT V3 - Onboarding</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ENERGISTRAT V3 - Onboarding</title>
 
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-<style>
-body{background:#050505;color:#fff;font-family:Inter,sans-serif}
-.step-container{display:none}
-.step-container.active{display:block}
-</style>
+  <!-- FontAwesome pour les icônes -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    /* Base Dark Mode & Font */
+    body {
+      background-color: #050505;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* Couleurs Charte */
+    .bg-abysse { background-color: #0F172A; }
+    .bg-abysse-light { background-color: #1E293B; }
+    .text-cyan { color: #00E5FF; }
+    .border-cyan { border-color: #00E5FF; }
+    .bg-cyan { background-color: #00E5FF; }
+
+    /* Input Styles */
+    .input-bento {
+      width: 100%;
+      background-color: #1E293B;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.75rem;
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+      transition: all 0.3s ease;
+      outline: none;
+    }
+    .input-bento:focus {
+      border-color: #00E5FF;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.1);
+    }
+
+    /* Animations */
+    .step-container {
+      display: none;
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+    .step-container.active { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Loader Scan */
+    .scan-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: #00E5FF;
+      box-shadow: 0 0 10px #00E5FF;
+      animation: scanMove 1.5s infinite linear;
+      display: none;
+    }
+    @keyframes scanMove {
+      0% { top: 0; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    .hint {
+      font-size: 10px;
+      color: rgba(255,255,255,0.45);
+      line-height: 1.3;
+    }
+  </style>
 </head>
 
-<body class="flex items-center justify-center min-h-screen p-4">
+<body>
 
-<div class="w-full max-w-md bg-[#0F172A] p-8 rounded-3xl border border-white/10">
+  <!-- Main Card Bento -->
+  <div class="relative w-full max-w-md p-8 bg-abysse rounded-[2rem] border border-white/10 shadow-2xl">
 
-<!-- HEADER -->
-<div class="text-center mb-6">
-  <h1 id="header-title" class="text-2xl font-black">Espace Énergie</h1>
-  <p class="text-xs text-gray-400">Connexion sécurisée & Audit</p>
-</div>
+    <!-- Header Dynamique -->
+    <div class="text-center mb-6">
+      <div id="header-icon" class="text-4xl mb-2 text-cyan drop-shadow-[0_0_10px_rgba(0,229,255,0.4)]">⚡</div>
+      <h1 id="header-title" class="text-2xl font-black tracking-tight">Espace Énergie</h1>
+      <p id="header-subtitle" class="text-gray-400 text-xs mt-1">Connexion sécurisée & Audit</p>
 
-<!-- STEP 0 : CHOIX PROFIL -->
-<div id="step-0" class="step-container active">
-  <h2 class="font-bold text-center mb-4">Choisissez votre espace</h2>
+      <!-- Progress Bar -->
+      <div class="w-full bg-white/5 h-1 rounded-full mt-4 overflow-hidden">
+        <div id="progress-bar" class="bg-cyan h-full w-[10%] transition-all duration-500"></div>
+      </div>
+    </div>
 
-  <button onclick="selectRole('pme')" class="w-full mb-3 p-4 rounded-xl bg-[#1E293B] border border-white/10">
-    PME / Industrie
-  </button>
+    <!-- STEP 0 : CHOIX DU PROFIL (si role absent) -->
+    <div id="step-0" class="step-container">
+      <h2 class="text-lg font-bold mb-2 text-center">Choisissez votre espace</h2>
+      <p class="text-xs text-gray-400 text-center mb-6">
+        Pour afficher le bon parcours (SIRET ou PDL/PCE) et sécuriser le consentement.
+      </p>
 
-  <button onclick="selectRole('public')" class="w-full mb-3 p-4 rounded-xl bg-[#1E293B] border border-white/10">
-    Collectivité / OPH
-  </button>
+      <div class="grid grid-cols-1 gap-3">
 
-  <button onclick="selectRole('citizen')" class="w-full p-4 rounded-xl bg-[#1E293B] border border-white/10">
-    Particulier
-  </button>
-</div>
+        <!-- PME / Industrie -->
+        <button onclick="selectRole('pme')"
+          class="w-full text-left bg-abysse-light border border-white/10 hover:border-cyan-400/40 rounded-2xl p-5 transition group">
+          <div class="flex items-start gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400/20 to-blue-600/20
+                        flex items-center justify-center border border-cyan-400/30 text-cyan-300 text-2xl">
+              <i class="fa-solid fa-chart-line"></i>
+            </div>
+            <div>
+              <div class="font-extrabold text-white text-base">PME / Industrie</div>
+              <div class="text-xs text-gray-400 mt-1 leading-relaxed">
+                Pilotage énergétique avancé • SIRET • mono / multi-sites<br>
+                <span class="text-gray-500">
+                  Données conservées jusqu’à <strong>5 ans</strong> pour garantir la qualité des audits réglementaires
+                  (ISO 50001, obligations contractuelles).
+                </span>
+              </div>
+            </div>
+          </div>
+        </button>
 
-<!-- STEP 1 AUTH -->
-<div id="step-1" class="step-container">
-  <button onclick="nextStep(2)" class="w-full mt-6 bg-cyan-400 text-black font-bold py-3 rounded-xl">
-    Se connecter
-  </button>
-</div>
+        <!-- Collectivité / OPH -->
+        <button onclick="selectRole('mairie')"
+          class="w-full text-left bg-abysse-light border border-white/10 hover:border-cyan-400/40 rounded-2xl p-5 transition group">
+          <div class="flex items-start gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-indigo-600/20
+                        flex items-center justify-center border border-purple-400/30 text-purple-300 text-2xl">
+              <i class="fa-solid fa-building-columns"></i>
+            </div>
+            <div>
+              <div class="font-extrabold text-white text-base">Collectivité / OPH</div>
+              <div class="text-xs text-gray-400 mt-1 leading-relaxed">
+                Patrimoine multi-sites • import CSV/XLSX • décret tertiaire<br>
+                <span class="text-gray-500">
+                  Historique conservé <strong>jusqu’à 5 ans</strong> pour le suivi réglementaire
+                  et la traçabilité des audits publics.
+                </span>
+              </div>
+            </div>
+          </div>
+        </button>
 
-<!-- STEP 2 CHOIX MÉTHODE -->
-<div id="step-2" class="step-container">
-  <h2 class="font-bold text-center mb-4">Méthode</h2>
-  <button onclick="nextStep(3)" class="w-full p-3 bg-[#1E293B] rounded-xl">Saisie manuelle</button>
-</div>
+        <!-- Particulier -->
+        <button onclick="selectRole('citoyen')"
+          class="w-full text-left bg-abysse-light border border-white/10 hover:border-cyan-400/40 rounded-2xl p-5 transition group">
+          <div class="flex items-start gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400/20 to-cyan-500/20
+                        flex items-center justify-center border border-emerald-400/30 text-emerald-300 text-2xl">
+              <i class="fa-solid fa-house-signal"></i>
+            </div>
+            <div>
+              <div class="font-extrabold text-white text-base">Particulier</div>
+              <div class="text-xs text-gray-400 mt-1 leading-relaxed">
+                Analyse simplifiée • PDL / PCE • consentement sécurisé<br>
+                <span class="text-gray-500">
+                  Données utilisées uniquement pour l’audit demandé.
+                </span>
+              </div>
+            </div>
+          </div>
+        </button>
 
-<!-- STEP 3 DONNÉES -->
-<div id="step-3" class="step-container">
-  <input id="input-email-holder" placeholder="Email titulaire" class="w-full p-3 rounded-xl mb-3 bg-[#1E293B]">
-  <input id="input-zip" placeholder="Code Postal" class="w-full p-3 rounded-xl mb-3 bg-[#1E293B]">
-  <button onclick="nextStep(4)" class="w-full py-3 bg-white text-black rounded-xl font-bold">Suivant</button>
-</div>
+      </div>
 
-<!-- STEP 4 CONSENTEMENT -->
-<div id="step-4" class="step-container">
-  <label class="flex gap-2 text-xs text-gray-400">
-    <input type="checkbox" id="consent-check">
-    J'autorise ENERGISTRAT à accéder aux données GRD
-  </label>
+      <p class="text-center text-[10px] text-gray-500 mt-6 leading-relaxed">
+        Les données professionnelles et publiques sont conservées jusqu’à 5 ans afin de garantir la continuité et la conformité des audits énergétiques.
+      </p>
 
-  <button onclick="submitFinal()" class="w-full mt-6 py-3 bg-cyan-400 text-black rounded-xl font-black">
-    Lancer l'audit
-  </button>
-</div>
+      <p class="text-center text-[10px] text-gray-500 mt-4">
+        Déjà inscrit ? <a href="./index.html" class="text-cyan underline">Se connecter</a>
+      </p>
+    </div>
 
-</div>
+    <!-- STEP 1 : AUTHENTIFICATION -->
+    <div id="step-1" class="step-container active">
+      <div class="space-y-3">
+        <!-- Social Login -->
+        <button class="w-full flex items-center justify-center gap-3 bg-white text-black font-bold py-3 rounded-xl hover:bg-gray-100 transition">
+          <i class="fab fa-google text-lg"></i> Continuer avec Google
+        </button>
 
-<script>
-let currentRole = null;
-let currentStep = 0;
+        <!-- Microsoft (Pro only logic via JS) -->
+        <button id="btn-microsoft" class="w-full flex items-center justify-center gap-3 bg-[#2F2F2F] text-white font-bold py-3 rounded-xl border border-white/10 hover:bg-[#3F3F3F] transition hidden">
+          <i class="fab fa-microsoft text-lg text-[#00A4EF]"></i> Microsoft Entra ID
+        </button>
 
-function showStep(step){
-  document.querySelectorAll('.step-container').forEach(s=>s.classList.remove('active'));
-  document.getElementById(`step-${step}`).classList.add('active');
-  currentStep = step;
-}
+        <!-- Apple (Citizen only logic via JS) -->
+        <button id="btn-apple" class="w-full flex items-center justify-center gap-3 bg-black text-white font-bold py-3 rounded-xl border border-white/10 hover:bg-gray-900 transition hidden">
+          <i class="fab fa-apple text-lg"></i> Continuer avec Apple
+        </button>
 
-function nextStep(step){ showStep(step); }
+        <div class="relative py-2">
+          <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-white/10"></div></div>
+          <div class="relative flex justify-center text-xs uppercase"><span class="bg-abysse px-2 text-gray-500">Ou email</span></div>
+        </div>
 
-function selectRole(role){
-  currentRole = role;
-  showStep(1);
-}
+        <!-- Email Form -->
+        <div>
+          <input type="email" id="login-email" placeholder="Email professionnel ou personnel" class="input-bento mb-3">
+          <input type="password" id="login-password" placeholder="Mot de passe" class="input-bento">
+        </div>
+      </div>
 
-/* 🔥 FONCTION STRATÉGIQUE */
-function submitFinal(){
+      <button onclick="nextStep(2)" class="w-full mt-6 bg-cyan text-abysse font-black py-3 rounded-xl hover:scale-[1.02] transition shadow-[0_0_15px_rgba(0,229,255,0.3)]">
+        Se connecter
+      </button>
 
-  const consent = document.getElementById('consent-check').checked;
-  if(!consent){
-    alert("Consentement obligatoire.");
-    return;
-  }
+      <p class="text-center text-[10px] text-gray-500 mt-4">
+        Pas encore de compte ?
+        <a href="#" class="text-cyan underline" onclick="nextStep(2); return false;">S'inscrire</a>
+      </p>
+    </div>
 
-  const profilePayload = {
-    role: currentRole,
-    source: "onboarding",
-    consent: true,
-    email: document.getElementById('input-email-holder').value,
-    zip: document.getElementById('input-zip').value,
-    timestamp: Date.now()
-  };
+    <!-- STEP 2 : MÉTHODE DE SAISIE (SCAN vs MANUEL) -->
+    <div id="step-2" class="step-container">
+      <h2 class="text-lg font-bold mb-4 text-center">Comment souhaitez-vous procéder ?</h2>
 
-  // 🔹 stockage pour le dashboard & moteur IA
-  localStorage.setItem("energistrat_profile", JSON.stringify(profilePayload));
+      <div class="grid grid-cols-2 gap-4">
+        <!-- Option Scan -->
+        <div onclick="triggerScan()" class="cursor-pointer group relative bg-abysse-light border border-cyan/30 hover:border-cyan rounded-2xl p-4 text-center transition-all hover:-translate-y-1">
+          <div class="scan-line" id="scan-fx"></div>
+          <div class="w-12 h-12 bg-cyan/10 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-cyan/20">
+            <i class="fas fa-camera text-cyan text-xl"></i>
+          </div>
+          <h3 class="font-bold text-sm">Scanner ma facture</h3>
+          <p class="text-[10px] text-gray-400 mt-1">Recommandé • Rapide</p>
+          <input type="file" id="file-upload" class="hidden" accept="image/*,.pdf" onchange="simulateOCR()">
+        </div>
 
-  console.log("Profil prêt pour moteur IA:", profilePayload);
+        <!-- Option Manuel -->
+        <div onclick="nextStep(3)" class="cursor-pointer group bg-abysse-light border border-white/10 hover:border-white/30 rounded-2xl p-4 text-center transition-all hover:-translate-y-1">
+          <div class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-white/10">
+            <i class="fas fa-pen text-gray-300 text-xl"></i>
+          </div>
+          <h3 class="font-bold text-sm">Saisie manuelle</h3>
+          <p class="text-[10px] text-gray-400 mt-1">Classique</p>
+        </div>
+      </div>
 
-  // 🔹 redirection processing
-  window.location.href = `processing.html?role=${encodeURIComponent(currentRole)}`;
-}
+      <div id="ocr-loading" class="hidden mt-6 text-center">
+        <i class="fas fa-circle-notch fa-spin text-cyan text-2xl mb-2"></i>
+        <p class="text-xs text-gray-400">Analyse IA de votre facture...</p>
+      </div>
 
-showStep(0);
-</script>
+      <button onclick="prevStep(1)" class="text-xs text-gray-500 mt-6 w-full hover:text-white">Retour</button>
+    </div>
+
+    <!-- STEP 3 : TITULAIRE & DONNÉES -->
+    <div id="step-3" class="step-container">
+      <h2 class="text-lg font-bold mb-1 text-center">Titulaire de la facture</h2>
+      <p class="text-xs text-gray-400 text-center mb-6">Nécessaire pour le consentement légal GRD (Enedis / GRDF).</p>
+
+      <div class="space-y-4">
+
+        <!-- Bloc PRO -->
+        <div id="form-pro" class="hidden space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <input type="text" id="holder-firstname-pro" placeholder="Prénom du signataire" class="input-bento">
+            <input type="text" id="holder-lastname-pro" placeholder="Nom du signataire" class="input-bento">
+          </div>
+
+          <div class="flex gap-2">
+            <input type="text" id="input-siret" placeholder="N° SIRET (14 chiffres)" class="input-bento flex-1">
+            <button onclick="autoFillSiret()" class="bg-abysse-light border border-white/10 px-3 rounded-xl text-xs hover:bg-white/5" title="Simuler l'API INSEE">⚡ Auto</button>
+          </div>
+
+          <input type="text" id="input-company" placeholder="Raison sociale (titulaire)" class="input-bento">
+
+          <div class="flex items-center gap-2 mt-2">
+            <input type="checkbox" id="multi-site" class="rounded bg-abysse-light border-white/10">
+            <label for="multi-site" class="text-xs text-gray-400">Multi-sites (upload CSV/XLSX à l’étape suivante)</label>
+          </div>
+
+          <p class="hint">Le consentement doit être donné par le titulaire de la facture ou une personne habilitée.</p>
+        </div>
+
+        <!-- Bloc CITOYEN -->
+        <div id="form-citizen" class="hidden space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <input type="text" id="input-pdl" placeholder="PDL (Électricité) – 14 chiffres" class="input-bento">
+            <input type="text" id="input-pce" placeholder="PCE (Gaz) – 14 chiffres" class="input-bento">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <input type="text" id="input-firstname" placeholder="Prénom titulaire" class="input-bento">
+            <input type="text" id="input-lastname" placeholder="Nom titulaire" class="input-bento">
+          </div>
+
+          <p class="hint">PDL/PCE se trouvent sur votre facture. Vous pouvez renseigner l’un, l’autre, ou les deux.</p>
+        </div>
+
+        <!-- Commun -->
+        <input type="email" id="input-email-holder" placeholder="Email du titulaire" class="input-bento">
+        <input type="text" id="input-zip" placeholder="Code Postal du site" class="input-bento">
+
+        <!-- Autorisation -->
+        <div class="bg-abysse-light/50 border border-white/10 rounded-2xl p-3">
+          <p class="text-[11px] text-gray-300 mb-2 font-semibold">Autorisation</p>
+          <label class="flex items-start gap-2 text-[11px] text-gray-400 cursor-pointer">
+            <input type="radio" name="auth_status" value="holder" class="mt-1" checked>
+            <span>Je suis le titulaire de la facture / du contrat.</span>
+          </label>
+          <label class="flex items-start gap-2 text-[11px] text-gray-400 cursor-pointer mt-2">
+            <input type="radio" name="auth_status" value="authorized" class="mt-1">
+            <span>Je suis habilité par le titulaire (ex : gestionnaire, DAF, chargé d’énergie).</span>
+          </label>
+        </div>
+
+      </div>
+
+      <div class="flex gap-3 mt-8">
+        <button onclick="prevStep(2)" class="w-1/3 bg-abysse-light text-white font-bold py-3 rounded-xl hover:bg-white/5 transition border border-white/10">Retour</button>
+        <button onclick="validateData()" class="w-2/3 bg-white text-black font-bold py-3 rounded-xl hover:scale-[1.02] transition">Suivant</button>
+      </div>
+    </div>
+
+    <!-- STEP 3B : UPLOAD MULTI-SITES -->
+    <div id="step-3b" class="step-container">
+      <h2 class="text-lg font-bold mb-1 text-center">Patrimoine multi-sites</h2>
+      <p class="text-xs text-gray-400 text-center mb-6">Importez un fichier CSV ou XLSX contenant vos PDL/PCE.</p>
+
+      <div class="bg-abysse-light border border-white/10 rounded-2xl p-4">
+        <div class="flex items-center gap-3 mb-3">
+          <i class="fas fa-file-upload text-cyan"></i>
+          <div>
+            <p class="text-sm font-bold">Upload CSV / XLSX</p>
+            <p class="hint">Colonnes recommandées : site_name, energy_type, pdl, pce, postal_code</p>
+          </div>
+        </div>
+
+        <input type="file" id="multi-upload" class="input-bento" accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+        <div class="mt-3 flex items-center justify-between gap-2">
+          <button onclick="downloadCsvTemplate()" class="w-1/2 bg-abysse-light text-white font-bold py-3 rounded-xl hover:bg-white/5 transition border border-white/10 text-xs">
+            Télécharger modèle CSV
+          </button>
+          <div class="w-1/2 text-right">
+            <span id="upload-status" class="text-[10px] text-gray-500">Aucun fichier sélectionné</span>
+          </div>
+        </div>
+
+        <p class="hint mt-2">MVP : l’analyse détaillée du fichier sera traitée côté backend (collecte & validation serveur).</p>
+      </div>
+
+      <div class="flex gap-3 mt-8">
+        <button onclick="prevStep(3)" class="w-1/3 bg-abysse-light text-white font-bold py-3 rounded-xl hover:bg-white/5 transition border border-white/10">Retour</button>
+        <button onclick="nextStep(4)" class="w-2/3 bg-white text-black font-bold py-3 rounded-xl hover:scale-[1.02] transition">Continuer</button>
+      </div>
+    </div>
+
+    <!-- STEP 4 : CONSENTEMENT + RÉCAP -->
+    <div id="step-4" class="step-container">
+      <div class="bg-cyan/10 border border-cyan/20 p-4 rounded-2xl mb-6">
+        <div class="flex items-start gap-3">
+          <i class="fas fa-shield-alt text-cyan mt-1"></i>
+          <div>
+            <h3 class="text-sm font-bold text-cyan mb-1">Consentement d’accès aux données</h3>
+            <p class="text-[10px] text-gray-300 leading-relaxed">
+              Je certifie être le titulaire du contrat/facture identifié précédemment ou être dûment habilité.
+              Ce consentement permet l’accès aux historiques de consommation via Enedis / GRDF uniquement pour réaliser l’audit demandé.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Récapitulatif -->
+      <div class="bg-abysse-light/60 border border-white/10 rounded-2xl p-4">
+        <h4 class="text-sm font-bold text-white mb-2">Récapitulatif</h4>
+        <div id="recap" class="text-[11px] text-gray-400 space-y-1"></div>
+      </div>
+
+      <label class="flex items-start gap-3 cursor-pointer group mt-5">
+        <div class="relative flex items-center">
+          <input type="checkbox" id="consent-check" class="peer h-5 w-5 cursor-pointer appearance-none rounded border border-white/20 bg-abysse-light checked:border-cyan checked:bg-cyan transition-all">
+          <i class="fas fa-check text-abysse absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 peer-checked:opacity-100 text-xs pointer-events-none"></i>
+        </div>
+        <span class="text-[11px] text-gray-400 leading-snug select-none group-hover:text-gray-300">
+          J'autorise <strong>ENERGISTRAT</strong> à collecter mes historiques de consommation auprès des gestionnaires de réseau
+          (<strong>Enedis</strong> / <strong>GRDF</strong>) afin de réaliser l'audit énergétique. <br>
+          <span class="italic text-gray-500">Consentement révocable à tout moment • Aucun mandat • Aucun changement de fournisseur automatique.</span>
+        </span>
+      </label>
+
+      <div class="flex gap-3 mt-8">
+        <button onclick="prevStep(getBackStepForConsent())" class="w-1/3 bg-abysse-light text-white font-bold py-3 rounded-xl hover:bg-white/5 transition border border-white/10">Retour</button>
+        <button onclick="submitFinal()" class="w-2/3 bg-cyan text-abysse font-black py-3 rounded-xl hover:scale-[1.02] transition shadow-[0_0_15px_rgba(0,229,255,0.3)]">
+          Lancer l'audit
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    /**
+     * IMPORTANT (GitHub Pages + structure actuelle)
+     * - onboarding.html est dans /templates/
+     * - processing.html est dans /templates/
+     * => toujours utiliser des chemins relatifs "./xxx.html"
+     */
+
+    // --- MODE DE REDIRECTION ---
+    // true  = après consentement -> page dédiée (pme.html, mairie.html, etc.)
+    // false = après consentement -> processing.html (puis processing redirige)
+    const REDIRECT_TO_DEDICATED_PAGE_AFTER_SUBMIT = false;
+
+    // --- CONFIG & RÔLES ---
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentRole = (urlParams.get('role') || '').toLowerCase(); // pas de défaut : étape 0 si absent
+    let currentStep = 1;
+
+    const roleConfig = {
+      // --- B2C ---
+      'citoyen': { title: 'Mon Foyer', icon: '🏠', type: 'citizen', landing: './citoyen.html' },
+      'citizen': { title: 'Mon Foyer', icon: '🏠', type: 'citizen', landing: './citoyen.html' }, // alias
+
+      // --- PRO / ENTREPRISES ---
+      'pme': { title: 'Espace Pro', icon: '🏭', type: 'pro', landing: './pme.html' },
+      'industry': { title: 'Industrie', icon: '🏭', type: 'pro', landing: './industry.html' },
+
+      // --- PUBLIC / TERRITOIRES ---
+      'mairie': { title: 'Mairie', icon: '🏛️', type: 'pro', landing: './mairie.html' },
+      'sde': { title: 'SDE', icon: '🌍', type: 'pro', landing: './sde.html' },
+      'oph': { title: 'OPH', icon: '🏘️', type: 'pro', landing: './oph.html' },
+      'public': { title: 'Collectivité', icon: '🏛️', type: 'pro', landing: './mairie.html' }, // alias
+
+      // --- IMMO / RESEAUX ---
+      'syndic': { title: 'Syndic', icon: '🏢', type: 'pro', landing: './syndic.html' },
+      'retail': { title: 'Retail', icon: '🛍️', type: 'pro', landing: './retail.html' },
+
+      // --- PARTNER / ADMIN ---
+      'supplier': { title: 'Fournisseur', icon: '⚡', type: 'pro', landing: './supplier.html' },
+      'ops': { title: 'Ops Interne', icon: '🚀', type: 'pro', landing: './ops.html' }
+    };
+
+    function setProgress(step) {
+      // step 0->10%, 1->30%, 2->50%, 3->70%, 3b->80%, 4->100%
+      const bar = document.getElementById('progress-bar');
+      const map = { 0: 10, 1: 30, 2: 50, 3: 70, '3b': 80, 4: 100 };
+      bar.style.width = (map[step] ?? 10) + '%';
+    }
+
+    function showStep(step) {
+      document.querySelectorAll('.step-container').forEach(el => el.classList.remove('active'));
+      const target = document.getElementById(`step-${step}`);
+      if (target) target.classList.add('active');
+      setProgress(step);
+      currentStep = step;
+    }
+
+    function init() {
+      if (!currentRole) {
+        // pas de rôle => choix profil
+        showStep(0);
+        return;
+      }
+
+      const config = roleConfig[currentRole] || roleConfig['pme'];
+      document.getElementById('header-title').innerText = config.title;
+      document.getElementById('header-icon').innerText = config.icon;
+
+      // reset affichages
+      document.getElementById('btn-microsoft').classList.add('hidden');
+      document.getElementById('btn-apple').classList.add('hidden');
+      document.getElementById('form-pro').classList.add('hidden');
+      document.getElementById('form-citizen').classList.add('hidden');
+
+      // Affichage selon profil
+      if (config.type === 'pro') {
+        document.getElementById('btn-microsoft').classList.remove('hidden');
+        document.getElementById('form-pro').classList.remove('hidden');
+      } else {
+        document.getElementById('btn-apple').classList.remove('hidden');
+        document.getElementById('form-citizen').classList.remove('hidden');
+      }
+
+      // démarrer sur auth
+      showStep(1);
+    }
+
+    function selectRole(role) {
+      currentRole = (role || '').toLowerCase();
+
+      // mise à jour URL (utile si refresh)
+      const u = new URL(window.location.href);
+      u.searchParams.set('role', currentRole);
+      window.history.replaceState({}, "", u.toString());
+
+      init();
+      showStep(1);
+    }
+
+    function nextStep(targetStep) { showStep(targetStep); }
+    function prevStep(targetStep) { showStep(targetStep); }
+
+    function getBackStepForConsent() {
+      const isPro = (roleConfig[currentRole]?.type === 'pro');
+      const multi = isPro && document.getElementById('multi-site')?.checked;
+      return multi ? '3b' : 3;
+    }
+
+    // --- SCAN / OCR (MOCK UX) ---
+    function triggerScan() {
+      document.getElementById('file-upload').click();
+    }
+
+    function simulateOCR() {
+      const scanFx = document.getElementById('scan-fx');
+      const loader = document.getElementById('ocr-loading');
+
+      scanFx.style.display = 'block';
+      loader.classList.remove('hidden');
+
+      setTimeout(() => {
+        scanFx.style.display = 'none';
+        loader.classList.add('hidden');
+        fillMockData();
+        nextStep(3);
+      }, 1500);
+    }
+
+    function fillMockData() {
+      const isPro = (roleConfig[currentRole]?.type === 'pro');
+
+      if (isPro) {
+        document.getElementById('holder-firstname-pro').value = "Camille";
+        document.getElementById('holder-lastname-pro').value = "Martin";
+        document.getElementById('input-siret').value = "80295478500025";
+        document.getElementById('input-company').value = "ACME Industries SAS";
+        document.getElementById('input-email-holder').value = "direction@acme.fr";
+        document.getElementById('input-zip').value = "75008";
+      } else {
+        document.getElementById('input-pdl').value = "12345678901234";
+        document.getElementById('input-pce').value = "";
+        document.getElementById('input-firstname').value = "Jean";
+        document.getElementById('input-lastname').value = "Dupont";
+        document.getElementById('input-email-holder').value = "jean.dupont@email.com";
+        document.getElementById('input-zip').value = "69002";
+      }
+    }
+
+    // --- VALIDATION ---
+    function digitsOnly(v) { return (v || '').replace(/\D/g, ''); }
+    function isLen14(v) { return digitsOnly(v).length === 14; }
+
+    function autoFillSiret() {
+      const siretInput = document.getElementById('input-siret');
+      siretInput.value = "80295478500025";
+      siretInput.classList.add('text-cyan');
+
+      setTimeout(() => {
+        document.getElementById('input-company').value = "ENERGISTRAT SOLUTIONS";
+        document.getElementById('input-zip').value = "33000";
+      }, 250);
+    }
+
+    function validateData() {
+      const isPro = (roleConfig[currentRole]?.type === 'pro');
+
+      const email = document.getElementById('input-email-holder').value.trim();
+      const zip = document.getElementById('input-zip').value.trim();
+
+      if (!email || !zip) {
+        alert("Merci de renseigner l'email du titulaire et le code postal du site.");
+        return;
+      }
+
+      if (isPro) {
+        const siret = document.getElementById('input-siret').value;
+        const fn = document.getElementById('holder-firstname-pro').value.trim();
+        const ln = document.getElementById('holder-lastname-pro').value.trim();
+
+        if (!fn || !ln) {
+          alert("Merci de renseigner le prénom et le nom du signataire (personne qui donne le consentement).");
+          return;
+        }
+
+        if (!isLen14(siret)) {
+          alert("Le SIRET doit contenir 14 chiffres.");
+          return;
+        }
+
+        const multi = document.getElementById('multi-site').checked;
+        if (multi) { nextStep('3b'); return; }
+
+        nextStep(4);
+        buildRecap();
+      } else {
+        const pdl = document.getElementById('input-pdl').value;
+        const pce = document.getElementById('input-pce').value;
+        const fn = document.getElementById('input-firstname').value.trim();
+        const ln = document.getElementById('input-lastname').value.trim();
+
+        if (!fn || !ln) {
+          alert("Merci de renseigner le prénom et le nom du titulaire.");
+          return;
+        }
+
+        const hasPDL = digitsOnly(pdl).length > 0;
+        const hasPCE = digitsOnly(pce).length > 0;
+
+        if (!hasPDL && !hasPCE) {
+          alert("Merci de renseigner au moins un identifiant : PDL (électricité) ou PCE (gaz).");
+          return;
+        }
+
+        if (hasPDL && !isLen14(pdl)) { alert("Le PDL doit contenir 14 chiffres."); return; }
+        if (hasPCE && !isLen14(pce)) { alert("Le PCE doit contenir 14 chiffres."); return; }
+
+        nextStep(4);
+        buildRecap();
+      }
+    }
+
+    // --- RÉCAP ---
+    function buildRecap() {
+      const isPro = (roleConfig[currentRole]?.type === 'pro');
+      const recap = document.getElementById('recap');
+
+      const email = document.getElementById('input-email-holder').value.trim();
+      const zip = document.getElementById('input-zip').value.trim();
+      const auth = document.querySelector('input[name="auth_status"]:checked')?.value || 'holder';
+
+      let rows = [];
+      rows.push(`<div><span class="text-gray-500">Profil :</span> <span class="text-white">${currentRole}</span></div>`);
+      rows.push(`<div><span class="text-gray-500">Email titulaire :</span> <span class="text-white">${email}</span></div>`);
+      rows.push(`<div><span class="text-gray-500">Code postal :</span> <span class="text-white">${zip}</span></div>`);
+      rows.push(`<div><span class="text-gray-500">Statut :</span> <span class="text-white">${auth === 'holder' ? 'Titulaire' : 'Habilité'}</span></div>`);
+
+      if (isPro) {
+        const siret = digitsOnly(document.getElementById('input-siret').value);
+        const company = document.getElementById('input-company').value.trim();
+        const signFN = document.getElementById('holder-firstname-pro').value.trim();
+        const signLN = document.getElementById('holder-lastname-pro').value.trim();
+        const multi = document.getElementById('multi-site').checked;
+
+        rows.push(`<div><span class="text-gray-500">Raison sociale :</span> <span class="text-white">${company || '—'}</span></div>`);
+        rows.push(`<div><span class="text-gray-500">SIRET :</span> <span class="text-white">${siret || '—'}</span></div>`);
+        rows.push(`<div><span class="text-gray-500">Signataire :</span> <span class="text-white">${signFN} ${signLN}</span></div>`);
+        rows.push(`<div><span class="text-gray-500">Multi-sites :</span> <span class="text-white">${multi ? 'Oui' : 'Non'}</span></div>`);
+        if (multi) {
+          const file = document.getElementById('multi-upload')?.files?.[0];
+          rows.push(`<div><span class="text-gray-500">Fichier :</span> <span class="text-white">${file ? file.name : 'Non sélectionné'}</span></div>`);
+          rows.push(`<div class="mt-2 text-[10px] text-gray-500">Conservation : données pro/publiques jusqu’à <strong>5 ans</strong> pour garantir la qualité des audits réglementaires.</div>`);
+        }
+      } else {
+        const pdl = digitsOnly(document.getElementById('input-pdl').value);
+        const pce = digitsOnly(document.getElementById('input-pce').value);
+        const fn = document.getElementById('input-firstname').value.trim();
+        const ln = document.getElementById('input-lastname').value.trim();
+
+        rows.push(`<div><span class="text-gray-500">Titulaire :</span> <span class="text-white">${fn} ${ln}</span></div>`);
+        if (pdl) rows.push(`<div><span class="text-gray-500">PDL :</span> <span class="text-white">${pdl}</span></div>`);
+        if (pce) rows.push(`<div><span class="text-gray-500">PCE :</span> <span class="text-white">${pce}</span></div>`);
+      }
+
+      recap.innerHTML = rows.join('');
+    }
+
+    // --- TEMPLATE CSV ---
+    function downloadCsvTemplate() {
+      const csv =
+`site_name,energy_type,pdl,pce,postal_code
+Site A,ELECTRICITY,12345678901234,,75008
+Site B,GAS,,12345678901234,69002`;
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "energistrat_template_sites.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Upload status
+    document.addEventListener('change', (e) => {
+      if (e.target && e.target.id === 'multi-upload') {
+        const file = e.target.files && e.target.files[0];
+        const status = document.getElementById('upload-status');
+        if (status) status.textContent = file ? `Fichier : ${file.name}` : "Aucun fichier sélectionné";
+      }
+    });
+
+    // --- FINAL SUBMIT ---
+    function submitFinal() {
+      const consent = document.getElementById('consent-check').checked;
+
+      if (!consent) {
+        alert("Le consentement RGPD/GRD est obligatoire pour accéder aux données de consommation.");
+        return;
+      }
+
+      const btn = document.querySelector('#step-4 button:last-child');
+      btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Traitement...';
+
+      const cfg = roleConfig[currentRole] || roleConfig['pme'];
+
+      setTimeout(() => {
+        if (REDIRECT_TO_DEDICATED_PAGE_AFTER_SUBMIT) {
+          // ✅ va direct vers la page dédiée (dans templates/)
+          window.location.href = `${cfg.landing}?role=${encodeURIComponent(currentRole || 'unknown')}`;
+        } else {
+          // ✅ passe par processing (dans templates/)
+          window.location.href = `./processing.html?role=${encodeURIComponent(currentRole || 'unknown')}`;
+        }
+      }, 900);
+    }
+
+    // Lancement
+    init();
+  </script>
 
 </body>
 </html>
