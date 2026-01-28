@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | Smart Living</title>
+    
+    <!-- LIBS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- CONFIG -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        abysse: '#050505',
+                        card: '#0F172A',
+                        fun: '#D946EF',    // Fushia Électrique
+                        gain: '#10B981',   // Vert Émeraude
+                        tech: '#00E5FF',   // Cyan
+                        alert: '#F43F5E'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    borderRadius: { 'bento': '2rem' },
+                    boxShadow: { 
+                        'neon-fun': '0 0 20px rgba(217, 70, 239, 0.25)',
+                        'neon-gain': '0 0 20px rgba(16, 185, 129, 0.25)'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #050505; color: white; overflow: hidden; }
+        
+        /* Glassmorphism */
+        .bento-card {
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .bento-card:hover {
+            border-color: rgba(217, 70, 239, 0.4);
+            transform: scale(1.01);
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5);
+        }
+
+        /* Navigation Tabs */
+        .nav-pill {
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+        .nav-pill.active {
+            background: rgba(217, 70, 239, 0.1);
+            border-color: #D946EF;
+            color: #D946EF;
+            box-shadow: 0 0 15px rgba(217, 70, 239, 0.2);
+        }
+
+        /* Animations */
+        .page-content { display: none; opacity: 0; animation: fadeUp 0.4s forwards; }
+        .page-content.active { display: grid; }
+        @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } from { opacity: 0; transform: translateY(10px); } }
+        
+        /* Custom Scroll */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    </style>
+</head>
+<body class="flex h-screen w-screen font-sans relative">
+
+    <!-- AMBIANCE -->
+    <div class="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-fun/10 rounded-full blur-[120px] pointer-events-none"></div>
+    <div class="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-tech/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+    <!-- SIDEBAR (Mobile First Logic: Hidden on small screens, simplified) -->
+    <aside class="w-20 lg:w-64 bg-[#020617]/80 backdrop-blur border-r border-white/5 flex flex-col justify-between z-50 transition-all duration-300">
+        <div class="p-6 flex flex-col items-center lg:items-start">
+            <div class="flex items-center gap-3 mb-10">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-fun to-purple-600 flex items-center justify-center text-white font-black shadow-neon-fun">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <div class="hidden lg:block">
+                    <h1 class="font-black text-lg tracking-tight">MY<span class="text-fun">.HOME</span></h1>
+                    <p class="text-[9px] text-gray-500 font-mono uppercase">Smart Living V3</p>
+                </div>
+            </div>
+            
+            <nav class="flex flex-col gap-4 w-full">
+                <button onclick="navTo('cockpit')" id="nav-cockpit" class="nav-pill active w-full p-3 rounded-2xl flex items-center justify-center lg:justify-start gap-4 text-gray-400 hover:text-white transition">
+                    <i class="fa-solid fa-rocket text-xl"></i>
+                    <span class="hidden lg:block font-bold text-sm">Mon Cockpit</span>
+                </button>
+                <button onclick="navTo('vitality')" id="nav-vitality" class="nav-pill w-full p-3 rounded-2xl flex items-center justify-center lg:justify-start gap-4 text-gray-400 hover:text-white transition">
+                    <i class="fa-solid fa-gamepad text-xl"></i>
+                    <span class="hidden lg:block font-bold text-sm">Vitality Game</span>
+                </button>
+                <button onclick="navTo('smarthome')" id="nav-smarthome" class="nav-pill w-full p-3 rounded-2xl flex items-center justify-center lg:justify-start gap-4 text-gray-400 hover:text-white transition">
+                    <i class="fa-solid fa-wifi text-xl"></i>
+                    <span class="hidden lg:block font-bold text-sm">Smart Home</span>
+                </button>
+                <button onclick="navTo('coach')" id="nav-coach" class="nav-pill w-full p-3 rounded-2xl flex items-center justify-center lg:justify-start gap-4 text-gray-400 hover:text-white transition">
+                    <i class="fa-solid fa-user-astronaut text-xl"></i>
+                    <span class="hidden lg:block font-bold text-sm">Coach Cortex</span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="p-6 hidden lg:block">
+            <div class="bg-gradient-to-r from-fun/20 to-card border border-fun/30 rounded-2xl p-4 text-center">
+                <div class="text-xs font-bold text-white mb-1">🎁 Parrainage</div>
+                <p class="text-[10px] text-gray-400 mb-2">Gagnez 20€ / ami</p>
+                <div class="bg-abysse/50 rounded py-1 px-2 font-mono text-fun text-xs border border-dashed border-fun/50 cursor-pointer hover:bg-fun hover:text-white transition">CODE: FAM-MARTIN</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col relative overflow-hidden">
+        
+        <!-- HEADER (Sentinel) -->
+        <header class="h-20 flex items-center justify-between px-8 z-20">
+            <div class="flex items-center gap-4 bg-card/50 border border-white/5 rounded-full px-4 py-2 backdrop-blur-md">
+                <div class="w-2 h-2 rounded-full bg-fun animate-pulse"></div>
+                <span class="text-xs text-gray-300 font-mono">CORTEX : <span class="text-white">Pic de prix à 19h. Évitez le four !</span></span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-right hidden sm:block">
+                    <div class="text-xs text-gray-400">Économies 2026</div>
+                    <div class="text-lg font-mono font-bold text-gain">+ 450.00 €</div>
+                </div>
+                <div class="w-10 h-10 rounded-full border-2 border-fun p-0.5">
+                    <img src="https://ui-avatars.com/api/?name=Famille+M&background=000&color=fff" class="rounded-full w-full h-full">
+                </div>
+            </div>
+        </header>
+
+        <!-- CONTENT AREA -->
+        <div class="flex-1 overflow-y-auto p-8 pb-20 scroll-smooth">
+
+            <!-- TAB 1: COCKPIT (Vue Immédiate) -->
+            <div id="tab-cockpit" class="page-content active grid grid-cols-1 md:grid-cols-12 gap-6">
+                
+                <!-- SMART SCORE -->
+                <div class="col-span-12 md:col-span-4 bento-card rounded-bento p-8 flex flex-col items-center justify-center relative overflow-hidden">
+                    <div class="absolute inset-0 bg-fun/5 radial-gradient"></div>
+                    <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Smart Score</h3>
+                    <div class="relative w-40 h-40 flex items-center justify-center">
+                        <svg class="w-full h-full transform -rotate-90">
+                            <circle cx="80" cy="80" r="70" stroke="rgba(255,255,255,0.1)" stroke-width="10" fill="none"/>
+                            <circle cx="80" cy="80" r="70" stroke="#D946EF" stroke-width="10" fill="none" stroke-dasharray="440" stroke-dashoffset="66" stroke-linecap="round" class="drop-shadow-[0_0_10px_rgba(217,70,239,0.5)]"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-4xl font-black text-white">85</span>
+                            <span class="text-xs text-fun font-bold">EXCELLENT</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-4 text-center">Vous consommez mieux que 85% de vos voisins.</p>
+                </div>
+
+                <!-- SMART SWAP & CONVERSION -->
+                <div class="col-span-12 md:col-span-4 flex flex-col gap-6">
+                    <!-- SWAP -->
+                    <div class="bento-card rounded-bento p-6 border-l-4 border-gain relative group cursor-pointer">
+                        <div class="absolute top-4 right-4 text-gain text-2xl group-hover:scale-110 transition"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+                        <h3 class="text-lg font-bold text-white mb-1">Smart Swap</h3>
+                        <p class="text-xs text-gray-400 mb-4">Une offre moins chère détectée !</p>
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <div class="text-xs text-gray-500 line-through">0.22 €/kWh</div>
+                                <div class="text-2xl font-mono font-bold text-white">0.18 €<span class="text-sm text-gray-500">/kWh</span></div>
+                            </div>
+                            <button class="bg-gain text-abysse font-bold px-4 py-2 rounded-xl text-xs hover:bg-white transition shadow-neon-gain">CHANGER</button>
+                        </div>
+                    </div>
+                    <!-- FUN CONVERSION -->
+                    <div class="bento-card rounded-bento p-6 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center text-2xl">
+                            <i class="fa-solid fa-pizza-slice"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400 uppercase font-bold">Pouvoir d'Achat</div>
+                            <div class="text-sm text-white">Vos gains paient <span class="text-yellow-500 font-bold">12 Pizzas</span> / an.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- METEO ENERGIE -->
+                <div class="col-span-12 md:col-span-4 bento-card rounded-bento p-6 flex flex-col justify-between bg-gradient-to-br from-card to-tech/10 border-tech/20">
+                    <div class="flex justify-between items-start">
+                        <h3 class="text-lg font-bold text-white">Météo Énergie</h3>
+                        <div class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-[10px] font-bold border border-green-500/30">IDEAL MAINTENANT</div>
+                    </div>
+                    <div class="flex items-center justify-center my-4">
+                        <i class="fa-solid fa-sun text-6xl text-yellow-400 animate-pulse drop-shadow-[0_0_20px_rgba(250,204,21,0.5)]"></i>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-300">Prix du kWh très bas.</p>
+                        <p class="text-xs font-bold text-tech mt-1">Lancez votre machine à laver !</p>
+                    </div>
+                </div>
+
+                <!-- CHART -->
+                <div class="col-span-12 bento-card rounded-bento p-8">
+                    <h3 class="text-xl font-bold text-white mb-6">Ma Conso vs TRVE (Tarif État)</h3>
+                    <div class="h-64 w-full"><canvas id="chartCockpit"></canvas></div>
+                </div>
+            </div>
+
+            <!-- TAB 2: VITALITY GAME -->
+            <div id="tab-vitality" class="page-content grid grid-cols-1 md:grid-cols-12 gap-6">
+                <!-- LEADERBOARD -->
+                <div class="col-span-12 md:col-span-6 bento-card rounded-bento p-8">
+                    <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-trophy text-yellow-500"></i> Ligue du Quartier</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-white/10">
+                            <div class="font-black text-gray-500 w-6">1</div>
+                            <div class="w-8 h-8 rounded-full bg-blue-500"></div>
+                            <div class="flex-1 font-bold text-sm">Voisin #402</div>
+                            <div class="text-xs font-mono text-gain">-22%</div>
+                        </div>
+                        <div class="flex items-center gap-4 bg-fun/10 p-3 rounded-2xl border border-fun/50 relative overflow-hidden">
+                            <div class="absolute left-0 top-0 h-full w-1 bg-fun"></div>
+                            <div class="font-black text-fun w-6">2</div>
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-r from-fun to-purple-500"></div>
+                            <div class="flex-1 font-bold text-white">VOUS</div>
+                            <div class="text-xs font-mono text-gain font-bold">-18%</div>
+                        </div>
+                        <div class="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-white/10">
+                            <div class="font-black text-gray-500 w-6">3</div>
+                            <div class="w-8 h-8 rounded-full bg-green-500"></div>
+                            <div class="flex-1 font-bold text-sm">Voisin #12</div>
+                            <div class="text-xs font-mono text-gain">-15%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BADGES -->
+                <div class="col-span-12 md:col-span-6 bento-card rounded-bento p-8">
+                    <h3 class="text-xl font-bold text-white mb-6">Mes Badges</h3>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="aspect-square bg-abysse/50 rounded-2xl flex flex-col items-center justify-center border border-fun/30 shadow-neon-fun group cursor-pointer">
+                            <i class="fa-solid fa-moon text-3xl text-fun mb-2 group-hover:scale-110 transition"></i>
+                            <span class="text-[10px] text-gray-400 text-center">Veilleur<br>de Nuit</span>
+                        </div>
+                        <div class="aspect-square bg-abysse/50 rounded-2xl flex flex-col items-center justify-center border border-gain/30 shadow-neon-gain group cursor-pointer">
+                            <i class="fa-solid fa-leaf text-3xl text-gain mb-2 group-hover:scale-110 transition"></i>
+                            <span class="text-[10px] text-gray-400 text-center">Eco<br>Warrior</span>
+                        </div>
+                        <div class="aspect-square bg-abysse/50 rounded-2xl flex flex-col items-center justify-center border border-white/5 opacity-50 grayscale">
+                            <i class="fa-solid fa-bolt text-3xl text-gray-500 mb-2"></i>
+                            <span class="text-[10px] text-gray-500 text-center">Maître<br>Linky</span>
+                            <i class="fa-solid fa-lock absolute top-2 right-2 text-[10px]"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: SMART HOME -->
+            <div id="tab-smarthome" class="page-content grid grid-cols-1 md:grid-cols-12 gap-6">
+                <!-- HUB STATUS -->
+                <div class="col-span-12 bento-card rounded-bento p-8 border-t-4 border-tech">
+                    <h3 class="text-xl font-bold text-white mb-6">Hub Connecté</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col items-center text-center">
+                            <div class="w-3 h-3 rounded-full bg-green-500 mb-2 shadow-[0_0_10px_#10B981]"></div>
+                            <i class="fa-solid fa-plug text-2xl text-gray-300 mb-2"></i>
+                            <span class="text-xs font-bold">Linky</span>
+                        </div>
+                        <div class="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col items-center text-center">
+                            <div class="w-3 h-3 rounded-full bg-green-500 mb-2 shadow-[0_0_10px_#10B981]"></div>
+                            <i class="fa-solid fa-temperature-half text-2xl text-gray-300 mb-2"></i>
+                            <span class="text-xs font-bold">Netatmo</span>
+                            <span class="text-[10px] text-tech">19.5°C</span>
+                        </div>
+                        <div class="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col items-center text-center opacity-50">
+                            <div class="w-3 h-3 rounded-full bg-red-500 mb-2"></div>
+                            <i class="fa-solid fa-car-battery text-2xl text-gray-300 mb-2"></i>
+                            <span class="text-xs font-bold">Borne EV</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- REMOTE CONTROL -->
+                <div class="col-span-12 md:col-span-6 bento-card rounded-bento p-8">
+                    <h3 class="text-xl font-bold text-white mb-6">Pilotage Rapide</h3>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center bg-abysse/50 p-4 rounded-2xl">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-tv text-gray-400"></i>
+                                <span class="text-sm font-bold">Veille Salon</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" value="" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tech"></div>
+                            </label>
+                        </div>
+                        <div class="flex justify-between items-center bg-abysse/50 p-4 rounded-2xl">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-lightbulb text-gray-400"></i>
+                                <span class="text-sm font-bold">Lumière Ext.</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" value="" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tech"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: COACH CORTEX -->
+            <div id="tab-coach" class="page-content grid grid-cols-1 md:grid-cols-12 gap-6">
+                <div class="col-span-12 md:col-span-8 bento-card rounded-bento p-10 border border-dashed border-gray-600 flex flex-col items-center justify-center text-center hover:bg-white/5 transition cursor-pointer group">
+                    <div class="w-20 h-20 bg-fun/10 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition">
+                        <i class="fa-solid fa-file-invoice-dollar text-3xl text-fun"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white">Scanner une Facture</h3>
+                    <p class="text-sm text-gray-400 mt-2">Glissez votre PDF ici. CORTEX va vérifier les taxes (CSPE/TURPE).</p>
+                </div>
+                <div class="col-span-12 md:col-span-4 bento-card rounded-bento p-8">
+                    <h3 class="text-lg font-bold text-white mb-4">Check-list Hiver</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-5 h-5 rounded border border-gray-500 flex items-center justify-center cursor-pointer hover:bg-tech/20"><i class="fa-solid fa-check text-tech text-xs hidden"></i></div>
+                            <span class="text-xs text-gray-300">Purger les radiateurs</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-5 h-5 rounded border border-gray-500 flex items-center justify-center cursor-pointer hover:bg-tech/20"><i class="fa-solid fa-check text-tech text-xs hidden"></i></div>
+                            <span class="text-xs text-gray-300">Installer boudins de porte</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- FOOTER -->
+        <footer class="h-10 bg-abysse/90 border-t border-white/5 flex items-center justify-between px-8 text-[10px] text-gray-600 z-20">
+            <div><i class="fa-solid fa-lock mr-1"></i> Données chiffrées & Rétention 5 ans</div>
+            <div>ENERGISTRAT V3 • Zéro coût caché</div>
+        </footer>
+
+    </main>
+
+    <!-- LOGIC -->
+    <script>
+        // NAVIGATION
+        function navTo(tabId) {
+            document.querySelectorAll('.nav-pill').forEach(el => el.classList.remove('active', 'text-white'));
+            document.getElementById('nav-' + tabId).classList.add('active', 'text-white');
+            
+            document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+
+            if(tabId === 'cockpit') renderChart();
+        }
+
+        // CHART
+        let myChart = null;
+        function renderChart() {
+            const ctx = document.getElementById('chartCockpit').getContext('2d');
+            if(myChart) myChart.destroy();
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(217, 70, 239, 0.4)');
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin'],
+                    datasets: [
+                        {
+                            label: 'Ma Conso',
+                            data: [140, 130, 110, 80, 60, 50],
+                            borderColor: '#D946EF',
+                            backgroundColor: gradient,
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#050505',
+                            pointBorderColor: '#D946EF',
+                            pointBorderWidth: 2
+                        },
+                        {
+                            label: 'Tarif État (TRVE)',
+                            data: [160, 155, 135, 100, 80, 70],
+                            borderColor: '#94A3B8',
+                            borderDash: [6, 6],
+                            borderWidth: 2,
+                            tension: 0.4,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#64748B' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } }
+                    }
+                }
+            });
+        }
+
+        // INIT
+        document.addEventListener('DOMContentLoaded', () => {
+            navTo('cockpit');
+        });
+    </script>
+</body>
+</html>
