@@ -2,299 +2,88 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ENERGISTRAT — Analyse CORTEX</title>
-
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Google Fonts: Inter -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-  <!-- FontAwesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            abyss: "#050505",
-            cyan: { 400: "#00E5FF", 500: "#00B8CC", 900: "#004D55" },
-            surface: "#0B0F14",
-            panel: "rgba(255,255,255,0.06)",
-            panel2: "rgba(255,255,255,0.04)",
-            stroke: "rgba(255,255,255,0.10)",
-          },
-          fontFamily: { sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"] },
-          boxShadow: {
-            glow: "0 0 20px rgba(0, 229, 255, 0.15)",
-            "glow-strong": "0 0 30px rgba(0, 229, 255, 0.28)",
-          },
-        },
-      },
-    };
-  </script>
-
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    html, body { height: 100%; }
-    body {
-      margin: 0; background: #050505; color: #fff;
-      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      overflow: hidden;
-    }
-    /* Subtle grid background */
-    .bg-grid {
-      background-image:
-        linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
-      background-size: 44px 44px; opacity: .15;
-      mask-image: radial-gradient(circle at 50% 20%, black 0%, transparent 70%);
-      -webkit-mask-image: radial-gradient(circle at 50% 20%, black 0%, transparent 70%);
-    }
-    /* Bento look */
-    .bento-card {
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
-      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-radius: 28px;
-    }
-    /* Step connector line */
-    .step-connector {
-      position: absolute; left: 15px; top: 2rem; bottom: -1rem; width: 2px;
-      background: rgba(255, 255, 255, 0.10); z-index: 0;
-    }
-    .step-item:last-child .step-connector { display: none; }
-    /* CORTEX scanning animation */
-    @keyframes scan {
-      0% { transform: translateY(-120%); opacity: 0; }
-      40% { opacity: 1; }
-      100% { transform: translateY(120%); opacity: 0; }
-    }
-    .cortex-scan {
-      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: linear-gradient(to bottom, transparent, rgba(0, 229, 255, 0.22), transparent);
-      animation: scan 2.2s linear infinite; pointer-events: none;
-    }
-    .hint { font-size: 11px; color: rgba(255,255,255,0.55); line-height: 1.4; }
+    body { background: #050505; color: #00E5FF; font-family: 'JetBrains Mono', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+    .loader { width: 200px; height: 2px; background: rgba(0, 229, 255, 0.2); margin-top: 20px; position: relative; overflow: hidden; }
+    .loader::after { content: ''; position: absolute; left: -50%; width: 50%; height: 100%; background: #00E5FF; animation: load 2s infinite linear; }
+    @keyframes load { 0% { left: -50%; } 100% { left: 100%; } }
+    .log-item { opacity: 0; animation: fadeUp 0.5s forwards; margin-bottom: 5px; font-size: 0.8rem; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
+<body>
+    <div class="text-4xl font-bold mb-2">CORTEX AI</div>
+    <!-- Affichage dynamique du profil détecté pour confirmer que ça marche -->
+    <div class="text-xs text-gray-500 mb-8 font-bold tracking-widest" id="profile-label">INITIALISATION...</div>
+    
+    <div class="loader"></div>
+    <div id="logs" class="mt-8 text-center h-32 flex flex-col justify-end"></div>
 
-<body class="flex flex-col items-center justify-center min-h-screen p-4 relative">
+    <script>
+        // 1. Récupération du paramètre (target OU role)
+        const urlParams = new URLSearchParams(window.location.search);
+        let target = urlParams.get("target") || urlParams.get("role") || "citoyen";
+        
+        // Sécurité : on met tout en minuscule pour éviter les erreurs
+        target = target.toLowerCase();
 
-  <!-- Background Ambience -->
-  <div class="fixed inset-0 bg-grid pointer-events-none -z-10"></div>
-  <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[900px] h-[520px] bg-cyan-400/10 blur-[130px] rounded-full pointer-events-none -z-10"></div>
-  <div class="fixed bottom-[-20%] right-[-10%] w-[520px] h-[520px] bg-blue-900/20 blur-[120px] rounded-full pointer-events-none -z-10"></div>
+        // 2. CARTOGRAPHIE DES ROUTES (Les 9 Profils)
+        const routes = {
+            // Entreprises
+            'industry': '/dashboard/industry',
+            'retail':   '/dashboard/retail',
+            'pme':      '/dashboard/pme',
+            
+            // Public
+            'mairie':   '/dashboard/mairie',
+            'sde':      '/dashboard/sde',
+            'oph':      '/dashboard/oph',
+            
+            // Habitat & Partenaires
+            'syndic':   '/dashboard/syndic',
+            'citoyen':  '/dashboard/citoyen',
+            'supplier': '/dashboard/supplier'
+        };
 
-  <main class="w-full max-w-lg">
+        // 3. Détermination de l'URL finale
+        // Si le profil est inconnu, on redirige vers Citoyen par sécurité
+        const redirectUrl = routes[target] || '/dashboard/citoyen';
 
-    <!-- CORTEX Identity -->
-    <div class="text-center mb-8">
-      <div class="relative inline-flex items-center justify-center w-20 h-20 mb-4 rounded-full bg-panel2 border border-cyan-500/30 shadow-glow-strong overflow-hidden">
-        <i class="fa-solid fa-brain text-3xl text-cyan-400 z-10"></i>
-        <div class="absolute inset-0 rounded-full border border-cyan-400/20 opacity-20 animate-ping"></div>
-        <div class="absolute inset-0"><div class="cortex-scan"></div></div>
-      </div>
+        // Mise à jour de l'affichage pour le debug visuel
+        document.getElementById('profile-label').innerText = `CALIBRAGE PROFIL : ${target.toUpperCase()}`;
 
-      <h1 class="text-2xl font-extrabold tracking-tight">CORTEX<span class="text-cyan-400">.AI</span></h1>
-      <p class="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">Energy Manager IA — Tiers de Confiance</p>
-      <p id="cortex-line" class="mt-3 text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
-        CORTEX analyse vos données (GRD, fournisseurs, marché, usages compteurs) pour détecter les anomalies
-        et produire des recommandations claires, éthiques et actionnables.
-      </p>
-    </div>
+        // 4. Animation des Logs
+        const messages = [
+            "Connexion sécurisée aux API...",
+            "Récupération des courbes de charge...",
+            "Analyse des pics de puissance...",
+            "Calcul du Score Vitality...",
+            "Comparaison marchés Spot...",
+            "Génération du Dashboard..."
+        ];
 
-    <!-- Processing Bento Card -->
-    <div class="bento-card p-8 relative overflow-hidden">
-      <!-- Dynamic Header -->
-      <div class="mb-6">
-        <h2 id="status-title" class="text-lg font-semibold text-white mb-1">Initialisation…</h2>
-        <p id="status-desc" class="text-sm text-gray-400">CORTEX établit la connexion sécurisée.</p>
-      </div>
+        const logsDiv = document.getElementById('logs');
+        let delay = 0;
 
-      <!-- Progress Bar -->
-      <div class="w-full bg-white/5 rounded-full h-1.5 mb-8 overflow-hidden">
-        <div id="progress-bar" class="bg-cyan-400 h-1.5 rounded-full transition-all duration-500 ease-out shadow-glow" style="width: 5%"></div>
-      </div>
-
-      <!-- Stepper -->
-      <div class="space-y-6 relative" id="stepper-container">
-        <!-- Step 1 -->
-        <div class="step-item relative flex gap-4" id="step-1">
-          <div class="step-connector"></div>
-          <div class="relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center transition-colors duration-300 icon-box">
-            <i class="fa-solid fa-circle text-[8px] text-gray-500"></i>
-          </div>
-          <div class="pt-1"><h3 class="text-sm font-medium text-gray-400 transition-colors duration-300 label">Vérification des informations</h3></div>
-        </div>
-        <!-- Step 2 -->
-        <div class="step-item relative flex gap-4" id="step-2">
-          <div class="step-connector"></div>
-          <div class="relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center transition-colors duration-300 icon-box">
-            <i class="fa-solid fa-circle text-[8px] text-gray-500"></i>
-          </div>
-          <div class="pt-1"><h3 class="text-sm font-medium text-gray-400 transition-colors duration-300 label">Connexion GRD & Patrimoine</h3></div>
-        </div>
-        <!-- Step 3 -->
-        <div class="step-item relative flex gap-4" id="step-3">
-          <div class="step-connector"></div>
-          <div class="relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center transition-colors duration-300 icon-box">
-            <i class="fa-solid fa-circle text-[8px] text-gray-500"></i>
-          </div>
-          <div class="pt-1"><h3 class="text-sm font-medium text-gray-400 transition-colors duration-300 label">Analyse CORTEX (NAF / DJU / Marché / Usages)</h3></div>
-        </div>
-        <!-- Step 4 -->
-        <div class="step-item relative flex gap-4" id="step-4">
-          <div class="relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center transition-colors duration-300 icon-box">
-            <i class="fa-solid fa-circle text-[8px] text-gray-500"></i>
-          </div>
-          <div class="pt-1"><h3 class="text-sm font-medium text-gray-400 transition-colors duration-300 label">Génération du premier audit</h3></div>
-        </div>
-      </div>
-
-      <!-- Completion Actions -->
-      <div id="completion-actions" class="hidden mt-8 text-center">
-        <button onclick="goToDashboard()" class="w-full py-3 bg-cyan-400 hover:bg-cyan-500 text-abyss font-extrabold rounded-xl shadow-glow transition-all mb-3 flex items-center justify-center gap-2">
-          <span>Accéder au dashboard maintenant</span>
-          <i class="fa-solid fa-arrow-right"></i>
-        </button>
-        <div class="text-xs text-gray-500 mt-3">Redirection automatique dans quelques secondes…</div>
-      </div>
-    </div>
-
-    <!-- Reassurance Footer -->
-    <div class="mt-6 text-center px-4">
-      <div class="flex items-center justify-center gap-2 text-gray-500 text-xs mb-2">
-        <i class="fa-solid fa-shield-halved text-cyan-400"></i>
-        <span class="uppercase tracking-wide font-semibold">Sécurité & Confidentialité</span>
-      </div>
-      <p id="legal-text" class="text-[11px] text-gray-400 leading-relaxed max-w-md mx-auto"></p>
-    </div>
-  </main>
-
-  <script>
-    // --- 1) DÉTECTION DU PARAMÈTRE URL (target ou role) ---
-    // On accepte "target" (notre onboarding) ou "role" (ton code snippet)
-    const urlParams = new URLSearchParams(window.location.search);
-    let target = urlParams.get("target") || urlParams.get("role") || "citoyen";
-
-    // Normalisation des noms pour correspondre aux routes de main.py
-    if (target === "citizen") target = "citoyen";
-    if (target === "public") target = "mairie";
-    if (target === "industry") target = "industry";
-    // pme reste pme
-
-    // --- 2) CONFIGURATION DES TEXTES PAR PROFIL ---
-    // Note : La clé "redirect" pointe maintenant vers la route FastAPI (/dashboard/...)
-    const config = {
-      citoyen: {
-        title: "Analyse Résidentielle",
-        step2: "Connexion GRD (Enedis / GRDF) — PDL/PCE",
-        legal: "Conformité RGPD stricte. Données chiffrées. Aucun changement de fournisseur.",
-        redirect: "/dashboard/citoyen",
-      },
-      pme: {
-        title: "Audit Pro — Industrie & Tertiaire",
-        step2: "Connexion GRD + Analyse SIRET/NAF",
-        legal: "Données professionnelles conservées pour traçabilité réglementaire.",
-        redirect: "/dashboard/pme",
-      },
-      mairie: {
-        title: "Audit Collectivité — Patrimoine",
-        step2: "Connexion GRD + Import Patrimoine Public",
-        legal: "Données publiques sécurisées. Conformité M57.",
-        redirect: "/dashboard/mairie",
-      },
-      industry: {
-        title: "Audit Industriel — Haute Tension",
-        step2: "Connexion GRD + Analyse Process",
-        legal: "Données sensibles chiffrées. ISO 50001.",
-        redirect: "/dashboard/industry",
-      }
-    };
-
-    // Fallback si le target n'est pas reconnu
-    const currentConfig = config[target] || config.citoyen;
-
-    // Application des textes dynamiques
-    document.querySelector("#step-2 .label").innerText = currentConfig.step2;
-    document.getElementById("legal-text").innerText = currentConfig.legal;
-
-    // --- 3) MOTEUR DE SCÉNARIO ---
-    const steps = [
-      { id: "step-1", delay: 500,  text: "Vérification des données & cohérence du périmètre…", icon: "fa-check" },
-      { id: "step-2", delay: 2500, text: "Connexion sécurisée aux sources (GRD, fournisseurs)…", icon: "fa-network-wired" },
-      { id: "step-3", delay: 5000, text: "CORTEX détecte anomalies & écarts (usages, marché)…", icon: "fa-microchip" },
-      { id: "step-4", delay: 7500, text: "Génération du premier audit & préparation du dashboard…", icon: "fa-file-contract" },
-    ];
-
-    const totalTime = 9000; // Durée totale
-    let startTime = Date.now();
-
-    function updateProgress() {
-      const now = Date.now();
-      const elapsed = now - startTime;
-      const percent = Math.min((elapsed / totalTime) * 100, 100);
-      document.getElementById("progress-bar").style.width = percent + "%";
-
-      if (percent < 100) requestAnimationFrame(updateProgress);
-      else finishProcess();
-    }
-
-    function setStepStatus(stepId, status) {
-      const el = document.getElementById(stepId);
-      const iconBox = el.querySelector(".icon-box");
-      const icon = iconBox.querySelector("i");
-      const label = el.querySelector(".label");
-
-      if (status === "active") {
-        iconBox.className = "relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-cyan-900/30 border border-cyan-400 flex items-center justify-center transition-colors duration-300 icon-box shadow-glow";
-        icon.className = "fa-solid fa-circle-notch fa-spin text-cyan-400 text-xs";
-        label.className = "text-sm font-semibold text-white transition-colors duration-300 label";
-      } else if (status === "done") {
-        iconBox.className = "relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-cyan-400 border border-cyan-400 flex items-center justify-center transition-colors duration-300 icon-box";
-        icon.className = "fa-solid fa-check text-abyss text-sm";
-        label.className = "text-sm font-medium text-gray-300 transition-colors duration-300 label";
-      }
-    }
-
-    function runScenario() {
-      requestAnimationFrame(updateProgress);
-      steps.forEach((step, index) => {
-        setTimeout(() => {
-          if (index > 0) setStepStatus(steps[index - 1].id, "done");
-          setStepStatus(step.id, "active");
-          document.getElementById("status-title").innerText = currentConfig.title;
-          document.getElementById("status-desc").innerText = step.text;
-        }, step.delay);
-      });
-      setTimeout(() => {
-        setStepStatus("step-4", "done");
-        document.getElementById("status-title").innerText = "Analyse terminée";
-        document.getElementById("status-desc").innerText = "Votre audit est prêt. Ouverture du dashboard…";
-        document.getElementById("status-desc").classList.add("text-cyan-400");
-      }, totalTime);
-    }
-
-    // --- 4) FIN ET REDIRECTION ---
-    function finishProcess() {
-      document.getElementById("stepper-container").classList.add("opacity-60", "blur-[1px]", "transition-all");
-      document.getElementById("completion-actions").classList.remove("hidden");
-      
-      // Redirection automatique après 2 secondes
-      setTimeout(() => {
-        goToDashboard();
-      }, 2000);
-    }
-
-    function goToDashboard() {
-      // C'est ici que la magie opère : on utilise la route FastAPI
-      window.location.href = currentConfig.redirect;
-    }
-
-    window.onload = runScenario;
-  </script>
+        messages.forEach((msg, index) => {
+            delay += Math.random() * 600 + 200; 
+            setTimeout(() => {
+                const div = document.createElement('div');
+                div.className = 'log-item';
+                div.innerText = `> ${msg}`;
+                logsDiv.appendChild(div);
+                
+                if (index === messages.length - 1) {
+                    setTimeout(() => {
+                        // LA REDIRECTION SE FAIT ICI
+                        window.location.href = redirectUrl;
+                    }, 1000);
+                }
+            }, delay);
+        });
+    </script>
 </body>
 </html>
