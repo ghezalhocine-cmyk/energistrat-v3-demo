@@ -4,61 +4,71 @@ import io
 
 class CortexEngine:
     def __init__(self):
-        self.kwh_price = 0.18 # Prix moyen par défaut
+        # Prix moyen du marché pour estimation (0.18€/kWh)
+        self.kwh_price = 0.18 
 
     async def analyze_file(self, file_content, filename):
-        """
-        Analyse un fichier CSV ou Excel et retourne les KPI et les données pour les graphiques.
-        """
         try:
-            # 1. Lecture du fichier
+            # 1. LECTURE DU FICHIER (Excel ou CSV)
             if filename.endswith('.csv'):
-                df = pd.read_csv(io.BytesIO(file_content), sep=';') # Séparateur standard France
+                df = pd.read_csv(io.BytesIO(file_content), sep=';', parse_dates=[0], dayfirst=True)
             else:
                 df = pd.read_excel(io.BytesIO(file_content))
 
-            # 2. Nettoyage et Standardisation (On suppose une colonne 'Date' et 'Conso')
-            # Pour le test, on va être flexible sur les noms de colonnes
-            cols = [c.lower() for c in df.columns]
-            df.columns = cols
+            # 2. STANDARDISATION DES COLONNES
+            # On renomme pour être sûr de trouver les données peu importe le nom dans l'Excel
+            df.columns = [c.lower().strip() for c in df.columns]
             
-            # Recherche de la colonne consommation
-            conso_col = next((c for c in ['conso', 'kwh', 'puissance', 'p10', 'valeur'] if c in cols), None)
-            date_col = next((c for c in ['date', 'horodatage', 'time'] if c in cols), None)
+            # Détection intelligente des colonnes
+            col_date = next((c for c in df.columns if any(x in c for x in ['date', 'horodatage', 'temps'])), None)
+            col_val = next((c for c in df.columns if any(x in c for x in ['puissance', 'p10', 'kw', 'conso', 'valeur'])), None)
 
-            if not conso_col:
-                return {"error": "Colonne consommation introuvable (nommez-la 'conso' ou 'kwh')"}
+            if not col_date or not col_val:
+                return {"success": False, "error": "Colonnes 'Date' et 'Puissance' non trouvées."}
 
-            # 3. Calculs CORTEX (La vraie intelligence)
-            total_conso = df[conso_col].sum()
-            max_pic = df[conso_col].max()
-            cout_estime = total_conso * self.kwh_price
+            # Conversion en datetime et tri
+            df[col_date] = pd.to_datetime(df[col_date])
+            df = df.sort_values(by=col_date)
+            df = df.set_index(col_date)
+
+            # 3. ANALYSE TECHNIQUE (Sur la donnée brute 10 min)
+            # Volume total : Si c'est de la puissance moyenne 10min (kW), l'énergie (kWh) = Somme / 6
+            # Si c'est déjà des kWh, c'est juste la somme. On suppose ici du kW moyen (courbe de charge standard).
+            volume_total_kwh = df[col_val].sum() / 6 
             
-            # Simulation d'optimisation (Ex: on coupe les pics > 90% du max)
-            optim_gain = df[df[conso_col] > (max_pic * 0.9)][conso_col].sum() * 0.15 # 15% d'économie sur les pics
+            # Pic de puissance (Le max absolu atteint sur 10 min)
+            pic_max_kw = df[col_val].max()
+            
+            # Talon (Consommation minimale, souvent la nuit)
+            talon_min_kw = df[col_val].min()
 
-            # 4. Préparation des données pour Chart.js (Liste de valeurs)
-            # On prend les 12 premières valeurs ou une moyenne pour simplifier l'affichage
-            chart_data = df[conso_col].head(12).tolist()
-            chart_labels = df[date_col].head(12).tolist() if date_col else [f"P{i}" for i in range(12)]
+            # 4. PRÉPARATION GRAPHIQUE (Resampling)
+            # On ne peut pas afficher 50k points. On fait une moyenne par JOUR pour le graph.
+            df_daily = df[col_val].resample('D').mean()
+            
+            # On remplace les NaN par 0 (coupures)
+            df_daily = df_daily.fillna(0)
+
+            # Formatage pour Chart.js
+            chart_labels = df_daily.index.strftime('%d/%m').tolist()
+            chart_values = df_daily.round(2).tolist()
 
             return {
                 "success": True,
                 "kpi": {
-                    "volume_total": round(total_conso, 2),
-                    "pic_puissance": round(max_pic, 2),
-                    "budget_annuel": round(cout_estime, 2),
-                    "economie_potentielle": round(optim_gain, 2),
-                    "score_vitality": int(np.random.randint(60, 95)) # Simulé pour l'instant
+                    "volume_mwh": round(volume_total_kwh / 1000, 2), # En MWh
+                    "pic_kw": round(pic_max_kw, 2),
+                    "talon_kw": round(talon_min_kw, 2),
+                    "budget_estime": round(volume_total_kwh * self.kwh_price, 0)
                 },
                 "chart": {
                     "labels": chart_labels,
-                    "values": chart_data
+                    "values": chart_values
                 }
             }
 
         except Exception as e:
-            return {"error": str(e)}
+            return {"success": False, "error": str(e)}
 
-# Instance globale
+# Instance unique pour l'app
 cortex = CortexEngine()
