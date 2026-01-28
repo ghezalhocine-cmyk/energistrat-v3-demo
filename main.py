@@ -1,57 +1,62 @@
-from fastapi import FastAPI, Request, UploadFile, File
+from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 import os
 
-# Import du moteur IA (Assure-toi que cortex_engine.py est bien créé)
+# Import du moteur V4
 try:
     from cortex_engine import cortex
 except ImportError:
     cortex = None
-    print("⚠️ ALERTE : cortex_engine.py manquant. L'analyse ne fonctionnera pas.")
 
-app = FastAPI(title="ENERGISTRAT V3", version="3.9 Data-Ready")
+app = FastAPI(title="ENERGISTRAT V3", version="3.10 Ops-Ready")
 
-# 1. SETUP DOSSIERS
 if not os.path.exists("static"): os.makedirs("static")
 if not os.path.exists("templates"): os.makedirs("templates")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# ==============================================================================
-# ROUTEUR API (BACKEND DATA)
-# ==============================================================================
+# --- ROUTES API OPS (LE BACKEND RÉEL) ---
 
-@app.post("/api/analyze")
-async def analyze_energy_data(file: UploadFile = File(...)):
-    """
-    Reçoit un fichier Excel/CSV (Courbe de charge 10min),
-    L'analyse via CORTEX,
-    Renvoie les KPI et les points du graphique simplifiés.
-    """
-    if not cortex:
-        return JSONResponse({"success": False, "error": "Moteur CORTEX non chargé."})
-    
+@app.post("/api/ops/analyze")
+async def api_analyze(file: UploadFile = File(...)):
+    """Analyse réelle d'un fichier de courbe de charge"""
+    if not cortex: return JSONResponse({"success": False, "error": "Moteur HS"})
     content = await file.read()
     result = await cortex.analyze_file(content, file.filename)
     return JSONResponse(result)
 
+@app.post("/api/ops/chaos")
+async def api_chaos():
+    """Lance le Chaos Monkey sur le serveur"""
+    if not cortex: return JSONResponse({"results": []})
+    results = cortex.run_chaos_monkey()
+    return JSONResponse({"results": results})
 
-# ==============================================================================
-# ROUTEUR PAGES (FRONTEND)
-# ==============================================================================
+@app.post("/api/ops/audit")
+async def api_audit(filename: str = Form(...)):
+    """Simule un audit métier sur un fichier"""
+    result = cortex.simulate_audit(filename)
+    return JSONResponse(result)
 
-# --- LANDING PAGE ---
+@app.post("/api/ops/chat")
+async def api_chat(message: str = Form(...)):
+    """Chat avec l'agent Ops"""
+    response = cortex.ask_agent(message)
+    return JSONResponse({"response": response})
+
+# --- ROUTES FRONTEND (EXISTANTES) ---
+# ... (Garde tes routes existantes ici : /, /onboarding, /nexus, etc.) ...
+# Je remets juste les essentielles pour le contexte, ne les efface pas si elles y sont
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/index.html", response_class=HTMLResponse)
 async def landing(request: Request):
-    if not os.path.isfile("templates/index.html"):
-        return HTMLResponse("<h1>Erreur: index.html manquant</h1>", status_code=404)
+    if not os.path.isfile("templates/index.html"): return HTMLResponse("Err index", 404)
     return templates.TemplateResponse("index.html", {"request": request})
 
-# --- TUNNEL D'ACQUISITION ---
 @app.get("/onboarding", response_class=HTMLResponse)
 @app.get("/onboarding.html", response_class=HTMLResponse)
 async def onboarding(request: Request):
@@ -62,38 +67,28 @@ async def onboarding(request: Request):
 async def processing(request: Request):
     return templates.TemplateResponse("processing.html", {"request": request})
 
-# --- NEXUS ---
 @app.get("/nexus", response_class=HTMLResponse)
 @app.get("/dashboard.html", response_class=HTMLResponse)
 async def nexus(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
-# --- ADMIN OPS ---
 @app.get("/ops", response_class=HTMLResponse)
 @app.get("/ops.html", response_class=HTMLResponse)
 async def ops_dashboard(request: Request):
     return templates.TemplateResponse("ops.html", {"request": request})
 
-# --- ROUTE MAGIQUE VITRINES ---
 @app.get("/{page_name}.html", response_class=HTMLResponse)
 async def show_static_page(request: Request, page_name: str):
     file_path = f"{page_name}.html"
-    full_path = os.path.join("templates", file_path)
-    if os.path.isfile(full_path):
+    if os.path.isfile(f"templates/{file_path}"):
         return templates.TemplateResponse(file_path, {"request": request})
-    return HTMLResponse(f"<h1>404 - Page '{page_name}' introuvable</h1>", status_code=404)
+    return HTMLResponse("404", 404)
 
-# --- ROUTE DASHBOARDS MÉTIERS ---
 @app.get("/dashboard/{profil}", response_class=HTMLResponse)
 async def read_dashboard(request: Request, profil: str):
-    clean_profil = profil.replace(".html", "")
-    file_path = f"{clean_profil}.html"
-    full_path = os.path.join("templates", file_path)
-    
-    if os.path.isfile(full_path):
-        return templates.TemplateResponse(file_path, {"request": request})
-    
+    clean = profil.replace(".html", "")
+    if os.path.isfile(f"templates/{clean}.html"):
+        return templates.TemplateResponse(f"{clean}.html", {"request": request})
     if os.path.isfile("templates/404.html"):
         return templates.TemplateResponse("404.html", {"request": request}, status_code=404)
-        
-    return HTMLResponse("<h1>404 - Dashboard Introuvable</h1>", status_code=404)
+    return HTMLResponse("404", 404)
