@@ -4,54 +4,59 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 import os
 import json
-import re # Ajouté pour l'extraction de texte (Regex)
+import re
 
-# import pdfplumber  # <- À décommenter quand tu installeras pdfplumber via requirements.txt
-
+# Tentative d'import du moteur Cortex
 try:
     from cortex_engine import cortex
 except ImportError:
     cortex = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="3.14 PERSISTENCE")
+app = FastAPI(title="ENERGISTRAT V3", version="3.14 PERSISTENCE & AUDIT")
 
-# 1. SETUP DOSSIERS
+# ==============================================================================
+# 1. SETUP DOSSIERS & CONFIG
+# ==============================================================================
 if not os.path.exists("static"): os.makedirs("static")
 if not os.path.exists("templates"): os.makedirs("templates")
-# Création d'un dossier pour stocker les données clients temporaires
+# Dossier pour la persistance des données clients (Pont de Données)
 if not os.path.exists("data_store"): os.makedirs("data_store")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # ==============================================================================
-# ROUTES API
+# 2. ROUTES API (BACKEND INTELLIGENCE)
 # ==============================================================================
 
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
-    if not cortex: return JSONResponse({"success": False, "error": "Moteur HS"})
+    """
+    Ingestion SGE : Lit le fichier, l'analyse via Cortex, et sauvegarde le JSON.
+    """
+    if not cortex: return JSONResponse({"success": False, "error": "Moteur Cortex HS"})
     
     try:
         content = await file.read()
+        # Appel au moteur Cortex pour l'analyse SGE
         result = await cortex.analyze_file(content, file.filename)
         
         if result.get("success"):
-            # SAUVEGARDE SUR DISQUE (JSON)
-            # On écrit dans un fichier physique pour que toutes les instances le voient
+            # PERSISTANCE : Ecriture sur disque pour que les Dashboard Clients puissent lire
             file_path = f"data_store/{target}.json"
             with open(file_path, "w") as f:
                 json.dump(result, f)
-            print(f"✅ Données écrites sur disque : {file_path}")
+            print(f"✅ [PERSISTANCE] Données écrites pour {target} : {file_path}")
             
         return JSONResponse(result)
     except Exception as e:
+        print(f"❌ Erreur Analyze: {str(e)}")
         return JSONResponse({"success": False, "error": str(e)})
 
 @app.get("/api/data/{profil}")
 async def get_client_data(profil: str):
     """
-    Lit le fichier JSON sur le disque
+    Pont de Données : Le Dashboard Client (Front) appelle cette route pour récupérer ses données.
     """
     file_path = f"data_store/{profil}.json"
     if os.path.exists(file_path):
@@ -59,18 +64,12 @@ async def get_client_data(profil: str):
             data = json.load(f)
         return JSONResponse({"found": True, "data": data})
     else:
-        return JSONResponse({"found": False, "message": "Aucune donnée"})
+        return JSONResponse({"found": False, "message": "Aucune donnée réelle disponible."})
 
-@app.post("/api/ops/chaos")
-async def api_chaos():
-    if not cortex: return JSONResponse({"results": []})
-    return JSONResponse({"results": cortex.run_chaos_monkey()})
-
-# --- NOUVELLE ROUTE : AUDIT JURIDIQUE & FINANCIER (PDF) ---
 @app.post("/api/ops/audit")
 async def api_audit(invoice: UploadFile = File(...), contract: UploadFile = File(...)):
     """
-    Comparaison Intelligente Facture vs Contrat (PDF)
+    AUDIT LAB : Comparaison Facture vs Contrat (PDF/OCR)
     """
     results = {
         "files": [invoice.filename, contract.filename],
@@ -79,65 +78,94 @@ async def api_audit(invoice: UploadFile = File(...), contract: UploadFile = File
         "status": "SUCCESS"
     }
 
-    # Lecture binaire des fichiers (ici on stocke en mémoire, prêt pour pdfplumber)
-    inv_content = await invoice.read()
-    ctr_content = await contract.read()
+    # Lecture des noms de fichiers pour la simulation intelligente
+    # (Dans une version ultérieure, on utilisera pdfplumber ici sur le contenu binaire)
+    inv_name = invoice.filename.lower()
+    ctr_name = contract.filename.lower()
+
+    # --- LOGIQUE DE VÉRIFICATION (MOTEUR DE RÈGLES) ---
     
-    # --- LOGIQUE DE DÉTECTION (Simulation Intelligente pour le MVP) ---
-    # Si le nom de la facture contient "err" ou "error", on génère une anomalie.
-    # Si le contrat contient "exonere", on vérifie la taxe.
+    # 1. CHECK PRIX (Simulation basée sur le nom du fichier pour le test)
+    # Si le fichier contient "err", on simule une erreur de prix
+    contract_price = 85.00
+    invoice_price = 89.50 if "err" in inv_name else 85.00
     
-    is_error = "err" in invoice.filename.lower()
-    is_exonere = "exonere" in contract.filename.lower()
+    price_status = "OK"
+    is_price_error = False
     
-    # CHECK 1 : PRIX UNITAIRE GAZ (€/MWh)
-    price_contract = 85.00
-    price_invoice = 89.50 if is_error else 85.00
-    delta_price = price_invoice - price_contract
-    
+    if invoice_price != contract_price:
+        price_status = "ÉCART PRIX"
+        is_price_error = True
+        results["score"] -= 30
+
     results["checks"].append({
-        "point": "Prix Unitaire Gaz (€/MWh)",
-        "a": f"{price_invoice} €",
-        "b": f"{price_contract} €",
-        "status": "ÉCART DÉTECTÉ" if delta_price != 0 else "OK",
-        "error": delta_price != 0
+        "point": "Prix Molécule Gaz (€/MWh)",
+        "a": f"{invoice_price:.2f} €",
+        "b": f"{contract_price:.2f} €",
+        "status": price_status,
+        "error": is_price_error
     })
 
-    # CHECK 2 : VALIDITÉ JURIDIQUE (PÉRIODE & TACITE RECONDUCTION)
+    # 2. CHECK TAXES (TICGN / CSPE)
+    # Si le contrat mentionne "exonere", la facture doit l'être aussi
+    is_exonere = "exonere" in ctr_name
+    tax_applied = True # Par défaut les factures appliquent la taxe
+    
+    tax_status = "OK"
+    is_tax_error = False
+
+    if is_exonere and tax_applied:
+        tax_status = "ERREUR FISCALE"
+        is_tax_error = True
+        results["score"] -= 35
+
     results["checks"].append({
-        "point": "Période Validité & Reconduction",
+        "point": "Fiscalité (TICGN)",
+        "a": "Taxe Appliquée" if tax_applied else "0 €",
+        "b": "Exonération" if is_exonere else "Standard",
+        "status": tax_status,
+        "error": is_tax_error
+    })
+
+    # 3. CHECK PÉRIODE
+    results["checks"].append({
+        "point": "Validité Temporelle",
         "a": "Fév 2026",
-        "b": "Actif (Fin 31/12)",
+        "b": "Actif (Fin 2027)",
         "status": "OK",
         "error": False
     })
 
-    # CHECK 3 : TAXES (CSPE / TICGN)
-    tax_status = "NON-CONFORME" if (is_error and is_exonere) else "OK"
-    results["checks"].append({
-        "point": "Fiscalité (TICGN / CSPE)",
-        "a": "Taxe Appliquée",
-        "b": "Exonéré" if is_exonere else "Standard",
-        "status": tax_status,
-        "error": (tax_status != "OK")
-    })
-
-    # CALCUL DU SCORE FINAL
-    if any(c["error"] for c in results["checks"]):
+    # Synthèse
+    if results["score"] < 100:
         results["status"] = "ANOMALIE"
-        results["score"] = 65
-        
-    return JSONResponse(content=results)
+
+    return JSONResponse(results)
+
+@app.post("/api/ops/chaos")
+async def api_chaos():
+    """
+    Lance le Chaos Monkey pour tester la robustesse
+    """
+    if not cortex: return JSONResponse({"results": []})
+    return JSONResponse({"results": cortex.run_chaos_monkey()})
 
 @app.post("/api/ops/chat")
 async def api_chat(message: str = Form(...)):
-    if not cortex: return JSONResponse({"response": "Moteur IA déconnecté."})
+    """
+    Chatbot Ops (Cortex Dev)
+    """
+    if not cortex: return JSONResponse({"response": "Cortex Offline."})
     return JSONResponse({"response": cortex.ask_agent(message)})
+
+# ==============================================================================
+# 3. ROUTES FRONTEND (HTML)
+# ==============================================================================
 
 def render_404(request):
     if os.path.isfile("templates/404.html"):
         return templates.TemplateResponse("404.html", {"request": request}, status_code=404)
-    return HTMLResponse("<h1>404</h1>", status_code=404)
+    return HTMLResponse("<h1>404 - Page Not Found</h1>", status_code=404)
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/index.html", response_class=HTMLResponse)
@@ -164,6 +192,7 @@ async def nexus(request: Request):
 async def ops_dashboard(request: Request):
     return templates.TemplateResponse("ops.html", {"request": request})
 
+# Route générique pour les pages statiques (settings, etc.)
 @app.get("/{page_name}.html", response_class=HTMLResponse)
 async def show_static_page(request: Request, page_name: str):
     file_path = f"{page_name}.html"
@@ -171,6 +200,7 @@ async def show_static_page(request: Request, page_name: str):
         return templates.TemplateResponse(file_path, {"request": request})
     return render_404(request)
 
+# Route dynamique pour les profils clients (industry, mairie, sde, etc.)
 @app.get("/dashboard/{profil}", response_class=HTMLResponse)
 async def read_dashboard(request: Request, profil: str):
     clean_profil = profil.replace(".html", "")
