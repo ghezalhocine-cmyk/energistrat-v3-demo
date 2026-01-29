@@ -5,6 +5,9 @@
     <title>ENERGISTRAT V3 | Retail Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- CORE ENGINE UX -->
+    <script src="/static/js/main.js"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
@@ -22,6 +25,8 @@
         .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
         .bento-card:hover { border-color: rgba(168, 85, 247, 0.5); transform: translateY(-2px); }
         .rank-badge { clip-path: polygon(0 0, 100% 0, 100% 85%, 50% 100%, 0 85%); }
+        .nav-item.active { background: rgba(168, 85, 247, 0.1); border-left: 3px solid #A855F7; color: white; }
+        .page-content { display: none; } .page-content.active { display: grid; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
@@ -34,13 +39,13 @@
                 <div><h1 class="font-bold tracking-wider text-base">RETAIL<span class="text-retail">.OS</span></h1><p class="text-[10px] text-gray-500">Groupe & Franchises</p></div>
             </div>
             <nav class="space-y-2">
-                <button class="w-full text-left px-4 py-3 rounded-xl bg-retail/10 text-retail border border-retail/20 font-bold uppercase tracking-wide flex items-center gap-3">
+                <button onclick="navTo('vision')" id="btn-vision" class="nav-item active w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide flex items-center gap-3 transition">
                     <span>📊</span> Vision Groupe
                 </button>
-                <button class="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
+                <button onclick="navTo('league')" id="btn-league" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
                     <span>🏆</span> Green League
                 </button>
-                <button class="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
+                <button onclick="navTo('froid')" id="btn-froid" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
                     <span>❄️</span> Chaine Froid
                 </button>
             </nav>
@@ -48,10 +53,10 @@
         
         <!-- WIDGET PARRAINAGE FRANCHISE -->
         <div class="p-6 border-t border-white/5">
-            <div class="bg-gradient-to-br from-card to-abysse border border-white/10 rounded-xl p-4">
+            <div class="bg-gradient-to-br from-card to-abysse border border-white/10 rounded-xl p-4 cursor-pointer group" onclick="App.toast('Code Franchisé copié !', 'success')">
                 <div class="text-xs font-bold text-white mb-1">🚀 Extension Réseau</div>
                 <p class="text-[10px] text-gray-400 mb-2">Invitez un nouveau franchisé.</p>
-                <div class="text-center bg-black/30 rounded py-1 font-mono text-retail text-xs cursor-pointer border border-dashed border-retail/30 hover:text-white transition">CODE: FRANCHISE-24</div>
+                <div class="text-center bg-black/30 rounded py-1 font-mono text-retail text-xs border border-dashed border-retail/30 group-hover:bg-retail group-hover:text-black transition">CODE: FRANCHISE-24</div>
             </div>
         </div>
     </aside>
@@ -64,7 +69,7 @@
             <div class="px-2 py-1 rounded bg-retail text-white text-[10px] font-black animate-pulse tracking-wider">CORTEX RETAIL</div>
             <span class="text-xs text-retail font-mono flex-1">ALERTE HYPER : Dérive Talon Nuit (+15%) détectée sur "Hyper Sud". Probable éclairage parking resté allumé.</span>
             
-            <!-- LIEN SETTINGS AJOUTÉ ICI -->
+            <!-- LIEN SETTINGS -->
             <a href="/settings.html" class="h-10 w-10 rounded-full bg-gradient-to-br from-retail to-cyan p-[2px] cursor-pointer hover:scale-105 transition block" title="Paramètres">
                 <div class="h-full w-full rounded-full bg-abysse flex items-center justify-center font-bold text-retail">
                     RT
@@ -73,12 +78,12 @@
             
         </div>
 
-        <div class="p-8 overflow-y-auto grid grid-cols-12 gap-6 h-full pb-20">
+        <div class="p-8 overflow-y-auto h-full pb-20">
             
             <!-- HEADER -->
-            <div class="col-span-12 flex justify-between items-end">
+            <div class="flex justify-between items-end mb-6">
                 <div>
-                    <h2 class="text-3xl font-black text-white tracking-tight">Performance Réseau</h2>
+                    <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Performance Réseau</h2>
                     <p class="text-gray-400 text-xs mt-1">Comparatif Succursales vs Franchisés</p>
                 </div>
                 <div class="flex gap-4">
@@ -90,126 +95,174 @@
                 </div>
             </div>
 
-            <!-- GAMIFICATION: RETAIL GREEN LEAGUE -->
-            <div class="col-span-4 bg-gradient-to-b from-card to-abysse rounded-[2rem] p-0 bento-card border border-retail/20 overflow-hidden flex flex-col">
-                <div class="p-6 pb-2 border-b border-white/5 flex justify-between items-center">
-                    <h3 class="font-bold text-lg text-white flex items-center gap-2">🏆 Green League</h3>
-                    <span class="text-[10px] bg-retail text-white px-2 py-1 rounded font-bold">TOP 3</span>
-                </div>
-                
-                <div class="flex-1 p-6 space-y-4">
-                    <!-- Rank 1 -->
-                    <div class="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-yellow-500/30 relative overflow-hidden group hover:bg-white/10 transition">
-                        <div class="absolute -right-4 -top-4 w-12 h-12 bg-yellow-500/20 blur-xl"></div>
-                        <div class="w-8 h-8 bg-yellow-500 text-black font-black flex items-center justify-center rounded-full shadow-[0_0_10px_#EAB308]">1</div>
-                        <div class="flex-1">
-                            <div class="text-sm font-bold text-white">Hyper Nantes</div>
-                            <div class="text-[10px] text-gray-400">Franchisé • M. Dupont</div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-sm font-black text-green-400">-18%</div>
-                            <div class="text-[9px] text-gray-500">vs N-1</div>
-                        </div>
+            <!-- VIEW 1: VISION GROUPE -->
+            <div id="view-vision" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
+                <!-- GAMIFICATION: RETAIL GREEN LEAGUE -->
+                <div class="col-span-4 bg-gradient-to-b from-card to-abysse rounded-[2rem] p-0 bento-card border border-retail/20 overflow-hidden flex flex-col">
+                    <div class="p-6 pb-2 border-b border-white/5 flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-white flex items-center gap-2">🏆 Green League</h3>
+                        <span class="text-[10px] bg-retail text-white px-2 py-1 rounded font-bold">TOP 3</span>
                     </div>
+                    
+                    <div class="flex-1 p-6 space-y-4">
+                        <!-- Rank 1 -->
+                        <div class="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-yellow-500/30 relative overflow-hidden group hover:bg-white/10 transition cursor-pointer" onclick="App.toast('Bravo à Hyper Nantes ! Bonus activé.', 'success')">
+                            <div class="absolute -right-4 -top-4 w-12 h-12 bg-yellow-500/20 blur-xl"></div>
+                            <div class="w-8 h-8 bg-yellow-500 text-black font-black flex items-center justify-center rounded-full shadow-[0_0_10px_#EAB308]">1</div>
+                            <div class="flex-1">
+                                <div class="text-sm font-bold text-white">Hyper Nantes</div>
+                                <div class="text-[10px] text-gray-400">Franchisé • M. Dupont</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm font-black text-green-400">-18%</div>
+                                <div class="text-[9px] text-gray-500">vs N-1</div>
+                            </div>
+                        </div>
 
-                    <!-- Rank 2 -->
-                    <div class="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-gray-400/30 relative overflow-hidden">
-                        <div class="w-8 h-8 bg-gray-300 text-black font-black flex items-center justify-center rounded-full">2</div>
-                        <div class="flex-1">
-                            <div class="text-sm font-bold text-white">Super Lille</div>
-                            <div class="text-[10px] text-gray-400">Succursale</div>
+                        <!-- Rank 2 -->
+                        <div class="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-gray-400/30 relative overflow-hidden">
+                            <div class="w-8 h-8 bg-gray-300 text-black font-black flex items-center justify-center rounded-full">2</div>
+                            <div class="flex-1">
+                                <div class="text-sm font-bold text-white">Super Lille</div>
+                                <div class="text-[10px] text-gray-400">Succursale</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm font-black text-green-400">-14%</div>
+                                <div class="text-[9px] text-gray-500">vs N-1</div>
+                            </div>
                         </div>
-                        <div class="text-right">
-                            <div class="text-sm font-black text-green-400">-14%</div>
-                            <div class="text-[9px] text-gray-500">vs N-1</div>
+
+                        <!-- Rank 3 -->
+                        <div class="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-orange-700/30 relative overflow-hidden">
+                            <div class="w-8 h-8 bg-orange-700 text-white font-black flex items-center justify-center rounded-full">3</div>
+                            <div class="flex-1">
+                                <div class="text-sm font-bold text-white">Market Lyon</div>
+                                <div class="text-[10px] text-gray-400">Franchisé</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm font-black text-green-400">-11%</div>
+                                <div class="text-[9px] text-gray-500">vs N-1</div>
+                            </div>
                         </div>
                     </div>
+                    
+                    <div class="p-4 bg-white/5 text-center">
+                        <button onclick="navTo('league')" class="text-xs text-retail font-bold hover:text-white transition">Voir le classement complet (145 sites)</button>
+                    </div>
+                </div>
 
-                    <!-- Rank 3 -->
-                    <div class="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-orange-700/30 relative overflow-hidden">
-                        <div class="w-8 h-8 bg-orange-700 text-white font-black flex items-center justify-center rounded-full">3</div>
-                        <div class="flex-1">
-                            <div class="text-sm font-bold text-white">Market Lyon</div>
-                            <div class="text-[10px] text-gray-400">Franchisé</div>
+                <!-- CHART: BENCHMARK -->
+                <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card">
+                    <div class="flex justify-between mb-6">
+                        <h3 class="font-bold text-xl text-white">Benchmark Performance (kWh/m²)</h3>
+                        <div class="flex gap-4 text-xs">
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-retail"></span> Moyenne Réseau</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400"></span> Top Performers</span>
                         </div>
-                        <div class="text-right">
-                            <div class="text-sm font-black text-green-400">-11%</div>
-                            <div class="text-[9px] text-gray-500">vs N-1</div>
+                    </div>
+                    <div class="h-72 w-full"><canvas id="chartRetail"></canvas></div>
+                </div>
+
+                <!-- SPECIFIC RETAIL WIDGETS -->
+                <div class="col-span-6 bg-card rounded-[2rem] p-6 bento-card border-l-4 border-cold">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-bold text-lg text-white mb-1">Surveillance Froid</h3>
+                            <p class="text-xs text-gray-400">GTC Centralisée</p>
+                        </div>
+                        <div class="bg-cold/10 text-cold px-2 py-1 rounded text-[10px] font-bold animate-pulse">LIVE</div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-3 gap-4 text-center">
+                        <div class="bg-abysse/50 rounded-xl p-2 border border-white/5">
+                            <div class="text-lg font-bold text-white">-18.2°C</div>
+                            <div class="text-[9px] text-gray-500">Congélation</div>
+                        </div>
+                        <div class="bg-abysse/50 rounded-xl p-2 border border-white/5">
+                            <div class="text-lg font-bold text-white">+3.4°C</div>
+                            <div class="text-[9px] text-gray-500">Frais</div>
+                        </div>
+                        <div class="bg-abysse/50 rounded-xl p-2 border border-alert/30 cursor-pointer hover:bg-alert/10 transition" onclick="App.toast('Alerte Vitrine : Porte ouverte détectée (Rayon 4).', 'error')">
+                            <div class="text-lg font-bold text-alert">+6.1°C</div>
+                            <div class="text-[9px] text-alert font-bold">Alerte Vitrine</div>
                         </div>
                     </div>
                 </div>
-                
-                <div class="p-4 bg-white/5 text-center">
-                    <button class="text-xs text-retail font-bold hover:text-white transition">Voir le classement complet (145 sites)</button>
+
+                <div class="col-span-6 bg-card rounded-[2rem] p-6 bento-card border border-white/5">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="font-bold text-lg text-white">Facturation Franchise</h3>
+                        <button onclick="App.toast('Export CSV des refacturations généré.', 'success')" class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded transition">Exporter CSV</button>
+                    </div>
+                    <table class="w-full text-left text-xs text-gray-400">
+                        <thead class="text-[10px] uppercase text-gray-600 border-b border-white/5">
+                            <tr><th class="pb-2">Entité</th><th class="pb-2">Conso</th><th class="pb-2 text-right">Refacturation</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            <tr><td class="py-2 text-white">SARL DUPONT (Nantes)</td><td class="py-2">42 MWh</td><td class="py-2 text-right font-mono text-white">8 450 €</td></tr>
+                            <tr><td class="py-2 text-white">SAS MARKET (Lyon)</td><td class="py-2">38 MWh</td><td class="py-2 text-right font-mono text-white">7 210 €</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- VIEW 2: GREEN LEAGUE (Placeholder) -->
+            <div id="view-league" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                 <div class="col-span-12 bg-card rounded-[2rem] p-10 bento-card text-center border border-retail/20">
+                    <div class="text-4xl mb-4">🏆</div>
+                    <h3 class="text-xl font-bold text-white mb-2">Classement Complet</h3>
+                    <p class="text-gray-400 text-sm mb-6">Chargement des 145 magasins...</p>
+                    <button onclick="navTo('vision')" class="px-6 py-2 bg-retail text-white font-bold rounded-lg hover:bg-white/10 transition">Retour Synthèse</button>
                 </div>
             </div>
 
-            <!-- CHART: BENCHMARK -->
-            <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card">
-                <div class="flex justify-between mb-6">
-                    <h3 class="font-bold text-xl text-white">Benchmark Performance (kWh/m²)</h3>
-                    <div class="flex gap-4 text-xs">
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-retail"></span> Moyenne Réseau</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400"></span> Top Performers</span>
-                    </div>
+            <!-- VIEW 3: CHAINE FROID (Placeholder) -->
+            <div id="view-froid" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                 <div class="col-span-12 bg-card rounded-[2rem] p-10 bento-card text-center border border-cold/20">
+                    <div class="text-4xl mb-4">❄️</div>
+                    <h3 class="text-xl font-bold text-white mb-2">GTC Froid Centralisée</h3>
+                    <p class="text-gray-400 text-sm mb-6">Connexion aux sondes Danfoss/Carel...</p>
+                    <button onclick="navTo('vision')" class="px-6 py-2 bg-cold text-abysse font-bold rounded-lg hover:bg-white transition">Retour Synthèse</button>
                 </div>
-                <div class="h-72 w-full"><canvas id="chartRetail"></canvas></div>
-            </div>
-
-            <!-- SPECIFIC RETAIL WIDGETS -->
-            <div class="col-span-6 bg-card rounded-[2rem] p-6 bento-card border-l-4 border-cold">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h3 class="font-bold text-lg text-white mb-1">Surveillance Froid</h3>
-                        <p class="text-xs text-gray-400">GTC Centralisée</p>
-                    </div>
-                    <div class="bg-cold/10 text-cold px-2 py-1 rounded text-[10px] font-bold animate-pulse">LIVE</div>
-                </div>
-                <div class="mt-4 grid grid-cols-3 gap-4 text-center">
-                    <div class="bg-abysse/50 rounded-xl p-2 border border-white/5">
-                        <div class="text-lg font-bold text-white">-18.2°C</div>
-                        <div class="text-[9px] text-gray-500">Congélation</div>
-                    </div>
-                    <div class="bg-abysse/50 rounded-xl p-2 border border-white/5">
-                        <div class="text-lg font-bold text-white">+3.4°C</div>
-                        <div class="text-[9px] text-gray-500">Frais</div>
-                    </div>
-                    <div class="bg-abysse/50 rounded-xl p-2 border border-alert/30">
-                        <div class="text-lg font-bold text-alert">+6.1°C</div>
-                        <div class="text-[9px] text-alert font-bold">Alerte Vitrine</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-span-6 bg-card rounded-[2rem] p-6 bento-card border border-white/5">
-                <div class="flex justify-between items-start mb-4">
-                    <h3 class="font-bold text-lg text-white">Facturation Franchise</h3>
-                    <button class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded transition">Exporter CSV</button>
-                </div>
-                <table class="w-full text-left text-xs text-gray-400">
-                    <thead class="text-[10px] uppercase text-gray-600 border-b border-white/5">
-                        <tr><th class="pb-2">Entité</th><th class="pb-2">Conso</th><th class="pb-2 text-right">Refacturation</th></tr>
-                    </thead>
-                    <tbody class="divide-y divide-white/5">
-                        <tr><td class="py-2 text-white">SARL DUPONT (Nantes)</td><td class="py-2">42 MWh</td><td class="py-2 text-right font-mono text-white">8 450 €</td></tr>
-                        <tr><td class="py-2 text-white">SAS MARKET (Lyon)</td><td class="py-2">38 MWh</td><td class="py-2 text-right font-mono text-white">7 210 €</td></tr>
-                    </tbody>
-                </table>
             </div>
 
         </div>
     </main>
 
     <script>
-        (function() {
+        // NAVIGATION
+        function navTo(pageId) {
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active');
+                el.classList.add('text-gray-400');
+            });
+            document.getElementById('btn-' + pageId).classList.add('active');
+            document.getElementById('btn-' + pageId).classList.remove('text-gray-400');
+
+            document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
+            document.getElementById('view-' + pageId).classList.add('active');
+
+            const titles = {
+                'vision': 'Performance Réseau',
+                'league': 'Green League 2026',
+                'froid': 'Surveillance Chaine du Froid'
+            };
+            document.getElementById('page-title').innerText = titles[pageId];
+
+            if (pageId === 'vision') setTimeout(renderChart, 100);
+        }
+
+        // CHART
+        let retailChart = null;
+
+        function renderChart() {
             const ctxRetail = document.getElementById('chartRetail').getContext('2d');
-            if (window.retailChart instanceof Chart) window.retailChart.destroy();
+            if (retailChart) retailChart.destroy();
 
             const gradientRetail = ctxRetail.createLinearGradient(0, 0, 0, 300);
             gradientRetail.addColorStop(0, 'rgba(168, 85, 247, 0.2)');
             gradientRetail.addColorStop(1, 'rgba(0,0,0,0)');
 
-            window.retailChart = new Chart(ctxRetail, {
+            retailChart = new Chart(ctxRetail, {
                 type: 'line',
                 data: {
                     labels: ['Jan','Fev','Mar','Avr','Mai','Juin','Juil'],
@@ -245,7 +298,15 @@
                     } 
                 }
             });
-        })();
+        }
+
+        // INIT
+        document.addEventListener('DOMContentLoaded', () => {
+            renderChart();
+            setTimeout(() => {
+                App.toast('Synchronisation GTC Froid terminée.', 'info');
+            }, 800);
+        });
     </script>
 </body>
 </html>
