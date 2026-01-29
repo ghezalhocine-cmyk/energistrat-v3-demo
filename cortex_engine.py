@@ -9,14 +9,6 @@ class CortexEngine:
         self.kwh_price_elec = 0.18
         self.kwh_price_gaz = 0.09
 
-    def detect_delimiter(self, content_bytes):
-        try:
-            sample = content_bytes[:2048].decode('utf-8', errors='ignore')
-            if ';' in sample: return ';'
-            if ',' in sample: return ','
-            return ';'
-        except: return ';'
-
     # --- FONCTION DE NETTOYAGE (ANTI-CRASH JSON) ---
     def safe_value(self, val):
         """Transforme NaN ou Infinity en 0 pour le JSON"""
@@ -32,23 +24,38 @@ class CortexEngine:
             buffer = io.BytesIO(file_content)
             df = None
             
-            # 1. CHARGEMENT
+            # 1. CHARGEMENT ROBUSTE (Mode "Python Engine")
             if filename.lower().endswith('.csv'):
-                sep = self.detect_delimiter(file_content)
                 try:
-                    df = pd.read_csv(buffer, sep=sep, low_memory=False, encoding='utf-8')
+                    # TENTATIVE 1 : Autodétection intelligente
+                    df = pd.read_csv(buffer, sep=None, engine='python', encoding='utf-8')
                 except:
+                    # TENTATIVE 2 : Force le point-virgule et encodage Windows (Excel)
                     buffer.seek(0)
-                    df = pd.read_csv(buffer, sep=sep, low_memory=False, encoding='latin-1')
+                    df = pd.read_csv(buffer, sep=';', encoding='latin-1')
             else:
+                # Excel (.xlsx)
                 df = pd.read_excel(buffer)
 
             if df is None or df.empty:
                 return {"success": False, "error": "Fichier vide ou illisible."}
 
-            # 2. NETTOYAGE COLONNES
+            # 2. VÉRIFICATION DE LA STRUCTURE
+            # Si on a qu'une seule colonne, c'est que le séparateur a échoué
+            if len(df.columns) < 2:
+                # Dernière chance : on essaie la virgule
+                buffer.seek(0)
+                try:
+                    df = pd.read_csv(buffer, sep=',')
+                except: pass
+                
+                if len(df.columns) < 2:
+                    return {"success": False, "error": f"Échec lecture colonnes. J'ai lu : {list(df.columns)}. Vérifiez vos séparateurs (;)."}
+
+            # 3. NETTOYAGE COLONNES
             df.columns = [str(c).lower().strip().replace('"', '').replace("'", "") for c in df.columns]
             
+            # Recherche des colonnes
             possible_date = ['date', 'horodate', 'heure', 'time', 'timestamp', 'jour', 'dt']
             col_date = next((c for c in df.columns if any(x in c for x in possible_date)), None)
             
@@ -56,33 +63,32 @@ class CortexEngine:
             col_val = next((c for c in df.columns if any(x in c for x in possible_val)), None)
 
             if not col_date or not col_val:
-                return {"success": False, "error": f"Colonnes introuvables. Trouvé: {list(df.columns)}"}
+                return {"success": False, "error": f"Colonnes introuvables. Trouvé: {list(df.columns)}. Il faut 'Date' et 'Puissance'."}
 
-            # 3. TRAITEMENT
+            # 4. TRAITEMENT DATA
+            # Conversion Date
             df[col_date] = pd.to_datetime(df[col_date], dayfirst=True, errors='coerce')
             df = df.dropna(subset=[col_date]).sort_values(by=col_date).set_index(col_date)
             
+            # Conversion Nombre (Virgule française)
             if df[col_val].dtype == object:
                 df[col_val] = df[col_val].astype(str).str.replace(',', '.').astype(float)
 
-            # Nettoyage des NaN dans les données brutes
+            # Nettoyage des NaN
             df[col_val] = df[col_val].fillna(0)
 
-            # 4. CALCULS
+            # 5. CALCULS KPI
             vol = df[col_val].sum()
+            # Si pas 'kwh' ou 'index' dans le nom, on suppose kW 10min -> /6
             if 'kwh' not in col_val and 'index' not in col_val:
                 vol = vol / 6
 
             pic = df[col_val].max()
             talon = df[col_val].min()
             
-            # 5. RESAMPLING (Moyenne journalière)
+            # 6. RESAMPLING (Moyenne journalière)
             df_daily = df[col_val].resample('D').mean()
-            
-            # *** CRUCIAL : REMPLACER LES NAN/INF PAR 0 ***
             df_daily = df_daily.replace([np.inf, -np.inf], np.nan).fillna(0)
-            
-            # On limite à 365 points pour ne pas surcharger le graph
             df_daily = df_daily.tail(365)
 
             return {
@@ -95,7 +101,7 @@ class CortexEngine:
                 },
                 "chart": {
                     "labels": df_daily.index.strftime('%d/%m').tolist(),
-                    "values": [self.safe_value(x) for x in df_daily.tolist()] # Double sécurité
+                    "values": [self.safe_value(x) for x in df_daily.tolist()]
                 }
             }
 
