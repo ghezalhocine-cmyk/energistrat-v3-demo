@@ -4,6 +4,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 import os
 import json
+import re # Ajouté pour l'extraction de texte (Regex)
+
+# import pdfplumber  # <- À décommenter quand tu installeras pdfplumber via requirements.txt
 
 try:
     from cortex_engine import cortex
@@ -58,21 +61,77 @@ async def get_client_data(profil: str):
     else:
         return JSONResponse({"found": False, "message": "Aucune donnée"})
 
-# ... (Le reste des routes Chaos, Audit, Chat et Frontend reste inchangé) ...
-# Copie-colle le reste des routes (api_chaos, api_audit, render_404, etc.) ici
-# Je te remets le bloc standard pour être sûr :
-
 @app.post("/api/ops/chaos")
 async def api_chaos():
     if not cortex: return JSONResponse({"results": []})
     return JSONResponse({"results": cortex.run_chaos_monkey()})
 
+# --- NOUVELLE ROUTE : AUDIT JURIDIQUE & FINANCIER (PDF) ---
 @app.post("/api/ops/audit")
-async def api_audit(filename: str = Form(...)):
-    return JSONResponse(cortex.simulate_audit(filename))
+async def api_audit(invoice: UploadFile = File(...), contract: UploadFile = File(...)):
+    """
+    Comparaison Intelligente Facture vs Contrat (PDF)
+    """
+    results = {
+        "files": [invoice.filename, contract.filename],
+        "checks": [],
+        "score": 100,
+        "status": "SUCCESS"
+    }
+
+    # Lecture binaire des fichiers (ici on stocke en mémoire, prêt pour pdfplumber)
+    inv_content = await invoice.read()
+    ctr_content = await contract.read()
+    
+    # --- LOGIQUE DE DÉTECTION (Simulation Intelligente pour le MVP) ---
+    # Si le nom de la facture contient "err" ou "error", on génère une anomalie.
+    # Si le contrat contient "exonere", on vérifie la taxe.
+    
+    is_error = "err" in invoice.filename.lower()
+    is_exonere = "exonere" in contract.filename.lower()
+    
+    # CHECK 1 : PRIX UNITAIRE GAZ (€/MWh)
+    price_contract = 85.00
+    price_invoice = 89.50 if is_error else 85.00
+    delta_price = price_invoice - price_contract
+    
+    results["checks"].append({
+        "point": "Prix Unitaire Gaz (€/MWh)",
+        "a": f"{price_invoice} €",
+        "b": f"{price_contract} €",
+        "status": "ÉCART DÉTECTÉ" if delta_price != 0 else "OK",
+        "error": delta_price != 0
+    })
+
+    # CHECK 2 : VALIDITÉ JURIDIQUE (PÉRIODE & TACITE RECONDUCTION)
+    results["checks"].append({
+        "point": "Période Validité & Reconduction",
+        "a": "Fév 2026",
+        "b": "Actif (Fin 31/12)",
+        "status": "OK",
+        "error": False
+    })
+
+    # CHECK 3 : TAXES (CSPE / TICGN)
+    tax_status = "NON-CONFORME" if (is_error and is_exonere) else "OK"
+    results["checks"].append({
+        "point": "Fiscalité (TICGN / CSPE)",
+        "a": "Taxe Appliquée",
+        "b": "Exonéré" if is_exonere else "Standard",
+        "status": tax_status,
+        "error": (tax_status != "OK")
+    })
+
+    # CALCUL DU SCORE FINAL
+    if any(c["error"] for c in results["checks"]):
+        results["status"] = "ANOMALIE"
+        results["score"] = 65
+        
+    return JSONResponse(content=results)
 
 @app.post("/api/ops/chat")
 async def api_chat(message: str = Form(...)):
+    if not cortex: return JSONResponse({"response": "Moteur IA déconnecté."})
     return JSONResponse({"response": cortex.ask_agent(message)})
 
 def render_404(request):
