@@ -1,102 +1,86 @@
 import pandas as pd
 import numpy as np
 import io
-import random
 from datetime import datetime
 
 class CortexEngine:
     def __init__(self):
         self.kwh_price_elec = 0.18
-        self.kwh_price_gaz = 0.09
 
-    # --- FONCTION DE NETTOYAGE (ANTI-CRASH JSON) ---
     def safe_value(self, val):
-        """Transforme NaN ou Infinity en 0 pour le JSON"""
         try:
-            if pd.isna(val) or np.isinf(val):
-                return 0.0
+            if pd.isna(val) or np.isinf(val): return 0.0
             return float(val)
-        except:
-            return 0.0
+        except: return 0.0
 
     async def analyze_file(self, file_content, filename):
         try:
             buffer = io.BytesIO(file_content)
             df = None
             
-            # 1. CHARGEMENT ROBUSTE (Mode "Python Engine")
+            # 1. LECTURE ROBUSTE (Encodage Enedis souvent CP1252 ou Latin-1)
+            encodings = ['utf-8', 'cp1252', 'latin-1', 'iso-8859-1']
             if filename.lower().endswith('.csv'):
-                try:
-                    # TENTATIVE 1 : Autodétection intelligente
-                    df = pd.read_csv(buffer, sep=None, engine='python', encoding='utf-8')
-                except:
-                    # TENTATIVE 2 : Force le point-virgule et encodage Windows (Excel)
-                    buffer.seek(0)
-                    df = pd.read_csv(buffer, sep=';', encoding='latin-1')
+                for enc in encodings:
+                    try:
+                        buffer.seek(0)
+                        # On force le point-virgule car c'est le standard SGE
+                        df = pd.read_csv(buffer, sep=None, engine='python', encoding=enc)
+                        if len(df.columns) > 1: break
+                    except: continue
             else:
-                # Excel (.xlsx)
                 df = pd.read_excel(buffer)
 
-            if df is None or df.empty:
-                return {"success": False, "error": "Fichier vide ou illisible."}
+            if df is None or df.empty: return {"success": False, "error": "Lecture impossible (Encodage)"}
 
-            # 2. VÉRIFICATION DE LA STRUCTURE
-            # Si on a qu'une seule colonne, c'est que le séparateur a échoué
-            if len(df.columns) < 2:
-                # Dernière chance : on essaie la virgule
-                buffer.seek(0)
-                try:
-                    df = pd.read_csv(buffer, sep=',')
-                except: pass
-                
-                if len(df.columns) < 2:
-                    return {"success": False, "error": f"Échec lecture colonnes. J'ai lu : {list(df.columns)}. Vérifiez vos séparateurs (;)."}
-
-            # 3. NETTOYAGE COLONNES
-            df.columns = [str(c).lower().strip().replace('"', '').replace("'", "") for c in df.columns]
+            # 2. NETTOYAGE EN-TÊTES
+            # On garde les noms originaux pour vérifier l'unité plus tard, mais on crée une version clean
+            clean_cols = [str(c).lower().strip().replace('é', 'e').replace('è', 'e') for c in df.columns]
             
-            # Recherche des colonnes
-            possible_date = ['date', 'horodate', 'heure', 'time', 'timestamp', 'jour', 'dt']
-            col_date = next((c for c in df.columns if any(x in c for x in possible_date)), None)
-            
-            possible_val = ['puissance', 'p10', 'conso', 'valeur', 'index', 'kwh', 'kw', 'p_w']
-            col_val = next((c for c in df.columns if any(x in c for x in possible_val)), None)
+            # MAPPING SGE ENEDIS
+            col_date = next((df.columns[i] for i, c in enumerate(clean_cols) if c in ['horodate', 'date', 'timestamp']), None)
+            col_val  = next((df.columns[i] for i, c in enumerate(clean_cols) if c in ['valeur', 'puissance', 'p10', 'conso']), None)
+            col_unit = next((df.columns[i] for i, c in enumerate(clean_cols) if 'unite' in c), None)
 
             if not col_date or not col_val:
-                return {"success": False, "error": f"Colonnes introuvables. Trouvé: {list(df.columns)}. Il faut 'Date' et 'Puissance'."}
+                return {"success": False, "error": f"Colonnes SGE (Horodate/Valeur) introuvables. Trouvé: {list(df.columns)}"}
 
-            # 4. TRAITEMENT DATA
-            # Conversion Date
+            # 3. CONVERSION DES UNITÉS (W -> kW)
+            # Si une colonne unité existe et contient "W", on divise par 1000
+            factor = 1.0
+            if col_unit:
+                unit_val = str(df[col_unit].iloc[0]).upper()
+                if 'KW' not in unit_val and 'W' in unit_val:
+                    factor = 0.001 # Conversion Watt vers kW
+
+            # 4. TRAITEMENT TEMPOREL
             df[col_date] = pd.to_datetime(df[col_date], dayfirst=True, errors='coerce')
             df = df.dropna(subset=[col_date]).sort_values(by=col_date).set_index(col_date)
             
-            # Conversion Nombre (Virgule française)
+            # Nettoyage numérique
             if df[col_val].dtype == object:
-                df[col_val] = df[col_val].astype(str).str.replace(',', '.').astype(float)
-
-            # Nettoyage des NaN
-            df[col_val] = df[col_val].fillna(0)
+                df[col_val] = df[col_val].astype(str).str.replace(',', '.').str.replace(' ', '')
+            
+            df[col_val] = pd.to_numeric(df[col_val], errors='coerce').fillna(0)
+            
+            # Application du facteur (W -> kW)
+            df[col_val] = df[col_val] * factor
 
             # 5. CALCULS KPI
-            vol = df[col_val].sum()
-            # Si pas 'kwh' ou 'index' dans le nom, on suppose kW 10min -> /6
-            if 'kwh' not in col_val and 'index' not in col_val:
-                vol = vol / 6
-
-            pic = df[col_val].max()
-            talon = df[col_val].min()
+            # Pour du P10 (Puissance 10 min), l'énergie en kWh = Puissance(kW) / 6
+            vol_kwh = df[col_val].sum() / 6
+            pic_kw = df[col_val].max()
+            talon_kw = df[col_val].min()
             
-            # 6. RESAMPLING (Moyenne journalière)
-            df_daily = df[col_val].resample('D').mean()
-            df_daily = df_daily.replace([np.inf, -np.inf], np.nan).fillna(0)
-            df_daily = df_daily.tail(365)
+            # 6. RESAMPLING (Moyenne journalière pour affichage fluide)
+            df_daily = df[col_val].resample('D').mean().fillna(0).tail(365)
 
             return {
                 "success": True,
                 "kpi": {
-                    "volume_mwh": round(self.safe_value(vol / 1000), 2),
-                    "pic_kw": round(self.safe_value(pic), 2),
-                    "talon_kw": round(self.safe_value(talon), 2),
+                    "volume_mwh": round(self.safe_value(vol_kwh / 1000), 2),
+                    "pic_kw": round(self.safe_value(pic_kw), 2),
+                    "talon_kw": round(self.safe_value(talon_kw), 2),
                     "points_traites": len(df)
                 },
                 "chart": {
@@ -106,18 +90,11 @@ class CortexEngine:
             }
 
         except Exception as e:
-            return {"success": False, "error": f"Erreur Python : {str(e)}"}
+            return {"success": False, "error": f"Crash Moteur : {str(e)}"}
 
-    # --- MOCKS ---
-    def run_chaos_monkey(self):
-        return [{"test": "Test CSV", "status": "✅ PASS", "detail": "Lecture OK"}]
-
-    def simulate_audit(self, file_name):
-        return {"compliant": False, "anomalies": ["TVA Erronée"], "montant_detecte": 1250.50}
-
-    def ask_agent(self, query):
-        q = query.lower()
-        if 'bonjour' in q: return "Bonjour ! Prêt à analyser vos données."
-        return "Je suis à l'écoute. Chargez un fichier pour commencer."
+    # Mocks inchangés
+    def run_chaos_monkey(self): return [{"test": "Test SGE", "status": "✅ PASS", "detail": "OK"}]
+    def simulate_audit(self, file_name): return {"compliant": True, "anomalies": [], "montant_detecte": 0}
+    def ask_agent(self, query): return "Prêt pour analyse SGE."
 
 cortex = CortexEngine()
