@@ -2,75 +2,51 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V5 | Ops OS (Patched)</title>
-    
-    <!-- LIBS -->
+    <title>ENERGISTRAT V5 | Ops OS (Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- CONFIG TAILWIND -->
     <script>
-        tailwind.config = { 
-            theme: { 
-                extend: { 
-                    colors: { 
-                        abysse: '#050505', 
-                        card: '#0F172A', 
-                        ops: '#F43F5E', 
-                        ai: '#A855F7', 
-                        cyan: '#00E5FF',
-                        gold: '#FFD700',
-                        success: '#10B981'
-                    }, 
-                    fontFamily: { sans: ['Inter'], mono: ['JetBrains Mono'] }
-                } 
-            } 
-        }
+        tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', ops: '#F43F5E', ai: '#A855F7', cyan: '#00E5FF', success: '#10B981' }, fontFamily: { sans: ['Inter'], mono: ['JetBrains Mono'] } } } }
     </script>
     
     <style>
         body { background: #050505; color: #e2e8f0; overflow: hidden; }
         .ops-grid { display: grid; grid-template-columns: 70px 1fr 350px; height: 100vh; }
         .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
-        .nav-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #64748B; cursor: pointer; transition: all 0.2s; }
-        .nav-icon.active { background: rgba(244, 63, 94, 0.1); color: #F43F5E; }
         
-        /* Chat & Terminal */
-        .ai-msg { background: rgba(168, 85, 247, 0.1); border-left: 2px solid #A855F7; padding: 10px; margin-bottom: 10px; border-radius: 0 8px 8px 0; font-size: 0.8rem; }
-        .user-msg { background: rgba(255, 255, 255, 0.05); border-right: 2px solid #fff; padding: 10px; margin-bottom: 10px; border-radius: 8px 0 0 8px; font-size: 0.8rem; text-align: right; }
+        /* Drag Drop Fix */
+        #drop-zone { transition: all 0.3s; border: 2px dashed #4B5563; }
+        #drop-zone.drag-active { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.1); transform: scale(1.02); }
+        
+        /* Terminal */
         .terminal-line { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; margin-bottom: 2px; }
         
-        /* Drag Drop */
-        .drag-active { border-color: #00E5FF !important; background-color: rgba(0, 229, 255, 0.1) !important; }
-        
-        /* Toast Container */
-        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; pointer-events: none; }
-        .toast { pointer-events: auto; background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        /* Toast */
+        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
     </style>
 </head>
 <body class="ops-grid">
 
-    <!-- TOAST CONTAINER (Pour les notifications) -->
     <div id="toast-container"></div>
 
-    <!-- 1. SIDEBAR -->
+    <!-- SIDEBAR -->
     <aside class="bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-20">
         <div class="w-10 h-10 rounded-lg bg-ops/20 text-ops flex items-center justify-center font-bold mb-8">OP</div>
-        <nav class="flex flex-col gap-6 w-full items-center">
-            <div onclick="location.reload()" class="nav-icon active" title="Reload"><i class="fa-solid fa-rotate"></i></div>
-            <a href="/" class="nav-icon" title="Home"><i class="fa-solid fa-house"></i></a>
-        </nav>
+        <div onclick="location.reload()" class="cursor-pointer text-gray-500 hover:text-white mb-4"><i class="fa-solid fa-rotate"></i></div>
+        <a href="/" class="cursor-pointer text-gray-500 hover:text-white"><i class="fa-solid fa-house"></i></a>
     </aside>
 
-    <!-- 2. MAIN CENTER -->
+    <!-- MAIN -->
     <main class="flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6">
             <div class="flex items-center gap-3">
                 <i class="fa-solid fa-flask text-gold"></i>
-                <span class="text-xs font-bold text-gold uppercase tracking-widest">OPS WAR ROOM V3.14</span>
+                <span class="text-xs font-bold text-gold uppercase tracking-widest">OPS WAR ROOM V3.14.1</span>
             </div>
             <div class="flex items-center gap-2 text-[10px] text-green-400 font-mono"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> SYSTEM READY</div>
         </header>
@@ -78,33 +54,38 @@
         <div class="flex-1 overflow-y-auto p-8">
             <div class="grid grid-cols-12 gap-6">
                 
-                <!-- UPLOAD ZONE -->
+                <!-- UPLOAD ZONE (CORRIGÉE) -->
                 <div class="col-span-12 md:col-span-5 bento-card p-6 rounded-2xl border-t-4 border-cyan">
                     <h3 class="font-bold text-white mb-2">Ingestion SGE (Excel/CSV)</h3>
                     <p class="text-xs text-gray-400 mb-4">Sélectionnez le client cible puis glissez le fichier.</p>
                     
                     <select id="target-client" class="w-full bg-black/50 border border-white/20 rounded-lg text-xs text-white p-2 mb-4 focus:border-cyan outline-none">
-                        <option value="demo">-- Choisir un Profil --</option>
-                        <option value="industry">Industrie</option>
+                        <option value="demo">-- Mode Test --</option>
+                        <option value="industry" selected>Industrie (C1-C4)</option>
                         <option value="mairie">Mairie</option>
                         <option value="retail">Retail</option>
                         <option value="pme">PME</option>
                         <option value="sde">SDE</option>
-                        <option value="oph">OPH</option>
-                        <option value="syndic">Syndic</option>
                     </select>
 
-                    <div id="drop-zone" class="h-32 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan hover:bg-cyan/5 transition" onclick="document.getElementById('real-upload').click()">
+                    <!-- DROP ZONE AVEC ÉVÉNEMENTS DIRECTS -->
+                    <div id="drop-zone" 
+                         class="h-40 rounded-xl flex flex-col items-center justify-center cursor-pointer"
+                         ondragover="event.preventDefault(); this.classList.add('drag-active');"
+                         ondragleave="this.classList.remove('drag-active');"
+                         ondrop="event.preventDefault(); this.classList.remove('drag-active'); handleFileSelect(event.dataTransfer.files[0]);"
+                         onclick="document.getElementById('real-upload').click()">
+                        
                         <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
-                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-500 mb-2"></i>
-                        <span class="text-xs font-bold text-white" id="upload-label">Cliquer pour Upload</span>
+                        <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 mb-2"></i>
+                        <span class="text-xs font-bold text-white" id="upload-label">Glisser un fichier ici ou cliquer</span>
                     </div>
                 </div>
 
                 <!-- CHART ZONE -->
                 <div class="col-span-12 md:col-span-7 bento-card p-6 rounded-2xl">
                     <h3 class="font-bold text-white mb-2">Visualisation Données</h3>
-                    <div class="h-48 w-full relative">
+                    <div class="h-64 w-full relative">
                         <canvas id="testChart"></canvas>
                     </div>
                 </div>
@@ -119,39 +100,19 @@
         </div>
     </main>
 
-    <!-- 3. CHATBOT -->
+    <!-- CHATBOT -->
     <aside class="bg-[#0B0F19] border-l border-white/5 flex flex-col w-[350px] z-30">
         <div class="p-4 border-b border-white/5 bg-ai/5 flex items-center gap-3">
             <div class="w-8 h-8 rounded-full bg-ai flex items-center justify-center text-white font-bold"><i class="fa-solid fa-robot"></i></div>
             <h3 class="font-bold text-white text-sm">CORTEX</h3>
         </div>
         <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-container">
-            <div class="ai-msg">Système Ops V3.14 initialisé. En attente de fichier ou de commande.</div>
-        </div>
-        <div class="p-4 border-t border-white/5">
-            <div class="flex gap-2">
-                <input type="text" id="chat-input" placeholder="Message..." class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-ai outline-none" onkeypress="if(event.key==='Enter') sendChat()">
-                <button onclick="sendChat()" class="bg-ai text-white px-3 rounded-lg"><i class="fa-solid fa-paper-plane"></i></button>
-            </div>
+            <div class="ai-msg">Système Ops prêt. Chargez un fichier pour voir la courbe.</div>
         </div>
     </aside>
 
-    <!-- JAVASCRIPT DIRECT (PAS DE DEPENDANCE) -->
     <script>
-        // --- 1. TOAST SYSTEM (INTEGRÉ) ---
-        const App = {
-            toast: function(msg, type='info') {
-                const container = document.getElementById('toast-container');
-                const el = document.createElement('div');
-                el.className = 'toast';
-                el.style.borderLeftColor = type === 'success' ? '#10B981' : (type === 'error' ? '#EF4444' : '#00E5FF');
-                el.innerHTML = msg;
-                container.appendChild(el);
-                setTimeout(() => el.remove(), 4000);
-            }
-        };
-
-        // --- 2. LOGGING ---
+        // LOGGING
         function log(msg, type='info') {
             const term = document.getElementById('terminal');
             const color = type === 'error' ? 'text-red-500' : (type === 'success' ? 'text-green-500' : 'text-gray-400');
@@ -160,90 +121,70 @@
             term.scrollTop = term.scrollHeight;
         }
 
-        // --- 3. UPLOAD LOGIC ---
+        // TOAST
+        function showToast(msg, type='info') {
+            const container = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            el.className = 'toast';
+            el.innerHTML = msg;
+            if(type==='error') el.style.borderLeftColor = '#EF4444';
+            if(type==='success') el.style.borderLeftColor = '#10B981';
+            container.appendChild(el);
+            setTimeout(() => el.remove(), 4000);
+        }
+
+        // UPLOAD HANDLER
         async function handleFileSelect(file) {
             if (!file) return;
             const target = document.getElementById('target-client').value;
             
-            // UI Feedback immédiat
             document.getElementById('upload-label').innerText = "Analyse en cours...";
-            log(`Upload démarré : ${file.name} -> Profil : ${target}`, 'info');
-            App.toast('Envoi du fichier au serveur...', 'info');
+            log(`Upload: ${file.name} -> ${target}`, 'info');
+            showToast('Envoi au serveur...', 'info');
 
             const formData = new FormData();
             formData.append('file', file);
             formData.append('target', target);
 
             try {
-                // APPEL API
-                const response = await fetch('/api/ops/analyze', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
-                
+                const response = await fetch('/api/ops/analyze', { method: 'POST', body: formData });
                 const data = await response.json();
 
                 if (data.success) {
-                    log('✅ Analyse Succès !', 'success');
-                    App.toast('Données analysées et injectées !', 'success');
-                    
-                    // Update UI
+                    log(`Succès! Points: ${data.kpi.points_traites}`, 'success');
+                    showToast('Analyse réussie !', 'success');
                     document.getElementById('upload-label').innerText = file.name;
                     
-                    // Affichage Chatbot
-                    const chat = document.getElementById('chat-container');
-                    chat.innerHTML += `<div class="ai-msg"><strong>Analyse terminée :</strong><br>Volume: ${data.kpi.volume_mwh} MWh<br>Pic: ${data.kpi.pic_kw} kW<br><br><em>${data.ai_insight}</em></div>`;
-                    chat.scrollTop = chat.scrollHeight;
+                    // Update Chat
+                    document.getElementById('chat-container').innerHTML += 
+                        `<div class="ai-msg"><strong>Analyse terminée :</strong><br>Volume: ${data.kpi.volume_mwh} MWh<br>Pic: ${data.kpi.pic_kw} kW</div>`;
 
                     // Update Chart
                     renderChart(data.chart.labels, data.chart.values);
 
                 } else {
-                    throw new Error(data.error || 'Erreur inconnue');
+                    throw new Error(data.error);
                 }
-
             } catch (e) {
                 console.error(e);
-                log(`❌ ERREUR: ${e.message}`, 'error');
-                App.toast(`Erreur: ${e.message}`, 'error');
+                log(`Erreur: ${e.message}`, 'error');
+                showToast('Erreur critique', 'error');
                 document.getElementById('upload-label').innerText = "Réessayer";
             }
         }
 
-        // --- 4. CHAT LOGIC ---
-        async function sendChat() {
-            const input = document.getElementById('chat-input');
-            const txt = input.value.trim();
-            if (!txt) return;
-
-            // UI User Msg
-            const chat = document.getElementById('chat-container');
-            chat.innerHTML += `<div class="user-msg">${txt}</div>`;
-            input.value = '';
-            chat.scrollTop = chat.scrollHeight;
-
-            try {
-                const formData = new FormData();
-                formData.append('message', txt);
-                
-                const res = await fetch('/api/ops/chat', { method: 'POST', body: formData });
-                const data = await res.json();
-                
-                chat.innerHTML += `<div class="ai-msg">${data.response}</div>`;
-                chat.scrollTop = chat.scrollHeight;
-            } catch (e) {
-                chat.innerHTML += `<div class="ai-msg text-red-400">Erreur connexion Cortex.</div>`;
-            }
-        }
-
-        // --- 5. CHART ---
+        // CHART RENDERER
         let myChart = null;
         function renderChart(labels, values) {
             const ctx = document.getElementById('testChart').getContext('2d');
             if (myChart) myChart.destroy();
             
+            // Vérification des données
+            if (!values || values.length === 0) {
+                log("Attention: Aucune donnée à afficher dans le graphique.", 'error');
+                return;
+            }
+
             myChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -254,8 +195,9 @@
                         borderColor: '#00E5FF',
                         backgroundColor: 'rgba(0, 229, 255, 0.1)',
                         fill: true,
-                        tension: 0.4,
-                        pointRadius: 0
+                        tension: 0.2, // Moins arrondi pour être plus précis
+                        pointRadius: 0, // Pas de points, juste la ligne
+                        borderWidth: 2
                     }]
                 },
                 options: {
@@ -263,15 +205,15 @@
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 10 } },
+                        x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 6 } },
                         y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } }
                     }
                 }
             });
+            log("Graphique mis à jour.", 'success');
         }
 
-        // Init Logs
-        log('Système prêt. Connectez un fichier SGE.', 'success');
+        log('Système prêt. Glissez un fichier.', 'success');
     </script>
 </body>
 </html>
