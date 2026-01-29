@@ -53,14 +53,6 @@
         .nav-icon:hover { background: rgba(255,255,255,0.1); color: white; }
         .nav-icon.active { background: rgba(244, 63, 94, 0.1); color: #F43F5E; box-shadow: 0 0 15px rgba(244, 63, 94, 0.2); }
         
-        /* Tooltip ELI5 */
-        .eli5-trigger:hover + .eli5-tooltip { display: block; opacity: 1; transform: translateY(0); }
-        .eli5-tooltip {
-            display: none; opacity: 0; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(10px);
-            width: 250px; background: #1E293B; border: 1px solid #A855F7; color: white; padding: 10px; border-radius: 8px;
-            font-size: 0.75rem; z-index: 50; pointer-events: none; transition: all 0.2s; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
         /* AI Chat */
         .ai-msg { background: rgba(168, 85, 247, 0.1); border-left: 2px solid #A855F7; padding: 10px; margin-bottom: 10px; border-radius: 0 8px 8px 0; font-size: 0.8rem; }
         .user-msg { background: rgba(255, 255, 255, 0.05); border-right: 2px solid #fff; padding: 10px; margin-bottom: 10px; border-radius: 8px 0 0 8px; font-size: 0.8rem; text-align: right; }
@@ -76,6 +68,9 @@
         /* Custom Scrollbar */
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+        
+        /* Drag & Drop Visual Feedback */
+        .drag-active { border-color: #00E5FF !important; background-color: rgba(0, 229, 255, 0.1) !important; }
     </style>
 </head>
 <body class="ops-grid">
@@ -126,15 +121,34 @@
 
             <!-- === TAB 1: DATA LAB (Upload Réel) === -->
             <div id="view-datalab" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
-                <!-- Upload -->
+                
+                <!-- Upload & Affectation -->
                 <div class="col-span-12 md:col-span-4 bento-card p-6 rounded-2xl border-t-4 border-data flex flex-col">
-                    <h3 class="font-bold text-white mb-2"><i class="fa-solid fa-upload mr-2"></i>Ingestion Brute</h3>
-                    <p class="text-xs text-gray-400 mb-4">Analyse de courbes de charge réelles (CSV/Excel).</p>
-                    <label class="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-data hover:bg-data/5 transition group py-8">
-                        <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleRealUpload()">
-                        <i class="fa-solid fa-file-csv text-3xl mb-2 text-gray-500 group-hover:text-data"></i>
-                        <span class="text-xs font-bold text-white" id="upload-label">Choisir un fichier</span>
-                    </label>
+                    <h3 class="font-bold text-white mb-2"><i class="fa-solid fa-upload mr-2"></i>Ingestion & Affectation</h3>
+                    <p class="text-xs text-gray-400 mb-4">Analyse de courbes de charge réelles.</p>
+                    
+                    <!-- SÉLECTEUR DE CLIENT -->
+                    <div class="mb-4">
+                        <label class="text-[10px] text-gray-500 uppercase font-bold">Cible Client</label>
+                        <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 mt-1 focus:border-data outline-none">
+                            <option value="demo">-- Mode Test (Aucune affectation) --</option>
+                            <option value="industry">Industrie (Seveso)</option>
+                            <option value="mairie">Mairie (Collectivité)</option>
+                            <option value="retail">Retail (Groupe)</option>
+                            <option value="pme">PME (Boulangerie)</option>
+                            <option value="sde">Syndicat (SDE)</option>
+                            <option value="oph">Bailleur (OPH)</option>
+                            <option value="syndic">Syndic Copro</option>
+                        </select>
+                    </div>
+
+                    <!-- DROP ZONE CORRIGÉE -->
+                    <div id="drop-zone" class="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-data hover:bg-data/5 transition group py-8">
+                        <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
+                        <i class="fa-solid fa-file-csv text-3xl mb-2 text-gray-500 group-hover:text-data pointer-events-none"></i>
+                        <span class="text-xs font-bold text-white pointer-events-none" id="upload-label">Glisser un fichier ici</span>
+                        <span class="text-[10px] text-gray-500 mt-1 pointer-events-none">ou cliquer pour parcourir</span>
+                    </div>
                 </div>
 
                 <!-- KPI & Chart -->
@@ -162,6 +176,16 @@
                         <div id="chart-placeholder" class="absolute inset-0 flex items-center justify-center text-xs text-gray-600">En attente de données...</div>
                     </div>
                 </div>
+                
+                <!-- JSON VIEWER -->
+                <div class="col-span-12 bg-[#0A0F1C] rounded-bento p-6 border border-white/10 font-mono text-xs">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-bold text-gray-400">Réponse brute du Moteur (JSON)</h3>
+                    </div>
+                    <div class="h-40 overflow-y-auto bg-black/50 p-4 rounded-xl border border-white/5 text-slate-300 custom-scrollbar">
+                        <pre id="json-viewer">// Le retour de l'API s'affichera ici...</pre>
+                    </div>
+                </div>
             </div>
 
             <!-- === TAB 2: AUDIT LAB (QA Facture) === -->
@@ -187,7 +211,6 @@
                             <tr><th class="pb-2">Point de Contrôle</th><th class="pb-2">Facture (A)</th><th class="pb-2">Contrat/Réel (B)</th><th class="pb-2 text-right">Statut</th></tr>
                         </thead>
                         <tbody class="divide-y divide-white/5" id="audit-results">
-                            <!-- Rempli par JS -->
                             <tr><td class="py-3 text-gray-500 italic" colspan="4">En attente d'analyse...</td></tr>
                         </tbody>
                     </table>
@@ -212,15 +235,10 @@
                             <div class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-500"><i class="fa-solid fa-skull"></i></div>
                             <h3 class="font-bold text-white">Chaos Monkey</h3>
                         </div>
-                        <div class="relative">
-                            <i class="fa-regular fa-circle-question text-gray-500 hover:text-white cursor-help eli5-trigger"></i>
-                            <div class="eli5-tooltip"><strong>ELI5 :</strong> On envoie des fichiers cassés pour voir si le serveur résiste.</div>
-                        </div>
                     </div>
                     <p class="text-xs text-gray-400 mb-6">Injection de 10 fichiers corrompus via le Backend Python.</p>
                     <button onclick="runTest('chaos')" class="w-full py-2 bg-red-500/10 border border-red-500/30 text-red-500 font-bold rounded-lg text-xs hover:bg-red-500 hover:text-white transition">LANCER LE STRESS TEST</button>
                 </div>
-
                 <div class="col-span-6 bento-card p-6 rounded-2xl">
                     <div class="flex items-center gap-3 mb-4">
                         <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500"><i class="fa-solid fa-clone"></i></div>
@@ -339,9 +357,82 @@
             container.scrollTop = container.scrollHeight;
         }
 
+        // --- DRAG AND DROP LOGIC (FIXED) ---
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('real-upload');
+
+        // Click to open file dialog
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        // Drag Over
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-active');
+        });
+
+        // Drag Leave
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-active');
+        });
+
+        // Drop
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-active');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files; // Assign dropped file to input
+                handleFileSelect(files[0]);
+            }
+        });
+
         // --- BACKEND CALLS ---
         
-        // 1. CHAOS MONKEY
+        async function handleFileSelect(file) {
+            if (!file) return;
+
+            log(`Upload : ${file.name} (${(file.size/1024).toFixed(1)} KB)`, 'info');
+            document.getElementById('upload-label').innerText = "Analyse...";
+            
+            // Récupérer la cible (Target)
+            const target = document.getElementById('target-client').value;
+            log(`Cible : ${target}`, 'info');
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('target', target); // On envoie le target au serveur
+
+            try {
+                const res = await fetch('/api/ops/analyze', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                // Afficher JSON brut
+                document.getElementById('json-viewer').innerHTML = JSON.stringify(data, null, 2);
+
+                if (data.success) {
+                    log(`Succès. Points: ${data.kpi.points_traites}`, 'success');
+                    document.getElementById('kpi-vol').innerText = data.kpi.volume_mwh;
+                    document.getElementById('kpi-pic').innerText = data.kpi.pic_kw;
+                    document.getElementById('kpi-talon').innerText = data.kpi.talon_kw;
+                    document.getElementById('kpi-points').innerText = data.kpi.points_traites;
+                    renderTestChart(data.chart.labels, data.chart.values);
+                    document.getElementById('upload-label').innerText = file.name;
+                    
+                    if(target !== 'demo') {
+                        aiSpeak(`Données injectées avec succès dans le profil <strong>${target.toUpperCase()}</strong>.<br>Vous pouvez vérifier sur le Dashboard Client.`);
+                    }
+
+                } else {
+                    log(`Erreur: ${data.error}`, 'error');
+                    document.getElementById('upload-label').innerText = "Erreur";
+                }
+            } catch (e) {
+                log('Erreur réseau : ' + e, 'error');
+            }
+        }
+        
+        // --- OTHER FUNCTIONS ---
         async function runTest(testId) {
             if (testId === 'chaos') {
                 log('Démarrage Chaos Monkey...', 'info');
@@ -357,25 +448,20 @@
                     aiSpeak(`<strong>Résultat Chaos :</strong> ${success}/${data.results.length} tests passés.`);
                 } catch(e) { log('Erreur API Chaos', 'error'); }
             }
-            
             if (testId === 'clone') {
                 const target = document.getElementById('clone-target').value;
                 log(`Clonage ${target}...`, 'info');
                 aiSpeak(`Clone créé en Sandbox : <strong>${target}_COPY</strong>.`);
             }
-
             if (testId === 'ocr') {
-                // Simulation visuelle pour l'instant, en attendant l'upload réel
                 navTo('auditlab');
                 runCrossCheck();
             }
         }
 
-        // 2. AUDIT CROSS-CHECK
         function runCrossCheck() {
             log("Lancement Cross-Check...", "info");
             document.getElementById('audit-results').innerHTML = '<tr><td colspan="4" class="py-4 text-center"><i class="fa-solid fa-circle-notch fa-spin text-cyan-400"></i> Analyse en cours...</td></tr>';
-            
             setTimeout(() => {
                 const html = `
                     <tr><td class="py-3">Prix Gaz</td><td class="font-mono">85.00 €</td><td class="font-mono">85.00 €</td><td class="text-right text-green-400 font-bold">OK</td></tr>
@@ -388,46 +474,11 @@
             }, 1500);
         }
 
-        // 3. UPLOAD REEL
-        async function handleRealUpload() {
-            const input = document.getElementById('real-upload');
-            const file = input.files[0];
-            if (!file) return;
-
-            log(`Upload : ${file.name}`, 'info');
-            document.getElementById('upload-label').innerText = "Analyse...";
-            
-            const formData = new FormData();
-            formData.append('file', file);
-
-            try {
-                const res = await fetch('/api/ops/analyze', { method: 'POST', body: formData });
-                const data = await res.json();
-
-                if (data.success) {
-                    log(`Succès. Points: ${data.kpi.points_traites}`, 'success');
-                    document.getElementById('kpi-vol').innerText = data.kpi.volume_mwh;
-                    document.getElementById('kpi-pic').innerText = data.kpi.pic_kw;
-                    document.getElementById('kpi-talon').innerText = data.kpi.talon_kw;
-                    document.getElementById('kpi-points').innerText = data.kpi.points_traites;
-                    renderTestChart(data.chart.labels, data.chart.values);
-                    document.getElementById('upload-label').innerText = file.name;
-                } else {
-                    log(`Erreur: ${data.error}`, 'error');
-                    document.getElementById('upload-label').innerText = "Erreur";
-                }
-            } catch (e) {
-                log('Erreur réseau', 'error');
-            }
-        }
-
-        // 4. CHAT
         async function handleInput(e) {
             if (e.key === 'Enter') {
                 const txt = e.target.value;
                 userSpeak(txt);
                 e.target.value = '';
-                
                 const formData = new FormData();
                 formData.append('message', txt);
                 const res = await fetch('/api/ops/chat', { method: 'POST', body: formData });
@@ -436,7 +487,6 @@
             }
         }
 
-        // 5. PROTOCOL CHECK
         function checkProtocol() {
             const checks = document.querySelectorAll('.qa-checkbox:checked');
             const btn = document.getElementById('btn-deploy');
