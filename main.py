@@ -3,24 +3,23 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 import os
+import json
 
 try:
     from cortex_engine import cortex
 except ImportError:
     cortex = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="3.12 Multi-Tenant")
+app = FastAPI(title="ENERGISTRAT V3", version="3.14 PERSISTENCE")
 
+# 1. SETUP DOSSIERS
 if not os.path.exists("static"): os.makedirs("static")
 if not os.path.exists("templates"): os.makedirs("templates")
+# Création d'un dossier pour stocker les données clients temporaires
+if not os.path.exists("data_store"): os.makedirs("data_store")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
-
-# --- 💾 BASE DE DONNÉES EN MÉMOIRE (SIMULATION DB) ---
-# C'est ici que l'on stocke les données de chaque client temporairement
-# Structure : { "industry": { ...data... }, "mairie": { ...data... } }
-DATA_STORE = {}
 
 # ==============================================================================
 # ROUTES API
@@ -28,10 +27,6 @@ DATA_STORE = {}
 
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
-    """
-    1. Analyse le fichier
-    2. Sauvegarde le résultat dans le casier du client ciblé (target)
-    """
     if not cortex: return JSONResponse({"success": False, "error": "Moteur HS"})
     
     try:
@@ -39,9 +34,12 @@ async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
         result = await cortex.analyze_file(content, file.filename)
         
         if result.get("success"):
-            # SAUVEGARDE DANS LA MÉMOIRE DU SERVEUR
-            DATA_STORE[target] = result
-            print(f"✅ Données sauvegardées pour le profil : {target}")
+            # SAUVEGARDE SUR DISQUE (JSON)
+            # On écrit dans un fichier physique pour que toutes les instances le voient
+            file_path = f"data_store/{target}.json"
+            with open(file_path, "w") as f:
+                json.dump(result, f)
+            print(f"✅ Données écrites sur disque : {file_path}")
             
         return JSONResponse(result)
     except Exception as e:
@@ -50,17 +48,19 @@ async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
 @app.get("/api/data/{profil}")
 async def get_client_data(profil: str):
     """
-    Le Dashboard Client appelle cette route pour récupérer SA donnée.
+    Lit le fichier JSON sur le disque
     """
-    data = DATA_STORE.get(profil)
-    if data:
+    file_path = f"data_store/{profil}.json"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            data = json.load(f)
         return JSONResponse({"found": True, "data": data})
     else:
-        return JSONResponse({"found": False, "message": "Aucune donnée réelle pour ce client."})
+        return JSONResponse({"found": False, "message": "Aucune donnée"})
 
 # ... (Le reste des routes Chaos, Audit, Chat et Frontend reste inchangé) ...
-# (Copie-colle le reste de ton ancien main.py ici pour les routes /ops, /dashboard, etc.)
-# Je remets les routes essentielles pour que tu puisses copier-coller tout le bloc si besoin :
+# Copie-colle le reste des routes (api_chaos, api_audit, render_404, etc.) ici
+# Je te remets le bloc standard pour être sûr :
 
 @app.post("/api/ops/chaos")
 async def api_chaos():
