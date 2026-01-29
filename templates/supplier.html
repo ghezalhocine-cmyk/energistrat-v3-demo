@@ -5,14 +5,31 @@
     <title>ENERGISTRAT V3 | Partner Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- CORE ENGINE UX -->
+    <script src="/static/js/main.js"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <script>
-        tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', supplier: '#6366F1', cyan: '#00E5FF', alert: '#EF4444' }, borderRadius: { 'bento': '2rem' } } } }
+        tailwind.config = { 
+            theme: { 
+                extend: { 
+                    colors: { 
+                        abysse: '#050505', 
+                        card: '#0F172A', 
+                        supplier: '#6366F1', // Indigo
+                        cyan: '#00E5FF', 
+                        alert: '#EF4444' 
+                    }, 
+                    borderRadius: { 'bento': '2rem' } 
+                } 
+            } 
+        }
     </script>
     <style>
         body { background-color: #050505; color: white; }
         .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
         .bento-card:hover { border-color: rgba(99, 102, 241, 0.5); transform: translateY(-2px); }
+        .nav-item.active { background: rgba(99, 102, 241, 0.1); border-left: 3px solid #6366F1; color: white; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
@@ -25,16 +42,22 @@
                 <div><h1 class="font-bold tracking-wider text-base">PARTNER<span class="text-supplier">.HUB</span></h1><p class="text-[10px] text-gray-500">Courtage & Supply</p></div>
             </div>
             <nav class="space-y-2">
-                <button class="w-full text-left px-4 py-3 rounded-xl bg-supplier/10 text-supplier border border-supplier/20 font-bold uppercase tracking-wide">1. Portefeuille</button>
-                <button class="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition">2. Risque Churn</button>
-                <button class="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition">3. Compliance</button>
+                <button onclick="navTo('portfolio')" id="btn-portfolio" class="nav-item active w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition">
+                    <span>1.</span> Portefeuille
+                </button>
+                <button onclick="navTo('churn')" id="btn-churn" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition">
+                    <span>2.</span> Risque Churn
+                </button>
+                <button onclick="navTo('compliance')" id="btn-compliance" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition">
+                    <span>3.</span> Compliance
+                </button>
             </nav>
         </div>
         <div class="p-6 border-t border-white/5">
             <div class="bg-gradient-to-br from-card to-abysse border border-white/10 rounded-xl p-4">
                 <div class="text-xs font-bold text-white mb-1">🚀 Leads</div>
                 <p class="text-[10px] text-gray-400 mb-2">3 nouvelles opportunités.</p>
-                <div class="text-center bg-black/30 rounded py-1 font-mono text-supplier text-xs cursor-pointer border border-dashed border-supplier/30 hover:text-white transition">VIEW LEADS</div>
+                <div onclick="App.toast('Chargement des leads qualifiés...', 'info')" class="text-center bg-black/30 rounded py-1 font-mono text-supplier text-xs cursor-pointer border border-dashed border-supplier/30 hover:text-white transition">VIEW LEADS</div>
             </div>
         </div>
     </aside>
@@ -46,7 +69,7 @@
             <div class="px-2 py-1 rounded bg-supplier text-white text-[10px] font-black animate-pulse tracking-wider">CORTEX SALES</div>
             <span class="text-xs text-supplier font-mono flex-1">RISQUE CHURN : Le client "Mairie St-Lys" consulte la concurrence. Action requise avant J-45.</span>
             
-            <!-- LIEN SETTINGS AJOUTÉ ICI -->
+            <!-- LIEN SETTINGS -->
             <a href="/settings.html" class="h-10 w-10 rounded-full bg-gradient-to-br from-supplier to-cyan p-[2px] cursor-pointer hover:scale-105 transition block" title="Paramètres">
                 <div class="h-full w-full rounded-full bg-abysse flex items-center justify-center font-bold text-supplier">
                     PA
@@ -58,7 +81,7 @@
         <div class="p-8 overflow-y-auto grid grid-cols-12 gap-6 h-full pb-20">
             <!-- HEADER -->
             <div class="col-span-12 flex justify-between items-end">
-                <h2 class="text-3xl font-black text-white tracking-tight">Vue Partenaire</h2>
+                <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Vue Partenaire</h2>
                 <div class="bg-card border border-white/10 px-4 py-2 rounded-full">
                     <span class="text-xs font-bold text-gray-300 uppercase">Volume Signé</span>
                     <span class="text-sm font-bold text-white ml-2">45 GWh</span>
@@ -76,7 +99,7 @@
                             <div class="text-xs font-bold text-white">Mairie St-Lys</div>
                             <div class="text-[10px] text-alert">Score Fidélité: 2/10</div>
                         </div>
-                        <button class="px-3 py-1 bg-alert text-white text-[10px] font-bold rounded">CONTACTER</button>
+                        <button onclick="App.toast('Ticket commercial ouvert pour Mairie St-Lys (Priorité Haute).', 'success')" class="px-3 py-1 bg-alert text-white text-[10px] font-bold rounded hover:bg-white hover:text-alert transition">CONTACTER</button>
                     </div>
                     <div class="flex justify-between items-center bg-white/5 p-3 rounded-xl">
                         <div>
@@ -100,15 +123,39 @@
     </main>
 
     <script>
-        (function() {
+        // NAVIGATION
+        function navTo(pageId) {
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active', 'text-white');
+                el.classList.add('text-gray-400');
+            });
+            document.getElementById('btn-' + pageId).classList.add('active', 'text-white');
+            document.getElementById('btn-' + pageId).classList.remove('text-gray-400');
+
+            const titles = {
+                'portfolio': 'Vue Partenaire',
+                'churn': 'Analyse Rétention',
+                'compliance': 'Conformité & KYC'
+            };
+            if(titles[pageId]) document.getElementById('page-title').innerText = titles[pageId];
+            
+            // Simulation de changement de vue (Pour le MVP on reste sur la même page mais on notifie)
+            if(pageId === 'portfolio') setTimeout(renderChart, 100);
+            else App.toast('Module ' + pageId.toUpperCase() + ' chargé.', 'info');
+        }
+
+        // CHART
+        let supplierChart = null;
+
+        function renderChart() {
             const ctxSupplier = document.getElementById('chartSupplier').getContext('2d');
-            if (window.supplierChart instanceof Chart) window.supplierChart.destroy();
+            if (supplierChart) supplierChart.destroy();
 
             const gradientSupplier = ctxSupplier.createLinearGradient(0, 0, 0, 300);
             gradientSupplier.addColorStop(0, 'rgba(99, 102, 241, 0.2)');
             gradientSupplier.addColorStop(1, 'rgba(0,0,0,0)');
 
-            window.supplierChart = new Chart(ctxSupplier, {
+            supplierChart = new Chart(ctxSupplier, {
                 type: 'line',
                 data: {
                     labels: ['Jan','Fev','Mar','Avr','Mai','Juin'],
@@ -118,7 +165,15 @@
                 },
                 options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:'#64748B'}},y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748B'}}} }
             });
-        })();
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            renderChart();
+            setTimeout(() => {
+                App.toast('Synchronisation CRM : OK', 'success');
+            }, 800);
+        });
     </script>
 </body>
 </html>
