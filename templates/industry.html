@@ -140,10 +140,10 @@
             <div class="flex justify-between items-end mb-6">
                 <div>
                     <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Supervision Usine</h2>
-                    <p class="text-gray-400 text-xs mt-1 font-mono">Pmax: 2.4 MW • Cos φ: 0.94</p>
+                    <!-- ID Ajouté pour mise à jour JS -->
+                    <p class="text-gray-400 text-xs mt-1 font-mono" id="header-infos">Pmax: 2.4 MW • Cos φ: 0.94</p>
                 </div>
                 <div class="flex gap-4 items-center">
-                    <!-- WIDGET PRIX SPOT -->
                     <div class="bg-card border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
                         <div class="text-right">
                             <div class="text-[10px] text-gray-400 uppercase font-bold">Prix Spot (EEX)</div>
@@ -151,10 +151,12 @@
                         </div>
                         <span class="text-xs text-green-400"><i class="fa-solid fa-arrow-trend-down"></i></span>
                     </div>
-
-                    <!-- BOUTON SETTINGS (AJOUTÉ) -->
+                    
+                    <!-- LIEN SETTINGS AJOUTÉ -->
                     <a href="/settings.html" class="h-10 w-10 rounded-full bg-gradient-to-br from-cyan to-blue-600 p-[2px] cursor-pointer hover:scale-105 transition block" title="Paramètres">
-                        <img src="https://ui-avatars.com/api/?name=Indus+Admin&background=050505&color=fff" class="h-full w-full rounded-full bg-abysse object-cover">
+                        <div class="h-full w-full rounded-full bg-abysse flex items-center justify-center overflow-hidden">
+                            <img src="https://ui-avatars.com/api/?name=Indus+Admin&background=050505&color=fff" alt="Admin">
+                        </div>
                     </a>
                 </div>
             </div>
@@ -397,7 +399,6 @@
     <script>
         // NAVIGATION
         function navTo(pageId) {
-            // Reset UI
             document.querySelectorAll('.nav-item').forEach(el => {
                 el.classList.remove('active', 'text-white');
                 el.classList.add('text-gray-400');
@@ -406,11 +407,9 @@
             btn.classList.add('active', 'text-white');
             btn.classList.remove('text-gray-400');
 
-            // Switch Content
             document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
             document.getElementById('view-' + pageId).classList.add('active');
 
-            // Update Title
             const titles = {
                 'command': 'Supervision Usine',
                 'trading': 'Salle de Marchés',
@@ -419,7 +418,6 @@
             };
             document.getElementById('page-title').innerText = titles[pageId];
 
-            // Render Charts
             if (pageId === 'command') setTimeout(renderLoadCurve, 100);
             if (pageId === 'trading') setTimeout(renderMarketChart, 100);
             if (pageId === 'perf') { setTimeout(renderIPEChart, 100); setTimeout(renderCarbonChart, 100); }
@@ -428,7 +426,6 @@
         // SIMULATOR LOGIC
         function updateSim(val) {
             document.getElementById('sim-val').innerText = '+' + val + '%';
-            // Simple fake calculation logic
             const cost = (val * 2.25).toFixed(0);
             const ebitda = (val * 0.04).toFixed(1);
             document.getElementById('sim-cost').innerText = '- ' + cost + ' k€';
@@ -527,9 +524,38 @@
             });
         }
 
+        // --- BRIDGE DATA LOGIC (NOUVEAU) ---
+        async function loadRealData() {
+            try {
+                const response = await fetch('/api/data/industry');
+                const result = await response.json();
+
+                if (result.found && result.data.success) {
+                    const data = result.data;
+                    console.log("Données réelles chargées:", data);
+
+                    // Update Header KPIs
+                    const mw = (data.kpi.pic_kw / 1000).toFixed(1);
+                    const infoElem = document.getElementById('header-infos');
+                    if(infoElem) infoElem.innerText = `Pmax: ${mw} MW • Cos φ: 0.94 (Donnée Réelle)`;
+
+                    // Update Chart
+                    if (chartLoad) {
+                        chartLoad.data.labels = data.chart.labels;
+                        chartLoad.data.datasets[0].data = data.chart.values;
+                        chartLoad.data.datasets[0].label = "Charge Réelle (SGE)";
+                        chartLoad.update();
+                    }
+                }
+            } catch (e) {
+                console.log("Mode Démo (Pas de données réelles)");
+            }
+        }
+
         // Init
         document.addEventListener('DOMContentLoaded', () => {
             navTo('command');
+            loadRealData(); // Appel du pont de données
         });
 
     </script>
