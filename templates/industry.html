@@ -7,6 +7,9 @@
     <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- CORE ENGINE UX -->
+    <script src="/static/js/main.js"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -115,7 +118,7 @@
             <div class="bg-gradient-to-br from-card to-abysse border border-white/10 rounded-xl p-4">
                 <div class="text-xs font-bold text-white mb-1"><i class="fa-solid fa-network-wired mr-2"></i>Cluster Industriel</div>
                 <p class="text-[10px] text-gray-400 mb-2">Invitez un site partenaire.</p>
-                <div class="text-center bg-black/30 rounded py-1 font-mono text-cyan text-xs cursor-pointer border border-cyan/30 hover:text-white transition">CODE: IND-88X</div>
+                <div class="text-center bg-black/30 rounded py-1 font-mono text-cyan text-xs cursor-pointer border border-cyan/30 hover:text-white transition" onclick="App.toast('Code d\'invitation copié dans le presse-papier', 'info')">CODE: IND-88X</div>
             </div>
         </div>
     </aside>
@@ -130,7 +133,7 @@
             </div>
             <span class="text-xs text-cyan font-mono flex-1 typing-effect">ALERTE CHARGE : Pic prédictif détecté sur TGBT-2 à 14h30. Délestage Compresseur recommandé.</span>
             
-            <select class="bg-card border border-white/10 text-xs rounded-lg px-3 py-1.5 text-gray-300 focus:outline-none focus:border-cyan font-mono">
+            <select class="bg-card border border-white/10 text-xs rounded-lg px-3 py-1.5 text-gray-300 focus:outline-none focus:border-cyan font-mono" onchange="App.toast('Changement de vue : ' + this.value, 'info')">
                 <option>Vue : Global (Groupe)</option>
                 <option>Site : Usine Nord (HTA)</option>
                 <option>Site : Logistique Sud</option>
@@ -282,7 +285,7 @@
                     </div>
                     <div class="mt-auto">
                         <input type="text" placeholder="Saisir un ordre (ex: 200MW @ 45€)" class="w-full bg-abysse border border-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono mb-2 focus:border-cyan outline-none">
-                        <button class="w-full bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-xs font-bold transition">Enregistrer Ordre</button>
+                        <button onclick="App.toast('Ordre simulé enregistré dans le carnet', 'success')" class="w-full bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-xs font-bold transition">Enregistrer Ordre</button>
                     </div>
                 </div>
             </div>
@@ -354,7 +357,7 @@
                             </div>
                             <div class="text-right">
                                 <div class="text-sm font-bold text-danger font-mono">1 240 €</div>
-                                <button class="text-[10px] text-white bg-danger/20 px-2 py-1 rounded hover:bg-danger hover:text-white transition">Réclamer</button>
+                                <button onclick="App.toast('Ticket Support #402 créé. Un expert va vous contacter.', 'info')" class="text-[10px] text-white bg-danger/20 px-2 py-1 rounded hover:bg-danger hover:text-white transition">Réclamer</button>
                             </div>
                         </div>
                         <div class="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
@@ -382,7 +385,7 @@
                             <span class="text-gray-400">Hausse Prix Marché</span>
                             <span class="font-bold text-cyan font-mono" id="sim-val">+20%</span>
                         </div>
-                        <input type="range" min="0" max="100" value="20" class="w-full" id="sim-range" oninput="updateSim(this.value)">
+                        <input type="range" min="0" max="100" value="20" class="w-full" id="sim-range" oninput="updateSim(this.value)" onchange="App.toast('Scénario de stress-test mis à jour', 'info')">
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
@@ -544,12 +547,18 @@
         // --- BRIDGE DATA LOGIC ---
         async function loadRealData() {
             try {
+                // Toast initial
+                App.toast('Tentative de connexion au pont SGE...', 'info');
+                
                 const response = await fetch('/api/data/industry');
                 const result = await response.json();
 
                 if (result.found && result.data.success) {
                     const data = result.data;
                     console.log("Données réelles chargées:", data);
+                    
+                    // Succès Toast
+                    App.toast('Données SGE synchronisées avec succès.', 'success');
 
                     // Update Header KPIs
                     const mw = (data.kpi.pic_kw / 1000).toFixed(1);
@@ -576,6 +585,8 @@
                 }
             } catch (e) {
                 console.log("Mode Démo (Pas de données réelles)");
+                // Toast info pour dire qu'on est en démo
+                App.toast('Mode DÉMO activé (Pas de flux SGE détecté).', 'info');
             }
         }
 
