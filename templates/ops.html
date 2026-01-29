@@ -2,18 +2,15 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V5 | Ops OS</title>
+    <title>ENERGISTRAT V5 | Ops OS (Patched)</title>
     
     <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- CORE ENGINE -->
-    <script src="/static/js/main.js"></script>
-
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- CONFIG -->
+    <!-- CONFIG TAILWIND -->
     <script>
         tailwind.config = { 
             theme: { 
@@ -25,390 +22,256 @@
                         ai: '#A855F7', 
                         cyan: '#00E5FF',
                         gold: '#FFD700',
-                        success: '#10B981',
-                        danger: '#EF4444'
+                        success: '#10B981'
                     }, 
-                    fontFamily: { sans: ['Inter'], mono: ['JetBrains Mono'] },
-                    animation: { 'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' }
+                    fontFamily: { sans: ['Inter'], mono: ['JetBrains Mono'] }
                 } 
             } 
         }
     </script>
     
-    <!-- STYLES -->
     <style>
         body { background: #050505; color: #e2e8f0; overflow: hidden; }
-        
-        /* Layout Grid : Sidebar | Main | Chatbot */
         .ops-grid { display: grid; grid-template-columns: 70px 1fr 350px; height: 100vh; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .nav-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #64748B; cursor: pointer; transition: all 0.2s; }
+        .nav-icon.active { background: rgba(244, 63, 94, 0.1); color: #F43F5E; }
         
-        /* Bento Cards */
-        .bento-card { 
-            background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); 
-            border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s; 
-        }
-        .bento-card:hover { border-color: rgba(168, 85, 247, 0.3); }
-
-        /* Navigation Icons */
-        .nav-icon {
-            width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
-            color: #64748B; transition: all 0.3s; cursor: pointer; position: relative;
-        }
-        .nav-icon:hover { background: rgba(255,255,255,0.1); color: white; }
-        .nav-icon.active { background: rgba(244, 63, 94, 0.1); color: #F43F5E; box-shadow: 0 0 15px rgba(244, 63, 94, 0.2); }
-        
-        /* AI Chat */
+        /* Chat & Terminal */
         .ai-msg { background: rgba(168, 85, 247, 0.1); border-left: 2px solid #A855F7; padding: 10px; margin-bottom: 10px; border-radius: 0 8px 8px 0; font-size: 0.8rem; }
         .user-msg { background: rgba(255, 255, 255, 0.05); border-right: 2px solid #fff; padding: 10px; margin-bottom: 10px; border-radius: 8px 0 0 8px; font-size: 0.8rem; text-align: right; }
-        .ai-action { cursor: pointer; background: #A855F7; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; display: inline-block; margin-top: 5px; transition: 0.2s; }
-        .ai-action:hover { background: #9333EA; }
-
-        /* Terminal & Page Logic */
         .terminal-line { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; margin-bottom: 2px; }
-        .page-content { display: none; opacity: 0; }
-        .page-content.active { display: grid; opacity: 1; animation: fadeIn 0.3s forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Custom Scrollbar */
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
         
-        /* Drag & Drop Visual Feedback */
+        /* Drag Drop */
         .drag-active { border-color: #00E5FF !important; background-color: rgba(0, 229, 255, 0.1) !important; }
+        
+        /* Toast Container */
+        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; pointer-events: none; }
+        .toast { pointer-events: auto; background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
 <body class="ops-grid">
 
-    <!-- 1. MINI SIDEBAR (Navigation) -->
-    <aside class="bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-20">
-        <div class="w-10 h-10 rounded-lg bg-ops/20 text-ops flex items-center justify-center font-bold mb-8 shadow-[0_0_15px_rgba(244,63,94,0.3)]">OP</div>
-        
-        <nav class="flex flex-col gap-6 w-full items-center">
-            <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active" title="Data Lab">
-                <i class="fa-solid fa-flask text-xl"></i>
-            </div>
-            <div onclick="navTo('auditlab')" id="nav-auditlab" class="nav-icon" title="Audit & Facture">
-                <i class="fa-solid fa-file-invoice-dollar text-xl"></i>
-            </div>
-            <div onclick="navTo('scenarios')" id="nav-scenarios" class="nav-icon" title="Scénarios & Chaos">
-                <i class="fa-solid fa-clapperboard text-xl"></i>
-            </div>
-            <div onclick="navTo('connectors')" id="nav-connectors" class="nav-icon" title="Connecteurs">
-                <i class="fa-solid fa-network-wired text-xl"></i>
-            </div>
-        </nav>
+    <!-- TOAST CONTAINER (Pour les notifications) -->
+    <div id="toast-container"></div>
 
-        <a href="/settings.html" class="mt-auto nav-icon mb-4" title="Paramètres">
-            <img src="https://ui-avatars.com/api/?name=Admin+Ops&background=050505&color=fff" class="w-8 h-8 rounded-full border border-white/20">
-        </a>
+    <!-- 1. SIDEBAR -->
+    <aside class="bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-20">
+        <div class="w-10 h-10 rounded-lg bg-ops/20 text-ops flex items-center justify-center font-bold mb-8">OP</div>
+        <nav class="flex flex-col gap-6 w-full items-center">
+            <div onclick="location.reload()" class="nav-icon active" title="Reload"><i class="fa-solid fa-rotate"></i></div>
+            <a href="/" class="nav-icon" title="Home"><i class="fa-solid fa-house"></i></a>
+        </nav>
     </aside>
 
-    <!-- 2. MAIN WORKSPACE (Centre) -->
+    <!-- 2. MAIN CENTER -->
     <main class="flex flex-col relative bg-abysse overflow-hidden">
-        
-        <!-- Top Bar Sandbox -->
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6">
             <div class="flex items-center gap-3">
-                <i class="fa-solid fa-box-open text-gold"></i>
-                <span class="text-xs font-bold text-gold uppercase tracking-widest" id="page-title">DATA LABORATORY</span>
-                <span class="text-[10px] text-gray-500">Mode Sandbox Actif</span>
+                <i class="fa-solid fa-flask text-gold"></i>
+                <span class="text-xs font-bold text-gold uppercase tracking-widest">OPS WAR ROOM V3.14</span>
             </div>
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-2 text-[10px] font-mono text-gray-400">
-                    <span class="w-2 h-2 rounded-full bg-green-500"></span> API: ONLINE
-                </div>
-            </div>
+            <div class="flex items-center gap-2 text-[10px] text-green-400 font-mono"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> SYSTEM READY</div>
         </header>
 
-        <!-- Scrollable Content -->
-        <div class="flex-1 overflow-y-auto p-8 custom-scrollbar">
-
-            <!-- === TAB 1: DATA LAB (Upload Réel) === -->
-            <div id="view-datalab" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
-                <!-- ... (Code existant inchangé pour Data Lab) ... -->
-                <!-- Pour la clarté, je remets le bloc DataLab complet si besoin, mais je me concentre sur AuditLab -->
-                <div class="col-span-12 md:col-span-4 bento-card p-6 rounded-2xl border-t-4 border-cyan flex flex-col">
-                    <h3 class="font-bold text-white mb-2"><i class="fa-solid fa-upload mr-2"></i>Ingestion SGE</h3>
-                    <p class="text-xs text-gray-400 mb-4">Analyse de courbes de charge réelles.</p>
-                    <div id="drop-zone" class="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan hover:bg-cyan/5 transition group py-8">
-                        <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
-                        <i class="fa-solid fa-file-csv text-3xl mb-2 text-gray-500 group-hover:text-cyan pointer-events-none"></i>
-                        <span class="text-xs font-bold text-white pointer-events-none" id="upload-label">Glisser un fichier ici</span>
-                    </div>
-                </div>
-                <div class="col-span-12 md:col-span-8 bento-card p-6 rounded-2xl">
-                    <div class="h-64 w-full relative">
-                        <canvas id="testChart"></canvas>
-                        <div id="chart-placeholder" class="absolute inset-0 flex items-center justify-center text-xs text-gray-600">En attente de données...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- === TAB 2: AUDIT LAB (QA Facture & Contrat) === -->
-            <div id="view-auditlab" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <!-- Inputs -->
-                <div class="col-span-4 space-y-4">
-                    <form id="audit-form">
-                        <div class="bento-card p-6 rounded-2xl mb-4">
-                            <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-file-pdf text-red-400"></i> Facture PDF</h3>
-                            <input type="file" id="invoice-file" accept=".pdf" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer">
-                        </div>
-                        <div class="bento-card p-6 rounded-2xl mb-4">
-                            <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-file-contract text-blue-400"></i> Contrat / CGV</h3>
-                            <input type="file" id="contract-file" accept=".pdf" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer">
-                        </div>
-                    </form>
-                    <button onclick="runRealAudit()" class="w-full py-3 bg-cyan text-abysse font-bold rounded-xl text-xs hover:bg-white transition shadow-lg flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-magnifying-glass-chart"></i> LANCER CROSS-CHECK
-                    </button>
-                </div>
-
-                <!-- Results & Protocol -->
-                <div class="col-span-8 bento-card p-6 rounded-2xl bg-abysse border border-white/10">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="font-bold text-lg text-white">Matrice de Cohérence (IA)</h3>
-                        <div id="audit-score" class="hidden px-3 py-1 rounded bg-gray-800 text-xs font-mono">Score: --/100</div>
-                    </div>
+        <div class="flex-1 overflow-y-auto p-8">
+            <div class="grid grid-cols-12 gap-6">
+                
+                <!-- UPLOAD ZONE -->
+                <div class="col-span-12 md:col-span-5 bento-card p-6 rounded-2xl border-t-4 border-cyan">
+                    <h3 class="font-bold text-white mb-2">Ingestion SGE (Excel/CSV)</h3>
+                    <p class="text-xs text-gray-400 mb-4">Sélectionnez le client cible puis glissez le fichier.</p>
                     
-                    <table class="w-full text-left text-xs mb-6 text-gray-300">
-                        <thead class="text-gray-500 border-b border-white/10">
-                            <tr><th class="pb-2">Point de Contrôle</th><th class="pb-2">Facture (A)</th><th class="pb-2">Contrat/Réel (B)</th><th class="pb-2 text-right">Statut</th></tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5" id="audit-results">
-                            <tr><td class="py-3 text-gray-500 italic" colspan="4">En attente des fichiers PDF...</td></tr>
-                        </tbody>
-                    </table>
+                    <select id="target-client" class="w-full bg-black/50 border border-white/20 rounded-lg text-xs text-white p-2 mb-4 focus:border-cyan outline-none">
+                        <option value="demo">-- Choisir un Profil --</option>
+                        <option value="industry">Industrie</option>
+                        <option value="mairie">Mairie</option>
+                        <option value="retail">Retail</option>
+                        <option value="pme">PME</option>
+                        <option value="sde">SDE</option>
+                        <option value="oph">OPH</option>
+                        <option value="syndic">Syndic</option>
+                    </select>
 
-                    <div class="bg-card p-4 rounded-xl border border-white/10">
-                        <h4 class="text-xs font-bold text-ops uppercase mb-3">Protocole de Mise en Prod</h4>
-                        <div class="flex gap-4 mb-4">
-                            <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="qa-checkbox accent-green-500" onchange="checkProtocol()"><span class="text-xs text-gray-400">OCR Validé</span></label>
-                            <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="qa-checkbox accent-green-500" onchange="checkProtocol()"><span class="text-xs text-gray-400">Algo OK</span></label>
-                            <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="qa-checkbox accent-green-500" onchange="checkProtocol()"><span class="text-xs text-gray-400">No Regression</span></label>
-                        </div>
-                        <button id="btn-deploy" disabled class="w-full py-2 bg-gray-700 text-gray-400 font-bold rounded-lg text-xs transition disabled:cursor-not-allowed">VALIDER & DÉPLOYER DANS LES PROFILS</button>
+                    <div id="drop-zone" class="h-32 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan hover:bg-cyan/5 transition" onclick="document.getElementById('real-upload').click()">
+                        <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-500 mb-2"></i>
+                        <span class="text-xs font-bold text-white" id="upload-label">Cliquer pour Upload</span>
                     </div>
                 </div>
-            </div>
 
-            <!-- ... (Autres Tabs Scenarios & Connectors identiques) ... -->
-             <div id="view-scenarios" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-6 bento-card p-6 rounded-2xl relative group">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-500"><i class="fa-solid fa-skull"></i></div>
-                            <h3 class="font-bold text-white">Chaos Monkey</h3>
-                        </div>
-                    </div>
-                    <p class="text-xs text-gray-400 mb-6">Injection de 10 fichiers corrompus via le Backend Python.</p>
-                    <button onclick="App.toast('Stress test lancé...', 'info')" class="w-full py-2 bg-red-500/10 border border-red-500/30 text-red-500 font-bold rounded-lg text-xs hover:bg-red-500 hover:text-white transition">LANCER LE STRESS TEST</button>
-                </div>
-            </div>
-            
-            <div id="view-connectors" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-8 rounded-2xl">
-                    <h3 class="font-bold text-lg text-white mb-6">État des Passerelles</h3>
-                    <div class="grid grid-cols-3 gap-6">
-                        <div class="bg-abysse/50 p-4 rounded-xl border border-green-500/30">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="font-bold text-white">ENEDIS SGE</span>
-                                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                            </div>
-                            <p class="text-[10px] text-gray-400">Latence: 24ms</p>
-                        </div>
+                <!-- CHART ZONE -->
+                <div class="col-span-12 md:col-span-7 bento-card p-6 rounded-2xl">
+                    <h3 class="font-bold text-white mb-2">Visualisation Données</h3>
+                    <div class="h-48 w-full relative">
+                        <canvas id="testChart"></canvas>
                     </div>
                 </div>
-             </div>
 
-        </div>
-
-        <!-- TERMINAL LOGS -->
-        <div class="h-40 bg-[#02050a] border-t border-white/10 p-4 font-mono text-xs overflow-hidden flex flex-col z-20">
-            <div class="flex justify-between items-center mb-2 px-2 sticky top-0 bg-[#02050a] pb-1 border-b border-white/5">
-                <span class="text-slate-500 font-bold uppercase tracking-widest text-[10px]">>> SYSTEM LOGS</span>
-                <button onclick="document.getElementById('terminal').innerHTML=''" class="text-[10px] text-gray-600 hover:text-white">CLEAR</button>
-            </div>
-            <div id="terminal" class="flex-1 overflow-y-auto custom-scrollbar text-slate-300 space-y-1">
-                <div class="terminal-line text-gray-500">> Initialisation Ops OS V5... OK</div>
             </div>
         </div>
 
+        <!-- TERMINAL -->
+        <div class="h-40 bg-[#02050a] border-t border-white/10 p-4 font-mono text-xs overflow-hidden flex flex-col">
+            <div class="text-gray-500 border-b border-white/5 pb-1 mb-1">>> SYSTEM LOGS</div>
+            <div id="terminal" class="flex-1 overflow-y-auto space-y-1 text-slate-300"></div>
+        </div>
     </main>
 
-    <!-- 3. CORTEX.DEV (Chatbot) -->
-    <aside class="bg-[#0B0F19] border-l border-white/5 flex flex-col w-[350px] shadow-2xl z-30">
+    <!-- 3. CHATBOT -->
+    <aside class="bg-[#0B0F19] border-l border-white/5 flex flex-col w-[350px] z-30">
         <div class="p-4 border-b border-white/5 bg-ai/5 flex items-center gap-3">
-            <div class="relative">
-                <div class="w-10 h-10 rounded-full bg-ai flex items-center justify-center text-white font-bold text-lg"><i class="fa-solid fa-robot"></i></div>
-                <div class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[#0B0F19] rounded-full"></div>
-            </div>
-            <div>
-                <h3 class="font-bold text-white text-sm">CORTEX.DEV</h3>
-                <p class="text-[10px] text-ai animate-pulse">En ligne</p>
-            </div>
+            <div class="w-8 h-8 rounded-full bg-ai flex items-center justify-center text-white font-bold"><i class="fa-solid fa-robot"></i></div>
+            <h3 class="font-bold text-white text-sm">CORTEX</h3>
         </div>
-        <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar" id="chat-container">
-            <div class="ai-msg">
-                👋 Bonjour Architecte. Module Audit V2 chargé.<br><br>
-                <strong>Tests Disponibles :</strong>
-                <div class="mt-2 flex flex-col gap-2">
-                    <span class="ai-action" onclick="navTo('auditlab')">▶ Tester Comparaison PDF</span>
-                </div>
-            </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-container">
+            <div class="ai-msg">Système Ops V3.14 initialisé. En attente de fichier ou de commande.</div>
         </div>
         <div class="p-4 border-t border-white/5">
-            <input type="text" placeholder="Envoyer une commande..." class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-ai outline-none" onkeypress="handleInput(event)">
+            <div class="flex gap-2">
+                <input type="text" id="chat-input" placeholder="Message..." class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-ai outline-none" onkeypress="if(event.key==='Enter') sendChat()">
+                <button onclick="sendChat()" class="bg-ai text-white px-3 rounded-lg"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
         </div>
     </aside>
 
+    <!-- JAVASCRIPT DIRECT (PAS DE DEPENDANCE) -->
     <script>
-        // --- NAVIGATION ---
-        function navTo(pageId){
-            document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active'));
-            document.getElementById('nav-' + pageId).classList.add('active');
-            
-            document.querySelectorAll('.page-content').forEach(e => e.classList.remove('active'));
-            document.getElementById('view-' + pageId).classList.add('active');
-            
-            const titles = {
-                'datalab': 'DATA LABORATORY', 'auditlab': 'AUDIT FACTURATION', 
-                'scenarios': 'SIMULATION SCENARIOS', 'connectors': 'CONNECTEURS API'
-            };
-            document.getElementById('page-title').innerText = titles[pageId];
-        }
+        // --- 1. TOAST SYSTEM (INTEGRÉ) ---
+        const App = {
+            toast: function(msg, type='info') {
+                const container = document.getElementById('toast-container');
+                const el = document.createElement('div');
+                el.className = 'toast';
+                el.style.borderLeftColor = type === 'success' ? '#10B981' : (type === 'error' ? '#EF4444' : '#00E5FF');
+                el.innerHTML = msg;
+                container.appendChild(el);
+                setTimeout(() => el.remove(), 4000);
+            }
+        };
 
-        // --- LOGGING ---
+        // --- 2. LOGGING ---
         function log(msg, type='info') {
             const term = document.getElementById('terminal');
             const color = type === 'error' ? 'text-red-500' : (type === 'success' ? 'text-green-500' : 'text-gray-400');
-            const time = new Date().toLocaleTimeString('fr-FR', {hour12:false, minute:'2-digit', second:'2-digit'});
-            term.innerHTML += `<div class="terminal-line ${color}"><span class="opacity-50 mr-2">[${time}]</span>${msg}</div>`;
+            const time = new Date().toLocaleTimeString();
+            term.innerHTML += `<div class="terminal-line ${color}">[${time}] ${msg}</div>`;
             term.scrollTop = term.scrollHeight;
         }
 
-        function aiSpeak(html) {
-            const container = document.getElementById('chat-container');
-            const msg = document.createElement('div');
-            msg.className = 'ai-msg';
-            msg.innerHTML = html;
-            container.appendChild(msg);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        // --- REAL AUDIT LOGIC (PDF CROSS-CHECK) ---
-        async function runRealAudit() {
-            const invoice = document.getElementById('invoice-file').files[0];
-            const contract = document.getElementById('contract-file').files[0];
-
-            if (!invoice || !contract) {
-                App.toast("Veuillez charger les 2 fichiers PDF.", "error");
-                log("Audit annulé : Fichiers manquants.", "error");
-                return;
-            }
-
-            log(`Démarrage Audit : ${invoice.name} vs ${contract.name}`, "info");
-            document.getElementById('audit-results').innerHTML = '<tr><td colspan="4" class="py-4 text-center"><i class="fa-solid fa-circle-notch fa-spin text-cyan-400"></i> Extraction OCR & Analyse Juridique...</td></tr>';
+        // --- 3. UPLOAD LOGIC ---
+        async function handleFileSelect(file) {
+            if (!file) return;
+            const target = document.getElementById('target-client').value;
+            
+            // UI Feedback immédiat
+            document.getElementById('upload-label').innerText = "Analyse en cours...";
+            log(`Upload démarré : ${file.name} -> Profil : ${target}`, 'info');
+            App.toast('Envoi du fichier au serveur...', 'info');
 
             const formData = new FormData();
-            formData.append('invoice', invoice);
-            formData.append('contract', contract);
+            formData.append('file', file);
+            formData.append('target', target);
 
             try {
-                // Simulation d'appel API Réel (À remplacer par fetch vers /api/ops/audit)
-                // const res = await fetch('/api/ops/audit', { method: 'POST', body: formData });
-                // const data = await res.json();
-                
-                // --- SIMULATION DU RETOUR BACKEND (POUR L'EXEMPLE) ---
-                // Je simule ici ce que le Python renverrait
-                await new Promise(r => setTimeout(r, 2000));
-                
-                // Détection de mots clés dans le nom de fichier pour simuler le "Vrai" test
-                let hasError = invoice.name.toLowerCase().includes('err');
-                
-                const data = {
-                    score: hasError ? 65 : 100,
-                    status: hasError ? "ANOMALIE" : "SUCCESS",
-                    checks: [
-                        { point: "Prix Unitaire Gaz", a: "89.50 €", b: "85.00 €", status: hasError ? "ÉCART" : "OK", error: hasError },
-                        { point: "Période Validité", a: "Fév 2026", b: "Actif", status: "OK", error: false },
-                        { point: "Taxe TICGN", a: "Appliquée", b: "Exonéré", status: hasError ? "NON-CONFORME" : "OK", error: hasError }
-                    ]
-                };
-                // ---------------------------------------------------
-
-                // RENDER RESULTS
-                let html = '';
-                data.checks.forEach(check => {
-                    const color = check.error ? 'text-red-400' : 'text-green-400';
-                    const badge = check.error 
-                        ? `<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded font-bold">${check.status}</span>`
-                        : `<span class="text-green-400 font-bold">OK</span>`;
-                    
-                    html += `<tr>
-                        <td class="py-3 text-white">${check.point}</td>
-                        <td class="font-mono text-gray-400">${check.a}</td>
-                        <td class="font-mono text-gray-400">${check.b}</td>
-                        <td class="text-right">${badge}</td>
-                    </tr>`;
+                // APPEL API
+                const response = await fetch('/api/ops/analyze', {
+                    method: 'POST',
+                    body: formData
                 });
 
-                document.getElementById('audit-results').innerHTML = html;
+                if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
                 
-                const scoreEl = document.getElementById('audit-score');
-                scoreEl.classList.remove('hidden', 'bg-gray-800', 'bg-green-900', 'bg-red-900');
-                scoreEl.innerText = `Score: ${data.score}/100`;
-                scoreEl.classList.add(data.score === 100 ? 'bg-green-900' : 'bg-red-900');
+                const data = await response.json();
 
-                if (data.status === "SUCCESS") {
-                    log("Audit terminé : Aucune anomalie.", "success");
-                    aiSpeak("Les documents sont conformes. Vous pouvez déployer la validation.");
+                if (data.success) {
+                    log('✅ Analyse Succès !', 'success');
+                    App.toast('Données analysées et injectées !', 'success');
+                    
+                    // Update UI
+                    document.getElementById('upload-label').innerText = file.name;
+                    
+                    // Affichage Chatbot
+                    const chat = document.getElementById('chat-container');
+                    chat.innerHTML += `<div class="ai-msg"><strong>Analyse terminée :</strong><br>Volume: ${data.kpi.volume_mwh} MWh<br>Pic: ${data.kpi.pic_kw} kW<br><br><em>${data.ai_insight}</em></div>`;
+                    chat.scrollTop = chat.scrollHeight;
+
+                    // Update Chart
+                    renderChart(data.chart.labels, data.chart.values);
+
                 } else {
-                    log("Audit terminé : Anomalies détectées.", "error");
-                    aiSpeak("Attention, j'ai détecté des écarts de prix ou de taxes. Vérifiez le tableau.");
-                    App.toast("Anomalies détectées !", "error");
+                    throw new Error(data.error || 'Erreur inconnue');
                 }
 
             } catch (e) {
-                log("Erreur critique lors de l'analyse.", "error");
+                console.error(e);
+                log(`❌ ERREUR: ${e.message}`, 'error');
+                App.toast(`Erreur: ${e.message}`, 'error');
+                document.getElementById('upload-label').innerText = "Réessayer";
             }
         }
 
-        function checkProtocol() {
-            const checks = document.querySelectorAll('.qa-checkbox:checked');
-            const btn = document.getElementById('btn-deploy');
-            if (checks.length === 3) {
-                btn.disabled = false;
-                btn.classList.remove('bg-gray-700', 'text-gray-400');
-                btn.classList.add('bg-green-500', 'text-white', 'hover:bg-green-400');
-                btn.onclick = () => {
-                    log("DÉPLOIEMENT EN PROD...", "success");
-                    btn.innerText = "DÉPLOYÉ ✅";
-                    btn.disabled = true;
-                    aiSpeak("Fonctionnalité déployée sur les profils clients.");
-                    App.toast("Mise à jour poussée en production.", "success");
-                };
+        // --- 4. CHAT LOGIC ---
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const txt = input.value.trim();
+            if (!txt) return;
+
+            // UI User Msg
+            const chat = document.getElementById('chat-container');
+            chat.innerHTML += `<div class="user-msg">${txt}</div>`;
+            input.value = '';
+            chat.scrollTop = chat.scrollHeight;
+
+            try {
+                const formData = new FormData();
+                formData.append('message', txt);
+                
+                const res = await fetch('/api/ops/chat', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                chat.innerHTML += `<div class="ai-msg">${data.response}</div>`;
+                chat.scrollTop = chat.scrollHeight;
+            } catch (e) {
+                chat.innerHTML += `<div class="ai-msg text-red-400">Erreur connexion Cortex.</div>`;
             }
         }
-        
-        // --- CHARTS & INIT ---
-        let testChart = null;
-        function renderTestChart(labels, values) { /* ... (Code Chart inchangé) ... */ }
-        
-        // Drag & Drop Logic (Code existant inchangé)
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('real-upload');
-        if(dropZone) {
-            dropZone.addEventListener('click', () => fileInput.click());
-            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
-            dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('drag-active'); });
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault(); dropZone.classList.remove('drag-active');
-                if (e.dataTransfer.files.length) handleFileSelect(e.dataTransfer.files[0]);
+
+        // --- 5. CHART ---
+        let myChart = null;
+        function renderChart(labels, values) {
+            const ctx = document.getElementById('testChart').getContext('2d');
+            if (myChart) myChart.destroy();
+            
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Puissance (kW)',
+                        data: values,
+                        borderColor: '#00E5FF',
+                        backgroundColor: 'rgba(0, 229, 255, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 10 } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } }
+                    }
+                }
             });
         }
-        
-        async function handleFileSelect(file) { /* ... (Code existant inchangé) ... */ }
 
+        // Init Logs
+        log('Système prêt. Connectez un fichier SGE.', 'success');
     </script>
 </body>
 </html>
