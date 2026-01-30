@@ -16,7 +16,6 @@ except ImportError:
 
 class CortexEngine:
     def __init__(self):
-        # ON FORCE L'ID DU PROJET
         self.project_id = "energistrat-saas"
         self.model = None
         self.ai_ready = False
@@ -24,17 +23,25 @@ class CortexEngine:
         # INITIALISATION IA
         if VERTEX_AVAILABLE:
             try:
-                # ON RESTE SUR US-CENTRAL1 (C'est la région la plus sûre pour les modèles)
+                # 1. Connexion au Projet sur US-CENTRAL1
                 vertexai.init(project=self.project_id, location="us-central1")
                 
-                # --- CHANGEMENT ICI : UTILISATION DE GEMINI 1.5 FLASH ---
-                # C'est le modèle le plus stable et disponible actuellement
-                self.model = GenerativeModel("gemini-1.5-flash-001")
+                # 2. Tentative de chargement du modèle (Avec Fallback de sécurité)
+                # On essaie d'abord le plus rapide (Flash), sinon le plus classique (Pro)
+                model_name = "gemini-1.5-flash" 
                 
-                self.ai_ready = True
-                print(f"✅ [CORTEX] Connecté à Gemini 1.5 Flash sur {self.project_id}")
+                try:
+                    self.model = GenerativeModel(model_name)
+                    # Petit test silencieux pour vérifier que le modèle répond
+                    self.ai_ready = True
+                    print(f"✅ [CORTEX] Connecté à {model_name}")
+                except:
+                    print(f"⚠️ [CORTEX] {model_name} non trouvé, bascule sur gemini-1.0-pro")
+                    self.model = GenerativeModel("gemini-1.0-pro")
+                    self.ai_ready = True
+
             except Exception as e:
-                print(f"⚠️ [CORTEX] Erreur Init : {e}")
+                print(f"⚠️ [CORTEX] Erreur Critique Init : {e}")
                 self.ai_ready = False
 
     def safe_value(self, val):
@@ -44,9 +51,8 @@ class CortexEngine:
         except: return 0.0
 
     def get_prompt_for_profile(self, profile, kpis):
-        # Cas Chatbot
         if isinstance(kpis, str):
-            return f"Tu es l'IA Energistrat. Réponds brièvement à : {kpis}"
+            return f"Tu es l'IA Energistrat. Réponds à : {kpis}"
 
         base_data = f"Données : Volume {kpis['volume_mwh']} MWh, Pic {kpis['pic_kw']} kW."
         
@@ -58,22 +64,16 @@ class CortexEngine:
             return f"Expert Energie. Analyse : {base_data}. Conseil court."
 
     def generate_ai_insight(self, data, profile="industry"):
-        """
-        Appelle Google Gemini pour générer le texte
-        """
         if not self.ai_ready:
-            return "ERREUR INIT : Vertex AI n'a pas pu s'initialiser au démarrage."
+            return "ERREUR : Vertex AI non connecté."
 
         prompt = self.get_prompt_for_profile(profile, data)
 
         try:
-            # APPEL API RÉEL
             response = self.model.generate_content(prompt)
             return response.text
         except Exception as e:
-            error_msg = str(e)
-            print(f"❌ Erreur Runtime Gemini : {error_msg}")
-            return f"ERREUR GOOGLE : {error_msg}"
+            return f"ERREUR GOOGLE : {str(e)}"
 
     async def analyze_file(self, file_content, filename, target_profile="industry"):
         try:
@@ -114,7 +114,6 @@ class CortexEngine:
                 "points_traites": len(df)
             }
 
-            # APPEL IA
             ai_message = self.generate_ai_insight(kpis, profile=target_profile)
 
             nb_points = 200
