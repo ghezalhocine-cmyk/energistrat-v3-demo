@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V5 | Ops OS</title>
+    <title>ENERGISTRAT V5.3 | Ops OS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -24,6 +24,12 @@
         #drop-zone.drag-active { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.1); }
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
         .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; }
+        
+        #terminal { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+        .log-line { margin-bottom: 2px; }
+        .log-success { color: #4ade80; }
+        .log-error { color: #f87171; }
+        .log-info { color: #94a3b8; }
     </style>
 </head>
 <body class="ops-grid">
@@ -44,7 +50,7 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-box-open text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V5</span></div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-box-open text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V5.3</span></div>
             <div class="text-[10px] font-mono text-gray-400"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>ONLINE</div>
         </header>
 
@@ -58,6 +64,9 @@
                         <option value="demo">-- Mode Test --</option>
                         <option value="industry">Industrie</option>
                         <option value="mairie">Mairie</option>
+                        <option value="retail">Retail</option>
+                        <option value="pme">PME</option>
+                        <option value="sde">SDE</option>
                     </select>
                     <div id="drop-zone" class="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan transition py-8" onclick="document.getElementById('real-upload').click()">
                         <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
@@ -68,7 +77,7 @@
 
                 <div class="col-span-12 md:col-span-8 bento-card p-6 rounded-2xl">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-white">Visualisation</h3>
+                        <h3 class="font-bold text-white">Courbe de Charge</h3>
                         <div class="flex gap-2">
                             <button onclick="updateZoom(7)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20">7J</button>
                             <button onclick="updateZoom(30)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20">30J</button>
@@ -79,40 +88,60 @@
                 </div>
             </div>
 
-            <!-- TAB 2: AUDIT -->
+            <!-- TAB 2: AUDIT (ZONE DISTINCTE) -->
             <div id="view-auditlab" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-4 space-y-4">
-                    <div class="bento-card p-4 rounded-2xl"><input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded"></div>
-                    <div class="bento-card p-4 rounded-2xl"><input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded"></div>
-                    <button onclick="runRealAudit()" class="w-full py-3 bg-cyan text-abysse font-bold rounded-xl text-xs hover:bg-white transition">LANCER AUDIT RÉEL (OCR)</button>
+                <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Audit Juridique & Financier</h3></div>
+                
+                <div class="col-span-6 bento-card p-6 rounded-2xl border border-red-500/30 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center text-red-500"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></div>
+                    <div class="flex-1">
+                        <label class="text-xs font-bold text-gray-400 block mb-1">1. FACTURE PDF</label>
+                        <input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-white/10 file:text-white hover:file:bg-white/20">
+                    </div>
                 </div>
-                <div class="col-span-8 bento-card p-6 rounded-2xl bg-abysse border border-white/10">
+
+                <div class="col-span-6 bento-card p-6 rounded-2xl border border-blue-500/30 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500"><i class="fa-solid fa-file-contract text-xl"></i></div>
+                    <div class="flex-1">
+                        <label class="text-xs font-bold text-gray-400 block mb-1">2. CONTRAT PDF</label>
+                        <input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-white/10 file:text-white hover:file:bg-white/20">
+                    </div>
+                </div>
+
+                <div class="col-span-12">
+                    <button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl text-sm hover:scale-[1.01] transition shadow-lg">LANCER L'ANALYSE CROISÉE</button>
+                </div>
+
+                <div class="col-span-12 bento-card p-6 rounded-2xl bg-abysse border border-white/10 mt-4">
                     <table class="w-full text-left text-xs text-gray-300">
-                        <thead class="text-gray-500 border-b border-white/10"><tr><th>Point</th><th>Facture</th><th>Contrat</th><th class="text-right">Statut</th></tr></thead>
-                        <tbody id="audit-results" class="divide-y divide-white/5"><tr><td colspan="4" class="py-4 text-gray-500">En attente...</td></tr></tbody>
+                        <thead class="text-gray-500 border-b border-white/10"><tr><th>Point de Contrôle</th><th>Donnée Facture</th><th>Donnée Contrat</th><th class="text-right">Statut</th></tr></thead>
+                        <tbody id="audit-results" class="divide-y divide-white/5"><tr><td colspan="4" class="py-4 text-gray-500 italic">En attente de documents...</td></tr></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- TAB 3: CHAOS MONKEY -->
+            <!-- TAB 3: CHAOS -->
             <div id="view-scenarios" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
                 <div class="col-span-12 bento-card p-6 rounded-2xl border-l-4 border-red-500">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-white text-lg"><i class="fa-solid fa-skull mr-2"></i>Chaos Monkey V5</h3>
-                        <button onclick="runTest()" class="px-4 py-2 bg-red-600 text-white font-bold rounded hover:bg-red-500 text-xs">LANCER STRESS TEST</button>
+                        <h3 class="font-bold text-white text-lg">Chaos Monkey</h3>
+                        <button onclick="runTest()" class="px-4 py-2 bg-red-600 text-white font-bold rounded hover:bg-red-500 text-xs">TESTER INFRA</button>
                     </div>
-                    <div id="chaos-results" class="grid grid-cols-3 gap-4">
-                        <!-- Résultats ici -->
-                    </div>
+                    <div id="chaos-results" class="grid grid-cols-3 gap-4"></div>
                 </div>
             </div>
 
         </div>
 
-        <!-- TERMINAL -->
-        <div class="h-32 bg-[#02050a] border-t border-white/10 p-4 font-mono text-xs overflow-hidden flex flex-col">
-            <div id="terminal" class="flex-1 overflow-y-auto custom-scrollbar text-slate-300 space-y-1"></div>
+        <!-- TERMINAL (LOGS RÉTABLIS) -->
+        <div class="h-40 bg-[#02050a] border-t border-white/10 p-4 overflow-hidden flex flex-col z-20">
+            <div class="flex justify-between items-center mb-1 border-b border-white/5 pb-1">
+                <span class="text-slate-500 font-bold uppercase tracking-widest text-[10px]">>> SYSTEM LOGS</span>
+                <button onclick="document.getElementById('terminal').innerHTML=''" class="text-[10px] text-gray-600 hover:text-white">CLEAR</button>
+            </div>
+            <div id="terminal" class="flex-1 overflow-y-auto space-y-1"></div>
         </div>
+
     </main>
 
     <!-- CHATBOT -->
@@ -128,7 +157,18 @@
     </aside>
 
     <script>
-        // --- CORE ---
+        // --- LOGGING SYSTEM ---
+        function log(msg, type='info') {
+            const term = document.getElementById('terminal');
+            const time = new Date().toLocaleTimeString();
+            let colorClass = 'log-info';
+            if(type === 'success') colorClass = 'log-success';
+            if(type === 'error') colorClass = 'log-error';
+            
+            term.innerHTML += `<div class="log-line ${colorClass}">[${time}] ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
         const App = {
             toast: function(msg, type='info') {
                 const el = document.createElement('div');
@@ -139,12 +179,7 @@
                 setTimeout(() => el.remove(), 4000);
             }
         };
-        function log(msg, type='info') {
-            const term = document.getElementById('terminal');
-            const color = type==='error'?'text-red-500':(type==='success'?'text-green-500':'text-gray-400');
-            term.innerHTML += `<div class="${color}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
-            term.scrollTop = term.scrollHeight;
-        }
+
         function navTo(pageId) {
             document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active'));
             document.getElementById('nav-' + pageId).classList.add('active');
@@ -152,42 +187,62 @@
             document.getElementById('view-' + pageId).classList.add('active');
         }
 
-        // --- CHART JS (MODULABLE) ---
+        // --- CHART JS (AVEC MOYENNE) ---
         let testChart = null;
-        let fullData = { labels: [], values: [] }; // Stockage local des données complètes
+        let fullData = { labels: [], values: [], average: [] };
 
-        function renderTestChart(labels, values) {
-            fullData = { labels, values }; // On sauvegarde tout
-            updateZoom('all'); // Par défaut on affiche tout
+        function renderTestChart(labels, values, average) {
+            fullData = { labels, values, average };
+            updateZoom('all');
         }
 
         function updateZoom(range) {
             if(!fullData.values.length) return;
-            
             let limit = fullData.values.length;
-            if(range === 7) limit = 7 * 24; // approx 7 jours si données horaires
+            if(range === 7) limit = 7 * 24; 
             if(range === 30) limit = 30 * 24;
 
             const slicedLabels = fullData.labels.slice(-limit);
             const slicedValues = fullData.values.slice(-limit);
+            const slicedAverage = fullData.average.slice(-limit);
 
             const ctx = document.getElementById('testChart').getContext('2d');
             if (testChart) testChart.destroy();
+            
             testChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: slicedLabels,
-                    datasets: [{
-                        label: 'Puissance (kW)',
-                        data: slicedValues,
-                        borderColor: '#00E5FF',
-                        backgroundColor: 'rgba(0, 229, 255, 0.1)',
-                        fill: true,
-                        pointRadius: 0,
-                        borderWidth: 1.5
-                    }]
+                    datasets: [
+                        {
+                            label: 'Puissance (kW)',
+                            data: slicedValues,
+                            borderColor: '#00E5FF',
+                            backgroundColor: 'rgba(0, 229, 255, 0.1)',
+                            fill: true,
+                            pointRadius: 0,
+                            borderWidth: 1.5
+                        },
+                        {
+                            label: 'Moyenne (kW)',
+                            data: slicedAverage,
+                            borderColor: '#F59E0B',
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            borderWidth: 1,
+                            fill: false
+                        }
+                    ]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false } } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true }, title: { display: true, text: 'Courbe de Charge vs Moyenne', color: '#fff' } },
+                    scales: { 
+                        x: { display: true, ticks: { color: '#64748B', maxTicksLimit: 8 } },
+                        y: { display: true, title: { display: true, text: 'Puissance (kW)', color: '#64748B' }, ticks: { color: '#64748B' } } 
+                    }
+                }
             });
         }
 
@@ -198,13 +253,16 @@
             formData.append('file', file);
             formData.append('target', document.getElementById('target-client').value);
             
+            log(`Upload SGE: ${file.name}`, 'info');
             App.toast('Analyse en cours...', 'info');
+            
             try {
                 const res = await fetch('/api/ops/analyze', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
+                    log(`Succès! ${data.kpi.points_traites} points traités.`, 'success');
                     App.toast('Succès !', 'success');
-                    renderTestChart(data.chart.labels, data.chart.values);
+                    renderTestChart(data.chart.labels, data.chart.values, data.chart.average);
                     document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.ai_insight}</div>`;
                 } else throw new Error(data.error);
             } catch (e) { log(e.message, 'error'); App.toast('Erreur', 'error'); }
@@ -214,8 +272,9 @@
         async function runRealAudit() {
             const inv = document.getElementById('invoice-file').files[0];
             const ctr = document.getElementById('contract-file').files[0];
-            if(!inv || !ctr) return App.toast("Fichiers manquants", "error");
+            if(!inv || !ctr) return App.toast("Manque Facture ou Contrat", "error");
 
+            log("Démarrage Audit PDF...", "info");
             const fd = new FormData(); fd.append('invoice', inv); fd.append('contract', ctr);
             
             try {
@@ -224,28 +283,28 @@
                 let html = '';
                 data.checks.forEach(c => {
                     const color = c.error ? 'text-red-400' : 'text-green-400';
-                    html += `<tr><td class="py-2">${c.point}</td><td>${c.a}</td><td>${c.b}</td><td class="text-right ${color}">${c.status}</td></tr>`;
+                    html += `<tr><td class="py-2">${c.point}</td><td>${c.a}</td><td>${c.b}</td><td class="text-right ${color} font-bold">${c.status}</td></tr>`;
                 });
                 document.getElementById('audit-results').innerHTML = html;
+                log(`Audit terminé. Score: ${data.score}/100`, "success");
             } catch(e) { log("Erreur Audit", "error"); }
         }
 
-        // --- CHAOS ---
         async function runTest() {
-            const div = document.getElementById('chaos-results');
-            div.innerHTML = '<div class="text-gray-500">Test en cours...</div>';
+            log("Lancement Chaos Monkey...", "info");
             try {
                 const res = await fetch('/api/ops/chaos', {method:'POST'});
                 const data = await res.json();
+                const div = document.getElementById('chaos-results');
                 div.innerHTML = '';
                 data.results.forEach(r => {
-                    const bg = r.status.includes('PASS') ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30';
-                    div.innerHTML += `<div class="${bg} border p-2 rounded text-xs"><div class="font-bold text-white">${r.test}</div><div class="text-gray-400">${r.status}</div></div>`;
+                    const bg = r.status.includes('PASS') ? 'bg-green-900/30 border-green-500' : 'bg-red-900/30 border-red-500';
+                    div.innerHTML += `<div class="${bg} border p-2 rounded text-xs"><div class="font-bold text-white">${r.test}</div><div class="text-gray-300">${r.status}</div></div>`;
+                    log(`${r.test}: ${r.status}`, r.status.includes('PASS')?'success':'error');
                 });
             } catch(e) { log("Erreur Chaos", "error"); }
         }
 
-        // --- CHAT ---
         async function sendChat() {
             const txt = document.getElementById('chat-input').value;
             if(!txt) return;
@@ -257,6 +316,9 @@
             const data = await res.json();
             document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.response}</div>`;
         }
+
+        log('Ops V5.3 chargé. Modules actifs.', 'success');
     </script>
 </body>
 </html>
+
