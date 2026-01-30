@@ -12,7 +12,7 @@ try:
 except ImportError:
     cortex = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="3.14 PERSISTENCE & AUDIT")
+app = FastAPI(title="ENERGISTRAT V3", version="3.15 INTELLIGENCE & AUDIT")
 
 # ==============================================================================
 # 1. SETUP DOSSIERS & CONFIG
@@ -32,14 +32,16 @@ templates = Jinja2Templates(directory="templates")
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
     """
-    Ingestion SGE : Lit le fichier, l'analyse via Cortex, et sauvegarde le JSON.
+    Ingestion SGE : Lit le fichier, l'analyse via Cortex (avec contexte métier), et sauvegarde le JSON.
     """
     if not cortex: return JSONResponse({"success": False, "error": "Moteur Cortex HS"})
     
     try:
         content = await file.read()
-        # Appel au moteur Cortex pour l'analyse SGE
-        result = await cortex.analyze_file(content, file.filename)
+        
+        # --- CORRECTIF V3.15 : PASSAGE DU CONTEXTE TARGET ---
+        # On dit à Cortex quel est le profil (ex: 'industry', 'mairie') pour qu'il adapte son prompt IA
+        result = await cortex.analyze_file(content, file.filename, target_profile=target)
         
         if result.get("success"):
             # PERSISTANCE : Ecriture sur disque pour que les Dashboard Clients puissent lire
@@ -79,7 +81,7 @@ async def api_audit(invoice: UploadFile = File(...), contract: UploadFile = File
     }
 
     # Lecture des noms de fichiers pour la simulation intelligente
-    # (Dans une version ultérieure, on utilisera pdfplumber ici sur le contenu binaire)
+    # (En prod, on utiliserait pdfplumber sur le contenu binaire)
     inv_name = invoice.filename.lower()
     ctr_name = contract.filename.lower()
 
