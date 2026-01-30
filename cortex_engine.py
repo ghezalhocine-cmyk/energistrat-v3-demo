@@ -45,6 +45,14 @@ class CortexEngine:
     def get_prompt_for_profile(self, profile, kpis):
         """Génère un prompt adapté au métier du client"""
         
+        # Cas spécial pour le Chatbot Ops (Query libre)
+        if isinstance(kpis, str):
+            return f"""
+            Tu es CORTEX, l'IA centrale du SaaS Energistrat.
+            Réponds à l'administrateur Ops de manière technique, brève et précise (Style Cyberpunk).
+            Question : "{kpis}"
+            """
+
         base_data = f"Données : Volume {kpis['volume_mwh']} MWh, Pic {kpis['pic_kw']} kW, Talon {kpis['talon_kw']} kW."
 
         if profile == "industry":
@@ -88,14 +96,14 @@ class CortexEngine:
             """
 
     # --- GÉNÉRATION D'INSIGHTS (MOTEUR LLM) ---
-    def generate_ai_insight(self, kpis, profile="industry"):
+    def generate_ai_insight(self, data, profile="industry"):
         """
         Appelle Google Gemini pour générer le texte
         """
         if not self.ai_ready:
             return "Mode Simulation : Le profil de consommation est stable. Activez l'API Vertex AI pour une analyse sémantique réelle."
 
-        prompt = self.get_prompt_for_profile(profile, kpis)
+        prompt = self.get_prompt_for_profile(profile, data)
 
         try:
             # Appel à Gemini
@@ -154,7 +162,7 @@ class CortexEngine:
             # On passe le profil cible pour avoir un conseil adapté
             ai_message = self.generate_ai_insight(kpis, profile=target_profile)
 
-            # Chart Sampling
+            # Chart Sampling (Pour affichage rapide)
             nb_points = 200
             step = max(1, len(df) // nb_points)
             df_chart = df.iloc[::step]
@@ -173,8 +181,18 @@ class CortexEngine:
             return {"success": False, "error": f"Moteur: {str(e)}"}
 
     # --- AUTRES FONCTIONS ---
-    def run_chaos_monkey(self): return [{"test": "Vertex AI Ping", "status": "PASS" if self.ai_ready else "FAIL"}]
-    def ask_agent(self, query): return "Je suis Cortex V4. Posez-moi une question sur les données."
-    def simulate_audit(self, f): return {"score": 100}
+    
+    # Chatbot Ops : Appelle l'IA avec le contexte "ops"
+    def ask_agent(self, query):
+        return self.generate_ai_insight(query, profile="ops")
 
+    # Chaos Monkey : Teste la connexion Vertex AI
+    def run_chaos_monkey(self): 
+        return [{"test": "Vertex AI Ping", "status": "PASS" if self.ai_ready else "FAIL"}]
+    
+    # Audit : Placeholder
+    def simulate_audit(self, f): 
+        return {"score": 100}
+
+# Instantiation unique
 cortex = CortexEngine()
