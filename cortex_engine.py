@@ -24,7 +24,6 @@ class CortexEngine:
     def __init__(self):
         self.project_id = "energistrat-saas"
         self.model = None
-        self.active_model_name = "Mode Expert (Algorithmique)"
         self.ai_ready = False
         
         if VERTEX_AVAILABLE:
@@ -39,23 +38,20 @@ class CortexEngine:
                     if "gemini" in m: self.model = GenerativeModel(m); self.model.generate_content("Ping")
                     else: self.model = TextGenerationModel.from_pretrained(m); self.model.predict("Ping")
                     self.ai_ready = True
-                    self.active_model_name = m
                     return
                 except: continue
         except: pass
 
     def clean_number(self, val):
-        """Nettoie les nombres (ex: '12 119,56' -> 12119.56)"""
         try:
-            if isinstance(val, (int, float)): return val
             if isinstance(val, str):
-                # Enlève les espaces insécables et remplace virgule par point
-                clean = val.replace(' ', '').replace('\xa0', '').replace(',', '.')
-                return float(clean)
-            return 0
+                # Nettoyage format français (espace insécable, virgule)
+                val = val.replace(' ', '').replace('\xa0', '').replace(',', '.')
+            if pd.isna(val) or np.isinf(val): return 0
+            return float(val)
         except: return 0
 
-    # --- AUDIT PDF EXPERT (V5.3) ---
+    # --- AUDIT PDF EXPERT FRANCE (V5.4) ---
     def extract_pdf_data(self, file_bytes):
         text = ""
         if PDF_AVAILABLE:
@@ -67,115 +63,94 @@ class CortexEngine:
 
     def analyze_invoice_real(self, invoice_bytes, contract_bytes):
         inv_text = self.extract_pdf_data(invoice_bytes) or ""
-        ctr_text = self.extract_pdf_data(contract_bytes) or ""
         
-        # --- 1. EXTRACTION INTELLIGENTE (REGEX) ---
+        # 1. RECHERCHE INTELLIGENTE DES PUISSANCES (TURPE)
+        # On cherche des motifs comme "Souscrite : 330" ou "P : 250"
+        re_p_sous = r"(?:souscrite|P\.?\s?souscrite|P\.?\s?S\.?)[^\d]*(\d{2,5})"
+        re_p_max  = r"(?:atteinte|max|pointe)[^\d]*(\d{2,5})"
         
-        # Fournisseur
-        suppliers = ["GEG", "EDF", "ENGIE", "TOTALENERGIES", "ENI"]
+        match_sous = re.search(re_p_sous, inv_text, re.IGNORECASE)
+        match_max  = re.search(re_p_max, inv_text, re.IGNORECASE)
+        
+        p_souscrite = float(match_sous.group(1)) if match_sous else 0
+        p_atteinte = float(match_max.group(1)) if match_max else 0
+
+        # 2. IDENTIFICATION FOURNISSEUR & CONTRAT
+        suppliers = ["GEG", "EDF", "ENGIE", "TOTALENERGIES", "ENI", "VATTENFALL", "ALPIQ"]
         found_supplier = next((s for s in suppliers if s in inv_text.upper()), "Inconnu")
-
-        # Dates (dd/mm/yyyy)
-        dates_inv = re.findall(r'(\d{2}/\d{2}/\d{4})', inv_text)
-        dates_ctr = re.findall(r'(\d{2}/\d{2}/\d{4})', ctr_text)
         
-        # Montant TTC (Cherche format: 12 119,56 € ou 12119.56)
-        # On cherche le plus gros montant associé à "Total" ou "TTC"
-        re_price = r'(\d[\d\s]*[.,]\d{2})\s?€'
-        all_prices = re.findall(re_price, inv_text)
-        # On nettoie et on prend le max (souvent le Total TTC)
-        max_price = 0
-        if all_prices:
-            clean_prices = [self.clean_number(p) for p in all_prices]
-            max_price = max(clean_prices)
+        re_contrat = r"(?:Contrat|Réf)\s?[:N°.]?\s?([A-Z0-9-]{5,})"
+        match_contrat = re.search(re_contrat, inv_text, re.IGNORECASE)
+        num_contrat = match_contrat.group(1) if match_contrat else "Non détecté"
 
-        # Puissances (Spécifique GEG et standards)
-        # "Puissance souscrite ... 330 kW"
-        re_p_souscrite = r"(?:souscrite|P)\s?[:.]?\s?(\d{2,5})\s?kW"
-        # "Puissance atteinte ... 265 kW"
-        re_p_atteinte = r"(?:atteinte|max)\s?[:.]?\s?(\d{2,5})\s?kW"
-        
-        p_souscrite_match = re.search(re_p_souscrite, inv_text, re.IGNORECASE)
-        p_atteinte_match = re.search(re_p_atteinte, inv_text, re.IGNORECASE)
-        
-        p_souscrite = float(p_souscrite_match.group(1)) if p_souscrite_match else 0
-        p_atteinte = float(p_atteinte_match.group(1)) if p_atteinte_match else 0
+        # 3. ANALYSE FISCALE (CSPE / TICGN)
+        # La CSPE est devenue TICGN, on cherche les deux termes
+        has_taxes = "TICGN" in inv_text.upper() or "CSPE" in inv_text.upper()
 
-        # --- 2. ANALYSE CROISÉE (RÈGLES MÉTIER) ---
         checks = []
         score = 100
 
-        # A. Identité
+        # --- CHECK 1 : OPTIMISATION PUISSANCE (Le plus rentable) ---
+        if p_souscrite > 0 and p_atteinte > 0:
+            ratio = p_atteinte / p_souscrite
+            if ratio > 1.02:
+                status = "DÉPASSEMENT" # Pénalités
+                color = "KO"
+                score -= 30
+                conseil = f"Augmenter P. Souscrite (Atteint: {int(p_atteinte)} kW)"
+            elif ratio < 0.7:
+                status = "SUR-SOUSCRIPTION" # Gaspillage abonnement
+                color = "KO"
+                score -= 20
+                conseil = f"Baisser P. Souscrite (Trop payé)"
+            else:
+                status = "OPTIMISÉ"
+                color = "OK"
+                conseil = "Puissance bien calibrée"
+                
+            checks.append({
+                "point": "Optimisation TURPE",
+                "a": f"Atteinte: {int(p_atteinte)} kW",
+                "b": f"Souscrite: {int(p_souscrite)} kW",
+                "status": status,
+                "error": color == "KO"
+            })
+        else:
+            checks.append({"point": "Optimisation TURPE", "a": "?", "b": "?", "status": "NON LU", "error": True})
+
+        # --- CHECK 2 : CONFORMITÉ CONTRAT ---
         checks.append({
-            "point": "Fournisseur",
-            "a": found_supplier,
+            "point": "Réf. Contrat & Fournisseur",
+            "a": f"{found_supplier} - {num_contrat}",
             "b": "Base Active",
-            "status": "OK" if found_supplier != "Inconnu" else "ALERTE",
+            "status": "OK" if found_supplier != "Inconnu" else "INCONNU",
             "error": found_supplier == "Inconnu"
         })
 
-        # B. Cohérence Financière
+        # --- CHECK 3 : FISCALITÉ ---
         checks.append({
-            "point": "Montant Total TTC",
-            "a": f"{max_price:,.2f} €".replace(",", " "),
-            "b": "Vérifié",
-            "status": "OK" if max_price > 0 else "ERREUR",
-            "error": max_price == 0
+            "point": "Taxes (TICGN/CSPE)",
+            "a": "Présentes" if has_taxes else "Absentes",
+            "b": "Obligatoire",
+            "status": "OK" if has_taxes else "ALERTE",
+            "error": not has_taxes
         })
 
-        # C. Optimisation Puissance (TURPE)
-        # Si P_atteinte < P_souscrite de plus de 20%, on perd de l'argent sur l'abo
-        opti_status = "OPTIMISÉ"
-        is_opti_error = False
-        
-        if p_souscrite > 0 and p_atteinte > 0:
-            marge = p_souscrite - p_atteinte
-            if marge > (p_souscrite * 0.2): # Marge > 20%
-                opti_status = f"SURCAPACITÉ (+{int(marge)} kW)"
-                is_opti_error = True # C'est une opportunité, donc marqué comme 'écart' à corriger
-                score -= 10
-        
+        # --- CHECK 4 : ADRESSE LIVRAISON ---
+        # Recherche code postal 5 chiffres
+        re_zip = r"\b(0[1-9]|[1-8]\d|9[0-5])\d{3}\b"
+        zip_match = re.search(re_zip, inv_text)
         checks.append({
-            "point": "Optimisation Puissance",
-            "a": f"Atteinte: {int(p_atteinte)} kW",
-            "b": f"Souscrite: {int(p_souscrite)} kW",
-            "status": opti_status,
-            "error": is_opti_error # Affiche en rouge/orange si optimisable
-        })
-
-        # D. Validité Contrat
-        date_fin_contrat = dates_ctr[-1] if dates_ctr else "Inconnue"
-        date_facture = dates_inv[0] if dates_inv else "Inconnue"
-        
-        checks.append({
-            "point": "Validité Temporelle",
-            "a": f"Facture: {date_facture}",
-            "b": f"Fin Contrat: {date_fin_contrat}",
-            "status": "OK",
-            "error": False
-        })
-
-        # E. Adresse (Regex Code Postal)
-        re_zip = r"\b\d{5}\b"
-        zip_inv = re.search(re_zip, inv_text)
-        zip_ctr = re.search(re_zip, ctr_text)
-        
-        addr_status = "OK"
-        if zip_inv and zip_ctr and zip_inv.group(0) != zip_ctr.group(0):
-            addr_status = "DIVERGENCE"
-            score -= 50
-            
-        checks.append({
-            "point": "Lieu de Livraison",
-            "a": zip_inv.group(0) if zip_inv else "?",
-            "b": zip_ctr.group(0) if zip_ctr else "?",
-            "status": addr_status,
-            "error": addr_status != "OK"
+            "point": "Point de Livraison (Zip)",
+            "a": zip_match.group(0) if zip_match else "?",
+            "b": "Site Autorisé",
+            "status": "OK" if zip_match else "MANQUANT",
+            "error": not zip_match
         })
 
         return {"score": score, "checks": checks}
 
-    # --- ANALYSE SGE (INCHANGÉ - GARDE LES FONCTIONS PRÉCÉDENTES) ---
+    # --- ANALYSE SGE (V5.4 - Moyenne Mobile) ---
     async def analyze_file(self, file_content, filename, target_profile="industry"):
         try:
             buffer = io.BytesIO(file_content)
@@ -199,7 +174,11 @@ class CortexEngine:
 
             total = df[col_val].sum()
             vol = total / 6 if ('kw' in col_val and 'kwh' not in col_val) else total
-            moyenne_kw = df[col_val].mean()
+            
+            # --- CALCUL MOYENNE MOBILE (TENDANCE) ---
+            # On calcule une moyenne glissante sur 24 points (approx 1 jour ou 4h selon le pas)
+            # pour lisser la courbe et montrer la tendance de fond.
+            rolling_mean = df[col_val].rolling(window=24, min_periods=1).mean().fillna(0)
             
             kpis = {
                 "volume_mwh": round(self.clean_number(vol/1000), 2),
@@ -210,8 +189,10 @@ class CortexEngine:
 
             ai_msg = self.generate_ai_insight(kpis, profile=target_profile)
 
+            # Sampling Graphique (Max 2000 points)
             step = max(1, len(df)//2000)
             df_chart = df.iloc[::step]
+            rolling_chart = rolling_mean.iloc[::step] # On sample aussi la moyenne
             
             return {
                 "success": True, 
@@ -220,7 +201,7 @@ class CortexEngine:
                 "chart": {
                     "labels": df_chart[col_date].dt.strftime('%Y-%m-%d %H:%M').tolist(),
                     "values": [self.clean_number(x) for x in df_chart[col_val].tolist()],
-                    "average": [self.clean_number(moyenne_kw)] * len(df_chart)
+                    "average": [self.clean_number(x) for x in rolling_chart.tolist()] # Envoi de la moyenne mobile
                 }
             }
         except Exception as e:
@@ -231,7 +212,6 @@ class CortexEngine:
         try:
             if isinstance(data, str): prompt = f"Réponds court: {data}"
             else: prompt = f"Analyse {profile}: Vol {data['volume_mwh']}, Pic {data['pic_kw']}."
-            
             if "gemini" in str(self.model): return self.model.generate_content(prompt).text
             return self.model.predict(prompt, max_output_tokens=256).text
         except: return "Erreur génération IA."
