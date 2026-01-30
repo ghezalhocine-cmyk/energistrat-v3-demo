@@ -8,40 +8,39 @@ import json
 try:
     import vertexai
     from vertexai.generative_models import GenerativeModel
-    from vertexai.language_models import TextGenerationModel
     VERTEX_AVAILABLE = True
 except ImportError:
     VERTEX_AVAILABLE = False
 
 class CortexEngine:
     def __init__(self):
-        # Récupération automatique de l'ID projet (plus fiable que le hardcode)
+        # Récupération automatique de l'ID projet
         self.project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "energistrat-saas")
         self.model = None
         self.ai_ready = False
-        self.last_error = "Aucune tentative"
+        self.last_error = "Initialisation..."
         
         if VERTEX_AVAILABLE:
             self.init_ai()
 
     def init_ai(self):
-        """Tentative de connexion forcée en EUROPE (RGPD)"""
+        """Connexion à la région Mère (US-CENTRAL1) pour garantir l'accès"""
         try:
-            # 1. On tente PARIS (europe-west9) car ton Cloud Run y est hébergé
-            print(f"📡 Tentative connexion Vertex AI sur EUROPE-WEST9 pour {self.project_id}...")
-            vertexai.init(project=self.project_id, location="europe-west9")
+            print(f"📡 Tentative connexion Vertex AI sur US-CENTRAL1...")
             
-            # 2. On utilise le modèle le plus standard disponible en France
+            # --- FIX : ON FORCE LA REGION US ---
+            vertexai.init(project=self.project_id, location="us-central1")
+            
+            # On utilise le modèle standard
             self.model = GenerativeModel("gemini-1.0-pro")
             
-            # 3. Test immédiat
+            # Test immédiat
             self.model.generate_content("Ping")
             self.ai_ready = True
-            self.last_error = "Connecté (Europe-West9)"
-            print("✅ [CORTEX] Connecté à Gemini (Europe)")
+            self.last_error = "Connecté (US-Central1)"
+            print("✅ [CORTEX] Connecté à Gemini (USA)")
             
         except Exception as e:
-            # Si ça échoue, on stocke l'erreur pour l'afficher dans le chat
             self.ai_ready = False
             self.last_error = str(e)
             print(f"❌ [CORTEX] Echec Init : {e}")
@@ -58,9 +57,11 @@ class CortexEngine:
 
         # Construction du Prompt
         if isinstance(data, str):
-            prompt = f"Tu es l'IA Energistrat. Réponds à : {data}"
+            # Chatbot Ops
+            prompt = f"Tu es l'IA Energistrat. Réponds de façon technique et concise à : {data}"
         else:
-            prompt = f"Analyse ces données pour un profil {profile} : Vol {data['volume_mwh']} MWh, Pic {data['pic_kw']} kW."
+            # Analyse Fichier
+            prompt = f"Agis en expert énergie pour un client type '{profile}'. Analyse ces données : Volume {data['volume_mwh']} MWh, Pic {data['pic_kw']} kW. Donne un conseil court (2 phrases)."
 
         try:
             response = self.model.generate_content(prompt)
@@ -68,11 +69,11 @@ class CortexEngine:
         except Exception as e:
             return f"ERREUR RUNTIME : {str(e)}"
 
-    # --- FONCTIONS UTILES ---
     async def analyze_file(self, file_content, filename, target_profile="industry"):
         try:
             buffer = io.BytesIO(file_content)
             df = None
+            # Lecture robuste
             if filename.lower().endswith('.csv'):
                 try: df = pd.read_csv(buffer, sep=None, engine='python')
                 except: 
@@ -83,19 +84,33 @@ class CortexEngine:
 
             if df is None or df.empty: return {"success": False, "error": "Fichier vide"}
 
-            # Nettoyage minimaliste pour la démo
-            df.columns = [str(c).lower().strip() for c in df.columns]
+            # Nettoyage Colonnes
+            df.columns = [str(c).lower().strip().replace('"','').replace("'", "") for c in df.columns]
+            
+            # Détection colonnes
             col_val = next((c for c in df.columns if any(x in c for x in ['puiss', 'p10', 'conso', 'val', 'kw'])), None)
             col_date = next((c for c in df.columns if any(x in c for x in ['date', 'horo', 'time'])), None)
             
             if not col_val or not col_date: return {"success": False, "error": "Colonnes introuvables"}
 
+            # Traitement Données
             df[col_date] = pd.to_datetime(df[col_date], dayfirst=True, errors='coerce')
             df = df.dropna(subset=[col_date]).sort_values(by=col_date)
-            df[col_val] = pd.to_numeric(df[col_val].astype(str).str.replace(',','.'), errors='coerce').fillna(0)
+            
+            # Nettoyage valeurs (virgules)
+            if df[col_val].dtype == object:
+                df[col_val] = pd.to_numeric(df[col_val].astype(str).str.replace(',', '.'), errors='coerce')
+            df[col_val] = df[col_val].fillna(0)
+
+            # Calculs KPI
+            total = df[col_val].sum()
+            # Si c'est des kW (Puissance), on divise par 6 pour avoir des kWh (pas 10min)
+            # Si c'est déjà des kWh (Conso), on garde tel quel
+            is_power = 'kw' in col_val and 'kwh' not in col_val
+            vol = total / 6 if is_power else total
 
             kpis = {
-                "volume_mwh": round(df[col_val].sum()/1000, 2),
+                "volume_mwh": round(vol/1000, 2),
                 "pic_kw": round(df[col_val].max(), 2),
                 "talon_kw": round(df[col_val].min(), 2),
                 "points_traites": len(df)
@@ -104,7 +119,7 @@ class CortexEngine:
             # Appel IA
             ai_msg = self.generate_ai_insight(kpis, profile=target_profile)
 
-            # Chart
+            # Sampling Graphique (Max 200 points)
             step = max(1, len(df)//200)
             df_chart = df.iloc[::step]
 
@@ -118,16 +133,14 @@ class CortexEngine:
                 }
             }
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": f"Moteur: {str(e)}"}
 
     def ask_agent(self, query):
-        # COMMANDE SECRÈTE DE DEBUG
         if query.strip() == "#debug":
             return f"🔍 DIAGNOSTIC :\n- Projet: {self.project_id}\n- AI Ready: {self.ai_ready}\n- Dernière Erreur: {self.last_error}"
-        
         return self.generate_ai_insight(query, profile="ops")
 
-    def run_chaos_monkey(self): return []
+    def run_chaos_monkey(self): return [{"test": "Vertex AI Ping", "status": "PASS" if self.ai_ready else "FAIL"}]
     def simulate_audit(self, f): return {"score": 100}
 
 cortex = CortexEngine()
