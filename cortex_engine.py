@@ -9,6 +9,7 @@ import json
 try:
     import vertexai
     from vertexai.generative_models import GenerativeModel
+    from vertexai.language_models import TextGenerationModel # Pour l'ancienne génération
     VERTEX_AVAILABLE = True
 except ImportError:
     VERTEX_AVAILABLE = False
@@ -18,30 +19,48 @@ class CortexEngine:
     def __init__(self):
         self.project_id = "energistrat-saas"
         self.model = None
+        self.model_type = None # 'gemini' ou 'bison'
         self.ai_ready = False
         
-        # INITIALISATION IA
+        # INITIALISATION IA (STRATÉGIE EN CASCADE)
         if VERTEX_AVAILABLE:
             try:
-                # 1. Connexion au Projet sur US-CENTRAL1
+                # 1. Connexion US-CENTRAL1
                 vertexai.init(project=self.project_id, location="us-central1")
                 
-                # 2. Tentative de chargement du modèle (Avec Fallback de sécurité)
-                # On essaie d'abord le plus rapide (Flash), sinon le plus classique (Pro)
-                model_name = "gemini-1.5-flash" 
-                
+                # 2. TENTATIVE 1 : GEMINI 1.0 PRO (Le Standard)
                 try:
-                    self.model = GenerativeModel(model_name)
-                    # Petit test silencieux pour vérifier que le modèle répond
-                    self.ai_ready = True
-                    print(f"✅ [CORTEX] Connecté à {model_name}")
-                except:
-                    print(f"⚠️ [CORTEX] {model_name} non trouvé, bascule sur gemini-1.0-pro")
+                    print("Testing Gemini 1.0 Pro...")
                     self.model = GenerativeModel("gemini-1.0-pro")
+                    # Petit ping pour vérifier
+                    self.model.generate_content("Ping")
+                    self.model_type = 'gemini'
                     self.ai_ready = True
+                    print(f"✅ [CORTEX] Connecté à Gemini 1.0 Pro")
+                except:
+                    # 3. TENTATIVE 2 : GEMINI 1.5 FLASH (Le Rapide)
+                    try:
+                        print("Testing Gemini 1.5 Flash...")
+                        self.model = GenerativeModel("gemini-1.5-flash")
+                        self.model.generate_content("Ping")
+                        self.model_type = 'gemini'
+                        self.ai_ready = True
+                        print(f"✅ [CORTEX] Connecté à Gemini 1.5 Flash")
+                    except:
+                        # 4. TENTATIVE 3 : TEXT-BISON (L'Ancien, très robuste)
+                        try:
+                            print("Testing Text-Bison (Legacy)...")
+                            self.model = TextGenerationModel.from_pretrained("text-bison")
+                            self.model.predict("Ping")
+                            self.model_type = 'bison'
+                            self.ai_ready = True
+                            print(f"✅ [CORTEX] Connecté à Text-Bison (Legacy)")
+                        except Exception as e:
+                            print(f"❌ [CORTEX] AUCUN MODÈLE DISPO : {e}")
+                            self.ai_ready = False
 
             except Exception as e:
-                print(f"⚠️ [CORTEX] Erreur Critique Init : {e}")
+                print(f"⚠️ [CORTEX] Erreur Init Globale : {e}")
                 self.ai_ready = False
 
     def safe_value(self, val):
@@ -64,16 +83,27 @@ class CortexEngine:
             return f"Expert Energie. Analyse : {base_data}. Conseil court."
 
     def generate_ai_insight(self, data, profile="industry"):
+        """
+        Appelle Google (Gemini ou Bison selon ce qui a marché)
+        """
         if not self.ai_ready:
-            return "ERREUR : Vertex AI non connecté."
+            return "ERREUR : Aucun modèle IA n'a pu être chargé."
 
         prompt = self.get_prompt_for_profile(profile, data)
 
         try:
-            response = self.model.generate_content(prompt)
-            return response.text
+            # APPEL DIFFÉRENT SELON LE MODÈLE CHARGÉ
+            if self.model_type == 'gemini':
+                response = self.model.generate_content(prompt)
+                return response.text
+            elif self.model_type == 'bison':
+                response = self.model.predict(prompt, temperature=0.2, max_output_tokens=256)
+                return response.text
+            else:
+                return "Erreur Interne Modèle."
+                
         except Exception as e:
-            return f"ERREUR GOOGLE : {str(e)}"
+            return f"ERREUR GOOGLE ({self.model_type}) : {str(e)}"
 
     async def analyze_file(self, file_content, filename, target_profile="industry"):
         try:
