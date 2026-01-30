@@ -9,7 +9,7 @@ import json
 try:
     import vertexai
     from vertexai.generative_models import GenerativeModel
-    from vertexai.language_models import TextGenerationModel # Pour l'ancienne génération
+    from vertexai.language_models import TextGenerationModel
     VERTEX_AVAILABLE = True
 except ImportError:
     VERTEX_AVAILABLE = False
@@ -38,7 +38,7 @@ class CortexEngine:
                     self.ai_ready = True
                     print(f"✅ [CORTEX] Connecté à Gemini 1.0 Pro")
                 except:
-                    # 3. TENTATIVE 2 : GEMINI 1.5 FLASH (Le Rapide)
+                    # 3. TENTATIVE 2 : GEMINI 1.5 FLASH (Le Rapide - Nom générique)
                     try:
                         print("Testing Gemini 1.5 Flash...")
                         self.model = GenerativeModel("gemini-1.5-flash")
@@ -47,7 +47,7 @@ class CortexEngine:
                         self.ai_ready = True
                         print(f"✅ [CORTEX] Connecté à Gemini 1.5 Flash")
                     except:
-                        # 4. TENTATIVE 3 : TEXT-BISON (L'Ancien, très robuste)
+                        # 4. TENTATIVE 3 : TEXT-BISON (L'Ancien, ultra-robuste)
                         try:
                             print("Testing Text-Bison (Legacy)...")
                             self.model = TextGenerationModel.from_pretrained("text-bison")
