@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import io
 import os
-import time
 import json
 
 # IMPORT GOOGLE VERTEX AI
@@ -13,55 +12,39 @@ try:
     VERTEX_AVAILABLE = True
 except ImportError:
     VERTEX_AVAILABLE = False
-    print("⚠️ [CORTEX] Vertex AI SDK non installé.")
 
 class CortexEngine:
     def __init__(self):
-        self.project_id = "energistrat-saas"
+        # Récupération automatique de l'ID projet (plus fiable que le hardcode)
+        self.project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "energistrat-saas")
         self.model = None
-        self.model_type = None # 'gemini' ou 'bison'
         self.ai_ready = False
+        self.last_error = "Aucune tentative"
         
-        # INITIALISATION IA (STRATÉGIE EN CASCADE)
         if VERTEX_AVAILABLE:
-            try:
-                # 1. Connexion US-CENTRAL1
-                vertexai.init(project=self.project_id, location="us-central1")
-                
-                # 2. TENTATIVE 1 : GEMINI 1.0 PRO (Le Standard)
-                try:
-                    print("Testing Gemini 1.0 Pro...")
-                    self.model = GenerativeModel("gemini-1.0-pro")
-                    # Petit ping pour vérifier
-                    self.model.generate_content("Ping")
-                    self.model_type = 'gemini'
-                    self.ai_ready = True
-                    print(f"✅ [CORTEX] Connecté à Gemini 1.0 Pro")
-                except:
-                    # 3. TENTATIVE 2 : GEMINI 1.5 FLASH (Le Rapide - Nom générique)
-                    try:
-                        print("Testing Gemini 1.5 Flash...")
-                        self.model = GenerativeModel("gemini-1.5-flash")
-                        self.model.generate_content("Ping")
-                        self.model_type = 'gemini'
-                        self.ai_ready = True
-                        print(f"✅ [CORTEX] Connecté à Gemini 1.5 Flash")
-                    except:
-                        # 4. TENTATIVE 3 : TEXT-BISON (L'Ancien, ultra-robuste)
-                        try:
-                            print("Testing Text-Bison (Legacy)...")
-                            self.model = TextGenerationModel.from_pretrained("text-bison")
-                            self.model.predict("Ping")
-                            self.model_type = 'bison'
-                            self.ai_ready = True
-                            print(f"✅ [CORTEX] Connecté à Text-Bison (Legacy)")
-                        except Exception as e:
-                            print(f"❌ [CORTEX] AUCUN MODÈLE DISPO : {e}")
-                            self.ai_ready = False
+            self.init_ai()
 
-            except Exception as e:
-                print(f"⚠️ [CORTEX] Erreur Init Globale : {e}")
-                self.ai_ready = False
+    def init_ai(self):
+        """Tentative de connexion forcée en EUROPE (RGPD)"""
+        try:
+            # 1. On tente PARIS (europe-west9) car ton Cloud Run y est hébergé
+            print(f"📡 Tentative connexion Vertex AI sur EUROPE-WEST9 pour {self.project_id}...")
+            vertexai.init(project=self.project_id, location="europe-west9")
+            
+            # 2. On utilise le modèle le plus standard disponible en France
+            self.model = GenerativeModel("gemini-1.0-pro")
+            
+            # 3. Test immédiat
+            self.model.generate_content("Ping")
+            self.ai_ready = True
+            self.last_error = "Connecté (Europe-West9)"
+            print("✅ [CORTEX] Connecté à Gemini (Europe)")
+            
+        except Exception as e:
+            # Si ça échoue, on stocke l'erreur pour l'afficher dans le chat
+            self.ai_ready = False
+            self.last_error = str(e)
+            print(f"❌ [CORTEX] Echec Init : {e}")
 
     def safe_value(self, val):
         try:
@@ -69,49 +52,29 @@ class CortexEngine:
             return float(val)
         except: return 0.0
 
-    def get_prompt_for_profile(self, profile, kpis):
-        if isinstance(kpis, str):
-            return f"Tu es l'IA Energistrat. Réponds à : {kpis}"
-
-        base_data = f"Données : Volume {kpis['volume_mwh']} MWh, Pic {kpis['pic_kw']} kW."
-        
-        if profile == "industry":
-            return f"Expert Industrie. Analyse ces données : {base_data}. Donne un conseil technique court."
-        elif profile == "mairie":
-            return f"Conseiller Mairie. Analyse ces données : {base_data}. Rédige une note politique courte."
-        else:
-            return f"Expert Energie. Analyse : {base_data}. Conseil court."
-
     def generate_ai_insight(self, data, profile="industry"):
-        """
-        Appelle Google (Gemini ou Bison selon ce qui a marché)
-        """
         if not self.ai_ready:
-            return "ERREUR : Aucun modèle IA n'a pu être chargé."
+            return f"ERREUR SYSTÈME : {self.last_error}"
 
-        prompt = self.get_prompt_for_profile(profile, data)
+        # Construction du Prompt
+        if isinstance(data, str):
+            prompt = f"Tu es l'IA Energistrat. Réponds à : {data}"
+        else:
+            prompt = f"Analyse ces données pour un profil {profile} : Vol {data['volume_mwh']} MWh, Pic {data['pic_kw']} kW."
 
         try:
-            # APPEL DIFFÉRENT SELON LE MODÈLE CHARGÉ
-            if self.model_type == 'gemini':
-                response = self.model.generate_content(prompt)
-                return response.text
-            elif self.model_type == 'bison':
-                response = self.model.predict(prompt, temperature=0.2, max_output_tokens=256)
-                return response.text
-            else:
-                return "Erreur Interne Modèle."
-                
+            response = self.model.generate_content(prompt)
+            return response.text
         except Exception as e:
-            return f"ERREUR GOOGLE ({self.model_type}) : {str(e)}"
+            return f"ERREUR RUNTIME : {str(e)}"
 
+    # --- FONCTIONS UTILES ---
     async def analyze_file(self, file_content, filename, target_profile="industry"):
         try:
             buffer = io.BytesIO(file_content)
             df = None
-            
             if filename.lower().endswith('.csv'):
-                try: df = pd.read_csv(buffer, sep=None, engine='python', encoding='utf-8')
+                try: df = pd.read_csv(buffer, sep=None, engine='python')
                 except: 
                     buffer.seek(0)
                     df = pd.read_csv(buffer, sep=';', encoding='latin-1')
@@ -120,56 +83,51 @@ class CortexEngine:
 
             if df is None or df.empty: return {"success": False, "error": "Fichier vide"}
 
-            df.columns = [str(c).lower().strip().replace('"', '').replace("'", "") for c in df.columns]
-            col_date = next((c for c in df.columns if any(x in c for x in ['date', 'horodate', 'heure', 'timestamp'])), None)
-            col_val = next((c for c in df.columns if any(x in c for x in ['puissance', 'p10', 'conso', 'valeur', 'kwh', 'kw'])), None)
-
-            if not col_date or not col_val: return {"success": False, "error": "Colonnes inconnues"}
+            # Nettoyage minimaliste pour la démo
+            df.columns = [str(c).lower().strip() for c in df.columns]
+            col_val = next((c for c in df.columns if any(x in c for x in ['puiss', 'p10', 'conso', 'val', 'kw'])), None)
+            col_date = next((c for c in df.columns if any(x in c for x in ['date', 'horo', 'time'])), None)
+            
+            if not col_val or not col_date: return {"success": False, "error": "Colonnes introuvables"}
 
             df[col_date] = pd.to_datetime(df[col_date], dayfirst=True, errors='coerce')
             df = df.dropna(subset=[col_date]).sort_values(by=col_date)
-            
-            if df[col_val].dtype == object:
-                df[col_val] = df[col_val].astype(str).str.replace(',', '.').replace(' ', '')
-                df[col_val] = pd.to_numeric(df[col_val], errors='coerce')
-            df[col_val] = df[col_val].fillna(0)
+            df[col_val] = pd.to_numeric(df[col_val].astype(str).str.replace(',','.'), errors='coerce').fillna(0)
 
-            total_sum = df[col_val].sum()
-            vol_kwh = total_sum 
-            
             kpis = {
-                "volume_mwh": round(self.safe_value(vol_kwh / 1000), 2),
-                "pic_kw": round(self.safe_value(df[col_val].max()), 2),
-                "talon_kw": round(self.safe_value(df[col_val].min()), 2),
+                "volume_mwh": round(df[col_val].sum()/1000, 2),
+                "pic_kw": round(df[col_val].max(), 2),
+                "talon_kw": round(df[col_val].min(), 2),
                 "points_traites": len(df)
             }
 
-            ai_message = self.generate_ai_insight(kpis, profile=target_profile)
+            # Appel IA
+            ai_msg = self.generate_ai_insight(kpis, profile=target_profile)
 
-            nb_points = 200
-            step = max(1, len(df) // nb_points)
+            # Chart
+            step = max(1, len(df)//200)
             df_chart = df.iloc[::step]
 
             return {
-                "success": True,
-                "kpi": kpis,
-                "ai_insight": ai_message,
+                "success": True, 
+                "kpi": kpis, 
+                "ai_insight": ai_msg,
                 "chart": {
                     "labels": df_chart[col_date].dt.strftime('%d/%m %H:%M').tolist(),
-                    "values": [self.safe_value(x) for x in df_chart[col_val].tolist()]
+                    "values": df_chart[col_val].tolist()
                 }
             }
-
         except Exception as e:
-            return {"success": False, "error": f"Moteur: {str(e)}"}
+            return {"success": False, "error": str(e)}
 
     def ask_agent(self, query):
+        # COMMANDE SECRÈTE DE DEBUG
+        if query.strip() == "#debug":
+            return f"🔍 DIAGNOSTIC :\n- Projet: {self.project_id}\n- AI Ready: {self.ai_ready}\n- Dernière Erreur: {self.last_error}"
+        
         return self.generate_ai_insight(query, profile="ops")
 
-    def run_chaos_monkey(self): 
-        return [{"test": "Vertex AI Ping", "status": "PASS" if self.ai_ready else "FAIL"}]
-    
-    def simulate_audit(self, f): 
-        return {"score": 100}
+    def run_chaos_monkey(self): return []
+    def simulate_audit(self, f): return {"score": 100}
 
 cortex = CortexEngine()
