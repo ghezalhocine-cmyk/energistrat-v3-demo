@@ -23,15 +23,16 @@ class CortexEngine:
         # INITIALISATION IA (GEMINI PRO)
         if VERTEX_AVAILABLE:
             try:
-                # Initialisation sur la région par défaut (europe-west9 = Paris)
-                vertexai.init(project=self.project_id, location="europe-west9")
-                # Chargement du modèle Gemini Pro (Le plus puissant pour le texte)
+                # --- FIX V4.2 : PASSAGE EN US-CENTRAL1 POUR FIABILITÉ ---
+                vertexai.init(project=self.project_id, location="us-central1")
+                
+                # Chargement du modèle Gemini Pro
                 self.model = GenerativeModel("gemini-1.0-pro")
                 self.ai_ready = True
-                print("✅ [CORTEX] Cerveau connecté à Google Gemini Pro.")
+                print("✅ [CORTEX] Cerveau connecté à Google Gemini Pro (US-Central1).")
             except Exception as e:
                 print(f"⚠️ [CORTEX] Erreur connexion Vertex AI : {e}")
-                # Fallback simulation si l'API n'est pas active
+                # Fallback simulation si l'API n'est pas active ou erreur de quota
                 self.ai_ready = False
 
     def safe_value(self, val):
@@ -101,7 +102,7 @@ class CortexEngine:
         Appelle Google Gemini pour générer le texte
         """
         if not self.ai_ready:
-            return "Mode Simulation : Le profil de consommation est stable. Activez l'API Vertex AI pour une analyse sémantique réelle."
+            return "Mode Simulation : Le profil de consommation est stable. Activez l'API Vertex AI (US-Central1) pour une analyse sémantique réelle."
 
         prompt = self.get_prompt_for_profile(profile, data)
 
