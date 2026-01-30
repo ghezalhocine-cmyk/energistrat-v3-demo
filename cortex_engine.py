@@ -16,7 +16,7 @@ except ImportError:
 
 class CortexEngine:
     def __init__(self):
-        # ON FORCE L'ID DU PROJET (Vu sur ta capture)
+        # ON FORCE L'ID DU PROJET
         self.project_id = "energistrat-saas"
         self.model = None
         self.ai_ready = False
@@ -24,13 +24,15 @@ class CortexEngine:
         # INITIALISATION IA
         if VERTEX_AVAILABLE:
             try:
-                # TENTATIVE DE CONNEXION ROBUSTE (US-CENTRAL1)
+                # ON RESTE SUR US-CENTRAL1 (C'est la région la plus sûre pour les modèles)
                 vertexai.init(project=self.project_id, location="us-central1")
                 
-                # Utilisation de l'alias stable "gemini-pro"
-                self.model = GenerativeModel("gemini-pro")
+                # --- CHANGEMENT ICI : UTILISATION DE GEMINI 1.5 FLASH ---
+                # C'est le modèle le plus stable et disponible actuellement
+                self.model = GenerativeModel("gemini-1.5-flash-001")
+                
                 self.ai_ready = True
-                print(f"✅ [CORTEX] Connecté au projet {self.project_id} sur US-CENTRAL1")
+                print(f"✅ [CORTEX] Connecté à Gemini 1.5 Flash sur {self.project_id}")
             except Exception as e:
                 print(f"⚠️ [CORTEX] Erreur Init : {e}")
                 self.ai_ready = False
@@ -59,7 +61,6 @@ class CortexEngine:
         """
         Appelle Google Gemini pour générer le texte
         """
-        # Si l'init a échoué, on renvoie l'erreur d'init
         if not self.ai_ready:
             return "ERREUR INIT : Vertex AI n'a pas pu s'initialiser au démarrage."
 
@@ -70,7 +71,6 @@ class CortexEngine:
             response = self.model.generate_content(prompt)
             return response.text
         except Exception as e:
-            # ICI : ON RENVOIE L'ERREUR BRUTE DE GOOGLE POUR LE DEBUG
             error_msg = str(e)
             print(f"❌ Erreur Runtime Gemini : {error_msg}")
             return f"ERREUR GOOGLE : {error_msg}"
@@ -105,7 +105,7 @@ class CortexEngine:
             df[col_val] = df[col_val].fillna(0)
 
             total_sum = df[col_val].sum()
-            vol_kwh = total_sum # Simplifié pour le test
+            vol_kwh = total_sum 
             
             kpis = {
                 "volume_mwh": round(self.safe_value(vol_kwh / 1000), 2),
