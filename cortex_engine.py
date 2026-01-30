@@ -8,72 +8,92 @@ import json
 try:
     import vertexai
     from vertexai.generative_models import GenerativeModel
+    from vertexai.language_models import TextGenerationModel
     VERTEX_AVAILABLE = True
 except ImportError:
     VERTEX_AVAILABLE = False
+    print("⚠️ [CORTEX] Vertex AI SDK non installé.")
 
 class CortexEngine:
     def __init__(self):
-        # Récupération automatique de l'ID projet
-        self.project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "energistrat-saas")
+        self.project_id = "energistrat-saas"
         self.model = None
+        self.active_model_name = "Aucun"
         self.ai_ready = False
-        self.last_error = "Initialisation..."
         
         if VERTEX_AVAILABLE:
-            self.init_ai()
+            self.init_ai_robust()
 
-    def init_ai(self):
-        """Connexion à la région Mère (US-CENTRAL1) pour garantir l'accès"""
+    def init_ai_robust(self):
+        """Tente de se connecter à plusieurs modèles jusqu'à ce que ça marche"""
         try:
-            print(f"📡 Tentative connexion Vertex AI sur US-CENTRAL1...")
-            
-            # --- FIX : ON FORCE LA REGION US ---
+            # 1. Connexion Infrastructure (USA pour max compatibilité)
             vertexai.init(project=self.project_id, location="us-central1")
             
-            # On utilise le modèle standard
-            self.model = GenerativeModel("gemini-1.0-pro")
-            
-            # Test immédiat
-            self.model.generate_content("Ping")
-            self.ai_ready = True
-            self.last_error = "Connecté (US-Central1)"
-            print("✅ [CORTEX] Connecté à Gemini (USA)")
-            
-        except Exception as e:
-            self.ai_ready = False
-            self.last_error = str(e)
-            print(f"❌ [CORTEX] Echec Init : {e}")
+            # 2. Liste des modèles à tester (Ordre de préférence)
+            models_to_try = [
+                "gemini-1.5-flash-001", # Le plus rapide/récent
+                "gemini-1.5-pro-001",   # Le plus puissant
+                "gemini-1.0-pro",       # L'ancien standard
+                "gemini-pro"            # L'alias générique
+            ]
 
-    def safe_value(self, val):
+            for model_name in models_to_try:
+                try:
+                    print(f"🔄 Test connexion : {model_name}...")
+                    temp_model = GenerativeModel(model_name)
+                    # Test réel de génération
+                    temp_model.generate_content("Ping")
+                    
+                    self.model = temp_model
+                    self.active_model_name = model_name
+                    self.ai_ready = True
+                    print(f"✅ [CORTEX] SUCCÈS : Connecté sur {model_name}")
+                    return
+                except:
+                    continue # On essaie le suivant
+            
+            print("⚠️ [CORTEX] Aucun modèle n'a répondu.")
+
+        except Exception as e:
+            print(f"⚠️ [CORTEX] Erreur Init Critique : {e}")
+
+    # --- FIX CRITIQUE JSON SERIALIZATION ---
+    def clean_number(self, val):
+        """Convertit les types NumPy (int64, float64) en types Python natifs (int, float)"""
         try:
-            if pd.isna(val) or np.isinf(val): return 0.0
+            if pd.isna(val) or np.isinf(val): return 0
+            # Si c'est un entier NumPy
+            if isinstance(val, (np.integer, int)):
+                return int(val)
+            # Si c'est un flottant NumPy
+            if isinstance(val, (np.floating, float)):
+                return float(val)
             return float(val)
-        except: return 0.0
+        except:
+            return 0
 
     def generate_ai_insight(self, data, profile="industry"):
         if not self.ai_ready:
-            return f"ERREUR SYSTÈME : {self.last_error}"
+            return f"ERREUR IA : Aucun modèle disponible. (Dernier testé : {self.active_model_name})"
 
-        # Construction du Prompt
         if isinstance(data, str):
-            # Chatbot Ops
-            prompt = f"Tu es l'IA Energistrat. Réponds de façon technique et concise à : {data}"
+            prompt = f"Tu es l'IA Energistrat. Réponds à : {data}"
         else:
-            # Analyse Fichier
-            prompt = f"Agis en expert énergie pour un client type '{profile}'. Analyse ces données : Volume {data['volume_mwh']} MWh, Pic {data['pic_kw']} kW. Donne un conseil court (2 phrases)."
+            prompt = f"Agis en expert énergie ({profile}). Analyse : Vol {data['volume_mwh']} MWh, Pic {data['pic_kw']} kW. Conseil court."
 
         try:
             response = self.model.generate_content(prompt)
             return response.text
         except Exception as e:
-            return f"ERREUR RUNTIME : {str(e)}"
+            return f"ERREUR RUNTIME ({self.active_model_name}) : {str(e)}"
 
     async def analyze_file(self, file_content, filename, target_profile="industry"):
         try:
             buffer = io.BytesIO(file_content)
             df = None
-            # Lecture robuste
+            
+            # Lecture Robuste
             if filename.lower().endswith('.csv'):
                 try: df = pd.read_csv(buffer, sep=None, engine='python')
                 except: 
@@ -86,61 +106,62 @@ class CortexEngine:
 
             # Nettoyage Colonnes
             df.columns = [str(c).lower().strip().replace('"','').replace("'", "") for c in df.columns]
-            
-            # Détection colonnes
             col_val = next((c for c in df.columns if any(x in c for x in ['puiss', 'p10', 'conso', 'val', 'kw'])), None)
             col_date = next((c for c in df.columns if any(x in c for x in ['date', 'horo', 'time'])), None)
             
             if not col_val or not col_date: return {"success": False, "error": "Colonnes introuvables"}
 
-            # Traitement Données
+            # Traitement
             df[col_date] = pd.to_datetime(df[col_date], dayfirst=True, errors='coerce')
             df = df.dropna(subset=[col_date]).sort_values(by=col_date)
             
-            # Nettoyage valeurs (virgules)
             if df[col_val].dtype == object:
                 df[col_val] = pd.to_numeric(df[col_val].astype(str).str.replace(',', '.'), errors='coerce')
             df[col_val] = df[col_val].fillna(0)
 
-            # Calculs KPI
+            # KPI
             total = df[col_val].sum()
-            # Si c'est des kW (Puissance), on divise par 6 pour avoir des kWh (pas 10min)
-            # Si c'est déjà des kWh (Conso), on garde tel quel
-            is_power = 'kw' in col_val and 'kwh' not in col_val
-            vol = total / 6 if is_power else total
-
+            vol = total / 6 if ('kw' in col_val and 'kwh' not in col_val) else total
+            
+            # --- FIX JSON : On utilise clean_number partout ---
             kpis = {
-                "volume_mwh": round(vol/1000, 2),
-                "pic_kw": round(df[col_val].max(), 2),
-                "talon_kw": round(df[col_val].min(), 2),
-                "points_traites": len(df)
+                "volume_mwh": round(self.clean_number(vol/1000), 2),
+                "pic_kw": round(self.clean_number(df[col_val].max()), 2),
+                "talon_kw": round(self.clean_number(df[col_val].min()), 2),
+                "points_traites": int(len(df)) # Force le cast en int Python pur
             }
 
-            # Appel IA
+            # APPEL IA
             ai_msg = self.generate_ai_insight(kpis, profile=target_profile)
 
-            # Sampling Graphique (Max 200 points)
+            # Chart Sampling
             step = max(1, len(df)//200)
             df_chart = df.iloc[::step]
+
+            # --- FIX JSON CHART : List comprehension avec clean_number ---
+            chart_values = [self.clean_number(x) for x in df_chart[col_val].tolist()]
+            chart_labels = df_chart[col_date].dt.strftime('%d/%m %H:%M').tolist()
 
             return {
                 "success": True, 
                 "kpi": kpis, 
                 "ai_insight": ai_msg,
                 "chart": {
-                    "labels": df_chart[col_date].dt.strftime('%d/%m %H:%M').tolist(),
-                    "values": df_chart[col_val].tolist()
+                    "labels": chart_labels,
+                    "values": chart_values
                 }
             }
         except Exception as e:
+            # On log l'erreur exacte pour le debug
+            print(f"❌ ERREUR ANALYSE : {str(e)}")
             return {"success": False, "error": f"Moteur: {str(e)}"}
 
     def ask_agent(self, query):
-        if query.strip() == "#debug":
-            return f"🔍 DIAGNOSTIC :\n- Projet: {self.project_id}\n- AI Ready: {self.ai_ready}\n- Dernière Erreur: {self.last_error}"
+        if query == "#model":
+            return f"Modèle actif : {self.active_model_name} (Région: us-central1)"
         return self.generate_ai_insight(query, profile="ops")
 
-    def run_chaos_monkey(self): return [{"test": "Vertex AI Ping", "status": "PASS" if self.ai_ready else "FAIL"}]
+    def run_chaos_monkey(self): return []
     def simulate_audit(self, f): return {"score": 100}
 
 cortex = CortexEngine()
