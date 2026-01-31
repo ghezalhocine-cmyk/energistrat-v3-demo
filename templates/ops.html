@@ -2,10 +2,9 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V6.4 | Ops Expert</title>
+    <title>ENERGISTRAT V6.5 | Real Data Ops</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Plugin Annotation pour la ligne de Talon si besoin, sinon on simule avec un dataset -->
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -21,7 +20,6 @@
         .nav-icon.active { background: rgba(244, 63, 94, 0.1); color: #F43F5E; }
         .page-content { display: none; opacity: 0; animation: fadeIn 0.3s forwards; }
         .page-content.active { display: grid; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         #drop-zone.drag-active { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.1); }
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
         .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; }
@@ -41,7 +39,6 @@
         <nav class="flex flex-col w-full items-center">
             <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active"><i class="fa-solid fa-flask text-xl"></i></div>
             <div onclick="navTo('auditlab')" id="nav-auditlab" class="nav-icon"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></div>
-            <div onclick="navTo('scenarios')" id="nav-scenarios" class="nav-icon"><i class="fa-solid fa-bomb text-xl"></i></div>
         </nav>
         <a href="/" class="mt-auto nav-icon"><i class="fa-solid fa-house"></i></a>
     </aside>
@@ -49,7 +46,7 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-box-open text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V6.4 EXPERT</span></div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-box-open text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V6.5 REAL DATA</span></div>
             <div class="text-[10px] font-mono text-gray-400"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>ONLINE</div>
         </header>
 
@@ -59,23 +56,17 @@
             <div id="view-datalab" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
                 <!-- COLONNE GAUCHE -->
                 <div class="col-span-12 md:col-span-4 bento-card p-6 rounded-2xl border-t-4 border-cyan flex flex-col">
-                    <h3 class="font-bold text-white mb-2">Ingestion HD</h3>
+                    <h3 class="font-bold text-white mb-2">Ingestion Fichier Réel</h3>
                     <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 mb-4 focus:border-cyan outline-none">
-                        <option value="demo">-- Mode Test --</option>
-                        <option value="retail">Retail / Franchise</option>
+                        <option value="retail">Retail</option>
                         <option value="industry">Industrie</option>
                         <option value="mairie">Collectivité</option>
-                        <option value="pme">PME</option>
-                        <option value="sde">Syndicat (SDE)</option>
-                        <option value="oph">Bailleur (OPH)</option>
-                        <option value="syndic">Syndic</option>
-                        <option value="citoyen">Particulier</option>
-                        <option value="supplier">Partenaire</option>
+                        <option value="demo">Test</option>
                     </select>
                     <div id="drop-zone" class="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan transition py-8" onclick="document.getElementById('real-upload').click()">
                         <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
-                        <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 mb-2"></i>
-                        <span class="text-xs font-bold text-white" id="upload-label">Glisser un fichier</span>
+                        <i class="fa-solid fa-file-csv text-3xl text-gray-500 mb-2"></i>
+                        <span class="text-xs font-bold text-white" id="upload-label">Glisser CSV / Excel SGE</span>
                     </div>
                     <div id="upload-result" class="hidden mt-4 bg-green-900/10 border border-green-500/30 p-3 rounded-xl">
                         <div class="text-[10px] text-gray-400">Token :</div>
@@ -89,64 +80,62 @@
                     <!-- Graphique -->
                     <div class="bento-card p-6 rounded-2xl mb-6">
                         <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
-                            <h3 class="font-bold text-white">Courbe de Charge SGE</h3>
+                            <h3 class="font-bold text-white">Courbe de Charge</h3>
                             <div class="flex items-center gap-2 bg-white/5 p-1 rounded-lg border border-white/10">
-                                <input type="date" id="date-start"> <span class="text-gray-500 text-xs">-</span> <input type="date" id="date-end">
+                                <input type="date" id="date-start"> <span class="text-gray-500 text-xs">au</span> <input type="date" id="date-end">
                                 <button onclick="applyDateFilter()" class="bg-cyan/20 text-cyan px-2 rounded text-xs hover:bg-cyan/40"><i class="fa-solid fa-filter"></i></button>
                             </div>
-                            <div class="flex gap-1">
-                                <button onclick="zoomPreset(7)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20">7J</button>
-                                <button onclick="zoomPreset(30)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20">30J</button>
-                                <button onclick="zoomPreset('all')" class="px-2 py-1 bg-cyan/20 text-[10px] text-cyan rounded hover:bg-cyan/30">TOUT</button>
-                            </div>
+                            <button onclick="zoomPreset('all')" class="px-2 py-1 bg-cyan/20 text-[10px] text-cyan rounded hover:bg-cyan/30">RESET</button>
                         </div>
                         <div class="h-64 w-full relative"><canvas id="testChart"></canvas></div>
+                        
+                        <!-- STATS DYNAMIQUES -->
+                        <div class="flex justify-between mt-4 pt-4 border-t border-white/5">
+                            <div>
+                                <div class="text-[10px] text-gray-500 uppercase">Conso. Période (Cumul)</div>
+                                <div class="text-xl font-mono font-bold text-white" id="dyn-conso">--</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] text-gray-500 uppercase">Puissance Max (Période)</div>
+                                <div class="text-xl font-mono font-bold text-white" id="dyn-pmax">--</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-[10px] text-gray-500 uppercase">Points affichés</div>
+                                <div class="text-xl font-mono text-cyan" id="dyn-points">--</div>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- ANALYSE EXPERTE (NOUVEAU) -->
+                    <!-- KPI GLOBAUX (Calculés par le Backend sur tout le fichier) -->
                     <div class="grid grid-cols-3 gap-6">
                         <div class="bento-card p-4 rounded-xl border border-white/5">
                             <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Talon (Baseload)</div>
                             <div class="text-2xl font-mono font-bold text-white" id="kpi-talon">-- kW</div>
-                            <div class="text-[10px] text-green-400 mt-1">Seuil minimal atteint</div>
+                            <div class="text-[10px] text-green-400 mt-1">Bruit de fond</div>
                         </div>
                         <div class="bento-card p-4 rounded-xl border border-white/5">
                             <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Ratio Inactivité</div>
                             <div class="text-2xl font-mono font-bold text-white" id="kpi-ratio">-- %</div>
-                            <div class="text-[10px] text-gray-400 mt-1">Conso Weekend vs Semaine</div>
+                            <div class="text-[10px] text-gray-400 mt-1">Weekend / Semaine</div>
                         </div>
                         <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-ai/10">
-                            <div class="text-[10px] text-ai uppercase font-bold mb-1"><i class="fa-solid fa-robot"></i> Diagnostic Cortex</div>
-                            <div class="text-xs text-white leading-relaxed" id="kpi-diag">En attente d'analyse...</div>
+                            <div class="text-[10px] text-ai uppercase font-bold mb-1"><i class="fa-solid fa-robot"></i> Diagnostic</div>
+                            <div class="text-xs text-white leading-relaxed" id="kpi-diag">En attente...</div>
                         </div>
                     </div>
                 </div>
-
-                <!-- ZONE RETAIL -->
-                <div id="retail-zone" class="col-span-12 hidden">
-                    <div class="bento-card p-6 rounded-2xl border border-purple-500/30 mt-6">
-                        <h3 class="font-bold text-white mb-4"><i class="fa-solid fa-store text-purple-500"></i> Benchmark Retail</h3>
-                        <table class="w-full text-left text-xs text-gray-300">
-                            <thead class="text-gray-500 border-b border-white/10"><tr><th>Magasin</th><th>Conso</th><th>Ratio</th><th class="text-right">Statut</th></tr></thead>
-                            <tbody id="retail-results" class="divide-y divide-white/5"></tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
 
-            <!-- TAB 2 & 3 INCHANGÉS -->
+            <!-- AUDIT TAB -->
             <div id="view-auditlab" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
                 <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Audit Expert</h3></div>
-                <div class="col-span-6 bento-card p-6 rounded-2xl border border-red-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">1. FACTURE PDF</label><input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
-                <div class="col-span-6 bento-card p-6 rounded-2xl border border-blue-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">2. CONTRAT PDF</label><input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
-                <div class="col-span-12"><button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl text-sm hover:scale-[1.01] transition shadow-lg">LANCER L'AUDIT</button></div>
-                <div class="col-span-12 bento-card p-6 rounded-2xl bg-abysse border border-white/10 mt-4"><table class="w-full text-left text-xs text-gray-300"><thead class="text-gray-500 border-b border-white/10"><tr><th>Contrôle</th><th>Facture</th><th>Contrat</th><th class="text-right">Résultat</th></tr></thead><tbody id="audit-results" class="divide-y divide-white/5"><tr><td colspan="4" class="py-4 text-gray-500 italic">En attente...</td></tr></tbody></table></div>
-            </div>
-            <div id="view-scenarios" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-6 rounded-2xl border-l-4 border-red-500"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-white">Chaos Monkey</h3><button onclick="runTest()" class="px-4 py-2 bg-red-600 text-white font-bold rounded text-xs">TEST</button></div><div id="chaos-results" class="grid grid-cols-3 gap-4"></div></div>
+                <div class="col-span-6 bento-card p-6 rounded-2xl border border-red-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">FACTURE</label><input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
+                <div class="col-span-6 bento-card p-6 rounded-2xl border border-blue-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">CONTRAT</label><input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
+                <div class="col-span-12"><button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl text-sm hover:scale-[1.01]">AUDITER</button></div>
+                <div class="col-span-12 bento-card p-6 rounded-2xl bg-abysse border border-white/10 mt-4"><div id="audit-results" class="text-xs text-gray-400">Résultats ici...</div></div>
             </div>
         </div>
-
+        
         <!-- TERMINAL -->
         <div class="h-40 bg-[#02050a] border-t border-white/10 p-4 overflow-hidden flex flex-col z-20"><div class="flex justify-between items-center mb-1 border-b border-white/5 pb-1"><span class="text-slate-500 font-bold uppercase tracking-widest text-[10px]">>> SYSTEM LOGS</span><button onclick="document.getElementById('terminal').innerHTML=''" class="text-[10px] text-gray-600 hover:text-white">CLEAR</button></div><div id="terminal" class="flex-1 overflow-y-auto space-y-1"></div></div>
     </main>
@@ -163,7 +152,7 @@
         const App = { toast: function(msg, type='info') { const el = document.createElement('div'); el.className = 'toast'; el.style.borderLeftColor = type==='success'?'#10B981':(type==='error'?'#EF4444':'#00E5FF'); el.innerText = msg; document.getElementById('toast-container').appendChild(el); setTimeout(() => el.remove(), 4000); } };
         function navTo(pageId) { document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active')); document.getElementById('nav-' + pageId).classList.add('active'); document.querySelectorAll('.page-content').forEach(e => e.classList.remove('active')); document.getElementById('view-' + pageId).classList.add('active'); }
 
-        // CHART EXPERT
+        // --- CHART & DATA LOGIC ---
         let testChart = null;
         let masterData = { labels: [], values: [], average: [], talon: 0 };
 
@@ -180,45 +169,86 @@
             });
         }
 
+        // CALCULATEUR DYNAMIQUE (Client-Side)
+        function calculateStats(values) {
+            if (!values || values.length === 0) return;
+            const sum = values.reduce((a, b) => a + b, 0);
+            const max = Math.max(...values);
+            
+            // Mise à jour DOM
+            document.getElementById('dyn-conso').innerText = Math.round(sum).toLocaleString() + " kWh";
+            document.getElementById('dyn-pmax').innerText = Math.round(max).toLocaleString() + " kW";
+            document.getElementById('dyn-points').innerText = values.length;
+        }
+
         function loadChartData(labels, values, average, talon) {
             masterData = { labels, values, average, talon };
-            if(labels.length > 0) { document.getElementById('date-start').value = labels[0]; document.getElementById('date-end').value = labels[labels.length - 1]; }
+            
+            // Force les limites du DatePicker
+            if(labels.length > 0) {
+                const start = labels[0].split(' ')[0]; // YYYY-MM-DD
+                const end = labels[labels.length - 1].split(' ')[0];
+                const dStart = document.getElementById('date-start');
+                const dEnd = document.getElementById('date-end');
+                
+                dStart.min = start; dStart.max = end; dStart.value = start;
+                dEnd.min = start; dEnd.max = end; dEnd.value = end;
+            }
+            
             updateChartDisplay(labels, values, average, talon);
         }
 
         function updateChartDisplay(labels, values, average, talon) {
-            // Création d'un tableau pour la ligne de Talon (constante)
             const talonLine = new Array(values.length).fill(talon);
-
+            
             testChart.data.labels = labels;
             testChart.data.datasets = [
                 { label: 'Puissance (kW)', data: values, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, pointRadius: 0, borderWidth: 1.5 },
-                { label: 'Moyenne (kW)', data: average, borderColor: '#F59E0B', borderDash: [5, 5], pointRadius: 0, borderWidth: 1, fill: false },
-                { label: 'Talon (Baseload)', data: talonLine, borderColor: '#10B981', borderWidth: 1, pointRadius: 0, fill: false }
+                { label: 'Talon', data: talonLine, borderColor: '#10B981', borderWidth: 1, pointRadius: 0, fill: false }
             ];
             testChart.update();
+            
+            // Recalculer les stats sur ce qui est affiché
+            calculateStats(values);
         }
 
         function zoomPreset(range) {
             if(!masterData.values.length) return;
             let sl, sv, sa;
             if (range === 'all') { sl=masterData.labels; sv=masterData.values; sa=masterData.average; }
-            else { sl=masterData.labels.slice(-range); sv=masterData.values.slice(-range); sa=masterData.average.slice(-range); }
-            if(sl.length > 0) { document.getElementById('date-start').value = sl[0]; document.getElementById('date-end').value = sl[sl.length - 1]; }
+            else { 
+                // Pour zoomer sur les X derniers points
+                sl=masterData.labels.slice(-range); sv=masterData.values.slice(-range); sa=masterData.average.slice(-range); 
+            }
             updateChartDisplay(sl, sv, sa, masterData.talon);
         }
 
         function applyDateFilter() {
-            const start = document.getElementById('date-start').value;
-            const end = document.getElementById('date-end').value;
-            if(!start || !end || !masterData.labels.length) return;
-            const i1 = masterData.labels.indexOf(start);
-            const i2 = masterData.labels.indexOf(end);
-            if(i1 === -1 || i2 === -1 || i1 > i2) { App.toast("Dates invalides.", "error"); return; }
-            updateChartDisplay(masterData.labels.slice(i1, i2+1), masterData.values.slice(i1, i2+1), masterData.average.slice(i1, i2+1), masterData.talon);
+            const sVal = document.getElementById('date-start').value;
+            const eVal = document.getElementById('date-end').value;
+            
+            if(!sVal || !eVal) return;
+
+            // Filtrage Manuel plus robuste (String Comparison YYYY-MM-DD)
+            const filteredIndices = masterData.labels.map((date, index) => {
+                const d = date.split(' ')[0]; // On garde juste la date, pas l'heure
+                return (d >= sVal && d <= eVal) ? index : -1;
+            }).filter(i => i !== -1);
+
+            if(filteredIndices.length === 0) { App.toast("Aucune donnée sur cette plage", "error"); return; }
+
+            const startIdx = filteredIndices[0];
+            const endIdx = filteredIndices[filteredIndices.length - 1];
+
+            const sl = masterData.labels.slice(startIdx, endIdx + 1);
+            const sv = masterData.values.slice(startIdx, endIdx + 1);
+            const sa = masterData.average.slice(startIdx, endIdx + 1);
+
+            updateChartDisplay(sl, sv, sa, masterData.talon);
+            App.toast("Filtre appliqué.", "success");
         }
 
-        // UPLOAD & ANALYSE
+        // --- UPLOAD ---
         async function handleFileSelect(file) {
             if (!file) return;
             const target = document.getElementById('target-client').value;
@@ -226,8 +256,8 @@
             formData.append('file', file);
             formData.append('target', target);
             
-            log(`Analyse SGE: ${file.name}...`, 'info');
-            App.toast('Calcul Talon & Ratios...', 'info');
+            log(`Upload SGE: ${file.name}...`, 'info');
+            App.toast('Calculs Réels en cours...', 'info');
             
             try {
                 const res = await fetch('/api/ops/analyze', { method: 'POST', headers: { 'x-admin-token': adminPin }, body: formData });
@@ -235,42 +265,26 @@
                 const data = await res.json();
                 
                 if (data.success) {
-                    log(`Analyse terminée.`, 'success');
+                    log(`Succès. ${data.kpi.points_traites} points lus.`, 'success');
                     document.getElementById('upload-result').classList.remove('hidden');
                     document.getElementById('res-token').innerText = data.token;
                     document.getElementById('res-link').href = data.secure_link;
                     
-                    // MISE A JOUR KPI EXPERTS
+                    // MAJ KPI GLOBAUX
                     if(data.kpi) {
                         document.getElementById('kpi-talon').innerText = data.kpi.talon + " kW";
                         document.getElementById('kpi-ratio').innerText = data.kpi.inactivity_ratio + " %";
                         document.getElementById('kpi-diag').innerText = data.kpi.diagnosis;
-                        // Couleur conditionnelle
                         const diagEl = document.getElementById('kpi-diag');
-                        if(data.kpi.status === 'WARNING') diagEl.classList.add('text-red-400');
-                        else diagEl.classList.add('text-green-400');
+                        diagEl.className = "text-xs leading-relaxed " + (data.kpi.status === 'WARNING' ? 'text-red-400' : 'text-green-400');
                     }
 
                     if (data.chart) loadChartData(data.chart.labels, data.chart.values, data.chart.average, data.kpi.talon);
                     if (data.ai_insight) document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.ai_insight}</div>`;
-                    
-                    // RETAIL
-                    const rZ = document.getElementById('retail-zone');
-                    const rT = document.getElementById('retail-results');
-                    if (data.retail_data) {
-                        rZ.classList.remove('hidden');
-                        let rows = '';
-                        data.retail_data.benchmark.forEach(s => {
-                            const c = s.status === 'ALERTE' ? 'text-red-400 font-bold' : (s.status === 'TOP' ? 'text-green-400' : 'text-gray-400');
-                            rows += `<tr><td class="py-2">${s.nom}</td><td>${s.conso}</td><td>${s.ratio}</td><td class="text-right ${c}">${s.status}</td></tr>`;
-                        });
-                        rT.innerHTML = rows;
-                    } else { rZ.classList.add('hidden'); }
                 } else throw new Error(data.error);
-            } catch (e) { log(e.message, 'error'); }
+            } catch (e) { log(e.message, 'error'); App.toast("Erreur Lecture Fichier", "error"); }
         }
 
-        // AUDIT
         async function runRealAudit() {
             const inv = document.getElementById('invoice-file').files[0];
             const ctr = document.getElementById('contract-file').files[0];
@@ -291,13 +305,6 @@
             } catch(e) { log("Erreur Audit", "error"); }
         }
 
-        async function runTest() {
-            const res = await fetch('/api/ops/chaos', { method:'POST', headers: { 'x-admin-token': adminPin } });
-            const data = await res.json();
-            const div = document.getElementById('chaos-results'); div.innerHTML = '';
-            data.results.forEach(r => div.innerHTML += `<div class="border p-2 rounded text-xs text-white">${r.test}: ${r.status}</div>`);
-        }
-
         async function sendChat() {
             const txt = document.getElementById('chat-input').value;
             if(!txt) return;
@@ -310,7 +317,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', initChart);
-        log('Ops V6.4 Expert Ready.', 'success');
+        log('Ops V6.5 Real Data Ready.', 'success');
     </script>
 </body>
 </html>
