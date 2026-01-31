@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V6.6.2 | Ops Master</title>
+    <title>ENERGISTRAT V6.8 | Ops Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -15,28 +15,23 @@
     <style>
         body { background: #050505; color: #e2e8f0; overflow: hidden; }
         .ops-grid { display: grid; grid-template-columns: 70px 1fr 350px; height: 100vh; }
-        
-        /* FIX VISIBILITÉ V6.6 : Fond opaque */
-        .bento-card { 
-            background: rgba(15, 23, 42, 0.95); 
-            border: 1px solid rgba(255,255,255,0.1); 
-        }
-        
+        .bento-card { background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255,255,255,0.1); }
         .nav-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #64748B; cursor: pointer; transition: all 0.2s; margin-bottom: 1rem; }
         .nav-icon.active { background: rgba(244, 63, 94, 0.1); color: #F43F5E; }
-        
-        /* FIX AFFICHAGE : Pas d'animation complexe */
         .page-content { display: none; }
         .page-content.active { display: grid; }
-        
         #drop-zone.drag-active { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.1); }
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
         .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; }
         #terminal { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
         .log-success { color: #4ade80; } .log-error { color: #f87171; } .log-info { color: #94a3b8; }
         
-        input[type="date"] { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; padding: 4px; font-size: 10px; font-family: 'JetBrains Mono'; }
+        input[type="date"] { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; padding: 4px; font-size: 10px; font-family: 'JetBrains Mono'; cursor: pointer; }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+        
+        .audit-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        .audit-table th { text-align: left; padding: 12px; color: #64748B; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .audit-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e2e8f0; }
     </style>
 </head>
 <body class="ops-grid">
@@ -56,7 +51,7 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-box-open text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V6.6.2</span></div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-box-open text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V6.8</span></div>
             <div class="text-[10px] font-mono text-gray-400"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>ONLINE</div>
         </header>
 
@@ -64,17 +59,15 @@
 
             <!-- TAB 1: DATA LAB -->
             <div id="view-datalab" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
-                <!-- COLONNE GAUCHE -->
                 <div class="col-span-12 md:col-span-4 bento-card p-6 rounded-2xl border-t-4 border-cyan flex flex-col">
                     <h3 class="font-bold text-white mb-2">Ingestion Fichier Réel</h3>
                     
-                    <!-- MENU COMPLET 10 PROFILS (VÉRIFIÉ) -->
                     <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 mb-4 focus:border-cyan outline-none">
                         <option value="demo">-- Mode Test / Démo --</option>
                         <option value="retail">Retail / Franchise (NEW)</option>
                         <option value="industry">Industrie (ISO 50001)</option>
                         <option value="mairie">Collectivité (Mairie)</option>
-                        <option value="pme">PME / Artisan</option> <!-- ICI : PROFIL PME -->
+                        <option value="pme">PME / Artisan</option>
                         <option value="sde">Syndicat (SDE)</option>
                         <option value="oph">Bailleur Social (OPH)</option>
                         <option value="syndic">Syndic Copro</option>
@@ -94,28 +87,37 @@
                     </div>
                 </div>
 
-                <!-- COLONNE DROITE : GRAPHIQUE + ANALYSE EXPERTE -->
                 <div class="col-span-12 md:col-span-8">
-                    <!-- Graphique -->
                     <div class="bento-card p-6 rounded-2xl mb-6">
                         <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
                             <h3 class="font-bold text-white">Courbe de Charge</h3>
+                            
+                            <!-- CONTROLES DATE RÉPARÉS -->
                             <div class="flex items-center gap-2 bg-white/5 p-1 rounded-lg border border-white/10">
-                                <input type="date" id="date-start"> <span class="text-gray-500 text-xs">au</span> <input type="date" id="date-end">
-                                <button onclick="applyDateFilter()" class="bg-cyan/20 text-cyan px-2 rounded text-xs hover:bg-cyan/40"><i class="fa-solid fa-filter"></i></button>
+                                <input type="date" id="date-start" onchange="applyDateFilter()"> 
+                                <span class="text-gray-500 text-xs">au</span> 
+                                <input type="date" id="date-end" onchange="applyDateFilter()">
+                                <button onclick="applyDateFilter()" class="bg-cyan/20 text-cyan px-2 rounded text-xs hover:bg-cyan/40 h-6"><i class="fa-solid fa-filter"></i></button>
                             </div>
-                            <button onclick="zoomPreset('all')" class="px-2 py-1 bg-cyan/20 text-[10px] text-cyan rounded hover:bg-cyan/30">RESET</button>
+                            
+                            <!-- BOUTONS PRESETS -->
+                            <div class="flex gap-1">
+                                <button onclick="zoomPreset(7)" class="px-3 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20 transition border border-white/5">7J</button>
+                                <button onclick="zoomPreset(30)" class="px-3 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20 transition border border-white/5">30J</button>
+                                <button onclick="zoomPreset('all')" class="px-3 py-1 bg-cyan/20 text-[10px] text-cyan rounded hover:bg-cyan/30 transition border border-cyan/30">TOUT</button>
+                            </div>
                         </div>
+                        
                         <div class="h-64 w-full relative"><canvas id="testChart"></canvas></div>
                         
                         <!-- STATS DYNAMIQUES -->
                         <div class="flex justify-between mt-4 pt-4 border-t border-white/5">
                             <div>
-                                <div class="text-[10px] text-gray-500 uppercase">Conso. Période (Cumul)</div>
+                                <div class="text-[10px] text-gray-500 uppercase">Conso. Période</div>
                                 <div class="text-xl font-mono font-bold text-white" id="dyn-conso">--</div>
                             </div>
                             <div>
-                                <div class="text-[10px] text-gray-500 uppercase">Puissance Max (Période)</div>
+                                <div class="text-[10px] text-gray-500 uppercase">Puissance Max</div>
                                 <div class="text-xl font-mono font-bold text-white" id="dyn-pmax">--</div>
                             </div>
                             <div class="text-right">
@@ -125,33 +127,35 @@
                         </div>
                     </div>
 
-                    <!-- KPI GLOBAUX -->
                     <div class="grid grid-cols-3 gap-6">
                         <div class="bento-card p-4 rounded-xl border border-white/5">
                             <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Talon (Baseload)</div>
                             <div class="text-2xl font-mono font-bold text-white" id="kpi-talon">-- kW</div>
-                            <div class="text-[10px] text-green-400 mt-1">Bruit de fond</div>
                         </div>
                         <div class="bento-card p-4 rounded-xl border border-white/5">
                             <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Ratio Inactivité</div>
                             <div class="text-2xl font-mono font-bold text-white" id="kpi-ratio">-- %</div>
-                            <div class="text-[10px] text-gray-400 mt-1">Weekend / Semaine</div>
                         </div>
                         <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-ai/10">
-                            <div class="text-[10px] text-ai uppercase font-bold mb-1"><i class="fa-solid fa-robot"></i> Diagnostic</div>
+                            <div class="text-[10px] text-ai uppercase font-bold mb-1">Diagnostic</div>
                             <div class="text-xs text-white leading-relaxed" id="kpi-diag">En attente...</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- AUDIT TAB -->
+            <!-- TAB 2: AUDIT -->
             <div id="view-auditlab" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
                 <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Audit Expert</h3></div>
                 <div class="col-span-6 bento-card p-6 rounded-2xl border border-red-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">FACTURE</label><input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
                 <div class="col-span-6 bento-card p-6 rounded-2xl border border-blue-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">CONTRAT</label><input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
                 <div class="col-span-12"><button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl text-sm hover:scale-[1.01]">AUDITER</button></div>
-                <div class="col-span-12 bento-card p-6 rounded-2xl bg-abysse border border-white/10 mt-4"><div id="audit-results" class="text-xs text-gray-400">Résultats ici...</div></div>
+                <div class="col-span-12 bento-card p-0 rounded-2xl bg-abysse border border-white/10 mt-4 overflow-hidden">
+                    <table class="audit-table">
+                        <thead><tr class="bg-white/5"><th>Point de Contrôle</th><th>Donnée Facture</th><th>Donnée Contrat</th><th class="text-right">Résultat</th></tr></thead>
+                        <tbody id="audit-results"><tr><td colspan="4" class="text-center py-8 text-gray-500 italic">En attente de documents...</td></tr></tbody>
+                    </table>
+                </div>
             </div>
         </div>
         
@@ -163,7 +167,6 @@
     <aside class="bg-[#0B0F19] border-l border-white/5 flex flex-col w-[350px] z-30"><div class="p-4 border-b border-white/5 bg-ai/5 flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-ai flex items-center justify-center text-white font-bold"><i class="fa-solid fa-robot"></i></div><h3 class="font-bold text-white text-sm">CORTEX</h3></div><div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-container"></div><div class="p-4 border-t border-white/5"><input type="text" id="chat-input" placeholder="Message..." class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none" onkeypress="if(event.key==='Enter') sendChat()"></div></aside>
 
     <script>
-        // AUTH
         let adminPin = sessionStorage.getItem('admin_pin');
         if (!adminPin) { adminPin = prompt("🔒 PIN Ops Requis :"); if (adminPin) sessionStorage.setItem('admin_pin', adminPin); else { alert("Accès Refusé"); throw new Error("Stop"); } }
 
@@ -171,7 +174,6 @@
         const App = { toast: function(msg, type='info') { const el = document.createElement('div'); el.className = 'toast'; el.style.borderLeftColor = type==='success'?'#10B981':(type==='error'?'#EF4444':'#00E5FF'); el.innerText = msg; document.getElementById('toast-container').appendChild(el); setTimeout(() => el.remove(), 4000); } };
         function navTo(pageId) { document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active')); document.getElementById('nav-' + pageId).classList.add('active'); document.querySelectorAll('.page-content').forEach(e => e.classList.remove('active')); document.getElementById('view-' + pageId).classList.add('active'); }
 
-        // --- CHART & DATA LOGIC ---
         let testChart = null;
         let masterData = { labels: [], values: [], average: [], talon: 0 };
 
@@ -188,26 +190,39 @@
             });
         }
 
-        // CALCULATEUR DYNAMIQUE (Client-Side)
+        // --- CALCUL CONSO RÉPARÉ ---
         function calculateStats(values) {
             if (!values || values.length === 0) return;
-            const sum = values.reduce((a, b) => a + b, 0);
-            const max = Math.max(...values);
-            document.getElementById('dyn-conso').innerText = Math.round(sum).toLocaleString() + " kW.h (est.)";
+            
+            // 1. Somme des puissances (kW)
+            const sumPower = values.reduce((a, b) => a + b, 0);
+            const max = values.reduce((a, b) => Math.max(a, b), -Infinity);
+            
+            // 2. Estimation du pas de temps (Si > 1 point)
+            // Hypothèse : Données sur 1 an = 8760h. Si 52000 points => pas de 10 min.
+            // Formule : Energie (kWh) = Somme(P) * (24h / points_par_jour)
+            // Pour l'affichage instantané, on divise par le ratio points/heures
+            // Ratio approx : 1 point = 10 min = 1/6h
+            // On tente de deviner : si beaucoup de points, on divise par 6 (10min) ou 4 (15min)
+            
+            let factor = 1; // Par défaut 1h
+            if (values.length > 8000) factor = 0.166; // ~10 min (1/6)
+            
+            const energy = Math.round(sumPower * factor);
+            
+            document.getElementById('dyn-conso').innerText = energy.toLocaleString() + " kWh";
             document.getElementById('dyn-pmax').innerText = Math.round(max).toLocaleString() + " kW";
             document.getElementById('dyn-points').innerText = values.length;
         }
 
         function loadChartData(labels, values, average, talon) {
             masterData = { labels, values, average, talon };
-            
             if(labels.length > 0) {
+                // Extraction propre de la date YYYY-MM-DD
                 const start = labels[0].substring(0, 10);
                 const end = labels[labels.length - 1].substring(0, 10);
-                const dStart = document.getElementById('date-start');
-                const dEnd = document.getElementById('date-end');
-                dStart.min = start; dStart.max = end; dStart.value = start;
-                dEnd.min = start; dEnd.max = end; dEnd.value = end;
+                document.getElementById('date-start').value = start;
+                document.getElementById('date-end').value = end;
             }
             updateChartDisplay(labels, values, average, talon);
         }
@@ -223,13 +238,20 @@
             calculateStats(values);
         }
 
+        // --- FILTRES RÉPARÉS ---
         function zoomPreset(range) {
             if(!masterData.values.length) return;
             let sl, sv, sa;
             if (range === 'all') { sl=masterData.labels; sv=masterData.values; sa=masterData.average; }
             else { 
-                sl=masterData.labels.slice(-range); sv=masterData.values.slice(-range); sa=masterData.average.slice(-range); 
+                // Slice depuis la fin
+                sl=masterData.labels.slice(-range * 24 * 6); // Approx pour 10min data
+                if (sl.length > masterData.labels.length) sl = masterData.labels; // Safety
+                const idx = masterData.labels.length - sl.length;
+                sv = masterData.values.slice(idx);
+                sa = masterData.average.slice(idx);
             }
+            // MAJ Date Pickers
             if(sl.length > 0) {
                  document.getElementById('date-start').value = sl[0].substring(0, 10);
                  document.getElementById('date-end').value = sl[sl.length - 1].substring(0, 10);
@@ -240,15 +262,19 @@
         function applyDateFilter() {
             const sVal = document.getElementById('date-start').value;
             const eVal = document.getElementById('date-end').value;
-            if(!sVal || !eVal) return;
+            if(!sVal || !eVal || !masterData.labels.length) return;
 
+            // Comparaison de chaînes simple (YYYY-MM-DD est triable)
             const filteredIndices = [];
             for(let i=0; i<masterData.labels.length; i++) {
-                const d = masterData.labels[i].substring(0, 10);
-                if(d >= sVal && d <= eVal) filteredIndices.push(i);
+                const currentDate = masterData.labels[i].substring(0, 10);
+                if(currentDate >= sVal && currentDate <= eVal) {
+                    filteredIndices.push(i);
+                }
             }
 
             if(filteredIndices.length === 0) { App.toast("Aucune donnée sur cette plage", "error"); return; }
+
             const startIdx = filteredIndices[0];
             const endIdx = filteredIndices[filteredIndices.length - 1];
 
@@ -260,7 +286,6 @@
             App.toast("Filtre appliqué.", "success");
         }
 
-        // --- UPLOAD ---
         async function handleFileSelect(file) {
             if (!file) return;
             const target = document.getElementById('target-client').value;
@@ -286,11 +311,8 @@
                         document.getElementById('kpi-talon').innerText = data.kpi.talon + " kW";
                         document.getElementById('kpi-ratio').innerText = data.kpi.inactivity_ratio + " %";
                         document.getElementById('kpi-diag').innerText = data.kpi.diagnosis;
-                        const diagEl = document.getElementById('kpi-diag');
-                        diagEl.className = "text-xs leading-relaxed " + (data.kpi.status === 'WARNING' ? 'text-red-400' : 'text-green-400');
                     }
                     if (data.chart) loadChartData(data.chart.labels, data.chart.values, data.chart.average, data.kpi.talon);
-                    if (data.ai_insight) document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.ai_insight}</div>`;
                 } else throw new Error(data.error);
             } catch (e) { log(e.message, 'error'); App.toast("Erreur Lecture Fichier", "error"); }
         }
@@ -307,10 +329,12 @@
                 let html = '';
                 if(data.checks) {
                     data.checks.forEach(c => {
-                        const color = c.error ? 'text-red-400' : 'text-green-400';
-                        html += `<tr><td class="py-2">${c.point}</td><td>${c.a}</td><td>${c.b}</td><td class="text-right ${color} font-bold">${c.status}</td></tr>`;
+                        const color = c.error ? 'text-red-400 font-bold' : 'text-green-400';
+                        const icon = c.error ? '<i class="fa-solid fa-triangle-exclamation"></i>' : '<i class="fa-solid fa-check"></i>';
+                        html += `<tr class="hover:bg-white/5 transition"><td class="font-mono text-cyan-200">${c.point}</td><td>${c.a}</td><td>${c.b}</td><td class="text-right ${color}">${icon} ${c.status}</td></tr>`;
                     });
                     document.getElementById('audit-results').innerHTML = html;
+                    log(`Audit terminé. Score: ${data.score}/100`, "success");
                 }
             } catch(e) { log("Erreur Audit", "error"); }
         }
@@ -330,7 +354,7 @@
             initChart();
             navTo('datalab');
         });
-        log('Ops V6.6.2 Ready (Corrected).', 'success');
+        log('Ops V6.8 Final Ready.', 'success');
     </script>
 </body>
 </html>
