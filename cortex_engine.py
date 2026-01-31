@@ -1,4 +1,4 @@
-# cortex_engine.py V10.0 - CONTEXTUAL INTELLIGENCE (DJU + GEO)
+# cortex_engine.py V10.1 - PATCHED (ANTI-CRASH DJU & RATIO)
 import pandas as pd
 import numpy as np
 import io
@@ -6,7 +6,7 @@ import os
 import json
 import re
 import logging
-import requests # NOUVEAU POUR API
+import requests
 from datetime import datetime
 
 # IA & PDF (Optionnel)
@@ -36,11 +36,16 @@ class CortexEngine:
 
     # --- SÉCURITÉ MATHÉMATIQUE ---
     def _safe_int(self, value):
-        try: return 0 if (pd.isna(value) or np.isinf(value)) else int(value)
+        """Convertit en int sans planter sur NaN ou Inf"""
+        try:
+            if pd.isna(value) or np.isinf(value): return 0
+            return int(value)
         except: return 0
 
     def _safe_float(self, value):
-        try: return 0.0 if (pd.isna(value) or np.isinf(value)) else float(value)
+        try:
+            if pd.isna(value) or np.isinf(value): return 0.0
+            return float(value)
         except: return 0.0
 
     # ==========================================================================
@@ -52,12 +57,10 @@ class CortexEngine:
             df, time_step_hours = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible"}
 
-            # B. CONTEXTE GÉO & CLIMATIQUE (NOUVEAU V10)
-            # On cherche un code postal dans le nom du fichier (ex: Site_69002.csv)
+            # B. CONTEXTE GÉO & CLIMATIQUE
             zip_match = re.search(r'\b(0[1-9]|[1-8]\d|9[0-5])\d{3}\b', filename)
-            zip_code = zip_match.group(0) if zip_match else "75001" # Défaut Paris si non trouvé
+            zip_code = zip_match.group(0) if zip_match else "75001"
             
-            # Appels API Externes
             geo_data = self._fetch_geo_data(zip_code)
             dju_data = self._fetch_dju_data(geo_data, df['date'].min(), df['date'].max())
 
@@ -66,13 +69,11 @@ class CortexEngine:
             turpe = self._module_turpe(df, base['p_max'])
             season = self._module_saison(df)
             finance = self._module_finance(df, time_step_hours)
-            
-            # Module Climatique (Signature)
             climat = self._module_climatique(base['conso_totale'], dju_data)
             
             final_kpis = {**base, **turpe, **season, **finance, **climat, "geo": geo_data}
             
-            # D. SAMPLING & NARRATION
+            # D. SAMPLING
             step = max(1, len(df)//2000)
             df_chart = df.iloc[::step]
             
@@ -95,10 +96,9 @@ class CortexEngine:
             return {"success": False, "error": str(e)}
 
     # ==========================================================================
-    # 2. API EXTERNES (NOUVEAU V10)
+    # 2. API EXTERNES
     # ==========================================================================
     def _fetch_geo_data(self, zipcode):
-        """Récupère Lat/Lon via API Gouv"""
         try:
             url = f"https://api-adresse.data.gouv.fr/search/?q={zipcode}&limit=1"
             res = requests.get(url, timeout=2).json()
@@ -106,10 +106,9 @@ class CortexEngine:
                 coords = res['features'][0]['geometry']['coordinates']
                 return {"city": res['features'][0]['properties']['city'], "lat": coords[1], "lon": coords[0], "zip": zipcode}
         except: pass
-        return {"city": "Localisation Inconnue", "lat": 48.8566, "lon": 2.3522, "zip": zipcode} # Fallback Paris
+        return {"city": "Localisation Inconnue", "lat": 48.8566, "lon": 2.3522, "zip": zipcode}
 
     def _fetch_dju_data(self, geo, start_date, end_date):
-        """Récupère Météo via Open-Meteo et calcule les DJU"""
         try:
             s_str = start_date.strftime('%Y-%m-%d')
             e_str = end_date.strftime('%Y-%m-%d')
@@ -118,14 +117,13 @@ class CortexEngine:
             res = requests.get(url, timeout=3).json()
             if 'daily' in res and 'temperature_2m_mean' in res['daily']:
                 temps = res['daily']['temperature_2m_mean']
-                # Calcul DJU Base 18 (Chauffage)
+                # Calcul DJU Base 18
                 dju = sum([max(0, 18 - t) for t in temps if t is not None])
-                return {"dju_total": int(dju), "status": "OK"}
+                return {"dju_total": self._safe_int(dju), "status": "OK"} # PATCH ICI
         except: pass
         return {"dju_total": 0, "status": "API_ERROR"}
 
     def _module_climatique(self, conso_totale, dju_data):
-        """Calcule la Signature Énergétique"""
         dju = dju_data['dju_total']
         kwh_par_dju = 0
         if dju > 0:
@@ -133,14 +131,14 @@ class CortexEngine:
         
         return {
             "climat": {
-                "dju_periode": dju,
+                "dju_periode": self._safe_int(dju),
                 "signature_kwh_dju": kwh_par_dju,
                 "message": f"Rigueur climatique : {dju} DJU. Signature : {kwh_par_dju} kWh/DJU."
             }
         }
 
     # ==========================================================================
-    # 3. MODULES STANDARDS (V9.3)
+    # 3. MODULES STANDARDS
     # ==========================================================================
     def _parse_data(self, content, filename):
         try:
@@ -165,10 +163,8 @@ class CortexEngine:
             df['val'] = df['val'].fillna(0).replace([np.inf, -np.inf], 0)
             df = df.sort_values(by='date')
             
-            # Auto-Scale
             if df['val'].median() > 2000: df['val'] = df['val'] / 1000
             
-            # Time Step
             time_step = 0.166
             if len(df) > 1:
                 delta = (df.iloc[1]['date'] - df.iloc[0]['date']).total_seconds()
@@ -186,7 +182,12 @@ class CortexEngine:
         df['wd'] = df['date'].dt.weekday
         w_mean = df[df['wd'] < 5]['val'].mean()
         we_mean = df[df['wd'] >= 5]['val'].mean()
-        ratio = int((we_mean/w_mean)*100) if w_mean > 0 else 0
+        
+        # PATCH ICI : Utilisation de _safe_int
+        ratio = 0
+        if w_mean > 0:
+            ratio = (we_mean / w_mean) * 100
+        
         p_max = max(values) if values else 0
         conso_kwh = sum(values) * time_step
 
@@ -279,7 +280,7 @@ class CortexEngine:
         ]
         return {"score": 80, "checks": checks}
 
-    def ask_agent(self, q): return "Cortex V10.0 Online."
+    def ask_agent(self, q): return "Cortex V10.1 Online."
     def run_chaos_monkey(self): return [{"test": "API Météo", "status": "READY"}]
 
 cortex = CortexEngine()
