@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V7.0 | Storage Engine</title>
+    <title>ENERGISTRAT V7.2 | Ops Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -34,13 +34,14 @@
         <nav class="flex flex-col w-full items-center">
             <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active"><i class="fa-solid fa-server text-xl"></i></div>
             <div onclick="navTo('auditlab')" id="nav-auditlab" class="nav-icon"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></div>
+            <div onclick="navTo('scenarios')" id="nav-scenarios" class="nav-icon"><i class="fa-solid fa-bomb text-xl"></i></div>
         </nav>
         <a href="/" class="mt-auto nav-icon"><i class="fa-solid fa-house"></i></a>
     </aside>
 
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-database text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V7.0 STORAGE</span></div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-database text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V7.2 COMPLETE</span></div>
             <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CHECK DB</div>
         </header>
 
@@ -52,6 +53,7 @@
                     
                     <label class="text-[10px] text-gray-500 uppercase font-bold">Client / Groupe</label>
                     <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 mb-2 focus:border-cyan outline-none">
+                        <option value="demo">Test / Démo</option>
                         <option value="retail">Retail / Franchise</option>
                         <option value="industry">Industrie</option>
                         <option value="mairie">Collectivité</option>
@@ -61,7 +63,6 @@
                         <option value="syndic">Syndic</option>
                         <option value="citoyen">Particulier</option>
                         <option value="supplier">Partenaire</option>
-                        <option value="demo">Test / Démo</option>
                     </select>
 
                     <label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site</label>
@@ -87,7 +88,13 @@
                                 <input type="date" id="date-start" onchange="applyDateFilter()"> <span class="text-gray-500 text-xs">au</span> <input type="date" id="date-end" onchange="applyDateFilter()">
                                 <button onclick="applyDateFilter()" class="bg-cyan/20 text-cyan px-2 rounded text-xs hover:bg-cyan/40 h-6"><i class="fa-solid fa-filter"></i></button>
                             </div>
-                            <button onclick="zoomPreset('all')" class="px-2 py-1 bg-cyan/20 text-[10px] text-cyan rounded hover:bg-cyan/30">RESET</button>
+                            
+                            <!-- BOUTONS ZOOM RESTAURÉS -->
+                            <div class="flex gap-1">
+                                <button onclick="zoomPreset(7)" class="px-3 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20 transition border border-white/5">7J</button>
+                                <button onclick="zoomPreset(30)" class="px-3 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20 transition border border-white/5">30J</button>
+                                <button onclick="zoomPreset('all')" class="px-3 py-1 bg-cyan/20 text-[10px] text-cyan rounded hover:bg-cyan/30 transition border border-cyan/30">TOUT</button>
+                            </div>
                         </div>
                         <div class="h-64 w-full relative"><canvas id="testChart"></canvas></div>
                         <div class="flex justify-between mt-4 pt-4 border-t border-white/5">
@@ -97,7 +104,7 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-3 gap-6">
-                        <div class="bento-card p-4 rounded-xl border border-white/5"><div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Talon</div><div class="text-2xl font-mono font-bold text-white" id="kpi-talon">-- kW</div></div>
+                        <div class="bento-card p-4 rounded-xl border border-white/5"><div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Talon (Baseload)</div><div class="text-2xl font-mono font-bold text-white" id="kpi-talon">-- kW</div></div>
                         <div class="bento-card p-4 rounded-xl border border-white/5"><div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Ratio W.E</div><div class="text-2xl font-mono font-bold text-white" id="kpi-ratio">-- %</div></div>
                         <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-ai/10"><div class="text-[10px] text-ai uppercase font-bold mb-1">Diag.</div><div class="text-xs text-white leading-relaxed" id="kpi-diag">En attente...</div></div>
                     </div>
@@ -112,7 +119,19 @@
                 <div class="col-span-12"><button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl text-sm hover:scale-[1.01]">AUDITER</button></div>
                 <div class="col-span-12 bento-card p-0 rounded-2xl bg-abysse border border-white/10 mt-4 overflow-hidden"><table class="audit-table"><thead><tr class="bg-white/5"><th>Point</th><th>Facture</th><th>Contrat</th><th class="text-right">Résultat</th></tr></thead><tbody id="audit-results"><tr><td colspan="4" class="text-center py-8 text-gray-500 italic">En attente...</td></tr></tbody></table></div>
             </div>
+
+            <!-- TAB 3: CHAOS MONKEY (RESTAURÉ) -->
+            <div id="view-scenarios" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-12 bento-card p-6 rounded-2xl border-l-4 border-red-500">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-white">Chaos Monkey</h3>
+                        <button onclick="runTest()" class="px-4 py-2 bg-red-600 text-white font-bold rounded text-xs">TESTER INFRA</button>
+                    </div>
+                    <div id="chaos-results" class="grid grid-cols-3 gap-4"></div>
+                </div>
+            </div>
         </div>
+        
         <div class="h-40 bg-[#02050a] border-t border-white/10 p-4 overflow-hidden flex flex-col z-20"><div class="flex justify-between items-center mb-1 border-b border-white/5 pb-1"><span class="text-slate-500 font-bold uppercase tracking-widest text-[10px]">>> SYSTEM LOGS</span><button onclick="document.getElementById('terminal').innerHTML=''" class="text-[10px] text-gray-600 hover:text-white">CLEAR</button></div><div id="terminal" class="flex-1 overflow-y-auto space-y-1"></div></div>
     </main>
 
@@ -210,7 +229,7 @@
             const formData = new FormData();
             formData.append('file', file);
             formData.append('target', target);
-            formData.append('site_name', site); // ENVOI DU NOM DU SITE
+            formData.append('site_name', site);
             
             log(`Upload SGE: ${file.name}...`, 'info');
             App.toast('Stockage Structuré...', 'info');
@@ -266,6 +285,13 @@
             } catch(e) { log("Erreur Audit", "error"); }
         }
 
+        async function runTest() {
+            const res = await fetch('/api/ops/chaos', { method:'POST', headers: { 'x-admin-token': adminPin } });
+            const data = await res.json();
+            const div = document.getElementById('chaos-results'); div.innerHTML = '';
+            data.results.forEach(r => div.innerHTML += `<div class="border p-2 rounded text-xs text-white">${r.test}: ${r.status}</div>`);
+        }
+
         async function sendChat() {
             const txt = document.getElementById('chat-input').value;
             if(!txt) return;
@@ -281,7 +307,7 @@
             initChart();
             navTo('datalab');
         });
-        log('Ops V7.0 Storage Ready.', 'success');
+        log('Ops V7.2 Complete Ready.', 'success');
     </script>
 </body>
 </html>
