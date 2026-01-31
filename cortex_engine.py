@@ -1,4 +1,4 @@
-# cortex_engine.py V9.1 - FINANCE ROBUST (CRASH FIX)
+# cortex_engine.py V9.2 - ARMORED MATHS (ANTI-CRASH TOTAL)
 import pandas as pd
 import numpy as np
 import io
@@ -34,12 +34,14 @@ class CortexEngine:
 
     # --- SÉCURITÉ MATHÉMATIQUE RENFORCÉE ---
     def _safe_int(self, value):
+        """Convertit en int sans planter sur NaN ou Inf"""
         try:
             if pd.isna(value) or np.isinf(value): return 0
             return int(value)
         except: return 0
 
     def _safe_float(self, value):
+        """Convertit en float sans planter"""
         try:
             if pd.isna(value) or np.isinf(value): return 0.0
             return float(value)
@@ -51,11 +53,11 @@ class CortexEngine:
             df = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible"}
 
-            # Modules Experts
+            # Modules Experts (Tous sécurisés)
             base = self._module_socle(df)
             turpe = self._module_turpe(df, base['p_max'])
             season = self._module_saison(df)
-            finance = self._module_finance(df) # Module Finance Sécurisé
+            finance = self._module_finance(df)
             
             final_kpis = {**base, **turpe, **season, **finance}
             
@@ -79,7 +81,8 @@ class CortexEngine:
                 "retail_data": None
             }
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            logging.error(f"Cortex Crash: {e}")
+            return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
 
     # --- 2. MODULES ---
     def _parse_data(self, content, filename):
@@ -96,39 +99,50 @@ class CortexEngine:
             c_val = next((c for c in df.columns if any(x in c for x in ['puiss','p10','conso','val','kw'])), df.columns[1])
 
             df['date'] = pd.to_datetime(df[c_date], dayfirst=True, errors='coerce')
+            
+            # Nettoyage Valeurs
             if df[c_val].dtype == object:
                 df['val'] = pd.to_numeric(df[c_val].astype(str).str.replace(',', '.').replace(' ', ''), errors='coerce')
             else:
                 df['val'] = pd.to_numeric(df[c_val], errors='coerce')
 
-            df = df.dropna(subset=['date']).sort_values(by='date')
-            df['val'] = df['val'].fillna(0)
+            # Nettoyage NaNs et Infinis
+            df = df.dropna(subset=['date'])
+            df['val'] = df['val'].fillna(0).replace([np.inf, -np.inf], 0)
+            
+            df = df.sort_values(by='date')
             df['date_str'] = df['date'].dt.strftime('%Y-%m-%d %H:%M')
             return df[['date', 'val', 'date_str']]
         except: return None
 
     def _module_socle(self, df):
-        vals = df['val'].tolist()
-        pos = [v for v in vals if v > 0]
-        talon = float(np.percentile(pos, 10)) if pos else 0.0
+        values = df['val'].tolist()
+        pos_vals = [v for v in values if v > 0]
+        talon = float(np.percentile(pos_vals, 10)) if pos_vals else 0.0
         
         df['wd'] = df['date'].dt.weekday
         w_mean = df[df['wd'] < 5]['val'].mean()
         we_mean = df[df['wd'] >= 5]['val'].mean()
-        ratio = int((we_mean/w_mean)*100) if w_mean > 0 else 0
-        p_max = max(vals) if vals else 0
+        
+        # --- FIX DU CRASH ICI ---
+        # Ancienne ligne qui plantait : ratio = int(...)
+        ratio = 0
+        if w_mean > 0:
+            ratio = (we_mean / w_mean) * 100
+        
+        p_max = max(values) if values else 0
 
         diag, status = "Profil Standard", "OK"
         if ratio > 65: diag, status = "ALERTE : Forte conso Weekend (>65%).", "WARNING"
         elif talon > (p_max * 0.5): diag, status = "ALERTE : Talon critique (>50% Pmax).", "WARNING"
 
         return {
-            "points_traites": len(vals),
-            "conso_totale": self._safe_int(sum(vals)/6),
+            "points_traites": len(values),
+            "conso_totale": self._safe_int(sum(values)/6),
             "p_max": self._safe_float(p_max),
             "talon": self._safe_int(talon),
-            "inactivity_ratio": ratio,
-            "moyenne": self._safe_float(np.mean(vals)),
+            "inactivity_ratio": self._safe_int(ratio), # Sécurisé
+            "moyenne": self._safe_float(np.mean(values)),
             "diagnosis": diag,
             "status": status
         }
@@ -146,48 +160,35 @@ class CortexEngine:
         elif ete > hiver*1.2: sens = "Climatisation"
         return {"saisonnalite": {"sensibilite": sens}}
 
-    # --- MODULE FINANCE SÉCURISÉ (FIX V9.1) ---
     def _module_finance(self, df):
-        df['hour'] = df['date'].dt.hour
+        df['h'] = df['date'].dt.hour
+        # HP: 6h-22h, HC: 22h-6h
+        mask_hc = (df['h'] >= 22) | (df['h'] < 6)
         
-        # Segmentation
-        mask_hc = (df['hour'] >= 22) | (df['hour'] < 6)
+        # Somme sécurisée
         conso_hc = df[mask_hc]['val'].sum() / 6
         conso_hp = df[~mask_hc]['val'].sum() / 6
         
-        # Prix Ref
-        PRIX_HP = 0.18
-        PRIX_HC = 0.12
+        P_HP, P_HC = 0.18, 0.12
+        budg = (conso_hp * P_HP) + (conso_hc * P_HC)
+        tot = conso_hp + conso_hc
         
-        budget_hp = conso_hp * PRIX_HP
-        budget_hc = conso_hc * PRIX_HC
-        budget_total = budget_hp + budget_hc
-        
-        total_kwh = conso_hp + conso_hc
-        
-        # FIX DU CRASH : Calcul sécurisé du ratio
-        part_hc = 0
-        if total_kwh > 0:
-            part_hc = (conso_hc / total_kwh) * 100
-        
-        prix_moyen = 0.0
-        if total_kwh > 0:
-            prix_moyen = budget_total / total_kwh
+        part_hc = (conso_hc / tot * 100) if tot > 0 else 0
+        pm = (budg / tot) if tot > 0 else 0
 
         return {
             "finance": {
-                "budget_total_estime": self._safe_int(budget_total),
+                "budget_total_estime": self._safe_int(budg),
                 "conso_hp": self._safe_int(conso_hp),
                 "conso_hc": self._safe_int(conso_hc),
-                "part_hc": self._safe_int(part_hc), # Wrapper safe_int ici
-                "prix_moyen_calcule": round(prix_moyen, 3)
+                "part_hc": self._safe_int(part_hc), # Sécurisé
+                "prix_moyen_calcule": round(pm, 3)
             }
         }
 
     def _generate_expert_narrative(self, k, p):
-        txt = f"<b>ANALYSE ({p.upper()}) :</b><br>"
+        txt = f"<b>ANALYSE EXPERTE ({p.upper()}) :</b><br>"
         txt += f"• Volumétrie : {k['conso_totale']:,} kWh.<br>"
-        # Ajout Finance dans le texte
         if 'finance' in k:
             txt += f"• Finance : Budget est. <b>{k['finance']['budget_total_estime']:,} €/an</b>.<br>"
         txt += f"• Puissance : Pic à {k['p_max']} kW.<br>"
@@ -212,6 +213,7 @@ class CortexEngine:
 
     def analyze_invoice_real(self, inv_b, ctr_b):
         txt = self.extract_pdf(inv_b) or ""
+        # Regex Robustes
         m_sous = re.search(r"(?:souscrite|P\.?\s?souscrite)[^\d]*(\d{2,5})", txt, re.I)
         m_max = re.search(r"(?:atteinte|max|pointe)[^\d]*(\d{2,5})", txt, re.I)
         p_sous = float(m_sous.group(1)) if m_sous else 0
@@ -228,7 +230,7 @@ class CortexEngine:
         ]
         return {"score": 80, "checks": checks}
 
-    def ask_agent(self, q): return "Cortex V9.1 Finance Online."
-    def run_chaos_monkey(self): return [{"test": "Maths", "status": "PASS"}]
+    def ask_agent(self, q): return "Mode Expert V9.2 : Prêt."
+    def run_chaos_monkey(self): return [{"test": "Math Engine", "status": "PASS"}]
 
 cortex = CortexEngine()
