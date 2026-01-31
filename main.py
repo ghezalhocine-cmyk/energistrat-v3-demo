@@ -1,4 +1,4 @@
-# main.py V7.3 - ULTIMATE MERGE (STORAGE + ROBUST MATHS)
+# main.py V7.4 - GROUP AGGREGATION & ROBUST ENGINE
 import os
 import json
 import secrets
@@ -16,17 +16,19 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-# --- IMPORT DU MOTEUR DE STOCKAGE (V7.0) ---
+# --- IMPORT DU MOTEUR DE STOCKAGE ---
 from storage_engine import db
 
+# --- 1. CONFIGURATION ---
 ADMIN_PIN = "BOSS_V5"
 DATA_DIR = "data_store"
 
-# Setup dossiers
+# Création des dossiers critiques
+os.makedirs(DATA_DIR, exist_ok=True)
 if not os.path.exists("static"): os.makedirs("static")
 if not os.path.exists("templates"): os.makedirs("templates")
-# Note: data_store est géré par storage_engine, mais on le garde ici par sécurité
 
+# Tentative d'import du moteur Cortex (IA)
 try:
     from cortex_engine import cortex
     CORTEX_AVAILABLE = True
@@ -34,8 +36,9 @@ except ImportError:
     cortex = None
     CORTEX_AVAILABLE = False
 
-app = FastAPI(title="ENERGISTRAT V7.3", version="MERGED")
+app = FastAPI(title="ENERGISTRAT V7.4", version="AGGREGATION")
 
+# Middleware CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,13 +47,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Montage des fichiers statiques
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates" if os.path.exists("templates") else ".")
 
-# --- 1. MOTEUR DE CALCUL PANDAS ROBUSTE (V7.2) ---
+# --- 2. MOTEUR DE CALCUL PANDAS ROBUSTE (V7.2) ---
 def process_real_file(content: bytes, filename: str):
     """
-    Lit le fichier, nettoie les zéros, calcule le Talon réel.
+    Lit un fichier binaire (Excel/CSV), nettoie les données et calcule les KPIs énergétiques.
+    Exclut les zéros pour le calcul du Talon.
     """
     try:
         df = None
@@ -80,7 +85,7 @@ def process_real_file(content: bytes, filename: str):
         dates = df[date_col].dt.strftime('%Y-%m-%d %H:%M').tolist()
         values = df[val_col].tolist()
         
-        # --- CALCULS INTELLIGENTS ---
+        # --- CALCULS MÉTIERS ---
         
         # 1. Talon (Baseload) : On ignore les zéros (coupures)
         positive_values = [v for v in values if v > 0]
@@ -97,7 +102,6 @@ def process_real_file(content: bytes, filename: str):
         week_data = df[df['weekday'] < 5][val_col]
         weekend_data = df[df['weekday'] >= 5][val_col]
         
-        # Moyennes sur valeurs positives uniquement
         avg_week = week_data[week_data > 0].mean() if not week_data.empty else 1
         avg_weekend = weekend_data[weekend_data > 0].mean() if not weekend_data.empty else 0
         
@@ -132,7 +136,7 @@ def process_real_file(content: bytes, filename: str):
         print(f"Erreur Maths: {e}")
         raise e
 
-# --- 2. API OPS AVEC STOCKAGE V7.0 ---
+# --- 3. API OPS : ANALYSE & STOCKAGE ---
 @app.post("/api/ops/analyze")
 async def api_analyze(
     file: UploadFile = File(...), 
@@ -159,7 +163,7 @@ async def api_analyze(
                     "values": analysis['values'], 
                     "average": analysis['average'] 
                 },
-                "ai_insight": f"Analyse V7.3 : {analysis['kpi']['points_traites']} points traités.",
+                "ai_insight": f"Analyse V7.4 : {analysis['kpi']['points_traites']} points traités.",
                 "retail_data": None
             }
         # BRANCHE PDF (CORTEX)
@@ -178,7 +182,7 @@ async def api_analyze(
             "ingestion_date": datetime.now().isoformat()
         }
 
-        # --- SAUVEGARDE VIA STORAGE ENGINE (V7.0) ---
+        # --- SAUVEGARDE VIA STORAGE ENGINE ---
         saved_path, entry_log = db.save_analysis(target, site_name, final_data)
         phys_filename = os.path.basename(saved_path)
 
@@ -196,16 +200,27 @@ async def api_analyze(
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)})
 
-# --- 3. API OUTILS & STRUCTURE ---
+# --- 4. API OUTILS & STRUCTURE ---
 
+# Liste des clients (Arborescence)
 @app.get("/api/ops/structure")
 async def get_structure(x_admin_token: str = Header(None)):
     if x_admin_token != ADMIN_PIN: return JSONResponse({}, 401)
     return JSONResponse(db.get_client_structure())
 
+# --- NOUVEAUTÉ V7.4 : ROUTE D'AGRÉGATION ---
+@app.get("/api/ops/aggregate/{client}")
+async def aggregate_client(client: str, x_admin_token: str = Header(None)):
+    """
+    Calcule les totaux pour un groupe client donné via le Storage Engine.
+    """
+    if x_admin_token != ADMIN_PIN: return JSONResponse({"error": "Unauthorized"}, 401)
+    return JSONResponse(db.aggregate_client_data(client))
+
+# Endpoint Sécurisé (Vault)
 @app.get("/api/vault/{filename}")
 async def get_secure_data(filename: str, token: str):
-    # Recherche récursive (V7.0 nécessite de fouiller les dossiers clients)
+    # Recherche récursive dans le data_store
     found_path = None
     for root, dirs, files in os.walk("data_store"):
         if filename in files:
@@ -215,6 +230,7 @@ async def get_secure_data(filename: str, token: str):
     if not found_path or token not in filename: raise HTTPException(403)
     return FileResponse(found_path, media_type='application/json')
 
+# Outils Ops (Audit, Chaos, Chat)
 @app.post("/api/ops/audit")
 async def audit_ep(invoice: UploadFile = File(...), contract: UploadFile = File(...), x_admin_token: str = Header(None)):
     if x_admin_token != ADMIN_PIN: return JSONResponse({}, 401)
@@ -230,7 +246,7 @@ async def chaos_ep(x_admin_token: str = Header(None)):
 async def chat_ep(message: str = Form(...), x_admin_token: str = Header(None)):
     return JSONResponse({"response": cortex.ask_agent(message) if CORTEX_AVAILABLE else message})
 
-# --- 4. NAVIGATION ROBUSTE ---
+# --- 5. NAVIGATION ROBUSTE ---
 
 @app.get("/ops")
 @app.get("/ops.html")
