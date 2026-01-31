@@ -1,4 +1,4 @@
-# cortex_engine.py V10.1 - PATCHED (ANTI-CRASH DJU & RATIO)
+# cortex_engine.py V10.3 - GEO FIX (REGEX SOUPLE)
 import pandas as pd
 import numpy as np
 import io
@@ -36,16 +36,11 @@ class CortexEngine:
 
     # --- SÉCURITÉ MATHÉMATIQUE ---
     def _safe_int(self, value):
-        """Convertit en int sans planter sur NaN ou Inf"""
-        try:
-            if pd.isna(value) or np.isinf(value): return 0
-            return int(value)
+        try: return 0 if (pd.isna(value) or np.isinf(value)) else int(value)
         except: return 0
 
     def _safe_float(self, value):
-        try:
-            if pd.isna(value) or np.isinf(value): return 0.0
-            return float(value)
+        try: return 0.0 if (pd.isna(value) or np.isinf(value)) else float(value)
         except: return 0.0
 
     # ==========================================================================
@@ -57,8 +52,10 @@ class CortexEngine:
             df, time_step_hours = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible"}
 
-            # B. CONTEXTE GÉO & CLIMATIQUE
-            zip_match = re.search(r'\b(0[1-9]|[1-8]\d|9[0-5])\d{3}\b', filename)
+            # B. CONTEXTE GÉO (CORRECTIF V10.3)
+            # Regex plus souple : cherche 5 chiffres n'importe où
+            # (01-95 suivi de 3 chiffres)
+            zip_match = re.search(r'(0[1-9]|[1-8]\d|9[0-5])\d{3}', filename)
             zip_code = zip_match.group(0) if zip_match else "75001"
             
             geo_data = self._fetch_geo_data(zip_code)
@@ -69,6 +66,8 @@ class CortexEngine:
             turpe = self._module_turpe(df, base['p_max'])
             season = self._module_saison(df)
             finance = self._module_finance(df, time_step_hours)
+            
+            # Module Climatique (Signature)
             climat = self._module_climatique(base['conso_totale'], dju_data)
             
             final_kpis = {**base, **turpe, **season, **finance, **climat, "geo": geo_data}
@@ -103,10 +102,12 @@ class CortexEngine:
             url = f"https://api-adresse.data.gouv.fr/search/?q={zipcode}&limit=1"
             res = requests.get(url, timeout=2).json()
             if res['features']:
+                props = res['features'][0]['properties']
                 coords = res['features'][0]['geometry']['coordinates']
-                return {"city": res['features'][0]['properties']['city'], "lat": coords[1], "lon": coords[0], "zip": zipcode}
+                # On retourne la ville trouvée + le code postal détecté
+                return {"city": props['city'], "lat": coords[1], "lon": coords[0], "zip": zipcode}
         except: pass
-        return {"city": "Localisation Inconnue", "lat": 48.8566, "lon": 2.3522, "zip": zipcode}
+        return {"city": "Paris (Défaut)", "lat": 48.8566, "lon": 2.3522, "zip": "75001"}
 
     def _fetch_dju_data(self, geo, start_date, end_date):
         try:
@@ -117,9 +118,8 @@ class CortexEngine:
             res = requests.get(url, timeout=3).json()
             if 'daily' in res and 'temperature_2m_mean' in res['daily']:
                 temps = res['daily']['temperature_2m_mean']
-                # Calcul DJU Base 18
                 dju = sum([max(0, 18 - t) for t in temps if t is not None])
-                return {"dju_total": self._safe_int(dju), "status": "OK"} # PATCH ICI
+                return {"dju_total": self._safe_int(dju), "status": "OK"}
         except: pass
         return {"dju_total": 0, "status": "API_ERROR"}
 
@@ -133,12 +133,12 @@ class CortexEngine:
             "climat": {
                 "dju_periode": self._safe_int(dju),
                 "signature_kwh_dju": kwh_par_dju,
-                "message": f"Rigueur climatique : {dju} DJU. Signature : {kwh_par_dju} kWh/DJU."
+                "message": f"Rigueur : {dju} DJU. Signature : {kwh_par_dju} kWh/DJU."
             }
         }
 
     # ==========================================================================
-    # 3. MODULES STANDARDS
+    # 3. MODULES STANDARDS (V9.3)
     # ==========================================================================
     def _parse_data(self, content, filename):
         try:
@@ -183,7 +183,6 @@ class CortexEngine:
         w_mean = df[df['wd'] < 5]['val'].mean()
         we_mean = df[df['wd'] >= 5]['val'].mean()
         
-        # PATCH ICI : Utilisation de _safe_int
         ratio = 0
         if w_mean > 0:
             ratio = (we_mean / w_mean) * 100
@@ -227,6 +226,7 @@ class CortexEngine:
         
         budg = (conso_hp * 0.18) + (conso_hc * 0.12)
         tot = conso_hp + conso_hc
+        
         part_hc = (conso_hc / tot * 100) if tot > 0 else 0
         pm = (budg / tot) if tot > 0 else 0
 
@@ -242,9 +242,14 @@ class CortexEngine:
 
     def _generate_expert_narrative(self, k, p):
         txt = f"<b>ANALYSE V10 ({p.upper()}) :</b><br>"
-        txt += f"• Localisation : <b>{k['geo']['city']}</b> ({k['geo']['zip']}).<br>"
-        txt += f"• Climat : {k['climat']['dju_periode']} DJU sur la période.<br>"
-        txt += f"• Signature : <b>{k['climat']['signature_kwh_dju']} kWh/DJU</b>.<br>"
+        # Affichage conditionnel de la géolocalisation
+        if 'geo' in k:
+             txt += f"• Localisation : <b>{k['geo']['city']}</b> ({k['geo']['zip']}).<br>"
+        
+        # Affichage conditionnel de la météo
+        if 'climat' in k and k['climat']['dju_periode'] > 0:
+            txt += f"• Climat : {k['climat']['dju_periode']} DJU. Signature : <b>{k['climat']['signature_kwh_dju']} kWh/DJU</b>.<br>"
+            
         txt += f"• Finance : Budget est. {k['finance']['budget_total_estime']:,} €.<br>"
         txt += f"• Diag : {k['diagnosis']}"
         return txt
@@ -280,7 +285,8 @@ class CortexEngine:
         ]
         return {"score": 80, "checks": checks}
 
-    def ask_agent(self, q): return "Cortex V10.1 Online."
+    def ask_agent(self, q): return "Cortex V10.3 Online."
     def run_chaos_monkey(self): return [{"test": "API Météo", "status": "READY"}]
 
 cortex = CortexEngine()
+   
