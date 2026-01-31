@@ -1,5 +1,5 @@
-# storage_engine.py V7.0
-# GESTIONNAIRE DE DONNÉES STRUCTURÉES
+# storage_engine.py V7.1
+# GESTIONNAIRE DE DONNÉES STRUCTURÉES & AGRÉGATION
 import os
 import json
 import shutil
@@ -58,13 +58,14 @@ class StorageEngine:
             self.index["clients"][safe_client]["sites"][safe_site] = []
             
         # On ajoute l'entrée dans l'historique du site
+        # On stocke les KPI clés directement dans l'index pour une lecture rapide
         entry = {
             "date": datetime.now().isoformat(),
             "type": file_type,
             "path": full_path,
             "kpi_summary": {
-                "conso": data.get('kpi', {}).get('conso_totale'),
-                "pmax": data.get('kpi', {}).get('p_max')
+                "conso": data.get('kpi', {}).get('conso_totale', 0),
+                "pmax": data.get('kpi', {}).get('p_max', 0)
             },
             "token": data.get('meta', {}).get('token')
         }
@@ -77,6 +78,54 @@ class StorageEngine:
     def get_client_structure(self):
         """Retourne l'arbre des clients et sites existants"""
         return self.index["clients"]
+
+    # --- NOUVEAUTÉ V7.1 : MOTEUR D'AGRÉGATION ---
+    def aggregate_client_data(self, client_slug):
+        """
+        Calcule les totaux (Conso, Puissance) pour tout un groupe client.
+        """
+        safe_client = "".join([c for c in client_slug if c.isalnum() or c in '-_']).upper()
+        
+        if safe_client not in self.index["clients"]:
+            return {"success": False, "error": "Client introuvable"}
+
+        total_conso = 0
+        total_pmax = 0
+        sites_details = []
+        
+        client_data = self.index["clients"][safe_client]
+        
+        # On parcourt chaque site du client
+        for site_name, history in client_data["sites"].items():
+            if not history:
+                continue
+                
+            # On prend la dernière analyse en date (la plus récente)
+            latest_entry = history[-1]
+            kpi = latest_entry.get("kpi_summary", {})
+            
+            conso = kpi.get("conso", 0)
+            pmax = kpi.get("pmax", 0)
+            
+            # Agrégation
+            total_conso += int(conso)
+            total_pmax += float(pmax)
+            
+            sites_details.append({
+                "site": site_name,
+                "conso": conso,
+                "pmax": pmax,
+                "last_update": latest_entry.get("date")
+            })
+
+        return {
+            "success": True,
+            "client": safe_client,
+            "site_count": len(sites_details),
+            "global_conso": total_conso,
+            "global_pmax": round(total_pmax, 2),
+            "sites": sites_details
+        }
 
 # Instance unique
 db = StorageEngine()
