@@ -1,4 +1,4 @@
-# cortex_engine.py V9.0 - FINANCE MODULE ADDED
+# cortex_engine.py V9.1 - FINANCE ROBUST (CRASH FIX)
 import pandas as pd
 import numpy as np
 import io
@@ -32,13 +32,17 @@ class CortexEngine:
                 self.ai_ready = True
             except: pass
 
-    # --- SÉCURITÉ MATHÉMATIQUE ---
+    # --- SÉCURITÉ MATHÉMATIQUE RENFORCÉE ---
     def _safe_int(self, value):
-        try: return 0 if (pd.isna(value) or np.isinf(value)) else int(value)
+        try:
+            if pd.isna(value) or np.isinf(value): return 0
+            return int(value)
         except: return 0
 
     def _safe_float(self, value):
-        try: return 0.0 if (pd.isna(value) or np.isinf(value)) else float(value)
+        try:
+            if pd.isna(value) or np.isinf(value): return 0.0
+            return float(value)
         except: return 0.0
 
     # --- 1. ANALYSE SGE ---
@@ -51,9 +55,7 @@ class CortexEngine:
             base = self._module_socle(df)
             turpe = self._module_turpe(df, base['p_max'])
             season = self._module_saison(df)
-            
-            # --- NOUVEAU MODULE FINANCE ---
-            finance = self._module_finance(df)
+            finance = self._module_finance(df) # Module Finance Sécurisé
             
             final_kpis = {**base, **turpe, **season, **finance}
             
@@ -67,7 +69,7 @@ class CortexEngine:
                 "average": [base['moyenne']] * len(df_chart)
             }
 
-            narrative = self._generate_narrative(final_kpis, target_profile)
+            narrative = self._generate_expert_narrative(final_kpis, target_profile)
 
             return {
                 "success": True,
@@ -122,7 +124,7 @@ class CortexEngine:
 
         return {
             "points_traites": len(vals),
-            "conso_totale": self._safe_int(sum(vals)/6), # Approx 10min
+            "conso_totale": self._safe_int(sum(vals)/6),
             "p_max": self._safe_float(p_max),
             "talon": self._safe_int(talon),
             "inactivity_ratio": ratio,
@@ -144,21 +146,16 @@ class CortexEngine:
         elif ete > hiver*1.2: sens = "Climatisation"
         return {"saisonnalite": {"sensibilite": sens}}
 
-    # --- NOUVEAU MODULE FINANCE V9.0 ---
+    # --- MODULE FINANCE SÉCURISÉ (FIX V9.1) ---
     def _module_finance(self, df):
-        """
-        Calcule un budget estimatif basé sur des prix de marché standards.
-        HP (Heures Pleines) : 06h-22h | HC (Heures Creuses) : 22h-06h
-        Prix Ref (2025) : HP=0.18€/kWh, HC=0.12€/kWh
-        """
         df['hour'] = df['date'].dt.hour
         
-        # Segmentation HP/HC
+        # Segmentation
         mask_hc = (df['hour'] >= 22) | (df['hour'] < 6)
-        conso_hc = df[mask_hc]['val'].sum() / 6 # Approx 10min -> kWh
+        conso_hc = df[mask_hc]['val'].sum() / 6
         conso_hp = df[~mask_hc]['val'].sum() / 6
         
-        # Prix de référence (à rendre dynamique plus tard via input Ops)
+        # Prix Ref
         PRIX_HP = 0.18
         PRIX_HC = 0.12
         
@@ -166,26 +163,34 @@ class CortexEngine:
         budget_hc = conso_hc * PRIX_HC
         budget_total = budget_hp + budget_hc
         
-        # Part HC
         total_kwh = conso_hp + conso_hc
-        part_hc = int((conso_hc / total_kwh * 100)) if total_kwh > 0 else 0
         
+        # FIX DU CRASH : Calcul sécurisé du ratio
+        part_hc = 0
+        if total_kwh > 0:
+            part_hc = (conso_hc / total_kwh) * 100
+        
+        prix_moyen = 0.0
+        if total_kwh > 0:
+            prix_moyen = budget_total / total_kwh
+
         return {
             "finance": {
                 "budget_total_estime": self._safe_int(budget_total),
                 "conso_hp": self._safe_int(conso_hp),
                 "conso_hc": self._safe_int(conso_hc),
-                "part_hc": part_hc,
-                "prix_moyen_calcule": round(budget_total / total_kwh, 3) if total_kwh > 0 else 0
+                "part_hc": self._safe_int(part_hc), # Wrapper safe_int ici
+                "prix_moyen_calcule": round(prix_moyen, 3)
             }
         }
 
     def _generate_expert_narrative(self, k, p):
-        # Ajout de la dimension financière dans le texte
         txt = f"<b>ANALYSE ({p.upper()}) :</b><br>"
         txt += f"• Volumétrie : {k['conso_totale']:,} kWh.<br>"
-        txt += f"• Finance : Budget est. <b>{k['finance']['budget_total_estime']:,} €/an</b> (Prix moyen {k['finance']['prix_moyen_calcule']} €/kWh).<br>"
-        txt += f"• Puissance : Pic à {k['p_max']} kW. {k['turpe_optimisation']['message']}<br>"
+        # Ajout Finance dans le texte
+        if 'finance' in k:
+            txt += f"• Finance : Budget est. <b>{k['finance']['budget_total_estime']:,} €/an</b>.<br>"
+        txt += f"• Puissance : Pic à {k['p_max']} kW.<br>"
         txt += f"• Comportement : {k['diagnosis']}<br>"
         return txt
 
@@ -223,7 +228,7 @@ class CortexEngine:
         ]
         return {"score": 80, "checks": checks}
 
-    def ask_agent(self, q): return "Cortex V9.0 Online."
+    def ask_agent(self, q): return "Cortex V9.1 Finance Online."
     def run_chaos_monkey(self): return [{"test": "Maths", "status": "PASS"}]
 
 cortex = CortexEngine()
