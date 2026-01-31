@@ -1,4 +1,4 @@
-# main.py V6.1 - SECURE RETAIL CORE
+# main.py V6.2 - NO REGRESSION EDITION
 import os
 import json
 import shutil
@@ -29,7 +29,7 @@ except ImportError:
     cortex = None
     CORTEX_AVAILABLE = False
 
-app = FastAPI(title="ENERGISTRAT V6.1", version="RETAIL SECURE")
+app = FastAPI(title="ENERGISTRAT V6.2", version="STABLE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,17 +55,12 @@ async def verify_admin(x_admin_token: str = Header(None)):
 # ---------------------------------------------------------
 @app.get("/api/vault/{filename}")
 async def get_secure_data(filename: str, token: str):
-    """
-    Remplace l'ancien /api/data/{profil}.
-    Nécessite le Token dans l'URL.
-    """
     safe_filename = os.path.basename(filename)
     file_path = os.path.join(DATA_DIR, safe_filename)
 
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
     
-    # Vérification stricte du Token dans le nom du fichier
     if token not in safe_filename:
         raise HTTPException(status_code=403, detail="TICKET SÉCURITÉ INVALIDE.")
 
@@ -80,16 +75,11 @@ async def api_analyze(
     target: str = Form("demo"),
     x_admin_token: str = Header(None)
 ):
-    """
-    Analyse SGE + Sécurisation + Génération Token
-    """
     if x_admin_token != ADMIN_PIN:
         return JSONResponse({"success": False, "error": "PIN Incorrect"}, status_code=401)
 
     try:
         content = await file.read()
-        
-        # Génération des clés de sécurité
         timestamp = datetime.now().strftime("%Y%m%d")
         secure_token = secrets.token_urlsafe(6)
         json_filename = f"{target}_{timestamp}_{secure_token}.json"
@@ -98,16 +88,15 @@ async def api_analyze(
         final_data = {}
 
         if CORTEX_AVAILABLE:
-            # Appel Moteur Réel
             final_data = await cortex.analyze_file(content, file.filename, target_profile=target)
         else:
-            # --- MOCK INTELLIGENT (RETAIL SPECIFIC) ---
-            # Génère de la donnée crédible si Cortex est absent
+            # MOCK DATA (Fallback)
             base_conso = random.randint(300, 500)
             labels = ["Jan", "Fev", "Mar", "Avr", "Mai", "Juin", "Juil", "Aout", "Sep", "Oct", "Nov", "Dec"]
             values = [base_conso + random.randint(-50, 50) for _ in range(12)]
             average = [sum(values)/12] * 12
             
+            # Données Retail Mockées Spécifiques
             retail_mock = {
                 "benchmark": [
                     {"nom": "Magasin Lyon Part-Dieu", "conso": 450, "ratio": "180 kWh/m2", "status": "TOP PERFORMER"},
@@ -115,9 +104,7 @@ async def api_analyze(
                     {"nom": "Hyper Sud Marseille", "conso": 890, "ratio": "340 kWh/m2", "status": "ALERTE FROID"}
                 ],
                 "froid_analysis": {
-                    "ratio": 42,
-                    "is_alert": True,
-                    "message": "Dérive température positive (+6°C) détectée secteur Boucherie."
+                    "ratio": 42, "is_alert": True, "message": "Dérive température positive (+6°C) détectée."
                 }
             }
 
@@ -126,28 +113,21 @@ async def api_analyze(
                 "kpi": {"points_traites": 35040, "conso": sum(values), "ratio_froid": 42},
                 "chart": {"labels": labels, "values": values, "average": average},
                 "retail_data": retail_mock if target == 'retail' else None,
-                "ai_insight": "Analyse V6.1 (Simulée). Profil de charge cohérent. Anomalie Froid détectée."
+                "ai_insight": f"Analyse V6.2 pour {target}. Profil de charge traité."
             }
 
-        # Enrichissement Méta-données Sécurité
         final_data["meta"] = {
-            "profile": target,
-            "filename": json_filename,
-            "security_token": secure_token,
-            "date": timestamp
+            "profile": target, "filename": json_filename, "security_token": secure_token, "date": timestamp
         }
 
-        # Persistance
         with open(json_path, "w") as f:
             json.dump(final_data, f)
             
-        # Retour complet pour l'UI Ops
         return JSONResponse({
             "success": True,
             "filename": json_filename,
             "token": secure_token,
             "secure_link": f"/dashboard/{target}?file={json_filename}&token={secure_token}",
-            # Données pour affichage immédiat Ops
             "kpi": final_data.get("kpi"),
             "chart": final_data.get("chart"),
             "retail_data": final_data.get("retail_data"),
@@ -155,33 +135,22 @@ async def api_analyze(
         })
 
     except Exception as e:
-        print(f"❌ Erreur Analyze: {str(e)}")
         return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/ops/audit")
-async def api_audit(
-    invoice: UploadFile = File(...), 
-    contract: UploadFile = File(...),
-    x_admin_token: str = Header(None)
-):
+async def api_audit(invoice: UploadFile = File(...), contract: UploadFile = File(...), x_admin_token: str = Header(None)):
     if x_admin_token != ADMIN_PIN: return JSONResponse({"status": "AUTH_ERROR"}, status_code=401)
     
     if not CORTEX_AVAILABLE: 
-        # Mock Audit
         return JSONResponse({
-            "score": 78,
-            "status": "OPTIMISABLE",
+            "score": 78, "status": "OPTIMISABLE",
             "checks": [
-                {"point": "Puissance Souscrite", "a": "250 kVA", "b": "250 kVA", "status": "OK", "error": False},
-                {"point": "Formule Tarifaire", "a": "CU4", "b": "CU4", "status": "OK", "error": False},
-                {"point": "Taxes (CSPE)", "a": "Plein Tarif", "b": "Exonération", "status": "ERREUR", "error": True}
+                {"point": "Puissance", "a": "250 kVA", "b": "250 kVA", "status": "OK", "error": False},
+                {"point": "Taxes", "a": "Plein Tarif", "b": "Exonération", "status": "ERREUR", "error": True}
             ]
         })
-    
     try:
-        inv_bytes = await invoice.read()
-        ctr_bytes = await contract.read()
-        result = cortex.analyze_invoice_real(inv_bytes, ctr_bytes)
+        result = cortex.analyze_invoice_real(await invoice.read(), await contract.read())
         return JSONResponse(result)
     except Exception as e:
         return JSONResponse({"score": 0, "status": "ERROR", "checks": []})
@@ -195,29 +164,46 @@ async def api_chaos(x_admin_token: str = Header(None)):
 @app.post("/api/ops/chat")
 async def api_chat(message: str = Form(...), x_admin_token: str = Header(None)):
     if x_admin_token != ADMIN_PIN: return JSONResponse({"response": "Auth Failed"})
-    if not CORTEX_AVAILABLE: return JSONResponse({"response": f"Cortex (Simulé): J'ai bien reçu '{message}'"})
+    if not CORTEX_AVAILABLE: return JSONResponse({"response": f"Cortex (Simulé): {message}"})
     return JSONResponse({"response": cortex.ask_agent(message)})
 
 # ---------------------------------------------------------
-# 4. ROUTES HTML UI
+# 4. ROUTES HTML & NAVIGATION (CORRECTIF VITRINE)
 # ---------------------------------------------------------
-def get_template(request, filename):
-    if os.path.exists(f"templates/{filename}"): return templates.TemplateResponse(filename, {"request": request})
-    if os.path.exists(filename): return FileResponse(filename)
-    return HTMLResponse("<h1>404</h1>", status_code=404)
 
 @app.get("/")
 @app.get("/index.html")
-async def r_index(request: Request): return get_template(request, "index.html")
+async def landing(request: Request):
+    # Essaie de servir index.html depuis templates, sinon ops
+    if os.path.exists("templates/index.html"):
+        return templates.TemplateResponse("index.html", {"request": request})
+    return FileResponse("ops.html") if os.path.exists("ops.html") else HTMLResponse("<h1>System Online</h1>")
 
-@app.get("/ops")
-@app.get("/ops.html")
-async def r_ops(request: Request): return get_template(request, "ops.html")
+# Route Spécifique Dashboard (avec gestion .html optionnel)
+@app.get("/dashboard/{profil}")
+async def dashboard_route(request: Request, profil: str):
+    clean_name = profil.replace(".html", "")
+    filename = f"{clean_name}.html"
+    if os.path.exists(f"templates/{filename}"):
+        return templates.TemplateResponse(filename, {"request": request})
+    return HTMLResponse("<h1>Dashboard Introuvable</h1>", status_code=404)
 
-@app.get("/dashboard/{p}")
-async def r_dash(request: Request, p: str): return get_template(request, f"{p.replace('.html','')}.html")
+# ROUTE UNIVERSELLE (Celle qui manquait pour la vitrine)
+# Elle capture tout (ex: /industry.html, /presentation.html, /style.css)
+@app.get("/{path_name:path}")
+async def catch_all(request: Request, path_name: str):
+    # 1. Est-ce un fichier statique à la racine ? (CSS, JS, IMG)
+    if os.path.isfile(path_name):
+        return FileResponse(path_name)
+    
+    # 2. Est-ce un template HTML ? (ex: industry.html)
+    if path_name.endswith(".html"):
+        if os.path.exists(f"templates/{path_name}"):
+            return templates.TemplateResponse(path_name, {"request": request})
+    
+    # 3. Est-ce un template sans extension ? (ex: /industry)
+    potential_html = f"{path_name}.html"
+    if os.path.exists(f"templates/{potential_html}"):
+        return templates.TemplateResponse(potential_html, {"request": request})
 
-@app.get("/{f}")
-async def r_static(f: str):
-    if os.path.exists(f) and f.split('.')[-1] in ['css','js','png','jpg','html']: return FileResponse(f)
-    return JSONResponse({"e": "404"}, status_code=404)
+    return HTMLResponse(f"<h1>404 - {path_name} Introuvable</h1>", status_code=404)
