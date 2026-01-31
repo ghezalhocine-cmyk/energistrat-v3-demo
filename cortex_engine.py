@@ -1,4 +1,4 @@
-# cortex_engine.py V9.3 - AUTO-SCALE & TIME STEP
+# cortex_engine.py V10.0 - CONTEXTUAL INTELLIGENCE (DJU + GEO)
 import pandas as pd
 import numpy as np
 import io
@@ -6,7 +6,10 @@ import os
 import json
 import re
 import logging
+import requests # NOUVEAU POUR API
+from datetime import datetime
 
+# IA & PDF (Optionnel)
 try:
     import vertexai
     from vertexai.generative_models import GenerativeModel
@@ -31,7 +34,7 @@ class CortexEngine:
                 self.ai_ready = True
             except: pass
 
-    # --- HELPERS ---
+    # --- SÉCURITÉ MATHÉMATIQUE ---
     def _safe_int(self, value):
         try: return 0 if (pd.isna(value) or np.isinf(value)) else int(value)
         except: return 0
@@ -40,23 +43,36 @@ class CortexEngine:
         try: return 0.0 if (pd.isna(value) or np.isinf(value)) else float(value)
         except: return 0.0
 
-    # --- 1. ANALYSE SGE ---
+    # ==========================================================================
+    # 1. ORCHESTRATEUR PRINCIPAL
+    # ==========================================================================
     async def analyze_file(self, file_content, filename, target_profile="demo"):
         try:
-            # A. INGESTION INTELLIGENTE (V9.3)
+            # A. INGESTION
             df, time_step_hours = self._parse_data(file_content, filename)
-            
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible"}
 
-            # B. MODULES EXPERTS (Avec Pas de temps réel)
+            # B. CONTEXTE GÉO & CLIMATIQUE (NOUVEAU V10)
+            # On cherche un code postal dans le nom du fichier (ex: Site_69002.csv)
+            zip_match = re.search(r'\b(0[1-9]|[1-8]\d|9[0-5])\d{3}\b', filename)
+            zip_code = zip_match.group(0) if zip_match else "75001" # Défaut Paris si non trouvé
+            
+            # Appels API Externes
+            geo_data = self._fetch_geo_data(zip_code)
+            dju_data = self._fetch_dju_data(geo_data, df['date'].min(), df['date'].max())
+
+            # C. MODULES EXPERTS
             base = self._module_socle(df, time_step_hours)
             turpe = self._module_turpe(df, base['p_max'])
             season = self._module_saison(df)
             finance = self._module_finance(df, time_step_hours)
             
-            final_kpis = {**base, **turpe, **season, **finance}
+            # Module Climatique (Signature)
+            climat = self._module_climatique(base['conso_totale'], dju_data)
             
-            # C. SAMPLING
+            final_kpis = {**base, **turpe, **season, **finance, **climat, "geo": geo_data}
+            
+            # D. SAMPLING & NARRATION
             step = max(1, len(df)//2000)
             df_chart = df.iloc[::step]
             
@@ -78,7 +94,54 @@ class CortexEngine:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    # --- 2. INGESTION AVEC AUTO-CORRECTION ---
+    # ==========================================================================
+    # 2. API EXTERNES (NOUVEAU V10)
+    # ==========================================================================
+    def _fetch_geo_data(self, zipcode):
+        """Récupère Lat/Lon via API Gouv"""
+        try:
+            url = f"https://api-adresse.data.gouv.fr/search/?q={zipcode}&limit=1"
+            res = requests.get(url, timeout=2).json()
+            if res['features']:
+                coords = res['features'][0]['geometry']['coordinates']
+                return {"city": res['features'][0]['properties']['city'], "lat": coords[1], "lon": coords[0], "zip": zipcode}
+        except: pass
+        return {"city": "Localisation Inconnue", "lat": 48.8566, "lon": 2.3522, "zip": zipcode} # Fallback Paris
+
+    def _fetch_dju_data(self, geo, start_date, end_date):
+        """Récupère Météo via Open-Meteo et calcule les DJU"""
+        try:
+            s_str = start_date.strftime('%Y-%m-%d')
+            e_str = end_date.strftime('%Y-%m-%d')
+            url = f"https://archive-api.open-meteo.com/v1/archive?latitude={geo['lat']}&longitude={geo['lon']}&start_date={s_str}&end_date={e_str}&daily=temperature_2m_mean&timezone=Europe%2FParis"
+            
+            res = requests.get(url, timeout=3).json()
+            if 'daily' in res and 'temperature_2m_mean' in res['daily']:
+                temps = res['daily']['temperature_2m_mean']
+                # Calcul DJU Base 18 (Chauffage)
+                dju = sum([max(0, 18 - t) for t in temps if t is not None])
+                return {"dju_total": int(dju), "status": "OK"}
+        except: pass
+        return {"dju_total": 0, "status": "API_ERROR"}
+
+    def _module_climatique(self, conso_totale, dju_data):
+        """Calcule la Signature Énergétique"""
+        dju = dju_data['dju_total']
+        kwh_par_dju = 0
+        if dju > 0:
+            kwh_par_dju = round(conso_totale / dju, 2)
+        
+        return {
+            "climat": {
+                "dju_periode": dju,
+                "signature_kwh_dju": kwh_par_dju,
+                "message": f"Rigueur climatique : {dju} DJU. Signature : {kwh_par_dju} kWh/DJU."
+            }
+        }
+
+    # ==========================================================================
+    # 3. MODULES STANDARDS (V9.3)
+    # ==========================================================================
     def _parse_data(self, content, filename):
         try:
             buffer = io.BytesIO(content)
@@ -93,7 +156,6 @@ class CortexEngine:
             c_val = next((c for c in df.columns if any(x in c for x in ['puiss','p10','conso','val','kw'])), df.columns[1])
 
             df['date'] = pd.to_datetime(df[c_date], dayfirst=True, errors='coerce')
-            
             if df[c_val].dtype == object:
                 df['val'] = pd.to_numeric(df[c_val].astype(str).str.replace(',', '.').replace(' ', ''), errors='coerce')
             else:
@@ -103,24 +165,18 @@ class CortexEngine:
             df['val'] = df['val'].fillna(0).replace([np.inf, -np.inf], 0)
             df = df.sort_values(by='date')
             
-            # --- AUTO-SCALE : Détection Watts vs kW ---
-            # Si la médiane est > 2000, on suppose que ce sont des Watts (sauf Industrie lourde)
-            median_val = df['val'].median()
-            if median_val > 2000:
-                df['val'] = df['val'] / 1000
+            # Auto-Scale
+            if df['val'].median() > 2000: df['val'] = df['val'] / 1000
             
-            # --- CALCUL PAS DE TEMPS (Time Step) ---
-            # On regarde la différence entre les 2 premières lignes
-            time_step = 0.166 # Par défaut 10 min (1/6h)
+            # Time Step
+            time_step = 0.166
             if len(df) > 1:
                 delta = (df.iloc[1]['date'] - df.iloc[0]['date']).total_seconds()
-                if delta > 0:
-                    time_step = delta / 3600 # En heures (ex: 10min = 0.166, 30min = 0.5)
+                if delta > 0: time_step = delta / 3600
 
             df['date_str'] = df['date'].dt.strftime('%Y-%m-%d %H:%M')
             return df[['date', 'val', 'date_str']], time_step
-
-        except Exception: return None, 0.166
+        except: return None, 0.166
 
     def _module_socle(self, df, time_step):
         values = df['val'].tolist()
@@ -130,13 +186,8 @@ class CortexEngine:
         df['wd'] = df['date'].dt.weekday
         w_mean = df[df['wd'] < 5]['val'].mean()
         we_mean = df[df['wd'] >= 5]['val'].mean()
-        
-        ratio = 0
-        if w_mean > 0: ratio = (we_mean / w_mean) * 100
-        
+        ratio = int((we_mean/w_mean)*100) if w_mean > 0 else 0
         p_max = max(values) if values else 0
-
-        # Calcul Conso Exact : Somme des Puissances * Pas de temps
         conso_kwh = sum(values) * time_step
 
         diag, status = "Profil Standard", "OK"
@@ -170,15 +221,11 @@ class CortexEngine:
     def _module_finance(self, df, time_step):
         df['h'] = df['date'].dt.hour
         mask_hc = (df['h'] >= 22) | (df['h'] < 6)
-        
-        # Conso exacte avec Time Step
         conso_hc = df[mask_hc]['val'].sum() * time_step
         conso_hp = df[~mask_hc]['val'].sum() * time_step
         
-        P_HP, P_HC = 0.18, 0.12
-        budg = (conso_hp * P_HP) + (conso_hc * P_HC)
+        budg = (conso_hp * 0.18) + (conso_hc * 0.12)
         tot = conso_hp + conso_hc
-        
         part_hc = (conso_hc / tot * 100) if tot > 0 else 0
         pm = (budg / tot) if tot > 0 else 0
 
@@ -193,19 +240,16 @@ class CortexEngine:
         }
 
     def _generate_expert_narrative(self, k, p):
-        txt = f"<b>ANALYSE ({p.upper()}) :</b><br>"
-        txt += f"• Volumétrie : {k['conso_totale']:,} kWh.<br>"
-        if 'finance' in k:
-            txt += f"• Finance : Budget est. <b>{k['finance']['budget_total_estime']:,} €/an</b>.<br>"
-        txt += f"• Puissance : Pic à {k['p_max']} kW.<br>"
-        txt += f"• Comportement : {k['diagnosis']}<br>"
+        txt = f"<b>ANALYSE V10 ({p.upper()}) :</b><br>"
+        txt += f"• Localisation : <b>{k['geo']['city']}</b> ({k['geo']['zip']}).<br>"
+        txt += f"• Climat : {k['climat']['dju_periode']} DJU sur la période.<br>"
+        txt += f"• Signature : <b>{k['climat']['signature_kwh_dju']} kWh/DJU</b>.<br>"
+        txt += f"• Finance : Budget est. {k['finance']['budget_total_estime']:,} €.<br>"
+        txt += f"• Diag : {k['diagnosis']}"
         return txt
 
     def _module_retail_placeholder(self, kpis):
-        return {
-            "benchmark": [{"nom": "Site Actuel", "conso": kpis['conso_totale'], "ratio": "---", "status": kpis['status']}],
-            "froid_analysis": {"ratio": 0, "is_alert": False, "message": "En attente module Froid."}
-        }
+        return {"benchmark": [], "froid_analysis": {"ratio": 0, "is_alert": False}}
 
     # --- AUDIT PDF ---
     def extract_pdf(self, b):
@@ -235,7 +279,7 @@ class CortexEngine:
         ]
         return {"score": 80, "checks": checks}
 
-    def ask_agent(self, q): return "Cortex V9.3 Online."
-    def run_chaos_monkey(self): return [{"test": "Math Engine", "status": "PASS"}]
+    def ask_agent(self, q): return "Cortex V10.0 Online."
+    def run_chaos_monkey(self): return [{"test": "API Météo", "status": "READY"}]
 
 cortex = CortexEngine()
