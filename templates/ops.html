@@ -2,9 +2,10 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V6.2 | Ops Master</title>
+    <title>ENERGISTRAT V6.4 | Ops Expert</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Plugin Annotation pour la ligne de Talon si besoin, sinon on simule avec un dataset -->
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -24,12 +25,10 @@
         #drop-zone.drag-active { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.1); }
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
         .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; }
-        
         #terminal { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
-        .log-line { margin-bottom: 2px; }
-        .log-success { color: #4ade80; }
-        .log-error { color: #f87171; }
-        .log-info { color: #94a3b8; }
+        .log-success { color: #4ade80; } .log-error { color: #f87171; } .log-info { color: #94a3b8; }
+        input[type="date"] { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 6px; padding: 4px; font-size: 10px; font-family: 'JetBrains Mono'; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
     </style>
 </head>
 <body class="ops-grid">
@@ -50,7 +49,7 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-box-open text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V6.2</span></div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-box-open text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V6.4 EXPERT</span></div>
             <div class="text-[10px] font-mono text-gray-400"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>ONLINE</div>
         </header>
 
@@ -58,198 +57,168 @@
 
             <!-- TAB 1: DATA LAB -->
             <div id="view-datalab" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
+                <!-- COLONNE GAUCHE -->
                 <div class="col-span-12 md:col-span-4 bento-card p-6 rounded-2xl border-t-4 border-cyan flex flex-col">
-                    <h3 class="font-bold text-white mb-2">Ingestion Sécurisée</h3>
-                    
-                    <!-- MENU RESTAURÉ COMPLET -->
+                    <h3 class="font-bold text-white mb-2">Ingestion HD</h3>
                     <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 mb-4 focus:border-cyan outline-none">
-                        <option value="demo">-- Mode Test / Démo --</option>
-                        <option value="retail">Retail / Franchise (NEW)</option>
-                        <option value="industry">Industrie (ISO 50001)</option>
-                        <option value="mairie">Collectivité (Mairie)</option>
-                        <option value="pme">Artisan / PME</option>
+                        <option value="demo">-- Mode Test --</option>
+                        <option value="retail">Retail / Franchise</option>
+                        <option value="industry">Industrie</option>
+                        <option value="mairie">Collectivité</option>
+                        <option value="pme">PME</option>
                         <option value="sde">Syndicat (SDE)</option>
-                        <option value="oph">Bailleur Social (OPH)</option>
-                        <option value="syndic">Syndic Copro</option>
+                        <option value="oph">Bailleur (OPH)</option>
+                        <option value="syndic">Syndic</option>
                         <option value="citoyen">Particulier</option>
                         <option value="supplier">Partenaire</option>
                     </select>
-
                     <div id="drop-zone" class="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan transition py-8" onclick="document.getElementById('real-upload').click()">
                         <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
                         <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 mb-2"></i>
                         <span class="text-xs font-bold text-white" id="upload-label">Glisser un fichier</span>
                     </div>
-
                     <div id="upload-result" class="hidden mt-4 bg-green-900/10 border border-green-500/30 p-3 rounded-xl">
-                        <div class="text-[10px] text-gray-400">Token Client :</div>
+                        <div class="text-[10px] text-gray-400">Token :</div>
                         <div id="res-token" class="text-sm font-mono text-cyan font-bold mb-2">...</div>
-                        <a id="res-link" href="#" target="_blank" class="block w-full bg-cyan text-black font-bold text-xs py-2 rounded text-center">OUVRIR DASHBOARD</a>
+                        <a id="res-link" href="#" target="_blank" class="block w-full bg-cyan text-black font-bold text-xs py-2 rounded text-center">DASHBOARD CLIENT</a>
                     </div>
                 </div>
 
-                <div class="col-span-12 md:col-span-8 bento-card p-6 rounded-2xl">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-white">Analyse de Charge</h3>
-                        <div class="flex gap-2">
-                            <button onclick="updateZoom('all')" class="px-2 py-1 bg-cyan/20 text-[10px] text-cyan rounded hover:bg-cyan/30">VUE GLOBALE</button>
+                <!-- COLONNE DROITE : GRAPHIQUE + ANALYSE EXPERTE -->
+                <div class="col-span-12 md:col-span-8">
+                    <!-- Graphique -->
+                    <div class="bento-card p-6 rounded-2xl mb-6">
+                        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+                            <h3 class="font-bold text-white">Courbe de Charge SGE</h3>
+                            <div class="flex items-center gap-2 bg-white/5 p-1 rounded-lg border border-white/10">
+                                <input type="date" id="date-start"> <span class="text-gray-500 text-xs">-</span> <input type="date" id="date-end">
+                                <button onclick="applyDateFilter()" class="bg-cyan/20 text-cyan px-2 rounded text-xs hover:bg-cyan/40"><i class="fa-solid fa-filter"></i></button>
+                            </div>
+                            <div class="flex gap-1">
+                                <button onclick="zoomPreset(7)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20">7J</button>
+                                <button onclick="zoomPreset(30)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20">30J</button>
+                                <button onclick="zoomPreset('all')" class="px-2 py-1 bg-cyan/20 text-[10px] text-cyan rounded hover:bg-cyan/30">TOUT</button>
+                            </div>
+                        </div>
+                        <div class="h-64 w-full relative"><canvas id="testChart"></canvas></div>
+                    </div>
+
+                    <!-- ANALYSE EXPERTE (NOUVEAU) -->
+                    <div class="grid grid-cols-3 gap-6">
+                        <div class="bento-card p-4 rounded-xl border border-white/5">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Talon (Baseload)</div>
+                            <div class="text-2xl font-mono font-bold text-white" id="kpi-talon">-- kW</div>
+                            <div class="text-[10px] text-green-400 mt-1">Seuil minimal atteint</div>
+                        </div>
+                        <div class="bento-card p-4 rounded-xl border border-white/5">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Ratio Inactivité</div>
+                            <div class="text-2xl font-mono font-bold text-white" id="kpi-ratio">-- %</div>
+                            <div class="text-[10px] text-gray-400 mt-1">Conso Weekend vs Semaine</div>
+                        </div>
+                        <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-ai/10">
+                            <div class="text-[10px] text-ai uppercase font-bold mb-1"><i class="fa-solid fa-robot"></i> Diagnostic Cortex</div>
+                            <div class="text-xs text-white leading-relaxed" id="kpi-diag">En attente d'analyse...</div>
                         </div>
                     </div>
-                    <div class="h-64 w-full relative"><canvas id="testChart"></canvas></div>
                 </div>
 
-                <!-- ZONE RETAIL BENCHMARK -->
+                <!-- ZONE RETAIL -->
                 <div id="retail-zone" class="col-span-12 hidden">
-                    <div class="bento-card p-6 rounded-2xl border border-purple-500/30">
-                        <h3 class="font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-store text-purple-500"></i> Benchmark Retail & Froid</h3>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-xs text-gray-300">
-                                <thead class="text-gray-500 border-b border-white/10"><tr><th>Magasin</th><th>Conso (MWh)</th><th>Ratio Froid</th><th class="text-right">Statut</th></tr></thead>
-                                <tbody id="retail-results" class="divide-y divide-white/5"></tbody>
-                            </table>
-                        </div>
+                    <div class="bento-card p-6 rounded-2xl border border-purple-500/30 mt-6">
+                        <h3 class="font-bold text-white mb-4"><i class="fa-solid fa-store text-purple-500"></i> Benchmark Retail</h3>
+                        <table class="w-full text-left text-xs text-gray-300">
+                            <thead class="text-gray-500 border-b border-white/10"><tr><th>Magasin</th><th>Conso</th><th>Ratio</th><th class="text-right">Statut</th></tr></thead>
+                            <tbody id="retail-results" class="divide-y divide-white/5"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
 
-            <!-- TAB 2: AUDIT -->
+            <!-- TAB 2 & 3 INCHANGÉS -->
             <div id="view-auditlab" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Audit Expert (TURPE & Taxes)</h3></div>
-                
-                <div class="col-span-6 bento-card p-6 rounded-2xl border border-red-500/30 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center text-red-500"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></div>
-                    <div class="flex-1">
-                        <label class="text-xs font-bold text-gray-400 block mb-1">1. FACTURE PDF</label>
-                        <input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-white/10 file:text-white hover:file:bg-white/20">
-                    </div>
-                </div>
-
-                <div class="col-span-6 bento-card p-6 rounded-2xl border border-blue-500/30 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500"><i class="fa-solid fa-file-contract text-xl"></i></div>
-                    <div class="flex-1">
-                        <label class="text-xs font-bold text-gray-400 block mb-1">2. CONTRAT PDF</label>
-                        <input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-white/10 file:text-white hover:file:bg-white/20">
-                    </div>
-                </div>
-
-                <div class="col-span-12">
-                    <button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl text-sm hover:scale-[1.01] transition shadow-lg">LANCER L'ANALYSE CROISÉE</button>
-                </div>
-
-                <div class="col-span-12 bento-card p-6 rounded-2xl bg-abysse border border-white/10 mt-4">
-                    <table class="w-full text-left text-xs text-gray-300">
-                        <thead class="text-gray-500 border-b border-white/10"><tr><th>Point de Contrôle</th><th>Donnée Facture</th><th>Donnée Contrat</th><th class="text-right">Résultat</th></tr></thead>
-                        <tbody id="audit-results" class="divide-y divide-white/5"><tr><td colspan="4" class="py-4 text-gray-500 italic">En attente de documents...</td></tr></tbody>
-                    </table>
-                </div>
+                <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Audit Expert</h3></div>
+                <div class="col-span-6 bento-card p-6 rounded-2xl border border-red-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">1. FACTURE PDF</label><input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
+                <div class="col-span-6 bento-card p-6 rounded-2xl border border-blue-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">2. CONTRAT PDF</label><input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
+                <div class="col-span-12"><button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl text-sm hover:scale-[1.01] transition shadow-lg">LANCER L'AUDIT</button></div>
+                <div class="col-span-12 bento-card p-6 rounded-2xl bg-abysse border border-white/10 mt-4"><table class="w-full text-left text-xs text-gray-300"><thead class="text-gray-500 border-b border-white/10"><tr><th>Contrôle</th><th>Facture</th><th>Contrat</th><th class="text-right">Résultat</th></tr></thead><tbody id="audit-results" class="divide-y divide-white/5"><tr><td colspan="4" class="py-4 text-gray-500 italic">En attente...</td></tr></tbody></table></div>
             </div>
-
-            <!-- TAB 3: CHAOS -->
             <div id="view-scenarios" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-6 rounded-2xl border-l-4 border-red-500">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-white text-lg">Chaos Monkey</h3>
-                        <button onclick="runTest()" class="px-4 py-2 bg-red-600 text-white font-bold rounded hover:bg-red-500 text-xs">TESTER INFRA</button>
-                    </div>
-                    <div id="chaos-results" class="grid grid-cols-3 gap-4"></div>
-                </div>
+                <div class="col-span-12 bento-card p-6 rounded-2xl border-l-4 border-red-500"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-white">Chaos Monkey</h3><button onclick="runTest()" class="px-4 py-2 bg-red-600 text-white font-bold rounded text-xs">TEST</button></div><div id="chaos-results" class="grid grid-cols-3 gap-4"></div></div>
             </div>
-
         </div>
 
         <!-- TERMINAL -->
-        <div class="h-40 bg-[#02050a] border-t border-white/10 p-4 overflow-hidden flex flex-col z-20">
-            <div class="flex justify-between items-center mb-1 border-b border-white/5 pb-1">
-                <span class="text-slate-500 font-bold uppercase tracking-widest text-[10px]">>> SYSTEM LOGS</span>
-                <button onclick="document.getElementById('terminal').innerHTML=''" class="text-[10px] text-gray-600 hover:text-white">CLEAR</button>
-            </div>
-            <div id="terminal" class="flex-1 overflow-y-auto space-y-1"></div>
-        </div>
-
+        <div class="h-40 bg-[#02050a] border-t border-white/10 p-4 overflow-hidden flex flex-col z-20"><div class="flex justify-between items-center mb-1 border-b border-white/5 pb-1"><span class="text-slate-500 font-bold uppercase tracking-widest text-[10px]">>> SYSTEM LOGS</span><button onclick="document.getElementById('terminal').innerHTML=''" class="text-[10px] text-gray-600 hover:text-white">CLEAR</button></div><div id="terminal" class="flex-1 overflow-y-auto space-y-1"></div></div>
     </main>
 
     <!-- CHATBOT -->
-    <aside class="bg-[#0B0F19] border-l border-white/5 flex flex-col w-[350px] z-30">
-        <div class="p-4 border-b border-white/5 bg-ai/5 flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-ai flex items-center justify-center text-white font-bold"><i class="fa-solid fa-robot"></i></div>
-            <h3 class="font-bold text-white text-sm">CORTEX</h3>
-        </div>
-        <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-container"></div>
-        <div class="p-4 border-t border-white/5">
-            <input type="text" id="chat-input" placeholder="Message..." class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none" onkeypress="if(event.key==='Enter') sendChat()">
-        </div>
-    </aside>
+    <aside class="bg-[#0B0F19] border-l border-white/5 flex flex-col w-[350px] z-30"><div class="p-4 border-b border-white/5 bg-ai/5 flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-ai flex items-center justify-center text-white font-bold"><i class="fa-solid fa-robot"></i></div><h3 class="font-bold text-white text-sm">CORTEX</h3></div><div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-container"></div><div class="p-4 border-t border-white/5"><input type="text" id="chat-input" placeholder="Message..." class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none" onkeypress="if(event.key==='Enter') sendChat()"></div></aside>
 
     <script>
-        // --- AUTHENTIFICATION ---
+        // AUTH
         let adminPin = sessionStorage.getItem('admin_pin');
-        if (!adminPin) {
-            adminPin = prompt("🔒 ACCÈS OPS V6.2\nEntrez le Code PIN :");
-            if (adminPin) sessionStorage.setItem('admin_pin', adminPin);
-            else document.body.innerHTML = "<h1 style='color:red;text-align:center;margin-top:20%'>🔒 ACCÈS REFUSÉ</h1>";
-        }
+        if (!adminPin) { adminPin = prompt("🔒 PIN Ops Requis :"); if (adminPin) sessionStorage.setItem('admin_pin', adminPin); else { alert("Accès Refusé"); throw new Error("Stop"); } }
 
-        // LOGGING
-        function log(msg, type='info') {
-            const term = document.getElementById('terminal');
-            const time = new Date().toLocaleTimeString();
-            let colorClass = 'log-info';
-            if(type === 'success') colorClass = 'log-success';
-            if(type === 'error') colorClass = 'log-error';
-            term.innerHTML += `<div class="log-line ${colorClass}">[${time}] ${msg}</div>`;
-            term.scrollTop = term.scrollHeight;
-        }
+        function log(msg, type='info') { const term = document.getElementById('terminal'); const color = type==='success'?'log-success':(type==='error'?'log-error':'log-info'); term.innerHTML += `<div class="log-line ${color}">[${new Date().toLocaleTimeString()}] ${msg}</div>`; term.scrollTop = term.scrollHeight; }
+        const App = { toast: function(msg, type='info') { const el = document.createElement('div'); el.className = 'toast'; el.style.borderLeftColor = type==='success'?'#10B981':(type==='error'?'#EF4444':'#00E5FF'); el.innerText = msg; document.getElementById('toast-container').appendChild(el); setTimeout(() => el.remove(), 4000); } };
+        function navTo(pageId) { document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active')); document.getElementById('nav-' + pageId).classList.add('active'); document.querySelectorAll('.page-content').forEach(e => e.classList.remove('active')); document.getElementById('view-' + pageId).classList.add('active'); }
 
-        const App = {
-            toast: function(msg, type='info') {
-                const el = document.createElement('div');
-                el.className = 'toast';
-                el.style.borderLeftColor = type==='success'?'#10B981':(type==='error'?'#EF4444':'#00E5FF');
-                el.innerText = msg;
-                document.getElementById('toast-container').appendChild(el);
-                setTimeout(() => el.remove(), 4000);
-            }
-        };
-
-        function navTo(pageId) {
-            document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active'));
-            document.getElementById('nav-' + pageId).classList.add('active');
-            document.querySelectorAll('.page-content').forEach(e => e.classList.remove('active'));
-            document.getElementById('view-' + pageId).classList.add('active');
-        }
-
-        // CHART
+        // CHART EXPERT
         let testChart = null;
-        let fullData = { labels: [], values: [], average: [] };
+        let masterData = { labels: [], values: [], average: [], talon: 0 };
 
-        function renderTestChart(labels, values, average) {
-            fullData = { labels, values, average };
-            updateZoom('all');
-        }
-
-        function updateZoom(range) {
-            if(!fullData.values.length) return;
+        function initChart() {
             const ctx = document.getElementById('testChart').getContext('2d');
-            if (testChart) testChart.destroy();
-            
             testChart = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: fullData.labels,
-                    datasets: [
-                        { label: 'Puissance (kW)', data: fullData.values, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, pointRadius: 2, borderWidth: 1.5 },
-                        { label: 'Moyenne (kW)', data: fullData.average, borderColor: '#F59E0B', borderDash: [5, 5], pointRadius: 0, borderWidth: 1, fill: false }
-                    ]
-                },
+                data: { labels: [], datasets: [] },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: true }, title: { display: true, text: 'Courbe de Charge', color: '#fff' } },
-                    scales: { x: { display: true, ticks: { color: '#64748B' } }, y: { display: true, ticks: { color: '#64748B' } } }
+                    plugins: { legend: { display: true }, title: { display: false } },
+                    scales: { x: { ticks: { color: '#64748B', maxTicksLimit: 10 } }, y: { ticks: { color: '#64748B' } } }
                 }
             });
         }
 
-        // UPLOAD & RETAIL LOGIC
+        function loadChartData(labels, values, average, talon) {
+            masterData = { labels, values, average, talon };
+            if(labels.length > 0) { document.getElementById('date-start').value = labels[0]; document.getElementById('date-end').value = labels[labels.length - 1]; }
+            updateChartDisplay(labels, values, average, talon);
+        }
+
+        function updateChartDisplay(labels, values, average, talon) {
+            // Création d'un tableau pour la ligne de Talon (constante)
+            const talonLine = new Array(values.length).fill(talon);
+
+            testChart.data.labels = labels;
+            testChart.data.datasets = [
+                { label: 'Puissance (kW)', data: values, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, pointRadius: 0, borderWidth: 1.5 },
+                { label: 'Moyenne (kW)', data: average, borderColor: '#F59E0B', borderDash: [5, 5], pointRadius: 0, borderWidth: 1, fill: false },
+                { label: 'Talon (Baseload)', data: talonLine, borderColor: '#10B981', borderWidth: 1, pointRadius: 0, fill: false }
+            ];
+            testChart.update();
+        }
+
+        function zoomPreset(range) {
+            if(!masterData.values.length) return;
+            let sl, sv, sa;
+            if (range === 'all') { sl=masterData.labels; sv=masterData.values; sa=masterData.average; }
+            else { sl=masterData.labels.slice(-range); sv=masterData.values.slice(-range); sa=masterData.average.slice(-range); }
+            if(sl.length > 0) { document.getElementById('date-start').value = sl[0]; document.getElementById('date-end').value = sl[sl.length - 1]; }
+            updateChartDisplay(sl, sv, sa, masterData.talon);
+        }
+
+        function applyDateFilter() {
+            const start = document.getElementById('date-start').value;
+            const end = document.getElementById('date-end').value;
+            if(!start || !end || !masterData.labels.length) return;
+            const i1 = masterData.labels.indexOf(start);
+            const i2 = masterData.labels.indexOf(end);
+            if(i1 === -1 || i2 === -1 || i1 > i2) { App.toast("Dates invalides.", "error"); return; }
+            updateChartDisplay(masterData.labels.slice(i1, i2+1), masterData.values.slice(i1, i2+1), masterData.average.slice(i1, i2+1), masterData.talon);
+        }
+
+        // UPLOAD & ANALYSE
         async function handleFileSelect(file) {
             if (!file) return;
             const target = document.getElementById('target-client').value;
@@ -257,51 +226,48 @@
             formData.append('file', file);
             formData.append('target', target);
             
-            log(`Upload SGE: ${file.name} -> ${target}`, 'info');
-            App.toast('Analyse et Sécurisation...', 'info');
+            log(`Analyse SGE: ${file.name}...`, 'info');
+            App.toast('Calcul Talon & Ratios...', 'info');
             
             try {
-                const res = await fetch('/api/ops/analyze', { 
-                    method: 'POST', 
-                    headers: { 'x-admin-token': adminPin },
-                    body: formData 
-                });
-                
-                if (res.status === 401) {
-                    sessionStorage.removeItem('admin_pin');
-                    alert("PIN Incorrect");
-                    location.reload();
-                    return;
-                }
-
+                const res = await fetch('/api/ops/analyze', { method: 'POST', headers: { 'x-admin-token': adminPin }, body: formData });
+                if (res.status === 401) { sessionStorage.removeItem('admin_pin'); location.reload(); return; }
                 const data = await res.json();
+                
                 if (data.success) {
-                    log(`Succès! Token: ${data.token}`, 'success');
-                    App.toast('Succès !', 'success');
-                    
+                    log(`Analyse terminée.`, 'success');
                     document.getElementById('upload-result').classList.remove('hidden');
                     document.getElementById('res-token').innerText = data.token;
                     document.getElementById('res-link').href = data.secure_link;
-
-                    if(data.chart) renderTestChart(data.chart.labels, data.chart.values, data.chart.average);
-                    if(data.ai_insight) document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.ai_insight}</div>`;
                     
-                    const retailZone = document.getElementById('retail-zone');
-                    const retailTable = document.getElementById('retail-results');
-                    if (data.retail_data) {
-                        retailZone.classList.remove('hidden');
-                        let rows = '';
-                        data.retail_data.benchmark.forEach(s => {
-                            const color = s.status === 'ALERTE FROID' ? 'text-red-400 font-bold' : (s.status === 'TOP PERFORMER' ? 'text-green-400' : 'text-gray-400');
-                            rows += `<tr><td class="py-2">${s.nom}</td><td>${s.conso}</td><td>${s.ratio}</td><td class="text-right ${color}">${s.status}</td></tr>`;
-                        });
-                        retailTable.innerHTML = rows;
-                    } else {
-                        retailZone.classList.add('hidden');
+                    // MISE A JOUR KPI EXPERTS
+                    if(data.kpi) {
+                        document.getElementById('kpi-talon').innerText = data.kpi.talon + " kW";
+                        document.getElementById('kpi-ratio').innerText = data.kpi.inactivity_ratio + " %";
+                        document.getElementById('kpi-diag').innerText = data.kpi.diagnosis;
+                        // Couleur conditionnelle
+                        const diagEl = document.getElementById('kpi-diag');
+                        if(data.kpi.status === 'WARNING') diagEl.classList.add('text-red-400');
+                        else diagEl.classList.add('text-green-400');
                     }
 
+                    if (data.chart) loadChartData(data.chart.labels, data.chart.values, data.chart.average, data.kpi.talon);
+                    if (data.ai_insight) document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.ai_insight}</div>`;
+                    
+                    // RETAIL
+                    const rZ = document.getElementById('retail-zone');
+                    const rT = document.getElementById('retail-results');
+                    if (data.retail_data) {
+                        rZ.classList.remove('hidden');
+                        let rows = '';
+                        data.retail_data.benchmark.forEach(s => {
+                            const c = s.status === 'ALERTE' ? 'text-red-400 font-bold' : (s.status === 'TOP' ? 'text-green-400' : 'text-gray-400');
+                            rows += `<tr><td class="py-2">${s.nom}</td><td>${s.conso}</td><td>${s.ratio}</td><td class="text-right ${c}">${s.status}</td></tr>`;
+                        });
+                        rT.innerHTML = rows;
+                    } else { rZ.classList.add('hidden'); }
                 } else throw new Error(data.error);
-            } catch (e) { log(e.message, 'error'); App.toast('Erreur', 'error'); }
+            } catch (e) { log(e.message, 'error'); }
         }
 
         // AUDIT
@@ -309,16 +275,10 @@
             const inv = document.getElementById('invoice-file').files[0];
             const ctr = document.getElementById('contract-file').files[0];
             if(!inv || !ctr) return App.toast("Manque Fichier", "error");
-
             log("Audit PDF...", "info");
             const fd = new FormData(); fd.append('invoice', inv); fd.append('contract', ctr);
-            
             try {
-                const res = await fetch('/api/ops/audit', {
-                    method:'POST', 
-                    headers: { 'x-admin-token': adminPin }, 
-                    body:fd
-                });
+                const res = await fetch('/api/ops/audit', { method:'POST', headers: { 'x-admin-token': adminPin }, body:fd });
                 const data = await res.json();
                 let html = '';
                 if(data.checks) {
@@ -327,24 +287,15 @@
                         html += `<tr><td class="py-2">${c.point}</td><td>${c.a}</td><td>${c.b}</td><td class="text-right ${color} font-bold">${c.status}</td></tr>`;
                     });
                     document.getElementById('audit-results').innerHTML = html;
-                    log(`Audit terminé. Score: ${data.score}/100`, "success");
                 }
             } catch(e) { log("Erreur Audit", "error"); }
         }
 
-        // CHAOS & CHAT
         async function runTest() {
-            log("Lancement Chaos...", "info");
-            try {
-                const res = await fetch('/api/ops/chaos', { method:'POST', headers: { 'x-admin-token': adminPin } });
-                const data = await res.json();
-                const div = document.getElementById('chaos-results');
-                div.innerHTML = '';
-                data.results.forEach(r => {
-                    const bg = r.status.includes('PASS') ? 'bg-green-900/30 border-green-500' : 'bg-red-900/30 border-red-500';
-                    div.innerHTML += `<div class="${bg} border p-2 rounded text-xs"><div class="font-bold text-white">${r.test}</div><div class="text-gray-300">${r.status}</div></div>`;
-                });
-            } catch(e) { log("Erreur Chaos", "error"); }
+            const res = await fetch('/api/ops/chaos', { method:'POST', headers: { 'x-admin-token': adminPin } });
+            const data = await res.json();
+            const div = document.getElementById('chaos-results'); div.innerHTML = '';
+            data.results.forEach(r => div.innerHTML += `<div class="border p-2 rounded text-xs text-white">${r.test}: ${r.status}</div>`);
         }
 
         async function sendChat() {
@@ -353,15 +304,14 @@
             document.getElementById('chat-input').value = '';
             document.getElementById('chat-container').innerHTML += `<div class="user-msg">${txt}</div>`;
             const fd = new FormData(); fd.append('message', txt);
-            
             const res = await fetch('/api/ops/chat', { method:'POST', headers: { 'x-admin-token': adminPin }, body:fd });
             const data = await res.json();
             document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.response}</div>`;
         }
 
-        log('Ops V6.2 Loaded (All Profiles).', 'success');
+        document.addEventListener('DOMContentLoaded', initChart);
+        log('Ops V6.4 Expert Ready.', 'success');
     </script>
 </body>
 </html>
-
 
