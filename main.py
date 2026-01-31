@@ -1,24 +1,37 @@
-# main.py V5.5 - SECURITY & VAULT EDITION
+# main.py V5.6 - HYBRID SECURITY & INTELLIGENCE
 import os
 import json
 import shutil
 import logging
+import secrets
 from datetime import datetime
-import secrets # Pour générer les tokens sécurisés
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header, Depends
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Header, Depends
+from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-# --- CONFIGURATION SÉCURITÉ ---
+# --- 1. CONFIGURATION & SÉCURITÉ ---
 ADMIN_PIN = "BOSS_V5"  # Ton Code PIN Maître
 DATA_DIR = "data_store"
+
+# Création des dossiers critiques
 os.makedirs(DATA_DIR, exist_ok=True)
+if not os.path.exists("static"): os.makedirs("static")
+if not os.path.exists("templates"): os.makedirs("templates")
 
-app = FastAPI(title="ENERGISTRAT V5.5 - Secure Vault")
+# Tentative d'import du moteur Cortex
+try:
+    from cortex_engine import cortex
+    CORTEX_AVAILABLE = True
+except ImportError:
+    cortex = None
+    CORTEX_AVAILABLE = False
 
-# CORS (Autorise ton frontend à parler au backend)
+app = FastAPI(title="ENERGISTRAT V5.6", version="SECURE INTELLIGENCE")
+
+# Middleware CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,91 +40,109 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Montage des fichiers statiques (CSS/JS/Images uniquement)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Configuration Templates (Gestion robuste : cherche dans templates/ ou root)
+templates = Jinja2Templates(directory="templates" if os.path.exists("templates") else ".")
+
 # ---------------------------------------------------------
-# 1. SÉCURITÉ : LE GARDIEN (Vérification du PIN Admin)
+# 2. SÉCURITÉ : LE GARDIEN
 # ---------------------------------------------------------
 async def verify_admin(x_admin_token: str = Header(None)):
+    """Vérifie le PIN pour toute action Ops sensible"""
     if x_admin_token != ADMIN_PIN:
+        # On log l'tentative d'intrusion
+        print(f"⚠️  Tentative d'accès non autorisé avec token: {x_admin_token}")
         raise HTTPException(status_code=401, detail="ACCÈS REFUSÉ : Code PIN Incorrect.")
     return True
 
 # ---------------------------------------------------------
-# 2. LE COFFRE-FORT (Accès Client Sécurisé)
+# 3. API : LE COFFRE-FORT (Accès Client)
 # ---------------------------------------------------------
-# ATTENTION : On ne monte PLUS "/data_store" en StaticFiles.
-# Seul cet endpoint permet de lire un fichier.
-
 @app.get("/api/vault/{filename}")
 async def get_secure_data(filename: str, token: str):
     """
-    Récupère un JSON seulement si le token correspond à la signature du fichier.
+    Route unique pour lire les données JSON.
+    Vérifie que le token est présent dans le nom du fichier.
     """
-    # Sécurité : Empêcher de remonter dans les dossiers (Path Traversal)
     safe_filename = os.path.basename(filename)
     file_path = os.path.join(DATA_DIR, safe_filename)
 
-    # 1. Le fichier existe-t-il ?
+    # 1. Existence
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
 
-    # 2. Le Token est-il valide ?
-    # Règle V5.5 : Le token DOIT être présent dans le nom du fichier.
-    # Ex: 12345_RET_20260130_X9Y8Z7.json -> Token attendu : X9Y8Z7
+    # 2. Sécurité (Le token DOIT être dans le nom du fichier)
     if token not in safe_filename:
-         # Simulation d'un délai pour ralentir les attaques par force brute
-        raise HTTPException(status_code=403, detail="TICKET INVALIDE : Accès interdit.")
+        raise HTTPException(status_code=403, detail="TICKET INVALIDE.")
 
     return FileResponse(path=file_path, media_type='application/json')
 
 # ---------------------------------------------------------
-# 3. L'USINE OPS (Upload Sécurisé)
+# 4. API : L'USINE OPS (Upload & Intelligence)
 # ---------------------------------------------------------
 @app.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
     profile: str = Form(...),
-    siret: str = Form("UNKNOWN"), # Nouveau champ pour structurer
-    authorized: bool = Depends(verify_admin) # Protection par PIN
+    siret: str = Form("UNKNOWN"),
+    authorized: bool = Depends(verify_admin) # Protection PIN
 ):
+    """
+    Ingestion unifiée : Sécurité V5.5 + Intelligence CORTEX
+    """
     try:
-        # A. Analyse du fichier (Simulation CORTEX ou Appel Réel)
-        # Ici on garde la logique existante : on sauvegarde le PDF temporairement
+        # A. Sauvegarde temporaire pour analyse
         temp_filename = f"temp_{file.filename}"
-        with open(temp_filename, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        content = await file.read()
+        with open(temp_filename, "wb") as f:
+            f.write(content)
         
         # B. Génération des clés de sécurité
         timestamp = datetime.now().strftime("%Y%m%d")
-        secure_token = secrets.token_urlsafe(6) # Génère un code type 'Xy9_z2'
-        
-        # C. Nommage Structuré : SIRET_PROFIL_DATE_TOKEN.json
+        secure_token = secrets.token_urlsafe(6)
         safe_siret = siret.replace(" ", "")
+        
+        # Nommage sécurisé
         json_filename = f"{safe_siret}_{profile}_{timestamp}_{secure_token}.json"
         json_path = os.path.join(DATA_DIR, json_filename)
 
-        # D. Création de la donnée (Mock ou Engine)
-        # Pour le MVP Sécurité, on crée un JSON simple qui contient la référence
-        data = {
-            "meta": {
-                "siret": safe_siret,
-                "profile": profile,
-                "date": timestamp,
-                "security_token": secure_token,
-                "filename": json_filename
-            },
-            "status": "ANALYSIS_COMPLETE",
-            "message": "Ceci est une donnée sécurisée V5.5"
-        }
+        # C. INTELLIGENCE HYBRIDE
+        final_data = {}
         
-        # Sauvegarde disque
+        if CORTEX_AVAILABLE:
+            # Si Cortex est là, on l'utilise pour avoir de la vraie data
+            print(f"🧠 CORTEX ANALYSE : {file.filename} pour {profile}")
+            # On passe le contenu binaire ou le chemin
+            analysis_result = await cortex.analyze_file(content, file.filename, target_profile=profile)
+            final_data = analysis_result
+        else:
+            # Fallback : Données Mockées (Si Cortex HS ou absent)
+            print("⚠️ CORTEX ABSENT : Utilisation Mock Data")
+            final_data = {
+                "success": True,
+                "kpi": {"conso": 1250, "ratio_froid": 42, "budget": 180},
+                "chart": {"labels": ["Jan", "Fev"], "values": [100, 120]},
+                "ai_insight": "Analyse simulée (Mode Secours)."
+            }
+
+        # D. Enrichissement avec les métadonnées de sécurité
+        final_data["meta"] = {
+            "siret": safe_siret,
+            "profile": profile,
+            "date": timestamp,
+            "filename": json_filename,
+            "security_token": secure_token
+        }
+
+        # E. Persistance Sécurisée
         with open(json_path, "w") as f:
-            json.dump(data, f)
+            json.dump(final_data, f)
 
-        # Nettoyage temp
-        os.remove(temp_filename)
+        # Nettoyage
+        if os.path.exists(temp_filename): os.remove(temp_filename)
 
-        # E. Retourne le lien sécurisé à l'Ops
-        # Le lien contient le token en paramètre GET
         return {
             "status": "success", 
             "filename": json_filename,
@@ -123,7 +154,78 @@ async def upload_file(
         logging.error(f"Erreur Upload: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Endpoint de santé
-@app.get("/")
-def read_root():
-    return {"status": "Energistrat V5.5 Secure System Online"}
+# --- Autres Outils Ops (Protégés) ---
+
+@app.post("/api/ops/audit")
+async def api_audit(
+    invoice: UploadFile = File(...), 
+    contract: UploadFile = File(...),
+    x_admin_token: str = Header(None) # Protection manuelle ici si besoin, ou via Depends
+):
+    if x_admin_token != ADMIN_PIN: return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    
+    if not CORTEX_AVAILABLE: 
+        return JSONResponse({"score": 0, "checks": [], "status": "ENGINE_OFF"})
+    
+    try:
+        inv_bytes = await invoice.read()
+        ctr_bytes = await contract.read()
+        result = cortex.analyze_invoice_real(inv_bytes, ctr_bytes)
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"score": 0, "status": "ERROR", "error": str(e)})
+
+@app.post("/api/ops/chaos")
+async def api_chaos(authorized: bool = Depends(verify_admin)):
+    if not CORTEX_AVAILABLE: return JSONResponse({"results": [{"test": "Cortex", "status": "OFFLINE"}]})
+    return JSONResponse({"results": cortex.run_chaos_monkey()})
+
+@app.post("/api/ops/chat")
+async def api_chat(message: str = Form(...), authorized: bool = Depends(verify_admin)):
+    if not CORTEX_AVAILABLE: return JSONResponse({"response": "Cortex Offline."})
+    return JSONResponse({"response": cortex.ask_agent(message)})
+
+# ---------------------------------------------------------
+# 5. ROUTES FRONTEND (HTML)
+# ---------------------------------------------------------
+
+def get_template_response(request: Request, filename: str):
+    """Helper pour servir un template ou un fichier statique root"""
+    # 1. Priorité au dossier templates/
+    if os.path.isfile(f"templates/{filename}"):
+        return templates.TemplateResponse(filename, {"request": request})
+    # 2. Fallback à la racine (pour déploiement simple)
+    if os.path.isfile(filename):
+        return FileResponse(filename)
+    # 3. 404
+    return HTMLResponse("<h1>404 - Page Introuvable</h1>", status_code=404)
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/index.html")
+async def landing(request: Request):
+    # Si pas d'index, on renvoie vers ops
+    if not os.path.exists("templates/index.html") and not os.path.exists("index.html"):
+        return await ops_dashboard(request)
+    return get_template_response(request, "index.html")
+
+@app.get("/ops")
+@app.get("/ops.html")
+async def ops_dashboard(request: Request):
+    return get_template_response(request, "ops.html")
+
+# Route dynamique pour les dashboards (Retail, Industry, etc.)
+@app.get("/dashboard/{profil}")
+async def read_dashboard(request: Request, profil: str):
+    # Nettoyage du nom (ex: "retail" ou "retail.html")
+    clean_profil = profil.replace(".html", "")
+    filename = f"{clean_profil}.html"
+    return get_template_response(request, filename)
+
+# Route générique pour les fichiers CSS/JS s'ils sont à la racine (fallback)
+@app.get("/{filename}")
+async def read_root_static(filename: str):
+    allowed = ['.css', '.js', '.png', '.jpg', '.svg', '.ico', '.html']
+    if any(filename.endswith(ext) for ext in allowed):
+        if os.path.isfile(filename):
+            return FileResponse(filename)
+    return JSONResponse({"status": "404 Not Found"}, status_code=404)
