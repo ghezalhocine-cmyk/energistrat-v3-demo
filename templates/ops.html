@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V7.4 | Ops Aggregation</title>
+    <title>ENERGISTRAT V8.2 | Ops Expert</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -29,6 +29,32 @@
         .audit-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
         .audit-table th { text-align: left; padding: 12px; color: #64748B; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .audit-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e2e8f0; }
+        
+        /* --- NOUVEAUX STYLES CORTEX (V8) --- */
+        .ai-msg { 
+            background: rgba(168, 85, 247, 0.1); 
+            border-left: 3px solid #A855F7; 
+            padding: 12px; 
+            border-radius: 4px; 
+            margin-bottom: 10px; 
+            font-size: 0.75rem; 
+            color: #e2e8f0; 
+            line-height: 1.4;
+        }
+        .ai-msg b { color: #A855F7; } 
+        .user-msg { 
+            background: rgba(255, 255, 255, 0.05); 
+            padding: 8px; 
+            border-radius: 8px; 
+            margin-bottom: 8px; 
+            text-align: right; 
+            font-size: 0.75rem; 
+            color: #94a3b8; 
+        }
+        /* Scrollbar pour le diagnostic */
+        #kpi-diag { max-height: 80px; overflow-y: auto; padding-right: 5px; }
+        #kpi-diag::-webkit-scrollbar { width: 4px; }
+        #kpi-diag::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
     </style>
 </head>
 <body class="ops-grid">
@@ -49,7 +75,7 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V7.4 AGGREGATION</span></div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-brain text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V8.2 EXPERT</span></div>
             <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CHECK DB</div>
         </header>
 
@@ -76,7 +102,6 @@
                         <option value="supplier">Partenaire</option>
                     </select>
 
-                    <!-- BOUTON VISION GROUPE (NOUVEAU V7.4) -->
                     <button onclick="loadGroupView()" class="w-full mb-4 bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 text-[10px] font-bold py-2 rounded border border-purple-500/30 transition flex items-center justify-center gap-2">
                         <i class="fa-solid fa-layer-group"></i> CALCULER TOTAL GROUPE
                     </button>
@@ -126,7 +151,11 @@
                     <div class="grid grid-cols-3 gap-6">
                         <div class="bento-card p-4 rounded-xl border border-white/5"><div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Talon (Baseload)</div><div class="text-2xl font-mono font-bold text-white" id="kpi-talon">-- kW</div></div>
                         <div class="bento-card p-4 rounded-xl border border-white/5"><div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Ratio W.E</div><div class="text-2xl font-mono font-bold text-white" id="kpi-ratio">-- %</div></div>
-                        <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-ai/10"><div class="text-[10px] text-ai uppercase font-bold mb-1">Diag.</div><div class="text-xs text-white leading-relaxed" id="kpi-diag">En attente...</div></div>
+                        <!-- ANALYSE EXPERTE (NOUVEAU) -->
+                        <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-ai/10">
+                            <div class="text-[10px] text-ai uppercase font-bold mb-1">Analyse Experte</div>
+                            <div class="text-xs text-white leading-relaxed" id="kpi-diag">En attente...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -282,7 +311,7 @@
             formData.append('site_name', site);
             
             log(`Upload SGE: ${file.name}...`, 'info');
-            App.toast('Stockage Structuré...', 'info');
+            App.toast('Analyse Expert V8...', 'info');
             
             try {
                 const res = await fetch('/api/ops/analyze', { method: 'POST', headers: { 'x-admin-token': adminPin }, body: formData });
@@ -290,9 +319,8 @@
                 const data = await res.json();
                 
                 if (data.success) {
-                    log(data.storage_log || "Succès.", 'success');
+                    log("Analyse Terminée.", 'success');
                     document.getElementById('upload-result').classList.remove('hidden');
-                    // Reset UI si on vient d'une vue groupe
                     document.getElementById('res-link').style.display = 'block';
                     document.getElementById('res-path').innerText = `${target}/${site}`;
                     document.getElementById('res-link').href = data.secure_link;
@@ -300,8 +328,19 @@
                     if(data.kpi) {
                         document.getElementById('kpi-talon').innerText = data.kpi.talon + " kW";
                         document.getElementById('kpi-ratio').innerText = data.kpi.inactivity_ratio + " %";
-                        document.getElementById('kpi-diag').innerText = data.kpi.diagnosis;
+                        
+                        // --- FIX AFFICHAGE DIAGNOSTIC (HTML pour le gras/puces) ---
+                        const diagContent = data.ai_insight ? data.ai_insight : data.kpi.diagnosis;
+                        document.getElementById('kpi-diag').innerHTML = diagContent;
                     }
+                    
+                    // --- SIDEBAR CORTEX ---
+                    if (data.ai_insight) {
+                        const cortexBox = document.getElementById('chat-container');
+                        cortexBox.innerHTML += `<div class="ai-msg">${data.ai_insight}</div>`;
+                        cortexBox.scrollTop = cortexBox.scrollHeight;
+                    }
+
                     if (data.chart) loadChartData(data.chart.labels, data.chart.values, data.chart.average, data.kpi.talon);
                 } else throw new Error(data.error);
             } catch (e) { log(e.message, 'error'); App.toast("Erreur Lecture", "error"); }
@@ -359,8 +398,7 @@
             initChart();
             navTo('datalab');
         });
-        log('Ops V7.4 Aggregation Ready.', 'success');
+        log('Ops V8.2 Expert UI Ready.', 'success');
     </script>
 </body>
 </html>
-
