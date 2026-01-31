@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V5.5 | Ops Security Vault</title>
+    <title>ENERGISTRAT V5.7 | Ops Command</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -24,15 +24,8 @@
         #drop-zone.drag-active { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.1); }
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
         .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; }
-        
         #terminal { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
-        .log-line { margin-bottom: 2px; }
-        .log-success { color: #4ade80; }
-        .log-error { color: #f87171; }
-        .log-info { color: #94a3b8; }
-        
-        /* Styles V5.5 Security */
-        .secure-badge { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #10B981; }
+        .log-success { color: #4ade80; } .log-error { color: #f87171; } .log-info { color: #94a3b8; }
     </style>
 </head>
 <body class="ops-grid">
@@ -53,109 +46,61 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6">
-            <div class="flex items-center gap-3">
-                <i class="fa-solid fa-shield-halved text-gold"></i>
-                <span class="text-xs font-bold text-gold uppercase">OPS V5.5 SECURE</span>
-            </div>
-            <div class="text-[10px] font-mono text-gray-400">
-                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>VAULT CONNECTED
-            </div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-shield-halved text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V5.7 RESTORED</span></div>
+            <div class="text-[10px] font-mono text-gray-400"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>ONLINE</div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-8 custom-scrollbar">
 
-            <!-- TAB 1: DATA LAB (SECURE UPLOAD) -->
+            <!-- TAB 1: DATA LAB -->
             <div id="view-datalab" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
-                
-                <!-- Carte Upload Sécurisé -->
-                <div class="col-span-12 md:col-span-5 bento-card p-6 rounded-2xl border-t-4 border-cyan flex flex-col">
-                    <div class="flex justify-between items-start mb-4">
-                        <h3 class="font-bold text-white">Ingestion & Cryptage</h3>
-                        <span class="text-[10px] secure-badge px-2 py-1 rounded font-mono">AES-256 LOGIC</span>
-                    </div>
+                <div class="col-span-12 md:col-span-4 bento-card p-6 rounded-2xl border-t-4 border-cyan flex flex-col">
+                    <h3 class="font-bold text-white mb-2">Ingestion & Analyse</h3>
                     
-                    <!-- 1. Sélection Profil -->
-                    <label class="text-[10px] text-gray-500 uppercase font-bold mb-1">PROFIL CIBLE</label>
-                    <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 mb-3 focus:border-cyan outline-none">
-                        <option value="retail">Retail / Franchise</option>
-                        <option value="industry">Industrie (ISO 50001)</option>
-                        <option value="mairie">Collectivité (Mairie)</option>
-                        <option value="pme">Artisan / PME</option>
-                        <option value="sde">Syndicat (SDE)</option>
-                        <option value="oph">Bailleur Social (OPH)</option>
-                        <option value="citoyen">Particulier</option>
+                    <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 mb-2 focus:border-cyan outline-none">
+                        <option value="retail">Retail</option>
+                        <option value="industry">Industrie</option>
+                        <option value="mairie">Mairie</option>
                     </select>
+                    <input type="text" id="target-siret" placeholder="SIRET (Requis)" value="12345678900012" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 mb-4 font-mono">
 
-                    <!-- 2. SIRET (Nouveau V5.5) -->
-                    <label class="text-[10px] text-gray-500 uppercase font-bold mb-1">SIRET / ID ENTITÉ</label>
-                    <input type="text" id="target-siret" placeholder="ex: 123 456 789 00012" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 mb-4 focus:border-cyan outline-none font-mono">
-
-                    <!-- Zone de Drop -->
-                    <div id="drop-zone" class="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan transition py-8 min-h-[150px]" onclick="document.getElementById('real-upload').click()">
+                    <div id="drop-zone" class="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan transition py-8" onclick="document.getElementById('real-upload').click()">
                         <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx, .pdf" onchange="handleFileSelect(this.files[0])">
-                        <i class="fa-solid fa-fingerprint text-3xl text-gray-500 mb-2"></i>
-                        <span class="text-xs font-bold text-white" id="upload-label">Glisser Fichier Client</span>
-                        <span class="text-[10px] text-gray-600 mt-1">Génération Token Auto</span>
+                        <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 mb-2"></i>
+                        <span class="text-xs font-bold text-white" id="upload-label">Glisser Fichier SGE</span>
+                    </div>
+
+                    <!-- Résultat Sécurisé -->
+                    <div id="upload-result" class="hidden mt-4 bg-green-900/10 border border-green-500/30 p-3 rounded-xl">
+                        <div class="text-[10px] text-gray-400">Token Client :</div>
+                        <div id="res-token" class="text-sm font-mono text-cyan font-bold mb-2">...</div>
+                        <a id="res-link" href="#" target="_blank" class="block w-full bg-cyan text-black font-bold text-xs py-2 rounded text-center">OUVRIR DASHBOARD</a>
                     </div>
                 </div>
 
-                <!-- Résultat & Clés -->
-                <div class="col-span-12 md:col-span-7 bento-card p-6 rounded-2xl flex flex-col">
-                    <h3 class="font-bold text-white mb-4">Coffre-fort Numérique</h3>
-                    
-                    <div id="upload-result" class="hidden">
-                        <!-- Succès -->
-                        <div class="bg-green-900/10 border border-green-500/30 p-4 rounded-xl mb-4">
-                            <div class="flex items-center gap-2 text-green-400 mb-2">
-                                <i class="fa-solid fa-check-circle"></i>
-                                <span class="font-bold text-sm">Fichier Sécurisé</span>
-                            </div>
-                            <div class="text-xs text-gray-400 mb-1">Nom du fichier (Stockage) :</div>
-                            <div id="res-filename" class="text-[10px] font-mono text-gray-300 bg-black/40 p-2 rounded mb-3 break-all">...</div>
-                            
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <div class="text-[10px] text-gray-500 uppercase font-bold">TOKEN CLIENT</div>
-                                    <div id="res-token" class="text-lg font-mono text-cyan font-bold">...</div>
-                                </div>
-                                <div>
-                                    <a id="res-link" href="#" target="_blank" class="block w-full bg-cyan text-black font-bold text-xs py-2 rounded text-center hover:bg-white transition mt-1">
-                                        OUVRIR DASHBOARD <i class="fa-solid fa-external-link-alt ml-1"></i>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
+                <div class="col-span-12 md:col-span-8 bento-card p-6 rounded-2xl">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-white">Visualisation Immédiate</h3>
                     </div>
-
-                    <div id="upload-placeholder" class="flex-1 flex flex-col items-center justify-center text-gray-600 opacity-50">
-                        <i class="fa-solid fa-lock text-4xl mb-3"></i>
-                        <p class="text-xs">En attente d'ingestion sécurisée...</p>
-                    </div>
+                    <div class="h-64 w-full relative"><canvas id="testChart"></canvas></div>
                 </div>
             </div>
 
-            <!-- TAB 2: AUDIT (Inchangé mais sécurisé par PIN) -->
+            <!-- TAB 2: AUDIT -->
             <div id="view-auditlab" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Audit Expert (TURPE & Taxes)</h3></div>
+                <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Audit Expert</h3></div>
                 
-                <div class="col-span-6 bento-card p-6 rounded-2xl border border-red-500/30 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center text-red-500"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></div>
-                    <div class="flex-1">
-                        <label class="text-xs font-bold text-gray-400 block mb-1">1. FACTURE PDF</label>
-                        <input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-white/10 file:text-white hover:file:bg-white/20">
-                    </div>
+                <div class="col-span-6 bento-card p-6 rounded-2xl border border-red-500/30">
+                    <label class="text-xs font-bold text-gray-400 block mb-1">1. FACTURE PDF</label>
+                    <input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1">
                 </div>
-
-                <div class="col-span-6 bento-card p-6 rounded-2xl border border-blue-500/30 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500"><i class="fa-solid fa-file-contract text-xl"></i></div>
-                    <div class="flex-1">
-                        <label class="text-xs font-bold text-gray-400 block mb-1">2. CONTRAT PDF</label>
-                        <input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-white/10 file:text-white hover:file:bg-white/20">
-                    </div>
+                <div class="col-span-6 bento-card p-6 rounded-2xl border border-blue-500/30">
+                    <label class="text-xs font-bold text-gray-400 block mb-1">2. CONTRAT PDF</label>
+                    <input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1">
                 </div>
 
                 <div class="col-span-12">
-                    <button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl text-sm hover:scale-[1.01] transition shadow-lg">LANCER L'AUDIT DE PERFORMANCE</button>
+                    <button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl hover:scale-[1.01] transition">LANCER L'AUDIT DE PERFORMANCE</button>
                 </div>
 
                 <div class="col-span-12 bento-card p-6 rounded-2xl bg-abysse border border-white/10 mt-4">
@@ -170,8 +115,8 @@
             <div id="view-scenarios" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
                 <div class="col-span-12 bento-card p-6 rounded-2xl border-l-4 border-red-500">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-white text-lg">Chaos Monkey</h3>
-                        <button onclick="runTest()" class="px-4 py-2 bg-red-600 text-white font-bold rounded hover:bg-red-500 text-xs">TESTER INFRA</button>
+                        <h3 class="font-bold text-white">Chaos Monkey</h3>
+                        <button onclick="runTest()" class="px-4 py-2 bg-red-600 text-white font-bold rounded text-xs">TESTER INFRA</button>
                     </div>
                     <div id="chaos-results" class="grid grid-cols-3 gap-4"></div>
                 </div>
@@ -203,52 +148,20 @@
     </aside>
 
     <script>
-        // --- 1. SÉCURITÉ : AUTHENTIFICATION PIN ADMIN ---
+        // --- AUTHENTIFICATION ---
         let adminPin = sessionStorage.getItem('admin_pin');
-        
-        // Bloquer l'interface immédiatement si pas de PIN
         if (!adminPin) {
-            // Petit délai pour laisser le rendu se faire
-            setTimeout(() => {
-                const pin = prompt("🔒 ACCÈS RESTREINT OPS V5.5\nVeuillez entrer le Code PIN Admin :");
-                if (pin && pin.length > 0) {
-                    sessionStorage.setItem('admin_pin', pin);
-                    adminPin = pin;
-                    log('Authentification Admin réussie.', 'success');
-                } else {
-                    document.body.innerHTML = `
-                        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#050505;color:red;font-family:sans-serif">
-                            <i class="fa-solid fa-lock" style="font-size:3rem;margin-bottom:1rem"></i>
-                            <h1>ACCÈS REFUSÉ</h1>
-                            <p>Code PIN manquant. Veuillez rafraîchir la page.</p>
-                        </div>
-                    `;
-                    throw new Error("Access Denied");
-                }
-            }, 100);
+            adminPin = prompt("🔒 PIN Ops Requis :");
+            if (adminPin) sessionStorage.setItem('admin_pin', adminPin);
+            else { alert("Accès Refusé"); throw new Error("Stop"); }
         }
 
-        // --- UTILS ---
         function log(msg, type='info') {
             const term = document.getElementById('terminal');
-            const time = new Date().toLocaleTimeString();
-            let colorClass = 'log-info';
-            if(type === 'success') colorClass = 'log-success';
-            if(type === 'error') colorClass = 'log-error';
-            term.innerHTML += `<div class="log-line ${colorClass}">[${time}] ${msg}</div>`;
+            const color = type==='success'?'log-success':(type==='error'?'log-error':'log-info');
+            term.innerHTML += `<div class="log-line ${color}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
             term.scrollTop = term.scrollHeight;
         }
-
-        const App = {
-            toast: function(msg, type='info') {
-                const el = document.createElement('div');
-                el.className = 'toast';
-                el.style.borderLeftColor = type==='success'?'#10B981':(type==='error'?'#EF4444':'#00E5FF');
-                el.innerText = msg;
-                document.getElementById('toast-container').appendChild(el);
-                setTimeout(() => el.remove(), 4000);
-            }
-        };
 
         function navTo(pageId) {
             document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active'));
@@ -257,84 +170,93 @@
             document.getElementById('view-' + pageId).classList.add('active');
         }
 
-        // --- 2. UPLOAD SÉCURISÉ (NOUVEAU V5.5) ---
+        // --- CHART JS ---
+        let testChart = null;
+        function renderTestChart(labels, values, average) {
+            const ctx = document.getElementById('testChart').getContext('2d');
+            if (testChart) testChart.destroy();
+            
+            testChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Charge (kW)', data: values, borderColor: '#00E5FF', backgroundColor: 'rgba(0,229,255,0.1)', fill: true, tension: 0.4, borderWidth: 2 },
+                        { label: 'Moyenne', data: average, borderColor: '#F59E0B', borderDash: [5,5], borderWidth: 1 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            });
+        }
+
+        // --- UPLOAD & ANALYSE ---
         async function handleFileSelect(file) {
             if (!file) return;
-            
             const profile = document.getElementById('target-client').value;
             const siret = document.getElementById('target-siret').value;
-
-            if(!siret) {
-                alert("⚠️ Le SIRET est obligatoire pour le stockage sécurisé.");
-                return;
-            }
-
             const formData = new FormData();
             formData.append('file', file);
             formData.append('profile', profile);
             formData.append('siret', siret);
             
-            log(`🔒 Début Upload Sécurisé pour SIRET ${siret}...`, 'info');
-            App.toast('Cryptage et Envoi...', 'info');
-            
-            // UI Feedback
-            document.getElementById('upload-label').innerText = "Traitement en cours...";
-            
+            log(`Analyse de ${file.name}...`, 'info');
+            document.getElementById('upload-label').innerText = "Traitement...";
+
             try {
-                // Appel à l'endpoint sécurisé défini dans main.py
                 const res = await fetch('/upload', { 
                     method: 'POST', 
-                    headers: {
-                        'x-admin-token': adminPin // Envoi du PIN
-                    },
+                    headers: { 'x-admin-token': adminPin }, // PIN envoyé !
                     body: formData 
                 });
                 
-                if (res.status === 401) {
-                    sessionStorage.removeItem('admin_pin');
-                    alert("Code PIN Incorrect ou Expiré.");
-                    location.reload();
-                    return;
-                }
-
+                if (res.status === 401) { sessionStorage.removeItem('admin_pin'); location.reload(); return; }
                 const data = await res.json();
                 
                 if (data.status === 'success') {
-                    log(`✅ Fichier stocké: ${data.filename}`, 'success');
-                    App.toast('Upload Réussi !', 'success');
+                    log(`✅ Succès. Token: ${data.token}`, 'success');
                     
-                    // Affichage des résultats V5.5
-                    document.getElementById('upload-placeholder').classList.add('hidden');
+                    // 1. Afficher lien sécurisé
                     document.getElementById('upload-result').classList.remove('hidden');
-                    
-                    document.getElementById('res-filename').innerText = data.filename;
                     document.getElementById('res-token').innerText = data.token;
                     document.getElementById('res-link').href = data.secure_link;
                     
-                    document.getElementById('chat-container').innerHTML += `<div class="ai-msg">Fichier sécurisé généré pour ${profile}.<br>Token: <b>${data.token}</b></div>`;
-                } else {
-                    throw new Error(data.detail || "Erreur inconnue");
-                }
+                    // 2. Afficher le Graphique (RESTAURÉ)
+                    if (data.chart) {
+                        renderTestChart(data.chart.labels, data.chart.values, data.chart.average);
+                    }
+                    
+                    // 3. Feedback IA
+                    if (data.ai_insight) {
+                        document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.ai_insight}</div>`;
+                    }
+                    
+                    document.getElementById('upload-label').innerText = "Terminé !";
+                } else { throw new Error(data.message); }
             } catch (e) { 
                 log(e.message, 'error'); 
-                App.toast('Erreur Upload', 'error');
-                document.getElementById('upload-label').innerText = "Erreur - Réessayer";
+                document.getElementById('upload-label').innerText = "Erreur";
             }
         }
 
-        // --- 3. AUDIT (LEGACY V5.4) ---
+        // --- AUDIT PDF ---
         async function runRealAudit() {
             const inv = document.getElementById('invoice-file').files[0];
             const ctr = document.getElementById('contract-file').files[0];
-            if(!inv || !ctr) return App.toast("Manque Facture ou Contrat", "error");
+            if(!inv || !ctr) return alert("Sélectionnez les 2 fichiers PDF");
 
-            log("Démarrage Audit PDF...", "info");
+            log("Audit PDF en cours...", "info");
             const fd = new FormData(); fd.append('invoice', inv); fd.append('contract', ctr);
             
             try {
-                // On garde l'ancien endpoint pour l'instant ou on le sécurise plus tard
-                const res = await fetch('/api/ops/audit', {method:'POST', body:fd});
+                const res = await fetch('/api/ops/audit', {
+                    method:'POST', 
+                    headers: { 'x-admin-token': adminPin }, // PIN AJOUTÉ ICI
+                    body:fd
+                });
                 const data = await res.json();
+                
+                if(data.status === 'AUTH_ERROR') { alert("PIN Incorrect"); return; }
+                
                 let html = '';
                 if(data.checks) {
                     data.checks.forEach(c => {
@@ -344,24 +266,15 @@
                     document.getElementById('audit-results').innerHTML = html;
                     log(`Audit terminé. Score: ${data.score}/100`, "success");
                 }
-            } catch(e) { log("Erreur Audit (Mock ou Réel)", "error"); }
+            } catch(e) { log("Erreur Audit", "error"); }
         }
 
+        // --- CHAOS & CHAT ---
         async function runTest() {
-            log("Lancement Chaos Monkey...", "info");
-            try {
-                const res = await fetch('/api/ops/chaos', {method:'POST'});
-                const data = await res.json();
-                const div = document.getElementById('chaos-results');
-                div.innerHTML = '';
-                if(data.results) {
-                    data.results.forEach(r => {
-                        const bg = r.status.includes('PASS') ? 'bg-green-900/30 border-green-500' : 'bg-red-900/30 border-red-500';
-                        div.innerHTML += `<div class="${bg} border p-2 rounded text-xs"><div class="font-bold text-white">${r.test}</div><div class="text-gray-300">${r.status}</div></div>`;
-                        log(`${r.test}: ${r.status}`, r.status.includes('PASS')?'success':'error');
-                    });
-                }
-            } catch(e) { log("Erreur Chaos", "error"); }
+            const res = await fetch('/api/ops/chaos', { method:'POST', headers: { 'x-admin-token': adminPin } });
+            const data = await res.json();
+            const div = document.getElementById('chaos-results'); div.innerHTML = '';
+            data.results.forEach(r => div.innerHTML += `<div class="border p-2 rounded text-xs text-white">${r.test}: ${r.status}</div>`);
         }
 
         async function sendChat() {
@@ -370,13 +283,13 @@
             document.getElementById('chat-input').value = '';
             document.getElementById('chat-container').innerHTML += `<div class="user-msg">${txt}</div>`;
             
-            // Chatbot simple (Mock pour l'instant)
-            setTimeout(() => {
-                document.getElementById('chat-container').innerHTML += `<div class="ai-msg">Bien reçu. Je reste en attente de l'analyse des fichiers sécurisés.</div>`;
-            }, 500);
+            const fd = new FormData(); fd.append('message', txt);
+            const res = await fetch('/api/ops/chat', { method:'POST', headers: { 'x-admin-token': adminPin }, body:fd });
+            const data = await res.json();
+            document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.response}</div>`;
         }
 
-        log('Ops V5.5 Secure System Ready.', 'success');
+        log('Ops V5.7 Loaded.', 'success');
     </script>
 </body>
 </html>
