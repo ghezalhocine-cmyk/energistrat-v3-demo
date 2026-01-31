@@ -1,4 +1,4 @@
-# cortex_engine.py V8.1 - ROBUST MATHS (NaN FIX)
+# cortex_engine.py V8.2 - ROBUST MATHS + RICH AUDIT
 import pandas as pd
 import numpy as np
 import io
@@ -33,23 +33,17 @@ class CortexEngine:
             except:
                 self.ai_ready = False
 
-    # --- SÉCURITÉ MATHÉMATIQUE (NOUVEAU V8.1) ---
+    # --- SÉCURITÉ MATHÉMATIQUE ---
     def _safe_int(self, value):
-        """Convertit en int sans planter sur NaN ou Inf"""
-        try:
-            if pd.isna(value) or np.isinf(value): return 0
-            return int(value)
+        try: return 0 if (pd.isna(value) or np.isinf(value)) else int(value)
         except: return 0
 
     def _safe_float(self, value):
-        """Convertit en float sans planter"""
-        try:
-            if pd.isna(value) or np.isinf(value): return 0.0
-            return float(value)
+        try: return 0.0 if (pd.isna(value) or np.isinf(value)) else float(value)
         except: return 0.0
 
     # ==========================================================================
-    # 1. ORCHESTRATEUR PRINCIPAL
+    # 1. ORCHESTRATEUR PRINCIPAL (SGE)
     # ==========================================================================
     async def analyze_file(self, file_content, filename, target_profile="demo"):
         try:
@@ -98,7 +92,6 @@ class CortexEngine:
         try:
             buffer = io.BytesIO(content)
             df = None
-            
             if filename.lower().endswith('.csv'):
                 try: df = pd.read_csv(buffer, sep=None, engine='python')
                 except: buffer.seek(0); df = pd.read_csv(buffer, sep=';', encoding='latin-1')
@@ -106,34 +99,27 @@ class CortexEngine:
                 df = pd.read_excel(buffer)
 
             df.columns = [str(c).lower().strip() for c in df.columns]
-            
             col_date = next((c for c in df.columns if any(x in c for x in ['date', 'horo', 'time'])), df.columns[0])
             col_val = next((c for c in df.columns if any(x in c for x in ['puiss', 'p10', 'conso', 'val', 'kw'])), df.columns[1])
 
             df['date'] = pd.to_datetime(df[col_date], dayfirst=True, errors='coerce')
-            
             if df[col_val].dtype == object:
                 df['val'] = pd.to_numeric(df[col_val].astype(str).str.replace(',', '.').replace(' ', ''), errors='coerce')
             else:
                 df['val'] = pd.to_numeric(df[col_val], errors='coerce')
 
-            # Nettoyage agressif des NaNs
             df = df.dropna(subset=['date'])
             df['val'] = df['val'].fillna(0)
             df = df.sort_values(by='date')
-            
             df['date_str'] = df['date'].dt.strftime('%Y-%m-%d %H:%M')
             return df[['date', 'val', 'date_str']]
-
         except Exception: return None
 
     # ==========================================================================
-    # 3. MODULES MATHÉMATIQUES (SÉCURISÉS)
+    # 3. MODULES MATHÉMATIQUES
     # ==========================================================================
-    
     def _module_socle_technique(self, df):
         values = df['val'].tolist()
-        
         pos_vals = [v for v in values if v > 0]
         talon = float(np.percentile(pos_vals, 10)) if pos_vals else 0.0
         
@@ -142,24 +128,18 @@ class CortexEngine:
         weekend_mean = df[df['weekday'] >= 5]['val'].mean()
         
         ratio = 0
-        if week_mean > 0:
-            ratio = (weekend_mean / week_mean) * 100
+        if week_mean > 0: ratio = (weekend_mean / week_mean) * 100
 
         p_max = max(values) if values else 0
         
         diag = "Profil Standard"
         status = "OK"
-        if ratio > 65:
-            diag = "ALERTE : Forte consommation Weekend (>65%)."
-            status = "WARNING"
-        elif talon > (p_max * 0.5):
-            diag = "ALERTE : Talon énergétique critique (>50% Pmax)."
-            status = "WARNING"
+        if ratio > 65: diag, status = "ALERTE : Forte consommation Weekend (>65%).", "WARNING"
+        elif talon > (p_max * 0.5): diag, status = "ALERTE : Talon énergétique critique (>50% Pmax).", "WARNING"
 
-        # Utilisation de _safe_int pour éviter le crash NaN
         return {
             "points_traites": len(values),
-            "conso_totale": self._safe_int(sum(values) / 6), # Approx 10min
+            "conso_totale": self._safe_int(sum(values) / 6),
             "p_max": self._safe_float(p_max),
             "talon": self._safe_int(talon),
             "inactivity_ratio": self._safe_int(ratio),
@@ -170,7 +150,6 @@ class CortexEngine:
 
     def _module_turpe(self, df, p_max_atteinte):
         p_optimale = p_max_atteinte * 1.05
-        
         return {
             "turpe_optimisation": {
                 "p_atteinte": self._safe_float(p_max_atteinte),
@@ -183,7 +162,6 @@ class CortexEngine:
         df['month'] = df['date'].dt.month
         hiver = df[df['month'].isin([11, 12, 1, 2, 3])]
         ete = df[~df['month'].isin([11, 12, 1, 2, 3])]
-        
         conso_hiver_avg = hiver['val'].mean() if not hiver.empty else 0
         conso_ete_avg = ete['val'].mean() if not ete.empty else 0
         
@@ -209,12 +187,13 @@ class CortexEngine:
 
     def _module_retail_placeholder(self, kpis):
         return {
-            "benchmark": [
-                {"nom": "Site Actuel", "conso": kpis['conso_totale'], "ratio": "---", "status": kpis['status']}
-            ],
+            "benchmark": [{"nom": "Site Actuel", "conso": kpis['conso_totale'], "ratio": "---", "status": kpis['status']}],
             "froid_analysis": {"ratio": 0, "is_alert": False, "message": "En attente module Froid."}
         }
 
+    # ==========================================================================
+    # 4. AUDIT PDF EXPERT (RESTAURÉ COMPLET)
+    # ==========================================================================
     def extract_pdf_data(self, file_bytes):
         text = ""
         if PDF_AVAILABLE:
@@ -226,17 +205,50 @@ class CortexEngine:
 
     def analyze_invoice_real(self, invoice_bytes, contract_bytes):
         inv_text = self.extract_pdf_data(invoice_bytes) or ""
+        
+        # 1. Puissance Souscrite
+        re_p_sous = r"(?:souscrite|P\.?\s?souscrite|P\.?\s?S\.?)[^\d]*(\d{2,5})"
+        match_sous = re.search(re_p_sous, inv_text, re.IGNORECASE)
+        p_souscrite = float(match_sous.group(1)) if match_sous else 0
+        
+        # 2. Puissance Atteinte
         re_p_max = r"(?:atteinte|max|pointe)[^\d]*(\d{2,5})"
         match_max = re.search(re_p_max, inv_text, re.IGNORECASE)
         p_atteinte = float(match_max.group(1)) if match_max else 0
-        
-        checks = [
-            {"point": "Puissance Atteinte", "a": f"{p_atteinte} kW", "b": "Contrat", "status": "LU", "error": False},
-            {"point": "Taxes (CSPE)", "a": "Présentes" if "CSPE" in inv_text else "Non", "b": "Requises", "status": "OK", "error": False}
-        ]
-        return {"score": 85, "checks": checks}
 
-    def ask_agent(self, query): return "Mode Expert V8.1 : Prêt."
+        # 3. Contrat
+        re_contrat = r"(?:Contrat|Réf)\s?[:N°.]?\s?([A-Z0-9-]{5,})"
+        match_contrat = re.search(re_contrat, inv_text, re.IGNORECASE)
+        num_contrat = match_contrat.group(1) if match_contrat else "Non détecté"
+
+        # 4. Taxes
+        has_taxes = "TICGN" in inv_text.upper() or "CSPE" in inv_text.upper()
+
+        checks = []
+        score = 100
+
+        # Check 1 : TURPE
+        if p_souscrite > 0 and p_atteinte > 0:
+            if p_atteinte > p_souscrite: status, color = "DÉPASSEMENT", "KO"
+            else: status, color = "OPTIMISÉ", "OK"
+            checks.append({"point": "Optimisation TURPE", "a": f"Atteinte: {p_atteinte} kW", "b": f"Souscrite: {p_souscrite} kW", "status": status, "error": color == "KO"})
+        else:
+            checks.append({"point": "Optimisation TURPE", "a": "?", "b": "?", "status": "NON LU", "error": True})
+
+        # Check 2 : Contrat
+        checks.append({"point": "Réf. Contrat", "a": num_contrat, "b": "Base Active", "status": "OK" if num_contrat != "Non détecté" else "INCONNU", "error": num_contrat == "Non détecté"})
+
+        # Check 3 : Taxes
+        checks.append({"point": "Taxes (TICGN/CSPE)", "a": "Présentes" if has_taxes else "Absentes", "b": "Obligatoire", "status": "OK" if has_taxes else "ALERTE", "error": not has_taxes})
+
+        # Check 4 : PDL/Site
+        re_zip = r"\b(0[1-9]|[1-8]\d|9[0-5])\d{3}\b"
+        zip_match = re.search(re_zip, inv_text)
+        checks.append({"point": "Code Postal Site", "a": zip_match.group(0) if zip_match else "?", "b": "France", "status": "OK" if zip_match else "MANQUANT", "error": not zip_match})
+
+        return {"score": score, "checks": checks}
+
+    def ask_agent(self, query): return "Mode Expert V8.2 : Prêt."
     def run_chaos_monkey(self): return [{"test": "Math Engine", "status": "PASS"}]
 
 cortex = CortexEngine()
