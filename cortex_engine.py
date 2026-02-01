@@ -1,4 +1,4 @@
-# cortex_engine.py V11.0 - SECTORIAL INTELLIGENCE (NAF + SOLAR)
+# cortex_engine.py V11.1 - GEO ROBUST (FIX DETECT CP)
 import pandas as pd
 import numpy as np
 import io
@@ -7,7 +7,7 @@ import json
 import re
 import logging
 import requests
-import math # NOUVEAU POUR CALCUL SOLAIRE
+import math
 from datetime import datetime
 
 # IA & PDF (Optionnel)
@@ -53,9 +53,10 @@ class CortexEngine:
             df, time_step_hours = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible"}
 
-            # B. CONTEXTE GÉO
-            zip_match = re.search(r'(?<!\d)(0[1-9]|[1-8]\d|9[0-5])\d{3}(?!\d)', filename)
-            zip_code = zip_match.group(0) if zip_match else "75001"
+            # B. CONTEXTE GÉO (CORRECTIF V11.1)
+            # On utilise la nouvelle méthode robuste
+            zip_code = self._extract_zipcode(filename)
+            
             geo_data = self._fetch_geo_data(zip_code)
             
             # Dates
@@ -63,7 +64,7 @@ class CortexEngine:
             end_date = df['date'].max()
             dju_data = self._fetch_dju_data(geo_data, start_date, end_date)
 
-            # C. DÉTECTION SECTORIELLE (NOUVEAU V11)
+            # C. DÉTECTION SECTORIELLE
             naf_detected = self._detect_naf(filename)
 
             # D. MODULES EXPERTS
@@ -73,7 +74,7 @@ class CortexEngine:
             finance = self._module_finance(df, time_step_hours)
             climat = self._module_climatique(base['conso_totale'], dju_data)
             
-            # Module Sectoriel (Analyse Métier)
+            # Module Sectoriel
             sector = self._module_sectoriel(df, naf_detected, geo_data)
             
             context = {
@@ -108,10 +109,24 @@ class CortexEngine:
             return {"success": False, "error": str(e)}
 
     # ==========================================================================
-    # 2. INTELLIGENCE SECTORIELLE (NOUVEAU V11)
+    # 2. INTELLIGENCE (GEO / NAF / SOLAR)
     # ==========================================================================
+    
+    def _extract_zipcode(self, filename):
+        """
+        Cherche le premier nombre à 5 chiffres valide (10000-95999) dans le nom du fichier.
+        Ignore les dates (20250101) et les petits chiffres.
+        """
+        # Trouve toutes les séquences de 5 chiffres
+        candidates = re.findall(r'\d{5}', filename)
+        for cp in candidates:
+            val = int(cp)
+            # Vérifie si c'est un CP français métropolitain standard
+            if 10000 <= val <= 95999:
+                return cp
+        return "75001" # Défaut Paris
+
     def _detect_naf(self, filename):
-        """Détecte l'activité via le nom de fichier"""
         fn = filename.upper()
         if "EP" in fn or "ECLAIRAGE" in fn or "LUM" in fn: return {"code": "EP", "label": "Éclairage Public"}
         if "ECOLE" in fn or "85.20Z" in fn: return {"code": "85.20Z", "label": "Enseignement"}
@@ -120,19 +135,15 @@ class CortexEngine:
         return {"code": "NA", "label": "Standard"}
 
     def _module_sectoriel(self, df, naf, geo):
-        """Analyse spécifique selon le secteur"""
         code = naf["code"]
         diag_metier = "Analyse générique."
         status_metier = "OK"
         
-        # CAS 1 : ÉCLAIRAGE PUBLIC (EP)
+        # CAS 1 : ÉCLAIRAGE PUBLIC
         if code == "EP":
-            # Analyse Solaire simplifiée (Jour = 10h-16h toute l'année pour être sûr)
-            # On vérifie si ça consomme quand il fait jour
             df['hour'] = df['date'].dt.hour
             conso_jour = df[(df['hour'] >= 10) & (df['hour'] <= 16)]['val'].sum()
             total = df['val'].sum()
-            
             part_jour = (conso_jour / total * 100) if total > 0 else 0
             
             if part_jour > 5:
@@ -144,15 +155,13 @@ class CortexEngine:
 
         # CAS 2 : BÂTIMENT (ECOLE / BUREAU)
         elif code in ["85.20Z", "84.11Z"]:
-            # Vérification Weekend
             df['wd'] = df['date'].dt.weekday
             conso_we = df[df['wd'] >= 5]['val'].mean()
             conso_semaine = df[df['wd'] < 5]['val'].mean()
-            
             ratio = (conso_we / conso_semaine * 100) if conso_semaine > 0 else 0
             
             if ratio > 30:
-                diag_metier = f"⚠️ ALERTE OCCUPATION : Le bâtiment consomme trop le weekend ({int(ratio)}% vs semaine)."
+                diag_metier = f"⚠️ ALERTE OCCUPATION : Conso weekend anormale ({int(ratio)}% vs semaine)."
                 status_metier = "WARNING"
             else:
                 diag_metier = "✅ GESTION : Bon abaissement le weekend."
@@ -232,7 +241,6 @@ class CortexEngine:
             df = df.dropna(subset=['date'])
             df['val'] = df['val'].fillna(0).replace([np.inf, -np.inf], 0)
             df = df.sort_values(by='date')
-            
             if df['val'].median() > 2000: df['val'] = df['val'] / 1000
             
             time_step = 0.166
@@ -292,43 +300,24 @@ class CortexEngine:
         mask_hc = (df['h'] >= 22) | (df['h'] < 6)
         conso_hc = df[mask_hc]['val'].sum() * time_step
         conso_hp = df[~mask_hc]['val'].sum() * time_step
-        
         budg = (conso_hp * 0.18) + (conso_hc * 0.12)
         tot = conso_hp + conso_hc
         part_hc = (conso_hc / tot * 100) if tot > 0 else 0
         pm = (budg / tot) if tot > 0 else 0
-
-        return {
-            "finance": {
-                "budget_total_estime": self._safe_int(budg),
-                "conso_hp": self._safe_int(conso_hp),
-                "conso_hc": self._safe_int(conso_hc),
-                "part_hc": self._safe_int(part_hc),
-                "prix_moyen_calcule": round(pm, 3)
-            }
-        }
+        return {"finance": {"budget_total_estime": self._safe_int(budg), "conso_hp": self._safe_int(conso_hp), "conso_hc": self._safe_int(conso_hc), "part_hc": self._safe_int(part_hc), "prix_moyen_calcule": round(pm, 3)}}
 
     def _generate_expert_narrative(self, k, p):
         txt = f"<b>ANALYSE V11 ({p.upper()}) :</b><br>"
-        if 'geo' in k: txt += f"• Lieu : <b>{k['geo']['city']}</b>.<br>"
-        
-        # Ajout Narratif Sectoriel
+        if 'geo' in k: txt += f"• Lieu : <b>{k['geo']['city']}</b> ({k['geo']['zip']}).<br>"
         if 'sectoriel' in k:
             txt += f"• Métier : <b>{k['sectoriel']['secteur']}</b>.<br>"
-            if k['sectoriel']['status'] != 'OK':
-                txt += f"• 🎯 <b>{k['sectoriel']['diagnostic']}</b><br>"
-        
+            if k['sectoriel']['status'] != 'OK': txt += f"• 🎯 <b>{k['sectoriel']['diagnostic']}</b><br>"
         if 'climat' in k and k['climat']['dju_periode'] > 0: txt += f"• Climat : {k['climat']['dju_periode']} DJU.<br>"
         txt += f"• Finance : Budget est. {k['finance']['budget_total_estime']:,} €.<br>"
-        
-        # Si pas d'alerte sectorielle, on met le diag technique
-        if 'sectoriel' not in k or k['sectoriel']['status'] == 'OK':
-             txt += f"• Diag : {k['diagnosis']}"
-             
+        if 'sectoriel' not in k or k['sectoriel']['status'] == 'OK': txt += f"• Diag : {k['diagnosis']}"
         return txt
 
-    def _module_retail_placeholder(self, kpis):
-        return {"benchmark": [], "froid_analysis": {"ratio": 0, "is_alert": False}}
+    def _module_retail_placeholder(self, kpis): return {"benchmark": [], "froid_analysis": {"ratio": 0}}
 
     # --- AUDIT PDF ---
     def extract_pdf(self, b):
@@ -358,7 +347,7 @@ class CortexEngine:
         ]
         return {"score": 80, "checks": checks}
 
-    def ask_agent(self, q): return "Cortex V11.0 Online."
+    def ask_agent(self, q): return "Cortex V11.1 Online."
     def run_chaos_monkey(self): return [{"test": "API Météo", "status": "READY"}]
 
 cortex = CortexEngine()
