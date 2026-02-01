@@ -1,4 +1,4 @@
-# cortex_engine.py V11.1 - GEO ROBUST (FIX DETECT CP)
+# cortex_engine.py V11.2 - SMART PARSING (RIGHT-TO-LEFT SCAN)
 import pandas as pd
 import numpy as np
 import io
@@ -53,9 +53,9 @@ class CortexEngine:
             df, time_step_hours = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible"}
 
-            # B. CONTEXTE GÉO (CORRECTIF V11.1)
-            # On utilise la nouvelle méthode robuste
-            zip_code = self._extract_zipcode(filename)
+            # B. CONTEXTE GÉO (CORRECTIF V11.2)
+            # On cherche le code postal en priorité à la fin du nom de fichier
+            zip_code = self._extract_zipcode_smart(filename)
             
             geo_data = self._fetch_geo_data(zip_code)
             
@@ -112,19 +112,31 @@ class CortexEngine:
     # 2. INTELLIGENCE (GEO / NAF / SOLAR)
     # ==========================================================================
     
-    def _extract_zipcode(self, filename):
+    def _extract_zipcode_smart(self, filename):
         """
-        Cherche le premier nombre à 5 chiffres valide (10000-95999) dans le nom du fichier.
-        Ignore les dates (20250101) et les petits chiffres.
+        Scan de droite à gauche pour trouver le code postal ajouté par l'utilisateur.
+        Évite de confondre avec l'année 2026 (20260 = Calvi).
         """
-        # Trouve toutes les séquences de 5 chiffres
-        candidates = re.findall(r'\d{5}', filename)
-        for cp in candidates:
+        # Trouve tous les nombres de 5 chiffres isolés (entourés de non-chiffres)
+        # ex: _38000_ ou -38000.csv
+        matches = re.findall(r'(?:^|[^0-9])(\d{5})(?:$|[^0-9])', filename)
+        
+        if not matches:
+            return "75001" # Défaut
+
+        # On parcourt les résultats en inversant la liste (priorité à la fin du nom)
+        for cp in reversed(matches):
             val = int(cp)
-            # Vérifie si c'est un CP français métropolitain standard
-            if 10000 <= val <= 95999:
+            # Filtre anti-timestamp : On ignore les codes commençant par 202x (années 2020-2029)
+            # Sauf si c'est explicitement un CP Corse valide (202xx est valide, mais risque de confusion)
+            # Ici, on privilégie la sécurité : si on trouve un autre CP, on le prend.
+            if str(val).startswith("202") and len(matches) > 1:
+                continue 
+            
+            if 1000 <= val <= 95999:
                 return cp
-        return "75001" # Défaut Paris
+                
+        return matches[-1] if matches else "75001"
 
     def _detect_naf(self, filename):
         fn = filename.upper()
@@ -139,7 +151,6 @@ class CortexEngine:
         diag_metier = "Analyse générique."
         status_metier = "OK"
         
-        # CAS 1 : ÉCLAIRAGE PUBLIC
         if code == "EP":
             df['hour'] = df['date'].dt.hour
             conso_jour = df[(df['hour'] >= 10) & (df['hour'] <= 16)]['val'].sum()
@@ -147,13 +158,12 @@ class CortexEngine:
             part_jour = (conso_jour / total * 100) if total > 0 else 0
             
             if part_jour > 5:
-                diag_metier = f"⚠️ ALERTE EP : {int(part_jour)}% de conso en plein jour (Allumage diurne)."
+                diag_metier = f"⚠️ ALERTE EP : {int(part_jour)}% de conso en plein jour."
                 status_metier = "WARNING"
             else:
                 diag_metier = "✅ PERFORMANCE EP : Cycles nocturnes synchronisés."
                 status_metier = "OPTIMIZED"
 
-        # CAS 2 : BÂTIMENT (ECOLE / BUREAU)
         elif code in ["85.20Z", "84.11Z"]:
             df['wd'] = df['date'].dt.weekday
             conso_we = df[df['wd'] >= 5]['val'].mean()
@@ -241,6 +251,7 @@ class CortexEngine:
             df = df.dropna(subset=['date'])
             df['val'] = df['val'].fillna(0).replace([np.inf, -np.inf], 0)
             df = df.sort_values(by='date')
+            
             if df['val'].median() > 2000: df['val'] = df['val'] / 1000
             
             time_step = 0.166
@@ -260,10 +271,7 @@ class CortexEngine:
         df['wd'] = df['date'].dt.weekday
         w_mean = df[df['wd'] < 5]['val'].mean()
         we_mean = df[df['wd'] >= 5]['val'].mean()
-        
-        ratio = 0
-        if w_mean > 0: ratio = (we_mean / w_mean) * 100
-        
+        ratio = int((we_mean/w_mean)*100) if w_mean > 0 else 0
         p_max = max(values) if values else 0
         conso_kwh = sum(values) * time_step
 
@@ -307,7 +315,7 @@ class CortexEngine:
         return {"finance": {"budget_total_estime": self._safe_int(budg), "conso_hp": self._safe_int(conso_hp), "conso_hc": self._safe_int(conso_hc), "part_hc": self._safe_int(part_hc), "prix_moyen_calcule": round(pm, 3)}}
 
     def _generate_expert_narrative(self, k, p):
-        txt = f"<b>ANALYSE V11 ({p.upper()}) :</b><br>"
+        txt = f"<b>ANALYSE V11.2 ({p.upper()}) :</b><br>"
         if 'geo' in k: txt += f"• Lieu : <b>{k['geo']['city']}</b> ({k['geo']['zip']}).<br>"
         if 'sectoriel' in k:
             txt += f"• Métier : <b>{k['sectoriel']['secteur']}</b>.<br>"
@@ -347,7 +355,7 @@ class CortexEngine:
         ]
         return {"score": 80, "checks": checks}
 
-    def ask_agent(self, q): return "Cortex V11.1 Online."
+    def ask_agent(self, q): return "Cortex V11.2 Online."
     def run_chaos_monkey(self): return [{"test": "API Météo", "status": "READY"}]
 
 cortex = CortexEngine()
