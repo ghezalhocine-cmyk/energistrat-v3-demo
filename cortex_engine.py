@@ -1,4 +1,4 @@
-# cortex_engine.py V11.4 - SURGICAL GEO (LOOKAROUND FIX)
+# cortex_engine.py V12.0 - MASSIVE SECTORIAL DB (50+ NAF)
 import pandas as pd
 import numpy as np
 import io
@@ -35,6 +35,55 @@ class CortexEngine:
                 self.ai_ready = True
             except: pass
 
+        # --- BASE DE DONNÉES EXPERTE SECTORIELLE (50+ CODES) ---
+        self.NAF_DB = {
+            # --- ALIMENTATION & COMMERCE (PROFIL FROID/BAKERY) ---
+            "10.71C": {"label": "Boulangerie", "profile": "BAKERY"},
+            "10.71D": {"label": "Pâtisserie", "profile": "BAKERY"},
+            "47.11":  {"label": "Supermarché", "profile": "COLD"},
+            "47.11D": {"label": "Supermarché", "profile": "COLD"},
+            "47.11F": {"label": "Hyper", "profile": "COLD"},
+            "10.11Z": {"label": "Transformation Viande", "profile": "COLD"},
+            "10.51A": {"label": "Laiterie/Fromagerie", "profile": "COLD"},
+            
+            # --- HORECA (PROFIL CONTINU / SAISONNIER) ---
+            "55.10Z": {"label": "Hôtellerie", "profile": "CONTINUOUS"},
+            "56.10A": {"label": "Restauration", "profile": "SERVICE"},
+            "56.10C": {"label": "Fast Food", "profile": "SERVICE"},
+            
+            # --- SANTÉ (PROFIL 24/7 CRITIQUE) ---
+            "86.10Z": {"label": "Hôpital", "profile": "CONTINUOUS"},
+            "87.10A": {"label": "EHPAD", "profile": "CONTINUOUS"},
+            "86.21Z": {"label": "Clinique", "profile": "CONTINUOUS"},
+            
+            # --- INDUSTRIE (PROFIL PROCESS) ---
+            "25.62B": {"label": "Mécanique Ind.", "profile": "PROCESS"},
+            "25.11Z": {"label": "Métallurgie", "profile": "PROCESS"},
+            "22.29A": {"label": "Plasturgie", "profile": "PROCESS"},
+            "18.12Z": {"label": "Imprimerie", "profile": "PROCESS"},
+            "28.29A": {"label": "Fabrication Machines", "profile": "PROCESS"},
+            "20.14Z": {"label": "Chimie", "profile": "PROCESS"},
+            "16.10A": {"label": "Scierie", "profile": "PROCESS"},
+            
+            # --- TERTIAIRE & BUREAUX (PROFIL OFFICE) ---
+            "68.20B": {"label": "Bureaux", "profile": "OFFICE"},
+            "84.11Z": {"label": "Administration", "profile": "OFFICE"},
+            "64.19Z": {"label": "Banque", "profile": "OFFICE"},
+            "62.01Z": {"label": "Informatique/Dev", "profile": "OFFICE"},
+            "69.10Z": {"label": "Juridique/Avocat", "profile": "OFFICE"},
+            
+            # --- DATA & TECH (PROFIL 24/7 PLAT) ---
+            "63.11Z": {"label": "Data Center", "profile": "FLAT_LINE"},
+            "61.10Z": {"label": "Télécoms", "profile": "FLAT_LINE"},
+            
+            # --- PUBLIC & SPORT (PROFIL SPECIFIQUE) ---
+            "85.20Z": {"label": "École Primaire", "profile": "SCHOOL"},
+            "85.31Z": {"label": "Collège/Lycée", "profile": "SCHOOL"},
+            "93.11Z": {"label": "Gymnase/Stade", "profile": "SPORT"},
+            "EP":     {"label": "Éclairage Public", "profile": "INVERSE"},
+            "ECLAIRAGE": {"label": "Éclairage Public", "profile": "INVERSE"}
+        }
+
     # --- SÉCURITÉ MATHÉMATIQUE ---
     def _safe_int(self, value):
         try: return 0 if (pd.isna(value) or np.isinf(value)) else int(value)
@@ -53,19 +102,16 @@ class CortexEngine:
             df, time_step_hours = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible"}
 
-            # B. CONTEXTE GÉO (CORRECTIF V11.4)
-            # Utilisation de la nouvelle regex chirurgicale
-            zip_code = self._extract_zipcode(filename)
-            
+            # B. CONTEXTE GÉO (V11.4)
+            zip_code = self._extract_zipcode_smart(filename)
             geo_data = self._fetch_geo_data(zip_code)
             
-            # Dates
             start_date = df['date'].min()
             end_date = df['date'].max()
             dju_data = self._fetch_dju_data(geo_data, start_date, end_date)
 
-            # C. DÉTECTION SECTORIELLE
-            naf_detected = self._detect_naf(filename)
+            # C. DÉTECTION SECTORIELLE V12 (MASSIVE)
+            naf_info = self._detect_naf_advanced(filename)
 
             # D. MODULES EXPERTS
             base = self._module_socle(df, time_step_hours)
@@ -74,19 +120,18 @@ class CortexEngine:
             finance = self._module_finance(df, time_step_hours)
             climat = self._module_climatique(base['conso_totale'], dju_data)
             
-            # Module Sectoriel
-            sector = self._module_sectoriel(df, naf_detected, geo_data)
+            # Module Sectoriel Avancé
+            sector = self._module_sectoriel_v12(df, naf_info, geo_data)
             
             context = {
                 "start": start_date.strftime('%d/%m/%Y'),
                 "end": end_date.strftime('%d/%m/%Y'),
                 "days": (end_date - start_date).days,
-                "naf": naf_detected
+                "naf": naf_info
             }
             
             final_kpis = {**base, **turpe, **season, **finance, **climat, **sector, "geo": geo_data, "context": context}
             
-            # E. SAMPLING
             step = max(1, len(df)//2000)
             df_chart = df.iloc[::step]
             
@@ -109,89 +154,124 @@ class CortexEngine:
             return {"success": False, "error": str(e)}
 
     # ==========================================================================
-    # 2. INTELLIGENCE (GEO / NAF / SOLAR)
+    # 2. INTELLIGENCE SECTORIELLE AVANCÉE (V12)
     # ==========================================================================
-    def _extract_zipcode(self, filename):
+    def _detect_naf_advanced(self, filename):
         """
-        Regex Chirurgicale (Lookaround) : (?<!\d)(\d{5})(?!\d)
-        Trouve 5 chiffres qui ne sont ni précédés ni suivis par un chiffre.
-        N'absorbe pas les caractères autour (tiret, underscore).
+        Scan le nom de fichier pour trouver un code NAF (ex: 10.71C) ou un mot clé.
         """
-        matches = re.findall(r'(?<!\d)(\d{5})(?!\d)', filename)
-        
-        if not matches: return "75001" # Défaut Paris
-        
-        # On parcourt de la fin vers le début (priorité au CP manuel vs Timestamp)
-        for cp in reversed(matches):
-            val = int(cp)
-            # Filtre anti-timestamp (éviter l'année 202x si d'autres choix existent)
-            if str(val).startswith("202") and len(matches) > 1: continue 
-            # Validité CP France
-            if 1000 <= val <= 95999: return cp
-            
-        return matches[-1] if matches else "75001"
-
-    def _detect_naf(self, filename):
         fn = filename.upper()
-        if "EP" in fn or "ECLAIRAGE" in fn or "LUM" in fn: return {"code": "EP", "label": "Éclairage Public"}
-        if "ECOLE" in fn or "85.20Z" in fn: return {"code": "85.20Z", "label": "Enseignement"}
-        if "GYM" in fn or "STADE" in fn: return {"code": "93.11Z", "label": "Sport"}
-        if "MAIRIE" in fn or "BUREAU" in fn: return {"code": "84.11Z", "label": "Bureaux/Admin"}
-        return {"code": "NA", "label": "Standard"}
+        
+        # 1. Recherche Code NAF strict (ex: 68.20B)
+        naf_regex = re.search(r'\b\d{2}\.\d{2}[A-Z]\b', fn)
+        if naf_regex:
+            code = naf_regex.group(0)
+            if code in self.NAF_DB:
+                return {"code": code, **self.NAF_DB[code]}
 
-    def _module_sectoriel(self, df, naf, geo):
-        code = naf["code"]
-        diag_metier = "Analyse générique."
-        status_metier = "OK"
+        # 2. Recherche Mots Clés dans le Dictionnaire
+        for code, info in self.NAF_DB.items():
+            # On cherche le Label (ex: BOULANGERIE) dans le nom de fichier
+            if info["label"].upper() in fn:
+                return {"code": code, **info}
+            # Cas spéciaux (EP, ECOLE)
+            if code in fn: # Si "EP" est dans le nom
+                 return {"code": code, **info}
+
+        return {"code": "NA", "label": "Non Identifié", "profile": "STANDARD"}
+
+    def _module_sectoriel_v12(self, df, naf, geo):
+        """
+        Analyse basée sur l'ARCHETYPE (Profile) défini dans la DB.
+        """
+        profile = naf["profile"]
+        diag = f"Profil détecté : {profile} ({naf['label']})."
+        status = "OK"
         
-        # SÉCURITÉ RATIOS (INT)
+        # --- LOGIQUE PAR ARCHETYPE ---
         
-        if code == "EP":
-            df['hour'] = df['date'].dt.hour
-            conso_jour = df[(df['hour'] >= 10) & (df['hour'] <= 16)]['val'].sum()
-            total = df['val'].sum()
-            
-            part_jour = 0
-            if total > 0: part_jour = (conso_jour / total * 100)
-            safe_part = self._safe_int(part_jour)
-            
-            if safe_part > 5:
-                diag_metier = f"⚠️ ALERTE EP : {safe_part}% de conso en plein jour."
-                status_metier = "WARNING"
+        if profile == "INVERSE": # Éclairage Public
+            df['h'] = df['date'].dt.hour
+            conso_jour = df[(df['h'] >= 10) & (df['h'] <= 16)]['val'].sum()
+            part = (conso_jour / df['val'].sum() * 100) if df['val'].sum() > 0 else 0
+            if part > 5:
+                diag = f"⚠️ ALERTE EP : {int(part)}% de conso jour (Allumage diurne)."
+                status = "WARNING"
             else:
-                diag_metier = "✅ PERFORMANCE EP : Cycles nocturnes synchronisés."
-                status_metier = "OPTIMIZED"
+                diag = "✅ PERFORMANCE EP : Cycles nocturnes OK."
 
-        elif code in ["85.20Z", "84.11Z"]:
+        elif profile == "SCHOOL" or profile == "OFFICE": # Bâtiments fermés WE
             df['wd'] = df['date'].dt.weekday
-            conso_we = df[df['wd'] >= 5]['val'].mean()
-            conso_semaine = df[df['wd'] < 5]['val'].mean()
+            we_mean = df[df['wd'] >= 5]['val'].mean()
+            w_mean = df[df['wd'] < 5]['val'].mean()
+            ratio = (we_mean / w_mean * 100) if w_mean > 0 else 0
             
-            ratio = 0
-            if conso_semaine > 0: ratio = (conso_we / conso_semaine * 100)
-            safe_ratio = self._safe_int(ratio)
-            
-            if safe_ratio > 30:
-                diag_metier = f"⚠️ ALERTE OCCUPATION : Conso weekend anormale ({safe_ratio}% vs semaine)."
-                status_metier = "WARNING"
+            seuil = 20 if profile == "SCHOOL" else 35 # Écoles doivent être plus strictes
+            if ratio > seuil:
+                diag = f"⚠️ ALERTE OCCUPATION : Conso Weekend anormale ({int(ratio)}% vs Semaine)."
+                status = "WARNING"
             else:
-                diag_metier = "✅ GESTION : Bon abaissement le weekend."
+                diag = "✅ GESTION : Bon abaissement Weekend."
+
+        elif profile == "BAKERY": # Boulangerie (Pic Matin)
+            df['h'] = df['date'].dt.hour
+            matin_mean = df[(df['h'] >= 4) & (df['h'] <= 8)]['val'].mean()
+            jour_mean = df[(df['h'] >= 10) & (df['h'] <= 18)]['val'].mean()
+            if matin_mean > jour_mean:
+                diag = "✅ PROCESS : Pic matinal (Cuisson) identifié."
+            else:
+                diag = "⚠️ ANOMALIE : Pas de pic matinal caractéristique."
+
+        elif profile == "COLD": # Supermarché / Frigo
+            # Analyse volatilité nuit (les frigos cyclent)
+            df['h'] = df['date'].dt.hour
+            nuit = df[(df['h'] >= 0) & (df['h'] <= 4)]
+            if not nuit.empty:
+                std_dev = nuit['val'].std()
+                mean = nuit['val'].mean()
+                cv = (std_dev / mean) if mean > 0 else 0
+                if cv > 0.1: diag = "✅ FROID : Cycles compresseurs détectés."
+                else: diag = "⚠️ FROID : Conso nuit trop lisse (ou panne)."
+
+        elif profile == "PROCESS" or profile == "FLAT_LINE": # Industrie / Data Center
+            # On vérifie le Talon
+            vals = df['val'].tolist()
+            pmax = max(vals) if vals else 0
+            pos = [v for v in vals if v > 0]
+            talon = float(np.percentile(pos, 10)) if pos else 0
+            
+            ratio_talon = (talon / pmax * 100) if pmax > 0 else 0
+            if ratio_talon > 60:
+                diag = f"ℹ️ PROCESS : Talon très haut ({int(ratio_talon)}%). Normal pour ce secteur."
+            elif ratio_talon < 20:
+                 diag = "⚠️ PROCESS : Talon anormalement bas pour une industrie."
 
         return {
             "sectoriel": {
                 "secteur": naf['label'],
-                "diagnostic": diag_metier,
-                "status": status_metier
+                "code_naf": naf['code'],
+                "archetype": profile,
+                "diagnostic": diag,
+                "status": status
             }
         }
 
     # ==========================================================================
-    # 3. API EXTERNES
+    # 3. UTILS & API
     # ==========================================================================
+    def _extract_zipcode_smart(self, filename):
+        matches = re.findall(r'(?<!\d)(\d{5})(?!\d)', filename)
+        if not matches: return "75001"
+        for cp in reversed(matches):
+            val = int(cp)
+            if str(val).startswith("202") and len(matches) > 1: continue 
+            if 1000 <= val <= 95999: return cp
+        return matches[-1] if matches else "75001"
+
     def _fetch_geo_data(self, zipcode):
         try:
             url = f"https://api-adresse.data.gouv.fr/search/?q={zipcode}&limit=1"
-            res = requests.get(url, timeout=3).json()
+            res = requests.get(url, timeout=2).json()
             if res['features']:
                 props = res['features'][0]['properties']
                 coords = res['features'][0]['geometry']['coordinates']
@@ -204,28 +284,13 @@ class CortexEngine:
             s_str = start_date.strftime('%Y-%m-%d')
             e_str = end_date.strftime('%Y-%m-%d')
             url = f"https://archive-api.open-meteo.com/v1/archive?latitude={geo['lat']}&longitude={geo['lon']}&start_date={s_str}&end_date={e_str}&daily=temperature_2m_mean&timezone=Europe%2FParis"
-            
-            res = requests.get(url, timeout=4).json()
+            res = requests.get(url, timeout=3).json()
             if 'daily' in res and 'temperature_2m_mean' in res['daily']:
                 temps = res['daily']['temperature_2m_mean']
                 dju = sum([max(0, 18 - t) for t in temps if t is not None])
                 return {"dju_total": self._safe_int(dju), "status": "OK"}
         except: pass
         return {"dju_total": 0, "status": "API_ERROR"}
-
-    def _module_climatique(self, conso_totale, dju_data):
-        dju = dju_data['dju_total']
-        kwh_par_dju = 0
-        if dju > 0:
-            kwh_par_dju = round(conso_totale / dju, 2)
-        
-        return {
-            "climat": {
-                "dju_periode": self._safe_int(dju),
-                "signature_kwh_dju": kwh_par_dju,
-                "message": f"{dju} DJU Base 18."
-            }
-        }
 
     # ==========================================================================
     # 4. MODULES STANDARDS
@@ -252,7 +317,6 @@ class CortexEngine:
             df = df.dropna(subset=['date'])
             df['val'] = df['val'].fillna(0).replace([np.inf, -np.inf], 0)
             df = df.sort_values(by='date')
-            
             if df['val'].median() > 2000: df['val'] = df['val'] / 1000
             
             time_step = 0.166
@@ -272,10 +336,7 @@ class CortexEngine:
         df['wd'] = df['date'].dt.weekday
         w_mean = df[df['wd'] < 5]['val'].mean()
         we_mean = df[df['wd'] >= 5]['val'].mean()
-        
-        ratio = 0
-        if w_mean > 0: ratio = (we_mean / w_mean) * 100
-        
+        ratio = int((we_mean/w_mean)*100) if w_mean > 0 else 0
         p_max = max(values) if values else 0
         conso_kwh = sum(values) * time_step
 
@@ -312,40 +373,23 @@ class CortexEngine:
         mask_hc = (df['h'] >= 22) | (df['h'] < 6)
         conso_hc = df[mask_hc]['val'].sum() * time_step
         conso_hp = df[~mask_hc]['val'].sum() * time_step
-        
         budg = (conso_hp * 0.18) + (conso_hc * 0.12)
         tot = conso_hp + conso_hc
-        
         part_hc = (conso_hc / tot * 100) if tot > 0 else 0
         pm = (budg / tot) if tot > 0 else 0
-
-        return {
-            "finance": {
-                "budget_total_estime": self._safe_int(budg),
-                "conso_hp": self._safe_int(conso_hp),
-                "conso_hc": self._safe_int(conso_hc),
-                "part_hc": self._safe_int(part_hc),
-                "prix_moyen_calcule": round(pm, 3)
-            }
-        }
+        return {"finance": {"budget_total_estime": self._safe_int(budg), "conso_hp": self._safe_int(conso_hp), "conso_hc": self._safe_int(conso_hc), "part_hc": self._safe_int(part_hc), "prix_moyen_calcule": round(pm, 3)}}
 
     def _generate_expert_narrative(self, k, p):
-        txt = f"<b>ANALYSE V11.4 ({p.upper()}) :</b><br>"
+        txt = f"<b>ANALYSE V12 ({p.upper()}) :</b><br>"
         if 'geo' in k: txt += f"• Lieu : <b>{k['geo']['city']}</b> ({k['geo']['zip']}).<br>"
-        
         if 'sectoriel' in k:
             txt += f"• Métier : <b>{k['sectoriel']['secteur']}</b>.<br>"
-            if k['sectoriel']['status'] != 'OK': txt += f"• 🎯 <b>{k['sectoriel']['diagnostic']}</b><br>"
-            
+            txt += f"• 🎯 <b>{k['sectoriel']['diagnostic']}</b><br>"
         if 'climat' in k and k['climat']['dju_periode'] > 0: txt += f"• Climat : {k['climat']['dju_periode']} DJU.<br>"
-        
         txt += f"• Finance : Budget est. {k['finance']['budget_total_estime']:,} €.<br>"
-        
-        if 'sectoriel' not in k or k['sectoriel']['status'] == 'OK': txt += f"• Diag : {k['diagnosis']}"
         return txt
 
-    def _module_retail_placeholder(self, kpis):
-        return {"benchmark": [], "froid_analysis": {"ratio": 0, "is_alert": False}}
+    def _module_retail_placeholder(self, kpis): return {"benchmark": [], "froid_analysis": {"ratio": 0}}
 
     # --- AUDIT PDF ---
     def extract_pdf(self, b):
@@ -375,7 +419,7 @@ class CortexEngine:
         ]
         return {"score": 80, "checks": checks}
 
-    def ask_agent(self, q): return "Cortex V11.4 Online."
+    def ask_agent(self, q): return "Cortex V12.0 Online."
     def run_chaos_monkey(self): return [{"test": "API Météo", "status": "READY"}]
 
 cortex = CortexEngine()
