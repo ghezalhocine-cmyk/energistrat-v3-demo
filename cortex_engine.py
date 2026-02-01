@@ -1,4 +1,4 @@
-# cortex_engine.py V12.1 - MASSIVE SECTORIAL DB + CRASH FIX
+# cortex_engine.py V12.2 - SECTORIAL KEYWORDS FIX
 import pandas as pd
 import numpy as np
 import io
@@ -35,40 +35,39 @@ class CortexEngine:
                 self.ai_ready = True
             except: pass
 
-        # --- BASE DE DONNÉES EXPERTE SECTORIELLE (50+ CODES) ---
+        # --- BASE DE DONNÉES AVEC MOTS-CLÉS (V12.2) ---
         self.NAF_DB = {
-            "10.71C": {"label": "Boulangerie", "profile": "BAKERY"},
-            "10.71D": {"label": "Pâtisserie", "profile": "BAKERY"},
-            "47.11":  {"label": "Supermarché", "profile": "COLD"},
-            "47.11D": {"label": "Supermarché", "profile": "COLD"},
-            "47.11F": {"label": "Hyper", "profile": "COLD"},
-            "10.11Z": {"label": "Transformation Viande", "profile": "COLD"},
-            "10.51A": {"label": "Laiterie/Fromagerie", "profile": "COLD"},
-            "55.10Z": {"label": "Hôtellerie", "profile": "CONTINUOUS"},
-            "56.10A": {"label": "Restauration", "profile": "SERVICE"},
-            "56.10C": {"label": "Fast Food", "profile": "SERVICE"},
-            "86.10Z": {"label": "Hôpital", "profile": "CONTINUOUS"},
-            "87.10A": {"label": "EHPAD", "profile": "CONTINUOUS"},
-            "86.21Z": {"label": "Clinique", "profile": "CONTINUOUS"},
-            "25.62B": {"label": "Mécanique Ind.", "profile": "PROCESS"},
-            "25.11Z": {"label": "Métallurgie", "profile": "PROCESS"},
-            "22.29A": {"label": "Plasturgie", "profile": "PROCESS"},
-            "18.12Z": {"label": "Imprimerie", "profile": "PROCESS"},
-            "28.29A": {"label": "Fabrication Machines", "profile": "PROCESS"},
-            "20.14Z": {"label": "Chimie", "profile": "PROCESS"},
-            "16.10A": {"label": "Scierie", "profile": "PROCESS"},
-            "68.20B": {"label": "Bureaux", "profile": "OFFICE"},
-            "84.11Z": {"label": "Administration", "profile": "OFFICE"},
-            "64.19Z": {"label": "Banque", "profile": "OFFICE"},
-            "62.01Z": {"label": "Informatique/Dev", "profile": "OFFICE"},
-            "69.10Z": {"label": "Juridique/Avocat", "profile": "OFFICE"},
-            "63.11Z": {"label": "Data Center", "profile": "FLAT_LINE"},
-            "61.10Z": {"label": "Télécoms", "profile": "FLAT_LINE"},
-            "85.20Z": {"label": "École Primaire", "profile": "SCHOOL"},
-            "85.31Z": {"label": "Collège/Lycée", "profile": "SCHOOL"},
-            "93.11Z": {"label": "Gymnase/Stade", "profile": "SPORT"},
-            "EP":     {"label": "Éclairage Public", "profile": "INVERSE"},
-            "ECLAIRAGE": {"label": "Éclairage Public", "profile": "INVERSE"}
+            # COMMERCE & ALIM
+            "10.71C": {"label": "Boulangerie", "profile": "BAKERY", "keywords": ["BOULANGERIE", "PAIN", "FOURNIL", "BAGUETTE"]},
+            "10.71D": {"label": "Pâtisserie", "profile": "BAKERY", "keywords": ["PATISSERIE", "GATEAU"]},
+            "47.11":  {"label": "Supermarché", "profile": "COLD", "keywords": ["SUPERMARCHE", "MARKET", "SUPER", "FRAIS"]},
+            "47.11F": {"label": "Hyper", "profile": "COLD", "keywords": ["HYPER", "HYPERMARCHE", "GRAND SURFACE"]},
+            "10.11Z": {"label": "Viande", "profile": "COLD", "keywords": ["VIANDE", "BOUCHERIE", "ABATTOIR"]},
+            
+            # HORECA
+            "55.10Z": {"label": "Hôtellerie", "profile": "CONTINUOUS", "keywords": ["HOTEL", "HEBERGEMENT", "CHAMBRE"]},
+            "56.10A": {"label": "Restauration", "profile": "SERVICE", "keywords": ["RESTAURANT", "RESTO", "CUISINE"]},
+            
+            # SANTÉ
+            "86.10Z": {"label": "Hôpital", "profile": "CONTINUOUS", "keywords": ["HOPITAL", "CHU", "CHR", "SANTE"]},
+            "87.10A": {"label": "EHPAD", "profile": "CONTINUOUS", "keywords": ["EHPAD", "MAISON RETRAITE", "SENIOR"]},
+            
+            # INDUSTRIE
+            "25.11Z": {"label": "Métallurgie", "profile": "PROCESS", "keywords": ["METAL", "ACIER", "ALU", "FONONDERIE"]},
+            "22.29A": {"label": "Plasturgie", "profile": "PROCESS", "keywords": ["PLASTIQUE", "INJECTION", "MOULAGE"]},
+            "20.14Z": {"label": "Chimie", "profile": "PROCESS", "keywords": ["CHIMIE", "LABO", "PHARMA"]},
+            "16.10A": {"label": "Scierie", "profile": "PROCESS", "keywords": ["BOIS", "SCIERIE", "MENUISERIE"]},
+            
+            # TERTIAIRE
+            "68.20B": {"label": "Bureaux", "profile": "OFFICE", "keywords": ["BUREAU", "SIEGE", "AGENCE", "TERTIAIRE"]},
+            "84.11Z": {"label": "Administration", "profile": "OFFICE", "keywords": ["MAIRIE", "ADMIN", "PREFECTURE", "HOTEL DE VILLE"]},
+            "64.19Z": {"label": "Banque", "profile": "OFFICE", "keywords": ["BANQUE", "ASSURANCE", "AGENCE"]},
+            
+            # PUBLIC & SPORT
+            "85.20Z": {"label": "École Primaire", "profile": "SCHOOL", "keywords": ["ECOLE", "PRIMAIRE", "SCOLAIRE", "MATERNELLE"]},
+            "85.31Z": {"label": "Collège/Lycée", "profile": "SCHOOL", "keywords": ["COLLEGE", "LYCEE", "LYCÉE", "CAMPUS"]},
+            "93.11Z": {"label": "Gymnase/Stade", "profile": "SPORT", "keywords": ["GYMNASE", "STADE", "PISCINE", "SPORT", "COMPLEXE"]},
+            "EP":     {"label": "Éclairage Public", "profile": "INVERSE", "keywords": ["EP", "ECLAIRAGE", "LUM", "LAMPADAIRE"]}
         }
 
     # --- SÉCURITÉ MATHÉMATIQUE ---
@@ -97,7 +96,7 @@ class CortexEngine:
             end_date = df['date'].max()
             dju_data = self._fetch_dju_data(geo_data, start_date, end_date)
 
-            # C. DÉTECTION SECTORIELLE V12
+            # C. DÉTECTION SECTORIELLE (CORRECTIF V12.2)
             naf_info = self._detect_naf_advanced(filename)
 
             # D. MODULES EXPERTS
@@ -107,7 +106,7 @@ class CortexEngine:
             finance = self._module_finance(df, time_step_hours)
             climat = self._module_climatique(base['conso_totale'], dju_data)
             
-            # Module Sectoriel Avancé
+            # Module Sectoriel Avancé (Sécurisé V11.3)
             sector = self._module_sectoriel_v12(df, naf_info, geo_data)
             
             context = {
@@ -141,18 +140,29 @@ class CortexEngine:
             return {"success": False, "error": str(e)}
 
     # ==========================================================================
-    # 2. INTELLIGENCE SECTORIELLE AVANCÉE (V12)
+    # 2. INTELLIGENCE SECTORIELLE (CORRIGÉE V12.2)
     # ==========================================================================
     def _detect_naf_advanced(self, filename):
+        """Scan via Mots-Clés"""
         fn = filename.upper()
+        
+        # 1. Recherche Code NAF strict
         naf_regex = re.search(r'\b\d{2}\.\d{2}[A-Z]\b', fn)
         if naf_regex:
             code = naf_regex.group(0)
             if code in self.NAF_DB: return {"code": code, **self.NAF_DB[code]}
 
+        # 2. Recherche par Mots-Clés (Keywords)
         for code, info in self.NAF_DB.items():
-            if info["label"].upper() in fn: return {"code": code, **info}
-            if code in fn: return {"code": code, **info}
+            # Vérification des mots clés définis
+            if "keywords" in info:
+                for kw in info["keywords"]:
+                    if kw in fn:
+                        return {"code": code, **info}
+            
+            # Fallback sur le label exact (au cas où)
+            if info["label"].upper() in fn:
+                return {"code": code, **info}
 
         return {"code": "NA", "label": "Non Identifié", "profile": "STANDARD"}
 
@@ -161,16 +171,14 @@ class CortexEngine:
         diag = f"Profil détecté : {profile} ({naf['label']})."
         status = "OK"
         
-        # --- LOGIQUE PAR ARCHETYPE (SÉCURISÉE V12.1) ---
-        
-        if profile == "INVERSE": # Éclairage Public
+        if profile == "INVERSE":
             df['h'] = df['date'].dt.hour
             conso_jour = df[(df['h'] >= 10) & (df['h'] <= 16)]['val'].sum()
             part = (conso_jour / df['val'].sum() * 100) if df['val'].sum() > 0 else 0
+            safe_part = self._safe_int(part)
             
-            # FIX : Utilisation de _safe_int
-            if part > 5:
-                diag = f"⚠️ ALERTE EP : {self._safe_int(part)}% de conso jour."
+            if safe_part > 5:
+                diag = f"⚠️ ALERTE EP : {safe_part}% de conso jour."
                 status = "WARNING"
             else:
                 diag = "✅ PERFORMANCE EP : Cycles nocturnes OK."
@@ -180,11 +188,11 @@ class CortexEngine:
             we_mean = df[df['wd'] >= 5]['val'].mean()
             w_mean = df[df['wd'] < 5]['val'].mean()
             ratio = (we_mean / w_mean * 100) if w_mean > 0 else 0
+            safe_ratio = self._safe_int(ratio)
             seuil = 20 if profile == "SCHOOL" else 35
             
-            # FIX : Utilisation de _safe_int
-            if ratio > seuil:
-                diag = f"⚠️ ALERTE OCCUPATION : Conso Weekend anormale ({self._safe_int(ratio)}% vs Semaine)."
+            if safe_ratio > seuil:
+                diag = f"⚠️ ALERTE OCCUPATION : Conso Weekend anormale ({safe_ratio}% vs Semaine)."
                 status = "WARNING"
             else:
                 diag = "✅ GESTION : Bon abaissement Weekend."
@@ -212,11 +220,11 @@ class CortexEngine:
             pos = [v for v in vals if v > 0]
             talon = float(np.percentile(pos, 10)) if pos else 0
             ratio_talon = (talon / pmax * 100) if pmax > 0 else 0
+            safe_ratio = self._safe_int(ratio_talon)
             
-            # FIX : Utilisation de _safe_int
-            if ratio_talon > 60:
-                diag = f"ℹ️ PROCESS : Talon très haut ({self._safe_int(ratio_talon)}%). Normal."
-            elif ratio_talon < 20:
+            if safe_ratio > 60:
+                diag = f"ℹ️ PROCESS : Talon très haut ({safe_ratio}%). Normal."
+            elif safe_ratio < 20:
                  diag = "⚠️ PROCESS : Talon anormalement bas pour une industrie."
 
         return {
@@ -322,10 +330,7 @@ class CortexEngine:
         df['wd'] = df['date'].dt.weekday
         w_mean = df[df['wd'] < 5]['val'].mean()
         we_mean = df[df['wd'] >= 5]['val'].mean()
-        
-        ratio = 0
-        if w_mean > 0: ratio = (we_mean / w_mean) * 100
-        
+        ratio = int((we_mean/w_mean)*100) if w_mean > 0 else 0
         p_max = max(values) if values else 0
         conso_kwh = sum(values) * time_step
 
@@ -369,13 +374,14 @@ class CortexEngine:
         return {"finance": {"budget_total_estime": self._safe_int(budg), "conso_hp": self._safe_int(conso_hp), "conso_hc": self._safe_int(conso_hc), "part_hc": self._safe_int(part_hc), "prix_moyen_calcule": round(pm, 3)}}
 
     def _generate_expert_narrative(self, k, p):
-        txt = f"<b>ANALYSE V12 ({p.upper()}) :</b><br>"
+        txt = f"<b>ANALYSE V12.2 ({p.upper()}) :</b><br>"
         if 'geo' in k: txt += f"• Lieu : <b>{k['geo']['city']}</b> ({k['geo']['zip']}).<br>"
         if 'sectoriel' in k:
             txt += f"• Métier : <b>{k['sectoriel']['secteur']}</b>.<br>"
-            txt += f"• 🎯 <b>{k['sectoriel']['diagnostic']}</b><br>"
+            if k['sectoriel']['status'] != 'OK': txt += f"• 🎯 <b>{k['sectoriel']['diagnostic']}</b><br>"
         if 'climat' in k and k['climat']['dju_periode'] > 0: txt += f"• Climat : {k['climat']['dju_periode']} DJU.<br>"
         txt += f"• Finance : Budget est. {k['finance']['budget_total_estime']:,} €.<br>"
+        if 'sectoriel' not in k or k['sectoriel']['status'] == 'OK': txt += f"• Diag : {k['diagnosis']}"
         return txt
 
     def _module_retail_placeholder(self, kpis): return {"benchmark": [], "froid_analysis": {"ratio": 0}}
@@ -408,7 +414,7 @@ class CortexEngine:
         ]
         return {"score": 80, "checks": checks}
 
-    def ask_agent(self, q): return "Cortex V12.1 Online."
+    def ask_agent(self, q): return "Cortex V12.2 Online."
     def run_chaos_monkey(self): return [{"test": "API Météo", "status": "READY"}]
 
 cortex = CortexEngine()
