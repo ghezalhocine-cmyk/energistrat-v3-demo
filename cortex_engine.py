@@ -1,4 +1,4 @@
-# cortex_engine.py V12.0 - MASSIVE SECTORIAL DB (50+ NAF)
+# cortex_engine.py V12.1 - MASSIVE SECTORIAL DB + CRASH FIX
 import pandas as pd
 import numpy as np
 import io
@@ -37,7 +37,6 @@ class CortexEngine:
 
         # --- BASE DE DONNÉES EXPERTE SECTORIELLE (50+ CODES) ---
         self.NAF_DB = {
-            # --- ALIMENTATION & COMMERCE (PROFIL FROID/BAKERY) ---
             "10.71C": {"label": "Boulangerie", "profile": "BAKERY"},
             "10.71D": {"label": "Pâtisserie", "profile": "BAKERY"},
             "47.11":  {"label": "Supermarché", "profile": "COLD"},
@@ -45,18 +44,12 @@ class CortexEngine:
             "47.11F": {"label": "Hyper", "profile": "COLD"},
             "10.11Z": {"label": "Transformation Viande", "profile": "COLD"},
             "10.51A": {"label": "Laiterie/Fromagerie", "profile": "COLD"},
-            
-            # --- HORECA (PROFIL CONTINU / SAISONNIER) ---
             "55.10Z": {"label": "Hôtellerie", "profile": "CONTINUOUS"},
             "56.10A": {"label": "Restauration", "profile": "SERVICE"},
             "56.10C": {"label": "Fast Food", "profile": "SERVICE"},
-            
-            # --- SANTÉ (PROFIL 24/7 CRITIQUE) ---
             "86.10Z": {"label": "Hôpital", "profile": "CONTINUOUS"},
             "87.10A": {"label": "EHPAD", "profile": "CONTINUOUS"},
             "86.21Z": {"label": "Clinique", "profile": "CONTINUOUS"},
-            
-            # --- INDUSTRIE (PROFIL PROCESS) ---
             "25.62B": {"label": "Mécanique Ind.", "profile": "PROCESS"},
             "25.11Z": {"label": "Métallurgie", "profile": "PROCESS"},
             "22.29A": {"label": "Plasturgie", "profile": "PROCESS"},
@@ -64,19 +57,13 @@ class CortexEngine:
             "28.29A": {"label": "Fabrication Machines", "profile": "PROCESS"},
             "20.14Z": {"label": "Chimie", "profile": "PROCESS"},
             "16.10A": {"label": "Scierie", "profile": "PROCESS"},
-            
-            # --- TERTIAIRE & BUREAUX (PROFIL OFFICE) ---
             "68.20B": {"label": "Bureaux", "profile": "OFFICE"},
             "84.11Z": {"label": "Administration", "profile": "OFFICE"},
             "64.19Z": {"label": "Banque", "profile": "OFFICE"},
             "62.01Z": {"label": "Informatique/Dev", "profile": "OFFICE"},
             "69.10Z": {"label": "Juridique/Avocat", "profile": "OFFICE"},
-            
-            # --- DATA & TECH (PROFIL 24/7 PLAT) ---
             "63.11Z": {"label": "Data Center", "profile": "FLAT_LINE"},
             "61.10Z": {"label": "Télécoms", "profile": "FLAT_LINE"},
-            
-            # --- PUBLIC & SPORT (PROFIL SPECIFIQUE) ---
             "85.20Z": {"label": "École Primaire", "profile": "SCHOOL"},
             "85.31Z": {"label": "Collège/Lycée", "profile": "SCHOOL"},
             "93.11Z": {"label": "Gymnase/Stade", "profile": "SPORT"},
@@ -102,7 +89,7 @@ class CortexEngine:
             df, time_step_hours = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible"}
 
-            # B. CONTEXTE GÉO (V11.4)
+            # B. CONTEXTE GÉO
             zip_code = self._extract_zipcode_smart(filename)
             geo_data = self._fetch_geo_data(zip_code)
             
@@ -110,7 +97,7 @@ class CortexEngine:
             end_date = df['date'].max()
             dju_data = self._fetch_dju_data(geo_data, start_date, end_date)
 
-            # C. DÉTECTION SECTORIELLE V12 (MASSIVE)
+            # C. DÉTECTION SECTORIELLE V12
             naf_info = self._detect_naf_advanced(filename)
 
             # D. MODULES EXPERTS
@@ -157,73 +144,59 @@ class CortexEngine:
     # 2. INTELLIGENCE SECTORIELLE AVANCÉE (V12)
     # ==========================================================================
     def _detect_naf_advanced(self, filename):
-        """
-        Scan le nom de fichier pour trouver un code NAF (ex: 10.71C) ou un mot clé.
-        """
         fn = filename.upper()
-        
-        # 1. Recherche Code NAF strict (ex: 68.20B)
         naf_regex = re.search(r'\b\d{2}\.\d{2}[A-Z]\b', fn)
         if naf_regex:
             code = naf_regex.group(0)
-            if code in self.NAF_DB:
-                return {"code": code, **self.NAF_DB[code]}
+            if code in self.NAF_DB: return {"code": code, **self.NAF_DB[code]}
 
-        # 2. Recherche Mots Clés dans le Dictionnaire
         for code, info in self.NAF_DB.items():
-            # On cherche le Label (ex: BOULANGERIE) dans le nom de fichier
-            if info["label"].upper() in fn:
-                return {"code": code, **info}
-            # Cas spéciaux (EP, ECOLE)
-            if code in fn: # Si "EP" est dans le nom
-                 return {"code": code, **info}
+            if info["label"].upper() in fn: return {"code": code, **info}
+            if code in fn: return {"code": code, **info}
 
         return {"code": "NA", "label": "Non Identifié", "profile": "STANDARD"}
 
     def _module_sectoriel_v12(self, df, naf, geo):
-        """
-        Analyse basée sur l'ARCHETYPE (Profile) défini dans la DB.
-        """
         profile = naf["profile"]
         diag = f"Profil détecté : {profile} ({naf['label']})."
         status = "OK"
         
-        # --- LOGIQUE PAR ARCHETYPE ---
+        # --- LOGIQUE PAR ARCHETYPE (SÉCURISÉE V12.1) ---
         
         if profile == "INVERSE": # Éclairage Public
             df['h'] = df['date'].dt.hour
             conso_jour = df[(df['h'] >= 10) & (df['h'] <= 16)]['val'].sum()
             part = (conso_jour / df['val'].sum() * 100) if df['val'].sum() > 0 else 0
+            
+            # FIX : Utilisation de _safe_int
             if part > 5:
-                diag = f"⚠️ ALERTE EP : {int(part)}% de conso jour (Allumage diurne)."
+                diag = f"⚠️ ALERTE EP : {self._safe_int(part)}% de conso jour."
                 status = "WARNING"
             else:
                 diag = "✅ PERFORMANCE EP : Cycles nocturnes OK."
 
-        elif profile == "SCHOOL" or profile == "OFFICE": # Bâtiments fermés WE
+        elif profile == "SCHOOL" or profile == "OFFICE":
             df['wd'] = df['date'].dt.weekday
             we_mean = df[df['wd'] >= 5]['val'].mean()
             w_mean = df[df['wd'] < 5]['val'].mean()
             ratio = (we_mean / w_mean * 100) if w_mean > 0 else 0
+            seuil = 20 if profile == "SCHOOL" else 35
             
-            seuil = 20 if profile == "SCHOOL" else 35 # Écoles doivent être plus strictes
+            # FIX : Utilisation de _safe_int
             if ratio > seuil:
-                diag = f"⚠️ ALERTE OCCUPATION : Conso Weekend anormale ({int(ratio)}% vs Semaine)."
+                diag = f"⚠️ ALERTE OCCUPATION : Conso Weekend anormale ({self._safe_int(ratio)}% vs Semaine)."
                 status = "WARNING"
             else:
                 diag = "✅ GESTION : Bon abaissement Weekend."
 
-        elif profile == "BAKERY": # Boulangerie (Pic Matin)
+        elif profile == "BAKERY":
             df['h'] = df['date'].dt.hour
             matin_mean = df[(df['h'] >= 4) & (df['h'] <= 8)]['val'].mean()
             jour_mean = df[(df['h'] >= 10) & (df['h'] <= 18)]['val'].mean()
-            if matin_mean > jour_mean:
-                diag = "✅ PROCESS : Pic matinal (Cuisson) identifié."
-            else:
-                diag = "⚠️ ANOMALIE : Pas de pic matinal caractéristique."
+            if matin_mean > jour_mean: diag = "✅ PROCESS : Pic matinal (Cuisson) identifié."
+            else: diag = "⚠️ ANOMALIE : Pas de pic matinal caractéristique."
 
-        elif profile == "COLD": # Supermarché / Frigo
-            # Analyse volatilité nuit (les frigos cyclent)
+        elif profile == "COLD":
             df['h'] = df['date'].dt.hour
             nuit = df[(df['h'] >= 0) & (df['h'] <= 4)]
             if not nuit.empty:
@@ -233,16 +206,16 @@ class CortexEngine:
                 if cv > 0.1: diag = "✅ FROID : Cycles compresseurs détectés."
                 else: diag = "⚠️ FROID : Conso nuit trop lisse (ou panne)."
 
-        elif profile == "PROCESS" or profile == "FLAT_LINE": # Industrie / Data Center
-            # On vérifie le Talon
+        elif profile == "PROCESS" or profile == "FLAT_LINE":
             vals = df['val'].tolist()
             pmax = max(vals) if vals else 0
             pos = [v for v in vals if v > 0]
             talon = float(np.percentile(pos, 10)) if pos else 0
-            
             ratio_talon = (talon / pmax * 100) if pmax > 0 else 0
+            
+            # FIX : Utilisation de _safe_int
             if ratio_talon > 60:
-                diag = f"ℹ️ PROCESS : Talon très haut ({int(ratio_talon)}%). Normal pour ce secteur."
+                diag = f"ℹ️ PROCESS : Talon très haut ({self._safe_int(ratio_talon)}%). Normal."
             elif ratio_talon < 20:
                  diag = "⚠️ PROCESS : Talon anormalement bas pour une industrie."
 
@@ -292,6 +265,19 @@ class CortexEngine:
         except: pass
         return {"dju_total": 0, "status": "API_ERROR"}
 
+    def _module_climatique(self, conso_totale, dju_data):
+        dju = dju_data['dju_total']
+        kwh_par_dju = 0
+        if dju > 0:
+            kwh_par_dju = round(conso_totale / dju, 2)
+        return {
+            "climat": {
+                "dju_periode": self._safe_int(dju),
+                "signature_kwh_dju": kwh_par_dju,
+                "message": f"{dju} DJU Base 18."
+            }
+        }
+
     # ==========================================================================
     # 4. MODULES STANDARDS
     # ==========================================================================
@@ -336,7 +322,10 @@ class CortexEngine:
         df['wd'] = df['date'].dt.weekday
         w_mean = df[df['wd'] < 5]['val'].mean()
         we_mean = df[df['wd'] >= 5]['val'].mean()
-        ratio = int((we_mean/w_mean)*100) if w_mean > 0 else 0
+        
+        ratio = 0
+        if w_mean > 0: ratio = (we_mean / w_mean) * 100
+        
         p_max = max(values) if values else 0
         conso_kwh = sum(values) * time_step
 
@@ -419,7 +408,7 @@ class CortexEngine:
         ]
         return {"score": 80, "checks": checks}
 
-    def ask_agent(self, q): return "Cortex V12.0 Online."
+    def ask_agent(self, q): return "Cortex V12.1 Online."
     def run_chaos_monkey(self): return [{"test": "API Météo", "status": "READY"}]
 
 cortex = CortexEngine()
