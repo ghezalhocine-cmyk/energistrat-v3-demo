@@ -1,4 +1,4 @@
-# cortex_engine.py V11.3 - SECTORIAL SAFETY FIX (ANTI-CRASH)
+# cortex_engine.py V11.4 - SURGICAL GEO (LOOKAROUND FIX)
 import pandas as pd
 import numpy as np
 import io
@@ -37,17 +37,11 @@ class CortexEngine:
 
     # --- SÉCURITÉ MATHÉMATIQUE ---
     def _safe_int(self, value):
-        """Convertit en int sans planter sur NaN ou Inf"""
-        try:
-            if pd.isna(value) or np.isinf(value): return 0
-            return int(value)
+        try: return 0 if (pd.isna(value) or np.isinf(value)) else int(value)
         except: return 0
 
     def _safe_float(self, value):
-        """Convertit en float sans planter"""
-        try:
-            if pd.isna(value) or np.isinf(value): return 0.0
-            return float(value)
+        try: return 0.0 if (pd.isna(value) or np.isinf(value)) else float(value)
         except: return 0.0
 
     # ==========================================================================
@@ -59,10 +53,13 @@ class CortexEngine:
             df, time_step_hours = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible"}
 
-            # B. CONTEXTE GÉO
+            # B. CONTEXTE GÉO (CORRECTIF V11.4)
+            # Utilisation de la nouvelle regex chirurgicale
             zip_code = self._extract_zipcode(filename)
+            
             geo_data = self._fetch_geo_data(zip_code)
             
+            # Dates
             start_date = df['date'].min()
             end_date = df['date'].max()
             dju_data = self._fetch_dju_data(geo_data, start_date, end_date)
@@ -77,7 +74,7 @@ class CortexEngine:
             finance = self._module_finance(df, time_step_hours)
             climat = self._module_climatique(base['conso_totale'], dju_data)
             
-            # Module Sectoriel (C'est lui qui plantait, maintenant sécurisé)
+            # Module Sectoriel
             sector = self._module_sectoriel(df, naf_detected, geo_data)
             
             context = {
@@ -109,19 +106,29 @@ class CortexEngine:
                 "retail_data": None
             }
         except Exception as e:
-            logging.error(f"Cortex Crash: {e}")
-            return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
+            return {"success": False, "error": str(e)}
 
     # ==========================================================================
     # 2. INTELLIGENCE (GEO / NAF / SOLAR)
     # ==========================================================================
     def _extract_zipcode(self, filename):
-        matches = re.findall(r'(?:^|[^0-9])(\d{5})(?:$|[^0-9])', filename)
-        if not matches: return "75001"
+        """
+        Regex Chirurgicale (Lookaround) : (?<!\d)(\d{5})(?!\d)
+        Trouve 5 chiffres qui ne sont ni précédés ni suivis par un chiffre.
+        N'absorbe pas les caractères autour (tiret, underscore).
+        """
+        matches = re.findall(r'(?<!\d)(\d{5})(?!\d)', filename)
+        
+        if not matches: return "75001" # Défaut Paris
+        
+        # On parcourt de la fin vers le début (priorité au CP manuel vs Timestamp)
         for cp in reversed(matches):
             val = int(cp)
+            # Filtre anti-timestamp (éviter l'année 202x si d'autres choix existent)
             if str(val).startswith("202") and len(matches) > 1: continue 
+            # Validité CP France
             if 1000 <= val <= 95999: return cp
+            
         return matches[-1] if matches else "75001"
 
     def _detect_naf(self, filename):
@@ -137,7 +144,7 @@ class CortexEngine:
         diag_metier = "Analyse générique."
         status_metier = "OK"
         
-        # --- FIX CRASH : Utilisation systématique de _safe_int ---
+        # SÉCURITÉ RATIOS (INT)
         
         if code == "EP":
             df['hour'] = df['date'].dt.hour
@@ -145,10 +152,7 @@ class CortexEngine:
             total = df['val'].sum()
             
             part_jour = 0
-            if total > 0:
-                part_jour = (conso_jour / total * 100)
-            
-            # Sécurisation de l'affichage
+            if total > 0: part_jour = (conso_jour / total * 100)
             safe_part = self._safe_int(part_jour)
             
             if safe_part > 5:
@@ -164,10 +168,7 @@ class CortexEngine:
             conso_semaine = df[df['wd'] < 5]['val'].mean()
             
             ratio = 0
-            if conso_semaine > 0:
-                ratio = (conso_we / conso_semaine * 100)
-            
-            # Sécurisation de l'affichage
+            if conso_semaine > 0: ratio = (conso_we / conso_semaine * 100)
             safe_ratio = self._safe_int(ratio)
             
             if safe_ratio > 30:
@@ -190,7 +191,7 @@ class CortexEngine:
     def _fetch_geo_data(self, zipcode):
         try:
             url = f"https://api-adresse.data.gouv.fr/search/?q={zipcode}&limit=1"
-            res = requests.get(url, timeout=2).json()
+            res = requests.get(url, timeout=3).json()
             if res['features']:
                 props = res['features'][0]['properties']
                 coords = res['features'][0]['geometry']['coordinates']
@@ -204,7 +205,7 @@ class CortexEngine:
             e_str = end_date.strftime('%Y-%m-%d')
             url = f"https://archive-api.open-meteo.com/v1/archive?latitude={geo['lat']}&longitude={geo['lon']}&start_date={s_str}&end_date={e_str}&daily=temperature_2m_mean&timezone=Europe%2FParis"
             
-            res = requests.get(url, timeout=3).json()
+            res = requests.get(url, timeout=4).json()
             if 'daily' in res and 'temperature_2m_mean' in res['daily']:
                 temps = res['daily']['temperature_2m_mean']
                 dju = sum([max(0, 18 - t) for t in temps if t is not None])
@@ -311,24 +312,40 @@ class CortexEngine:
         mask_hc = (df['h'] >= 22) | (df['h'] < 6)
         conso_hc = df[mask_hc]['val'].sum() * time_step
         conso_hp = df[~mask_hc]['val'].sum() * time_step
+        
         budg = (conso_hp * 0.18) + (conso_hc * 0.12)
         tot = conso_hp + conso_hc
+        
         part_hc = (conso_hc / tot * 100) if tot > 0 else 0
         pm = (budg / tot) if tot > 0 else 0
-        return {"finance": {"budget_total_estime": self._safe_int(budg), "conso_hp": self._safe_int(conso_hp), "conso_hc": self._safe_int(conso_hc), "part_hc": self._safe_int(part_hc), "prix_moyen_calcule": round(pm, 3)}}
+
+        return {
+            "finance": {
+                "budget_total_estime": self._safe_int(budg),
+                "conso_hp": self._safe_int(conso_hp),
+                "conso_hc": self._safe_int(conso_hc),
+                "part_hc": self._safe_int(part_hc),
+                "prix_moyen_calcule": round(pm, 3)
+            }
+        }
 
     def _generate_expert_narrative(self, k, p):
-        txt = f"<b>ANALYSE V11.3 ({p.upper()}) :</b><br>"
+        txt = f"<b>ANALYSE V11.4 ({p.upper()}) :</b><br>"
         if 'geo' in k: txt += f"• Lieu : <b>{k['geo']['city']}</b> ({k['geo']['zip']}).<br>"
+        
         if 'sectoriel' in k:
             txt += f"• Métier : <b>{k['sectoriel']['secteur']}</b>.<br>"
             if k['sectoriel']['status'] != 'OK': txt += f"• 🎯 <b>{k['sectoriel']['diagnostic']}</b><br>"
+            
         if 'climat' in k and k['climat']['dju_periode'] > 0: txt += f"• Climat : {k['climat']['dju_periode']} DJU.<br>"
+        
         txt += f"• Finance : Budget est. {k['finance']['budget_total_estime']:,} €.<br>"
+        
         if 'sectoriel' not in k or k['sectoriel']['status'] == 'OK': txt += f"• Diag : {k['diagnosis']}"
         return txt
 
-    def _module_retail_placeholder(self, kpis): return {"benchmark": [], "froid_analysis": {"ratio": 0}}
+    def _module_retail_placeholder(self, kpis):
+        return {"benchmark": [], "froid_analysis": {"ratio": 0, "is_alert": False}}
 
     # --- AUDIT PDF ---
     def extract_pdf(self, b):
@@ -358,7 +375,7 @@ class CortexEngine:
         ]
         return {"score": 80, "checks": checks}
 
-    def ask_agent(self, q): return "Cortex V11.3 Online."
+    def ask_agent(self, q): return "Cortex V11.4 Online."
     def run_chaos_monkey(self): return [{"test": "API Météo", "status": "READY"}]
 
 cortex = CortexEngine()
