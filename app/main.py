@@ -1,52 +1,113 @@
-from fastapi import FastAPI, HTTPException, Request
+# app/main.py V9.0 - ARCHITECTURE V3 (CLEAN & ROBUST)
+import os
+import secrets
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Header
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+
+# Import des moteurs modulaires (Le secret de la V3)
 from app.core.storage_engine import storage
 from app.core.cortex_engine import cortex
-import os
 
-app = FastAPI(title="ENERGISTRAT V3", version="3.0")
+app = FastAPI(title="ENERGISTRAT V3.0", version="ENTERPRISE")
 
-# Montage des fichiers statiques (CSS/JS)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# 1. SÉCURITÉ & MIDDLEWARE
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Configuration des Templates (HTML)
+# 2. MONTAGE DES FICHIERS
+# Les fichiers statiques (CSS/JS) sont à la racine du conteneur
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+elif os.path.exists("statique"): # Support legacy
+    app.mount("/static", StaticFiles(directory="statique"), name="static")
+
 templates = Jinja2Templates(directory="app/templates")
 
-# --- ROUTES SYSTEME ---
-
-@app.get("/")
-async def root(request: Request):
-    """Page d'accueil (Landing Page)"""
-    # Pour l'instant on renvoie vers ops, on changera plus tard vers index.html
-    return templates.TemplateResponse("ops.html", {"request": request, "version": "V3.0"})
-
+# 3. ROUTES SYSTÈME (Santé Cloud Run)
 @app.get("/health")
 async def health_check():
-    """Vérification Santé Cloud Run"""
-    is_writable = os.access("/app/data", os.W_OK)
     return {
         "status": "ONLINE",
-        "storage_writable": is_writable, 
-        "version_cortex": cortex.version,
-        "sites_managed": len(storage.index.get("sites", {}))
+        "version": "V3.0",
+        "storage_ok": os.access("/app/data", os.W_OK),
+        "cortex_version": cortex.version
     }
 
-# --- ROUTES API ---
+# 4. API OPS : LE CŒUR DU SYSTÈME (Anciennement /api/ops/analyze)
+@app.post("/api/ops/analyze")
+async def api_analyze(
+    file: UploadFile = File(...), 
+    target: str = Form("demo"), 
+    site_name: str = Form("Site_Principal"), 
+    x_admin_token: str = Header(None)
+):
+    # Sécurité (PIN codé en dur pour l'instant, on passera en ENV plus tard)
+    if x_admin_token != "BOSS_V5": 
+        return JSONResponse({"success": False, "error": "PIN Incorrect"}, 401)
 
-@app.post("/api/v1/ingest/webhook")
-async def ingest_api_data(site_id: str, connector_id: str, payload: dict):
-    """Webhook pour recevoir les données API externes"""
-    # 1. Vérification
-    site = storage.index["sites"].get(site_id)
-    if not site:
-        raise HTTPException(status_code=404, detail="Site inconnu")
+    try:
+        content = await file.read()
+        token = secrets.token_urlsafe(6)
         
-    # 2. Sauvegarde brute
-    file_path = storage.save_api_raw_data(site_id, connector_id, payload)
+        # Appel au Cerveau (Cortex Engine V13)
+        # Note: Nous réimplémenterons analyze_file dans cortex_engine.py juste après
+        analysis_result = cortex.analyze_file(content, file.filename, target_profile=target)
+        
+        if not analysis_result.get("success"):
+            return JSONResponse(analysis_result)
+
+        # Sauvegarde via Storage Engine (Le nouveau standard)
+        # On adapte la logique pour qu'elle corresponde au nouveau stockage
+        # TODO: Connecter le résultat au master_index.json
+        
+        return JSONResponse({
+            "success": True,
+            "filename": file.filename,
+            "token": token,
+            "secure_link": f"/dashboard/{target}?file={file.filename}&token={token}",
+            "kpi": analysis_result.get('kpi', {}),
+            "chart": analysis_result.get('chart', {}),
+            "ai_insight": analysis_result.get('ai_insight', "Analyse V3 en cours...")
+        })
+
+    except Exception as e:
+        print(f"[ERROR] Pipeline Failed: {e}")
+        return JSONResponse({"success": False, "error": str(e)})
+
+# 5. ROUTAGE INTELLIGENT (DASHBOARDS)
+@app.get("/dashboard/{profile}")
+async def client_dashboard(request: Request, profile: str):
+    """Charge dynamiquement le template HTML demandé."""
+    clean_name = profile.replace(".html", "")
+    filename = f"{clean_name}.html"
     
-    # 3. Audit
-    storage.log_audit("SYSTEM", "API_WEBHOOK", site_id, {"ref": file_path})
+    # Vérifie dans app/templates
+    if os.path.exists(f"app/templates/{filename}"):
+        return templates.TemplateResponse(filename, {"request": request})
     
-    return {"status": "RECEIVED", "ref": file_path}
+    # Fallback générique
+    if os.path.exists("app/templates/dashboard.html"):
+        return templates.TemplateResponse("dashboard.html", {"request": request, "profile": clean_name})
+        
+    return HTMLResponse(f"<h1>Dashboard '{clean_name}' introuvable</h1>", 404)
+
+# 6. ROUTE CATCH-ALL (Pour index, ops, etc.)
+@app.get("/{path_name:path}")
+async def catch_all(request: Request, path_name: str):
+    if path_name == "" or path_name == "/":
+        return templates.TemplateResponse("index.html", {"request": request})
+        
+    clean_name = path_name if path_name.endswith(".html") else f"{path_name}.html"
+    
+    if os.path.exists(f"app/templates/{clean_name}"):
+        return templates.TemplateResponse(clean_name, {"request": request})
+        
+    return JSONResponse({"error": "Page not found"}, 404)
