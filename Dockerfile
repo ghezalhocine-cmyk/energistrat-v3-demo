@@ -20,7 +20,7 @@ COPY app/ ./app/
 
 # 3. Gestion des fichiers statiques (CSS/JS/Images)
 # On copie ton dossier 'statique' local vers le dossier standard 'static' du serveur
-COPY statique/ ./static/
+COPY static/ ./static/
 
 # 4. Création du point de montage pour les données (Volume Persistant)
 RUN mkdir -p /app/data
@@ -28,3 +28,4 @@ RUN mkdir -p /app/data
 # 5. Lancement de l'application
 # Note le changement : 'app.main:app' au lieu de 'main:app'
 CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
+
