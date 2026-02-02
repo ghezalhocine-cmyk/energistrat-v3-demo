@@ -1,4 +1,4 @@
-# main.py V8.2 - CORTEX CONNECTOR (FINAL STABLE)
+# main.py V8.3 - CORTEX CONNECTOR + PROFILE ROUTING FIX
 import os
 import json
 import secrets
@@ -32,7 +32,7 @@ except ImportError:
     CORTEX_AVAILABLE = False
     print("⚠️ CRITICAL : CORTEX ENGINE NOT FOUND")
 
-app = FastAPI(title="ENERGISTRAT V8.2", version="FINAL STABLE")
+app = FastAPI(title="ENERGISTRAT V8.3", version="ROUTING FIX")
 
 # Middleware CORS
 app.add_middleware(
@@ -67,11 +67,10 @@ async def api_analyze(
         token = secrets.token_urlsafe(6)
         
         # --- APPEL AU CERVEAU V8.2 (HYBRIDE) ---
-        # Cortex gère tout : Ingestion Pandas, Maths, Narration
         analysis_result = await cortex.analyze_file(content, file.filename, target_profile=target)
         
         if not analysis_result.get("success"):
-            return JSONResponse(analysis_result) # Renvoie l'erreur de Cortex si échec
+            return JSONResponse(analysis_result)
 
         # Enrichissement Meta pour le stockage
         analysis_result["meta"] = {
@@ -91,6 +90,7 @@ async def api_analyze(
             "success": True,
             "filename": phys_filename,
             "token": token,
+            # Le lien pointe vers /dashboard/{target} (ex: /dashboard/retail)
             "secure_link": f"/dashboard/{target}?file={phys_filename}&token={token}",
             "kpi": analysis_result['kpi'],
             "chart": analysis_result['chart'],
@@ -127,11 +127,9 @@ async def get_secure_data(filename: str, token: str):
 async def audit_ep(invoice: UploadFile = File(...), contract: UploadFile = File(...), x_admin_token: str = Header(None)):
     if x_admin_token != ADMIN_PIN: return JSONResponse({}, 401)
     
-    # Fallback si Cortex n'est pas là
     if not CORTEX_AVAILABLE:
         return JSONResponse({"score": 0, "status": "ENGINE_OFF", "checks": []})
 
-    # Appel au moteur d'audit riche V8.2
     return JSONResponse(cortex.analyze_invoice_real(await invoice.read(), await contract.read()))
 
 @app.post("/api/ops/chaos")
@@ -142,7 +140,29 @@ async def chaos_ep(x_admin_token: str = Header(None)):
 async def chat_ep(message: str = Form(...), x_admin_token: str = Header(None)):
     return JSONResponse({"response": cortex.ask_agent(message) if CORTEX_AVAILABLE else "Cortex Offline"})
 
-# --- 4. NAVIGATION ---
+# --- 4. NAVIGATION (ROUTAGE CLIENT CORRIGÉ) ---
+
+# Route spécifique pour les tableaux de bord clients
+@app.get("/dashboard/{profile}")
+async def client_dashboard(request: Request, profile: str):
+    """
+    Route dynamique pour charger le template HTML correspondant au profil.
+    Ex: /dashboard/retail -> charge templates/retail.html
+    Ex: /dashboard/industry -> charge templates/industry.html
+    """
+    # Nettoyage du nom (au cas où .html est passé)
+    clean_name = profile.replace(".html", "")
+    filename = f"{clean_name}.html"
+    
+    # 1. Vérifie si le template spécifique existe
+    if os.path.exists(f"templates/{filename}"):
+        return templates.TemplateResponse(filename, {"request": request})
+    
+    # 2. Sinon, tente un template générique 'dashboard.html' s'il existe
+    if os.path.exists("templates/dashboard.html"):
+        return templates.TemplateResponse("dashboard.html", {"request": request})
+        
+    return HTMLResponse(f"<h1>Erreur 404 : Dashboard '{clean_name}' introuvable</h1><p>Vérifiez que le fichier {filename} existe dans le dossier templates.</p>", status_code=404)
 
 @app.get("/ops")
 @app.get("/ops.html")
