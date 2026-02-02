@@ -60,7 +60,7 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V11.2</span></div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V11.2 (PATCHED)</span></div>
             <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CHECK DB</div>
         </header>
 
@@ -215,6 +215,12 @@
         const App = { toast: function(msg, type='info') { const el = document.createElement('div'); el.className = 'toast'; el.style.borderLeftColor = type==='success'?'#10B981':(type==='error'?'#EF4444':'#00E5FF'); el.innerText = msg; document.getElementById('toast-container').appendChild(el); setTimeout(() => el.remove(), 4000); } };
         function navTo(pageId) { document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active')); document.getElementById('nav-' + pageId).classList.add('active'); document.querySelectorAll('.page-content').forEach(e => e.classList.remove('active')); document.getElementById('view-' + pageId).classList.add('active'); }
 
+        // --- FONCTION DE SÉCURITÉ ANTI-CRASH (NOUVEAU) ---
+        function safeLoc(val, suffix='') {
+            if (val === undefined || val === null || isNaN(val)) return '--';
+            return Math.round(val).toLocaleString() + suffix;
+        }
+
         let testChart = null;
         let masterData = { labels: [], values: [], average: [], talon: 0 };
         let currentFinanceData = null;
@@ -333,14 +339,18 @@
                     document.getElementById('res-link').href = data.secure_link;
                     
                     if(data.kpi) {
-                        document.getElementById('kpi-talon').innerText = data.kpi.talon + " kW";
-                        document.getElementById('kpi-ratio').innerText = data.kpi.inactivity_ratio + " %";
+                        // --- FIX AFFICHAGE (V18 Compatible) ---
+                        document.getElementById('kpi-talon').innerText = safeLoc(data.kpi.talon, " kW");
+                        
+                        // Ratio W.E (Peut être inactiviy_ratio ou ratio_we)
+                        const ratio = data.kpi.inactivity_ratio !== undefined ? data.kpi.inactivity_ratio : 0;
+                        document.getElementById('kpi-ratio').innerText = safeLoc(ratio, " %");
                         
                         // --- INTEGRATION AFFICHAGE V11 (HTML) ---
                         const diagContent = data.ai_insight ? data.ai_insight : data.kpi.diagnosis;
                         document.getElementById('kpi-diag').innerHTML = diagContent;
                         
-                        // FINANCE LAB DATA
+                        // FINANCE LAB DATA (Compatible V18 & V11)
                         if (data.kpi.finance) {
                             currentFinanceData = data.kpi.finance;
                             updateFinanceDisplay(data.kpi.finance);
@@ -356,14 +366,26 @@
             } catch (e) { log(e.message, 'error'); App.toast("Erreur Lecture", "error"); }
         }
 
-        // --- FINANCE LOGIC ---
+        // --- FINANCE LOGIC (PATCHED) ---
         function updateFinanceDisplay(finData) {
             if(!finData) return;
-            document.getElementById('fin-budget').innerText = finData.budget_total_estime.toLocaleString() + " €";
-            document.getElementById('fin-avg-price').innerText = finData.prix_moyen_calcule + " €/kWh";
+            
+            // COMPATIBILITÉ V18 (budget_total) / V11 (budget_total_estime)
+            const budget = finData.budget_total !== undefined ? finData.budget_total : (finData.budget_total_estime || 0);
+            
+            // Calcul Prix Moyen si absent
+            let avg = finData.prix_moyen_calcule;
+            if (avg === undefined) {
+                // Si V18 ne renvoie pas le prix moyen, on le calcule à la volée si on a la conso
+                // (Mais pour l'affichage simple, on met -- si pas dispo)
+                avg = 0; 
+            }
+
+            document.getElementById('fin-budget').innerText = Math.round(budget).toLocaleString() + " €";
+            document.getElementById('fin-avg-price').innerText = avg ? avg.toFixed(3) + " €/kWh" : "-- €/kWh";
             
             const refPrice = 0.145;
-            if(finData.prix_moyen_calcule > refPrice) {
+            if(avg > refPrice) {
                 document.getElementById('fin-status').innerText = "SURCOÛT DÉTECTÉ";
                 document.getElementById('fin-status').className = "px-2 py-1 bg-red-900/30 text-red-400 text-[10px] rounded border border-red-500/30";
             } else {
@@ -376,12 +398,19 @@
             if(!currentFinanceData) { alert("Veuillez d'abord charger un fichier."); return; }
             const pHP = parseFloat(document.getElementById('price-hp').value);
             const pHC = parseFloat(document.getElementById('price-hc').value);
-            const budget = (currentFinanceData.conso_hp * pHP) + (currentFinanceData.conso_hc * pHC);
-            const totalKwh = currentFinanceData.conso_hp + currentFinanceData.conso_hc;
-            const avg = budget / totalKwh;
-            document.getElementById('fin-budget').innerText = Math.round(budget).toLocaleString() + " €";
-            document.getElementById('fin-avg-price').innerText = avg.toFixed(3) + " €/kWh";
-            App.toast("Budget Recalculé.", "success");
+            
+            // Note: En V18, on devrait idéalement refaire un appel API pour recalculer précisément
+            // Mais pour l'instant, on fait une estimation locale si on a les consos HP/HC
+            if (currentFinanceData.conso_hp !== undefined) {
+                const budget = (currentFinanceData.conso_hp * pHP) + (currentFinanceData.conso_hc * pHC);
+                const totalKwh = currentFinanceData.conso_hp + currentFinanceData.conso_hc;
+                const avg = budget / totalKwh;
+                document.getElementById('fin-budget').innerText = Math.round(budget).toLocaleString() + " €";
+                document.getElementById('fin-avg-price').innerText = avg.toFixed(3) + " €/kWh";
+                App.toast("Budget Recalculé (Local).", "success");
+            } else {
+                App.toast("Données détaillées manquantes pour recalcul local.", "error");
+            }
         }
 
         async function runRealAudit() {
