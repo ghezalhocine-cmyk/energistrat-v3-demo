@@ -1,4 +1,4 @@
-# app/core/cortex_engine.py V18.2 - STABLE PATCH (ANTI-REGRESSION)
+# app/core/cortex_engine.py V18.3 - STABLE PATCH + JS FIX
 import pandas as pd
 import numpy as np
 import io
@@ -25,7 +25,7 @@ except Exception:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "18.2 (Stable Patch)"
+        self.version = "18.3 (Stable Patch + JS Fix)"
         
         # --- BASE DE CONNAISSANCE (COMPLETE) ---
         self.NAF_DB = {
@@ -40,7 +40,7 @@ class CortexEngine:
             "EP":  {"label": "Éclairage Public", "profile": "INVERSE"}
         }
 
-    # --- SÉCURITÉ MATHÉMATIQUE RENFORCÉE (LE FIX) ---
+    # --- SÉCURITÉ MATHÉMATIQUE RENFORCÉE ---
     def _safe_int(self, value):
         """Convertit n'importe quoi en int sans planter (NaN, Inf, None, String)"""
         try:
@@ -118,7 +118,7 @@ class CortexEngine:
         except Exception as e:
             print(f"[CRITICAL ERROR] {str(e)}")
             # On renvoie l'erreur proprement pour le debug
-            return {"success": False, "error": f"Erreur Analyse V18.2: {str(e)}"}
+            return {"success": False, "error": f"Erreur Analyse V18.3: {str(e)}"}
 
     # ==========================================================================
     # 2. IA & GENERATION
@@ -160,6 +160,31 @@ class CortexEngine:
     # ==========================================================================
     # 3. MODULES CALCULS ROBUSTES
     # ==========================================================================
+    def _module_socle(self, df, time_step):
+        # Calculs de base
+        values = df['val'].tolist()
+        p_max = max(values) if values else 0
+        conso_kwh = sum(values) * time_step
+        pos_vals = [v for v in values if v > 0]
+        talon = float(np.percentile(pos_vals, 5)) if pos_vals else 0.0
+        
+        # --- RESTAURATION DU CALCUL RATIO WEEKEND (Fix JS Error) ---
+        df['wd'] = df['date'].dt.weekday # 0=Lundi, 6=Dimanche
+        mean_we = df[df['wd'] >= 5]['val'].mean() # Samedi/Dimanche
+        mean_sem = df[df['wd'] < 5]['val'].mean() # Semaine
+        
+        ratio = 0
+        if mean_sem > 0:
+            ratio = (mean_we / mean_sem) * 100
+            
+        return {
+            "conso_totale": self._safe_int(conso_kwh),
+            "p_max": self._safe_float(p_max),
+            "talon": self._safe_int(talon),
+            "moyenne": self._safe_float(np.mean(values)),
+            "inactivity_ratio": self._safe_int(ratio) # La clé manquante est revenue !
+        }
+
     def _module_solar_opportunity(self, df, time_step):
         try:
             df['h'] = df['date'].dt.hour
@@ -220,19 +245,6 @@ class CortexEngine:
 
     def _module_carbon(self, conso_kwh):
         return {"carbone": {"tonnes_co2": round((conso_kwh * 60) / 1_000_000, 2)}}
-
-    def _module_socle(self, df, time_step):
-        values = df['val'].tolist()
-        p_max = max(values) if values else 0
-        conso_kwh = sum(values) * time_step
-        pos_vals = [v for v in values if v > 0]
-        talon = float(np.percentile(pos_vals, 5)) if pos_vals else 0.0
-        return {
-            "conso_totale": self._safe_int(conso_kwh),
-            "p_max": self._safe_float(p_max),
-            "talon": self._safe_int(talon),
-            "moyenne": self._safe_float(np.mean(values))
-        }
 
     def _universal_profiler(self, df, naf_info):
         try:
