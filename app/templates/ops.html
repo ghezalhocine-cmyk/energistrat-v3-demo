@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V13.2 | Ops Enterprise</title>
+    <title>ENERGISTRAT V15.0 | Ops Enterprise</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -32,8 +32,8 @@
         .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         
         /* Badges & Scroll */
-        .badge-hph { background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid #3B82F6; }
-        .badge-hpe { background: rgba(249, 115, 22, 0.2); color: #FB923C; border: 1px solid #F97316; }
+        .badge-hph { background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid #3B82F6; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+        .badge-hpe { background: rgba(249, 115, 22, 0.2); color: #FB923C; border: 1px solid #F97316; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #050505; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
@@ -46,7 +46,7 @@
 
     <div id="toast-container"></div>
 
-    <!-- 1. SIDEBAR (Navigation Fixée z-50) -->
+    <!-- 1. SIDEBAR -->
     <aside class="bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-50 relative">
         <div class="w-10 h-10 rounded-lg bg-ops/20 text-ops flex items-center justify-center font-bold mb-8 shadow-lg shadow-ops/20">OP</div>
         <nav class="flex flex-col w-full items-center gap-2">
@@ -61,22 +61,21 @@
     <!-- 2. MAIN CONTENT -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6 shrink-0">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V13.2 (STABLE)</span></div>
-            <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CORTEX V21.2 READY</div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V15.0 (FULL)</span></div>
+            <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CORTEX V23 READY</div>
         </header>
 
         <div class="flex-1 overflow-hidden relative">
             <!-- TAB 1: DATA LAB -->
             <div id="view-datalab" class="page-content active p-8 custom-scrollbar">
                 <div class="grid grid-cols-12 gap-6">
-                    <!-- UPLOAD ZONE (CORRIGÉE) -->
+                    <!-- UPLOAD ZONE -->
                     <div class="col-span-12 md:col-span-4 bento-card p-6 rounded-2xl border-t-4 border-cyan flex flex-col">
                         <h3 class="font-bold text-white mb-4">Ingestion Données</h3>
                         
                         <div class="space-y-3">
                             <div>
                                 <label class="text-[10px] text-gray-500 uppercase font-bold">Client / Groupe</label>
-                                <!-- MENU COMPLET 10 PROFILS -->
                                 <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 focus:border-cyan outline-none">
                                     <option value="demo">Test / Démo</option>
                                     <option value="retail">Retail / Franchise</option>
@@ -87,24 +86,22 @@
                                     <option value="oph">Bailleur (OPH)</option>
                                     <option value="syndic">Syndic de Copro</option>
                                     <option value="citoyen">Particulier</option>
-                                    <option value="supplier">Partenaire / Fournisseur</option>
+                                    <option value="supplier">Partenaire</option>
                                 </select>
                             </div>
                             
-                            <!-- ZONE DE CLIC FIABLE (LABEL POUR INPUT) -->
+                            <!-- INPUT CACHÉ + LABEL CLICABLE -->
                             <label for="real-upload" id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center py-6">
                                 <i class="fa-solid fa-folder-tree text-3xl text-gray-500 mb-2"></i>
                                 <span class="text-xs font-bold text-white" id="upload-label">Cliquer pour charger CSV</span>
                                 <span class="text-[9px] text-gray-500 mt-1">Format SGE Enedis supporté</span>
                             </label>
-                            <!-- INPUT CACHÉ MAIS ACTIF -->
                             <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
 
                             <button onclick="loadGroupView()" class="w-full bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 text-[10px] font-bold py-2 rounded border border-purple-500/30 transition flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-layer-group"></i> AGRÉGATION GROUPE
                             </button>
                             
-                            <!-- CHAMP NOM DU SITE -->
                             <div>
                                 <label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site</label>
                                 <input type="text" id="target-site" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 focus:border-cyan outline-none font-mono" placeholder="ex: Magasin_Paris_Nord">
@@ -128,6 +125,11 @@
                                     <span class="text-gray-500 text-[10px]">-</span>
                                     <input type="date" id="date-end" onchange="applyDateFilter()" class="bg-transparent border-0 text-white text-[10px] w-24 cursor-pointer">
                                 </div>
+                                <div class="flex gap-1">
+                                    <button onclick="zoomPreset(7)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded">7J</button>
+                                    <button onclick="zoomPreset(30)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded">30J</button>
+                                    <button onclick="zoomPreset('all')" class="px-2 py-1 bg-cyan-500/20 text-cyan-500 text-[10px] rounded">TOUT</button>
+                                </div>
                             </div>
                             <div class="h-64 w-full relative"><canvas id="testChart"></canvas></div>
                             
@@ -138,7 +140,7 @@
                             </div>
                         </div>
 
-                        <!-- TITAN GRID (4 KPI) -->
+                        <!-- TITAN GRID -->
                         <div class="grid grid-cols-4 gap-4">
                             <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-red-500/5">
                                 <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">GHOST BUSTER</span><i class="fa-solid fa-ghost text-gray-600"></i></div>
@@ -165,12 +167,12 @@
                 </div>
             </div>
 
-            <!-- TAB 2: FINANCE LAB (4 POSTES COMPLET) -->
+            <!-- TAB 2: FINANCE LAB (SIMULATION RESTAURÉE) -->
             <div id="view-finlab" class="page-content p-8 custom-scrollbar">
                 <div class="grid grid-cols-12 gap-6">
                     <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Finance Lab (4 Postes)</h3></div>
                     
-                    <!-- SIMULATEUR 4 POSTES -->
+                    <!-- SIMULATEUR 4 POSTES (RESTAURÉ) -->
                     <div class="col-span-4 bento-card p-6 rounded-2xl border-t-4 border-finance">
                         <h4 class="font-bold text-white mb-4 text-xs uppercase tracking-wider">Tarification Saisonnière</h4>
                         
@@ -284,11 +286,8 @@
             document.getElementById('view-' + pageId).classList.add('active'); 
         }
 
-        // --- BLINDAGE ANTI-CRASH JS (LE FIX) ---
-        function safeSetText(id, val) {
-            const el = document.getElementById(id);
-            if (el) el.innerText = val;
-        }
+        // --- BLINDAGE ANTI-CRASH JS ---
+        function safeSetText(id, val) { const el = document.getElementById(id); if (el) el.innerText = val; }
         function safeSetVal(id, val) { const el = document.getElementById(id); if (el) el.value = val; }
         function safeLoc(val, suffix='') { if (val === undefined || val === null || isNaN(val)) return '--'; return Math.round(val).toLocaleString() + suffix; }
 
@@ -298,14 +297,15 @@
 
         function initChart() {
             const ctx = document.getElementById('testChart').getContext('2d');
-            testChart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true }, title: { display: false } }, scales: { x: { ticks: { color: '#64748B', maxTicksLimit: 10 } }, y: { ticks: { color: '#64748B' } } } } });
+            testChart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: '#ffffff10' } } }, elements: { point: { radius: 0 } } } });
         }
+
+        // --- UPLOAD LOGIC ---
+        function triggerUpload() { document.getElementById('real-upload').click(); }
 
         async function handleFileSelect(file) {
             if (!file) return;
-            // Reset input value to allow re-uploading same file
-            document.getElementById('real-upload').value = '';
-            
+            document.getElementById('real-upload').value = ''; // Reset
             const target = document.getElementById('target-client').value;
             const site = document.getElementById('target-site').value || "Site_Principal";
             const formData = new FormData(); formData.append('file', file); formData.append('target', target); formData.append('site_name', site);
@@ -317,7 +317,7 @@
                 const data = await res.json();
                 
                 if (data.success) {
-                    log("Analyse V21.2 Terminée.", 'success');
+                    log("Analyse V22 Terminée.", 'success');
                     document.getElementById('upload-result').classList.remove('hidden');
                     document.getElementById('res-link').style.display = 'block';
                     document.getElementById('res-link').href = data.secure_link;
@@ -364,7 +364,7 @@
             } catch (e) { log(e.message, 'error'); App.toast("Erreur Lecture", "error"); }
         }
 
-        // --- CHARTS & UI LOGIC ---
+        // --- CHART UPDATE ---
         function updateChartDisplay(labels, values, average, talon) {
             const talonLine = new Array(values.length).fill(talon);
             testChart.data.labels = labels;
@@ -375,23 +375,25 @@
             testChart.update();
             const sum = values.reduce((a, b) => a + b, 0);
             const max = Math.max(...values);
-            // Fix: Use safeSetText to avoid null error if elements are missing/loading
             safeSetText('dyn-conso', Math.round(sum * (values.length > 8000 ? 0.166 : 1)).toLocaleString() + " kWh");
             safeSetText('dyn-pmax', Math.round(max).toLocaleString() + " kW");
             safeSetText('dyn-points', values.length);
         }
 
         function zoomPreset(range) {
-            if(!masterData.values.length) return;
-            let sl, sv, sa;
-            if (range === 'all') { sl=masterData.labels; sv=masterData.values; sa=masterData.average; }
+            if(!masterData.labels.length) return;
+            let sl, sv;
+            if (range === 'all') { sl=masterData.labels; sv=masterData.values; }
             else { 
-                sl=masterData.labels.slice(-range * 24 * 6); 
-                if (sl.length > masterData.labels.length) sl = masterData.labels;
-                const idx = masterData.labels.length - sl.length;
-                sv = masterData.values.slice(idx); sa = masterData.average.slice(idx); 
+                const points = range * 24 * 6; 
+                sl = masterData.labels.slice(-points);
+                sv = masterData.values.slice(-points);
             }
-            updateChartDisplay(sl, sv, sa, masterData.talon);
+            if(sl.length > 0) {
+                safeSetVal('date-start', sl[0].substring(0, 10));
+                safeSetVal('date-end', sl[sl.length - 1].substring(0, 10));
+            }
+            updateChartDisplay(sl, sv, masterData.average, masterData.talon);
         }
 
         function applyDateFilter() {
@@ -403,14 +405,12 @@
                 const d = masterData.labels[i].substring(0, 10);
                 if(d >= sVal && d <= eVal) filteredIndices.push(i);
             }
-            if(filteredIndices.length === 0) { App.toast("Aucune donnée.", "error"); return; }
+            if(filteredIndices.length === 0) return App.toast("Aucune donnée.", "error");
             const startIdx = filteredIndices[0];
             const endIdx = filteredIndices[filteredIndices.length - 1];
             const sl = masterData.labels.slice(startIdx, endIdx + 1);
             const sv = masterData.values.slice(startIdx, endIdx + 1);
-            const sa = masterData.average.slice(startIdx, endIdx + 1);
-            updateChartDisplay(sl, sv, sa, masterData.talon);
-            App.toast("Filtre appliqué.", "success");
+            updateChartDisplay(sl, sv, masterData.average, masterData.talon);
         }
 
         // --- FINANCE 4 POSTES LOGIC ---
@@ -438,18 +438,15 @@
             const pHCE = parseFloat(document.getElementById('price-hce').value);
             
             const d = currentFinanceData.detail_4p;
-            const c1 = d.HPH.vol * pHPH;
-            const c2 = d.HCH.vol * pHCH;
-            const c3 = d.HPE.vol * pHPE;
-            const c4 = d.HCE.vol * pHCE;
+            const totalBudget = (d.HPH.vol * pHPH) + (d.HCH.vol * pHCH) + (d.HPE.vol * pHPE) + (d.HCE.vol * pHCE);
             
-            const totalBudget = c1 + c2 + c3 + c4;
-            document.getElementById('fin-budget').innerText = Math.round(totalBudget).toLocaleString() + " €";
+            safeSetText('fin-budget', Math.round(totalBudget).toLocaleString() + " €");
             
             const totalVol = d.HPH.vol + d.HCH.vol + d.HPE.vol + d.HCE.vol;
             const avg = totalVol > 0 ? (totalBudget / totalVol) : 0;
-            document.getElementById('fin-avg-price').innerText = avg.toFixed(3) + " €/kWh";
-            App.toast("Budget 4 Postes Recalculé.", "success");
+            safeSetText('fin-avg-price', avg.toFixed(3) + " €/kWh");
+            
+            App.toast("Budget Recalculé.", "success");
         }
 
         function updateFinanceDisplay(finData) {
@@ -459,23 +456,24 @@
             safeSetText('fin-avg-price', avg.toFixed(3) + " €/kWh");
         }
 
-        // --- AUDIT & CHAT ---
+        // --- AUDIT & CHAT & CHAOS ---
         async function runRealAudit() {
             const inv = document.getElementById('invoice-file').files[0];
             const ctr = document.getElementById('contract-file').files[0];
-            if(!inv || !ctr) return App.toast("Manque Fichier", "error");
-            log("Audit PDF...", "info");
-            const fd = new FormData(); fd.append('invoice', inv); fd.append('contract', ctr);
+            if(!inv) return alert("Fichier manquant");
+            log("Audit PDF en cours...", "info");
+            const fd = new FormData(); fd.append('invoice', inv); if(ctr) fd.append('contract', ctr);
             try {
                 const res = await fetch('/api/ops/audit', { method:'POST', headers: { 'x-admin-token': adminPin }, body:fd });
                 const data = await res.json();
-                let html = '';
                 if(data.checks) {
+                    let html = '';
                     data.checks.forEach(c => {
-                        const color = c.error ? 'text-red-400 font-bold' : 'text-green-400';
-                        html += `<tr><td class="p-2 border-b border-white/5">${c.point}</td><td class="p-2 border-b border-white/5">${c.a}</td><td class="p-2 border-b border-white/5 text-right ${color}">${c.status}</td></tr>`;
+                        const color = c.error ? 'text-red-500' : 'text-green-500';
+                        html += `<tr><td class="p-3 text-gray-400">${c.point}</td><td class="p-3 text-white">${c.a}</td><td class="p-3 text-white">${c.b}</td><td class="p-3 text-right font-bold ${color}">${c.status}</td></tr>`;
                     });
                     document.getElementById('audit-results').innerHTML = html;
+                    log("Audit Terminé.", "success");
                 }
             } catch(e) { log("Erreur Audit", "error"); }
         }
@@ -484,7 +482,8 @@
             const res = await fetch('/api/ops/chaos', { method:'POST', headers: { 'x-admin-token': adminPin } });
             const data = await res.json();
             const div = document.getElementById('chaos-results'); div.innerHTML = '';
-            data.results.forEach(r => div.innerHTML += `<div class="border p-2 rounded text-xs text-white">${r.test}: ${r.status}</div>`);
+            const list = data.results || data;
+            list.forEach(r => div.innerHTML += `<div class="border p-2 rounded text-xs text-white bg-white/5">${r.test}: ${r.status}</div>`);
         }
 
         async function sendChat() {
@@ -498,14 +497,10 @@
             document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.response}</div>`;
         }
 
-        async function loadGroupView() {
-            const client = document.getElementById('target-client').value;
-            log(`Chargement Vision Groupe : ${client}...`, 'info');
-            App.toast("Module Groupe en cours de connexion...", "info");
-        }
+        async function loadGroupView() { App.toast("Module Groupe en cours...", "info"); }
 
         document.addEventListener('DOMContentLoaded', () => { initChart(); navTo('datalab'); });
-        log('Ops V13.2 Stable Ready.', 'success');
+        log('Ops V15.0 Enterprise Ready.', 'success');
     </script>
 </body>
 </html>
