@@ -1,4 +1,4 @@
-# app/main.py V12.0 - PRODUCTION (FULL CONNECTIVITY)
+# app/main.py V13.0 - ROUTAGE STANDARD (SITE VITRINE + APP)
 import os
 import secrets
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Header
@@ -7,13 +7,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
-# IMPORT DES MOTEURS (Validés par le Safe Boot)
+# MOTEURS
 from app.core.storage_engine import storage
 from app.core.cortex_engine import cortex
 
-app = FastAPI(title="ENERGISTRAT V3", version="PROD")
+app = FastAPI(title="ENERGISTRAT V3", version="PROD_ROUTING")
 
-# 1. MIDDLEWARE
+# 1. CONFIGURATION
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,23 +22,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 2. STATIC & TEMPLATES
+# 2. FICHIERS STATIQUES (CSS/JS/IMG)
+# Vital pour que le site ne soit pas "moche" ou "figé"
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
 
-# 3. SYSTEM HEALTH
+# 3. ROUTES SYSTÈME
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "ONLINE",
-        "version": "V3.0-PROD",
-        "cortex": cortex.version,
-        "storage": "WRITABLE" if os.access("/app/data", os.W_OK) else "READ_ONLY"
-    }
+    return {"status": "ONLINE", "version": "V3.0", "cortex": cortex.version}
 
-# 4. API : ANALYSE SGE (CSV/EXCEL)
+# ============================================================
+# 4. API MÉTIER (OPS & CORTEX)
+# ============================================================
+
 @app.post("/api/ops/analyze")
 async def api_analyze(
     file: UploadFile = File(...), 
@@ -47,47 +46,28 @@ async def api_analyze(
     x_admin_token: str = Header(None)
 ):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
-
     try:
         content = await file.read()
         token = secrets.token_urlsafe(6)
-        
-        # Appel Cortex V26
+        # Appel Cortex
         analysis_result = cortex.analyze_file(content, file.filename, target_profile=target)
-        
-        if not analysis_result.get("success"):
-            return JSONResponse(analysis_result)
+        if not analysis_result.get("success"): return JSONResponse(analysis_result)
 
-        # Lien dashboard
         analysis_result["token"] = token
         analysis_result["secure_link"] = f"/dashboard/{target}?site={site_name}"
-        
         return JSONResponse(analysis_result)
-
     except Exception as e:
-        print(f"[API ERROR] {e}")
         return JSONResponse({"success": False, "error": str(e)})
 
-# 5. API : AUDIT PDF (Connecté au V26)
 @app.post("/api/ops/audit")
-async def api_audit(
-    invoice: UploadFile = File(...),
-    contract: UploadFile = File(None),
-    x_admin_token: str = Header(None)
-):
+async def api_audit(invoice: UploadFile = File(...), contract: UploadFile = File(None), x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
-    
     try:
-        inv_content = await invoice.read()
-        ctr_content = await contract.read() if contract else None
-        
-        # Appel Cortex
-        result = cortex.analyze_invoice_real(inv_content, ctr_content)
-        return JSONResponse(result)
-    except Exception as e:
-        return JSONResponse({"score": 0, "checks": [], "error": str(e)})
+        inv = await invoice.read()
+        ctr = await contract.read() if contract else None
+        return JSONResponse(cortex.analyze_invoice_real(inv, ctr))
+    except Exception as e: return JSONResponse({"score": 0, "checks": [], "error": str(e)})
 
-# 6. API : CHAT & CHAOS
 @app.post("/api/ops/chat")
 async def api_chat(message: str = Form(...), x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
@@ -100,10 +80,21 @@ async def api_chaos(x_admin_token: str = Header(None)):
 
 @app.get("/api/ops/aggregate/{client}")
 async def api_aggregate(client: str, x_admin_token: str = Header(None)):
-    if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     return JSONResponse({"success": False, "error": "Module Agrégation en cours"})
 
-# 7. ROUTAGE FRONT
+# ============================================================
+# 5. ROUTAGE NAVIGATION (VITRINE & APP)
+# ============================================================
+
+# A. LA RACINE (ACCUEIL)
+@app.get("/")
+async def root(request: Request):
+    # On sert index.html (la vitrine) par défaut
+    if os.path.exists("app/templates/index.html"):
+        return templates.TemplateResponse("index.html", {"request": request})
+    return "ENERGISTRAT V3 ONLINE - Index manquante"
+
+# B. TABLEAUX DE BORD CLIENTS
 @app.get("/dashboard/{profile}")
 async def client_dashboard(request: Request, profile: str):
     clean_name = profile.replace(".html", "")
@@ -114,15 +105,17 @@ async def client_dashboard(request: Request, profile: str):
         return templates.TemplateResponse("dashboard.html", {"request": request})
     return HTMLResponse("Dashboard introuvable", 404)
 
-@app.get("/{path_name:path}")
-async def catch_all(request: Request, path_name: str):
-    if path_name == "" or path_name == "/":
-        # On renvoie vers Ops par défaut pour la démo
-        return templates.TemplateResponse("ops.html", {"request": request})
-        
+# C. ROUTAGE GÉNÉRIQUE (Pour /pme, /syndic, /ops...)
+@app.get("/{path_name}")
+async def catch_pages(request: Request, path_name: str):
+    # Nettoyage du nom (ex: "ops" -> "ops.html")
     clean_name = path_name if path_name.endswith(".html") else f"{path_name}.html"
     
+    # Sécurité : on empêche de remonter dans les dossiers
+    if ".." in clean_name or "/" in clean_name:
+        return HTMLResponse("Chemin invalide", 403)
+
     if os.path.exists(f"app/templates/{clean_name}"):
         return templates.TemplateResponse(clean_name, {"request": request})
-        
-    return JSONResponse({"error": "Page not found"}, 404)
+    
+    return JSONResponse({"error": f"Page '{clean_name}' introuvable"}, 404)
