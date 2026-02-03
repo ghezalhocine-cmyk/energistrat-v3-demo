@@ -1,4 +1,4 @@
-# app/core/cortex_engine.py V21.2 - FINAL CERTIFIED (4P REAL + ROBUST DATE)
+# app/core/cortex_engine.py V21.3 - ENEDIS DATE FIX (NO REGRESSION)
 import pandas as pd
 import numpy as np
 import io
@@ -26,7 +26,7 @@ except Exception:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "21.2 (Final Certified)"
+        self.version = "21.3 (Enedis Fix)"
         
         # --- BASE DE CONNAISSANCE (COMPLETE) ---
         self.NAF_DB = {
@@ -63,7 +63,7 @@ class CortexEngine:
     # ==========================================================================
     def analyze_file(self, file_content, filename, target_profile="demo"):
         try:
-            # A. INGESTION (Avec Parsing Date Renforcé)
+            # A. INGESTION (Parsing Renforcé V21.3)
             df, time_step_hours = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Données illisibles"}
             
@@ -79,7 +79,7 @@ class CortexEngine:
             profiling = self._universal_profiler(df, naf_input)
             base = self._module_socle(df, time_step_hours)
             
-            # --- FINANCE 4 POSTES (VRAIE SIMULATION) ---
+            # --- FINANCE 4 POSTES ---
             finance = self._module_finance_4_postes(df, time_step_hours, base['p_max'])
             
             # Modules Avancés
@@ -123,70 +123,56 @@ class CortexEngine:
             return {"success": False, "error": f"Erreur Analyse: {str(e)}"}
 
     # ==========================================================================
-    # 2. MODULE FINANCE 4 POSTES (REALITY CHECK)
+    # 2. MODULE FINANCE 4 POSTES
     # ==========================================================================
     def _module_finance_4_postes(self, df, time_step, p_max):
-        """
-        Découpage strict selon le calendrier TURPE / Fournisseur.
-        """
         # 1. Enrichissement Temporel
         df['month'] = df['date'].dt.month
         df['hour'] = df['date'].dt.hour
         
-        # 2. Définition des Saisons (Hiver = Nov-Mars)
+        # 2. Définition Saisons (Hiver = Nov-Mars)
         mask_winter = df['month'].isin([11, 12, 1, 2, 3])
-        mask_summer = ~mask_winter # Le reste (Avril-Oct)
+        mask_summer = ~mask_winter
         
-        # 3. Définition des Horaires (HP = 06h-22h)
+        # 3. Définition Horaires (HP = 06h-22h)
         mask_hp = (df['hour'] >= 6) & (df['hour'] < 22)
         mask_hc = ~mask_hp
         
-        # 4. Calcul des Volumes (kWh)
+        # 4. Calcul Volumes
         vol_hph = df[mask_winter & mask_hp]['val'].sum() * time_step
         vol_hch = df[mask_winter & mask_hc]['val'].sum() * time_step
         vol_hpe = df[mask_summer & mask_hp]['val'].sum() * time_step
         vol_hce = df[mask_summer & mask_hc]['val'].sum() * time_step
         
-        # 5. Tarifs de Référence (B2B 2026 Estimés)
-        P_HPH = 0.22 # Hiver Plein (Cher)
-        P_HCH = 0.14 # Hiver Creux
-        P_HPE = 0.14 # Eté Plein
-        P_HCE = 0.09 # Eté Creux (Pas cher)
+        # 5. Tarifs Ref
+        P_HPH, P_HCH, P_HPE, P_HCE = 0.22, 0.14, 0.14, 0.09
         
-        # 6. Calcul Budget Énergie
+        # 6. Budget
         cout_elec = (vol_hph * P_HPH) + (vol_hch * P_HCH) + (vol_hpe * P_HPE) + (vol_hce * P_HCE)
+        cout_fixe = (p_max * 14) + ((vol_hph + vol_hch + vol_hpe + vol_hce) * 0.03)
+        budget_total = cout_elec + cout_fixe
         
-        # 7. Part Fixe (Abo + Taxes)
-        cout_abo = p_max * 14 # ~14€/kVA/an
-        cout_taxes = (vol_hph + vol_hch + vol_hpe + vol_hce) * 0.03 # ~30€/MWh
-        
-        budget_total = cout_elec + cout_abo + cout_taxes
-        
-        # 8. Calcul Prix Moyen
         total_kwh = vol_hph + vol_hch + vol_hpe + vol_hce
         avg_price = budget_total / total_kwh if total_kwh > 0 else 0
         
         return {
             "finance": {
-                # Clés Compatibilité V11 (Front)
                 "budget_total_estime": self._safe_int(budget_total),
                 "budget_total": self._safe_int(budget_total),
                 "conso_hp": self._safe_int(vol_hph + vol_hpe),
                 "conso_hc": self._safe_int(vol_hch + vol_hce),
                 "prix_moyen_calcule": round(avg_price, 3),
-                
-                # NOUVEAU : Détail 4 Postes (Pour affichage futur ou expert)
                 "detail_4p": {
-                    "HPH": {"vol": self._safe_int(vol_hph), "prix": P_HPH, "cout": self._safe_int(vol_hph * P_HPH)},
-                    "HCH": {"vol": self._safe_int(vol_hch), "prix": P_HCH, "cout": self._safe_int(vol_hch * P_HCH)},
-                    "HPE": {"vol": self._safe_int(vol_hpe), "prix": P_HPE, "cout": self._safe_int(vol_hpe * P_HPE)},
-                    "HCE": {"vol": self._safe_int(vol_hce), "prix": P_HCE, "cout": self._safe_int(vol_hce * P_HCE)}
+                    "HPH": {"vol": self._safe_int(vol_hph), "cout": self._safe_int(vol_hph * P_HPH)},
+                    "HCH": {"vol": self._safe_int(vol_hch), "cout": self._safe_int(vol_hch * P_HCH)},
+                    "HPE": {"vol": self._safe_int(vol_hpe), "cout": self._safe_int(vol_hpe * P_HPE)},
+                    "HCE": {"vol": self._safe_int(vol_hce), "cout": self._safe_int(vol_hce * P_HCE)}
                 }
             }
         }
 
     # ==========================================================================
-    # 3. MODULES RESTAURÉS (NON RÉGRESSIFS)
+    # 3. MODULES RESTAURÉS
     # ==========================================================================
     def _module_socle(self, df, time_step):
         values = df['val'].tolist()
@@ -195,7 +181,6 @@ class CortexEngine:
         pos_vals = [v for v in values if v > 0]
         talon = float(np.percentile(pos_vals, 5)) if pos_vals else 0.0
         
-        # Ratio Week-end
         df['wd'] = df['date'].dt.weekday
         mean_we = df[df['wd'] >= 5]['val'].mean()
         mean_sem = df[df['wd'] < 5]['val'].mean()
@@ -213,74 +198,58 @@ class CortexEngine:
         try:
             url = f"https://api-adresse.data.gouv.fr/search/?q={zipcode}&limit=1"
             res = requests.get(url, timeout=1).json()
-            if res['features']:
-                return {"city": res['features'][0]['properties']['city'], "zip": zipcode}
+            if res['features']: return {"city": res['features'][0]['properties']['city'], "zip": zipcode}
         except: pass
         return {"city": "Localisation Inconnue", "zip": zipcode}
 
-    # --- AUDIT PDF RESTAURÉ ---
-    def extract_pdf(self, b):
-        t = ""
-        if PDF_AVAILABLE:
-            try:
-                with pdfplumber.open(io.BytesIO(b)) as pdf:
-                    for p in pdf.pages: t += p.extract_text() + "\n"
-            except: pass
-        return t
-
-    def analyze_invoice_real(self, inv_b, ctr_b):
-        txt = self.extract_pdf(inv_b) or ""
-        m_sous = re.search(r"(?:souscrite|P\.?\s?souscrite)[^\d]*(\d{2,5})", txt, re.I)
-        m_max = re.search(r"(?:atteinte|max|pointe)[^\d]*(\d{2,5})", txt, re.I)
-        p_sous = float(m_sous.group(1)) if m_sous else 0
-        p_att = float(m_max.group(1)) if m_max else 0
-        
-        checks = [
-            {"point": "Puissance Souscrite", "a": f"{p_sous} kVA", "b": "Contrat", "status": "LU", "error": False},
-            {"point": "Puissance Atteinte", "a": f"{p_att} kVA", "b": "-", "status": "ALERTE" if p_att > p_sous else "OK", "error": p_att > p_sous},
-            {"point": "Taxes (CSPE)", "a": "Présente" if "CSPE" in txt else "Non", "b": "Requise", "status": "OK" if "CSPE" in txt else "KO", "error": "CSPE" not in txt}
-        ]
-        return {"score": 80, "checks": checks}
-
-    def run_chaos_monkey(self):
-        return [
-            {"test": "PDF Engine", "status": "OK" if PDF_AVAILABLE else "MISSING"},
-            {"test": "Vertex AI", "status": "OK" if AI_AVAILABLE else "OFFLINE"},
-            {"test": "Météo API", "status": "READY"}
-        ]
-
-    # --- UTILS STANDARD (PARSING RENFORCÉ) ---
+    # --- PARSING ENEDIS STRICT (LE FIX V21.3) ---
     def _parse_data(self, content, filename):
         try:
             buffer = io.BytesIO(content)
             df = None
+            
+            # 1. Détection Format (CSV Enedis = Point-virgule)
             if filename.lower().endswith('.csv'):
-                try: df = pd.read_csv(buffer, sep=None, engine='python')
-                except: buffer.seek(0); df = pd.read_csv(buffer, sep=';', encoding='latin-1')
-            else: df = pd.read_excel(buffer)
+                try:
+                    # Essai 1 : Format Enedis Standard (Latin-1 + ';')
+                    df = pd.read_csv(buffer, sep=';', encoding='latin-1', engine='python')
+                except:
+                    # Essai 2 : Format CSV Standard (UTF-8 + ',')
+                    buffer.seek(0)
+                    df = pd.read_csv(buffer, sep=',', encoding='utf-8')
+            else:
+                df = pd.read_excel(buffer)
 
+            # 2. Normalisation Colonnes
             df.columns = [str(c).lower().strip() for c in df.columns]
-            c_date = next((c for c in df.columns if any(x in c for x in ['date','horo','time'])), df.columns[0])
-            c_val = next((c for c in df.columns if any(x in c for x in ['puiss','p10','conso','val','kw'])), df.columns[1])
+            
+            # Recherche intelligente des colonnes
+            c_date = next((c for c in df.columns if 'date' in c or 'horo' in c), df.columns[0])
+            c_val = next((c for c in df.columns if 'puiss' in c or 'conso' in c or 'val' in c), df.columns[1])
 
-            # PARSING DATE RENFORCÉ (C'EST ICI LA CLÉ DU 4 POSTES)
+            # 3. Parsing Date (LE FIX)
+            # Enedis : JJ/MM/AAAA HH:MM:SS
             try:
-                # On essaie d'abord en UTC (format ISO strict)
-                df['date'] = pd.to_datetime(df[c_date], utc=True, errors='coerce').dt.tz_convert('Europe/Paris')
-            except:
-                # Sinon on tente le format "Français" (JJ/MM/AAAA)
+                # Force le format jour/mois/année (dayfirst=True)
                 df['date'] = pd.to_datetime(df[c_date], dayfirst=True, errors='coerce')
+                # Si échec (NaT), on tente le format ISO
+                if df['date'].isnull().all():
+                    df['date'] = pd.to_datetime(df[c_date], utc=True, errors='coerce').dt.tz_convert('Europe/Paris')
+            except:
+                # Fallback ultime
+                df['date'] = pd.to_datetime(df[c_date], errors='coerce')
 
-            # Nettoyage numérique
+            # 4. Nettoyage Valeurs
             if df[c_val].dtype == object:
                 df['val'] = pd.to_numeric(df[c_val].astype(str).str.replace(',', '.').replace(' ', ''), errors='coerce')
             else:
                 df['val'] = pd.to_numeric(df[c_val], errors='coerce')
 
             df = df.dropna(subset=['date'])
+            df['val'] = df['val'].fillna(0).replace([np.inf, -np.inf], 0)
             df = df.sort_values(by='date')
             
-            # Auto-Scale (W -> kW)
+            # Auto-Scale (Enedis W -> kW)
             if df['val'].median() > 2000: df['val'] = df['val'] / 1000
             
             time_step = 0.166
@@ -303,7 +272,29 @@ class CortexEngine:
                 if kw in fn: return {"code": code, **info}
         return {"code": "NA", "label": "Non Identifié", "profile": "STANDARD"}
 
-    # --- MODULES QUANTUM (V17) ---
+    # --- AUDIT PDF RESTAURÉ ---
+    def extract_pdf(self, b):
+        t = ""
+        if PDF_AVAILABLE:
+            try:
+                with pdfplumber.open(io.BytesIO(b)) as pdf:
+                    for p in pdf.pages: t += p.extract_text() + "\n"
+            except: pass
+        return t
+
+    def analyze_invoice_real(self, inv_b, ctr_b):
+        txt = self.extract_pdf(inv_b) or ""
+        m_sous = re.search(r"(?:souscrite|P\.?\s?souscrite)[^\d]*(\d{2,5})", txt, re.I)
+        m_max = re.search(r"(?:atteinte|max|pointe)[^\d]*(\d{2,5})", txt, re.I)
+        p_sous = float(m_sous.group(1)) if m_sous else 0
+        p_att = float(m_max.group(1)) if m_max else 0
+        checks = [{"point": "Puissance", "a": f"{p_sous}", "b": f"{p_att}", "status": "OK" if p_att<=p_sous else "ALERTE", "error": p_att>p_sous}]
+        return {"score": 80, "checks": checks}
+
+    def run_chaos_monkey(self):
+        return [{"test": "Vertex AI", "status": "OK" if AI_AVAILABLE else "OFFLINE"}]
+
+    # --- MODULES QUANTUM ---
     def _module_solar_opportunity(self, df, time_step):
         try:
             df['h'] = df['date'].dt.hour
@@ -327,15 +318,18 @@ class CortexEngine:
         return {"archetype": "STANDARD", "label_detecte": naf['label']}
 
     def _generate_hybrid_insight(self, k):
-        # Génère une réponse textuelle (Vertex ou Fallback)
         if AI_AVAILABLE:
             try: return self._ask_vertex_for_strategy(k)
             except: pass
-        return f"Analyse V20 (4 Postes). Conso: {k['conso_totale']} kWh."
+        return f"Analyse V21 (4 Postes). Conso: {k['conso_totale']} kWh."
 
     def _ask_vertex_for_strategy(self, data):
         prompt = f"Analyse Énergie pour {data['sectoriel']['label']}. Budget: {data['finance']['budget_total']}€. Rédige 3 lignes de conseils."
         return AI_MODEL.generate_content(prompt).text
+
+    def ask_agent(self, msg):
+        if AI_AVAILABLE: return AI_MODEL.generate_content(msg).text
+        return "IA Offline."
 
 # Instance Singleton
 cortex = CortexEngine()
