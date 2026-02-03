@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V15.0 | Ops Enterprise</title>
+    <title>ENERGISTRAT V15.1 | Ops Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -15,249 +15,173 @@
     <style>
         body { background: #050505; color: #e2e8f0; overflow: hidden; }
         .ops-grid { display: grid; grid-template-columns: 70px 1fr 350px; height: 100vh; }
-        .bento-card { background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
-        .nav-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #64748B; cursor: pointer; transition: all 0.2s; margin-bottom: 1rem; }
-        .nav-icon.active { background: rgba(244, 63, 94, 0.1); color: #F43F5E; box-shadow: 0 0 10px rgba(244, 63, 94, 0.2); }
-        .nav-icon:hover { color: white; background: rgba(255,255,255,0.05); }
-        
-        .page-content { display: none; height: 100%; overflow-y: auto; padding-bottom: 50px; } 
+        .bento-card { background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255,255,255,0.1); }
+        .nav-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #64748B; cursor: pointer; margin-bottom: 1rem; }
+        .nav-icon.active { background: rgba(244, 63, 94, 0.1); color: #F43F5E; }
+        .page-content { display: none; height: 100%; overflow-y: auto; padding: 20px; } 
         .page-content.active { display: grid; }
         
-        #drop-zone { transition: all 0.3s ease; cursor: pointer; }
-        #drop-zone:hover { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.05); }
+        /* UPLOAD FIX : CURSOR POINTER SUR LA DIV */
+        .upload-box { border: 2px dashed #475569; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; cursor: pointer; transition: all 0.2s; }
+        .upload-box:hover { border-color: #00E5FF; background: rgba(0, 229, 255, 0.05); }
         
-        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
-        .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .audit-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .audit-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .ai-msg { background: rgba(168, 85, 247, 0.1); border-left: 3px solid #A855F7; padding: 10px; font-size: 0.75rem; margin-bottom: 10px; }
         
-        .ai-msg { background: rgba(168, 85, 247, 0.1); border-left: 3px solid #A855F7; padding: 10px; font-size: 0.75rem; margin-bottom: 10px; border-radius: 4px; line-height: 1.4; }
-        .user-msg { text-align: right; color: #94a3b8; font-size: 0.75rem; margin-bottom: 8px; }
-        
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #050505; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
-        
-        /* Tableaux */
-        .audit-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-        .audit-table th { text-align: left; padding: 12px; color: #64748B; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .audit-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        /* Badges 4 Postes */
+        .badge-hph { color: #60A5FA; border: 1px solid #3B82F6; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+        .badge-hpe { color: #FB923C; border: 1px solid #F97316; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
     </style>
 </head>
 <body class="ops-grid">
 
-    <div id="toast-container"></div>
+    <div id="toast-container" class="fixed top-5 right-5 z-50"></div>
 
-    <!-- 1. SIDEBAR -->
-    <aside class="bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-50 relative">
-        <div class="w-10 h-10 rounded-lg bg-ops/20 text-ops flex items-center justify-center font-bold mb-8 shadow-lg shadow-ops/20">OP</div>
-        <nav class="flex flex-col w-full items-center gap-2">
-            <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active"><i class="fa-solid fa-server text-xl"></i></div>
-            <div onclick="navTo('finlab')" id="nav-finlab" class="nav-icon"><i class="fa-solid fa-euro-sign text-xl"></i></div>
-            <div onclick="navTo('auditlab')" id="nav-auditlab" class="nav-icon"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></div>
-            <div onclick="navTo('scenarios')" id="nav-scenarios" class="nav-icon"><i class="fa-solid fa-bomb text-xl"></i></div>
-        </nav>
-        <a href="/" class="mt-auto nav-icon"><i class="fa-solid fa-house"></i></a>
+    <!-- SIDEBAR -->
+    <aside class="bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-50">
+        <div class="w-10 h-10 rounded-lg bg-ops/20 text-ops flex items-center justify-center font-bold mb-8">OP</div>
+        <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active"><i class="fa-solid fa-server text-xl"></i></div>
+        <div onclick="navTo('finlab')" id="nav-finlab" class="nav-icon"><i class="fa-solid fa-euro-sign text-xl"></i></div>
+        <div onclick="navTo('auditlab')" id="nav-auditlab" class="nav-icon"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></div>
+        <div onclick="navTo('scenarios')" id="nav-scenarios" class="nav-icon"><i class="fa-solid fa-bomb text-xl"></i></div>
     </aside>
 
-    <!-- 2. MAIN CONTENT -->
-    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
-        <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6 shrink-0">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V15.0 (FUSION)</span></div>
-            <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CORTEX V26 READY</div>
+    <!-- MAIN -->
+    <main class="flex-1 flex flex-col bg-abysse relative overflow-hidden">
+        <header class="h-12 border-b border-white/5 flex items-center justify-between px-6 shrink-0 bg-white/5">
+            <div class="text-xs font-bold text-gold uppercase">OPS V15.1 (UPLOAD FIX)</div>
+            <div class="text-[10px] text-gray-400">CORTEX V26 READY</div>
         </header>
 
-        <div class="flex-1 overflow-hidden relative">
-            <!-- TAB 1: DATA LAB -->
-            <div id="view-datalab" class="page-content active p-8 custom-scrollbar">
-                <div class="grid grid-cols-12 gap-6">
-                    <!-- UPLOAD -->
-                    <div class="col-span-12 md:col-span-4 bento-card p-6 rounded-2xl border-t-4 border-cyan flex flex-col">
-                        <h3 class="font-bold text-white mb-4">Ingestion Données</h3>
-                        
-                        <div class="space-y-3">
-                            <div>
-                                <label class="text-[10px] text-gray-500 uppercase font-bold">Client / Groupe</label>
-                                <!-- TON MENU COMPLET CONSERVÉ -->
-                                <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 focus:border-cyan outline-none">
-                                    <option value="demo">Test / Démo</option>
-                                    <option value="retail">Retail / Franchise</option>
-                                    <option value="industry">Industrie</option>
-                                    <option value="mairie">Collectivité</option>
-                                    <option value="pme">PME / Artisan</option>
-                                    <option value="sde">Syndicat (SDE)</option>
-                                    <option value="oph">Bailleur (OPH)</option>
-                                    <option value="syndic">Syndic</option>
-                                    <option value="citoyen">Particulier</option>
-                                    <option value="supplier">Partenaire</option>
-                                </select>
-                            </div>
-                            
-                            <!-- UPLOAD FIXÉ -->
-                            <label for="real-upload" id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center py-6">
-                                <i class="fa-solid fa-folder-tree text-3xl text-gray-500 mb-2"></i>
-                                <span class="text-xs font-bold text-white" id="upload-label">Cliquer pour charger CSV</span>
-                            </label>
-                            <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
-
-                            <button onclick="loadGroupView()" class="w-full bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 text-[10px] font-bold py-2 rounded border border-purple-500/30 transition flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-layer-group"></i> AGRÉGATION GROUPE
-                            </button>
-                            
-                            <div>
-                                <label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site</label>
-                                <input type="text" id="target-site" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 focus:border-cyan outline-none font-mono" placeholder="ex: Magasin_Paris_Nord">
-                            </div>
-                        </div>
-
-                        <div id="upload-result" class="hidden mt-4 bg-green-900/10 border border-green-500/30 p-3 rounded-xl">
-                            <div class="text-[10px] text-gray-400">Succès :</div>
-                            <div id="res-path" class="text-[10px] font-mono text-white mb-2 break-all">...</div>
-                            <a id="res-link" href="#" target="_blank" class="block w-full bg-cyan text-black font-bold text-xs py-2 rounded text-center">VOIR DASHBOARD</a>
-                        </div>
+        <!-- DATA LAB -->
+        <div id="view-datalab" class="page-content active grid grid-cols-12 gap-6">
+            <div class="col-span-4 bento-card p-6 border-t-4 border-cyan">
+                <h3 class="font-bold text-white mb-4">Ingestion</h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase font-bold">Client</label>
+                        <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 focus:border-cyan outline-none">
+                            <option value="demo">Test / Démo</option>
+                            <option value="retail">Retail</option>
+                            <option value="industry">Industrie</option>
+                            <option value="mairie">Collectivité</option>
+                            <option value="pme">PME</option>
+                            <option value="syndic">Syndic</option>
+                        </select>
                     </div>
 
-                    <!-- CHART & KPI -->
-                    <div class="col-span-12 md:col-span-8 space-y-6">
-                        <div class="bento-card p-6 rounded-2xl">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="font-bold text-white">Signature de Charge</h3>
-                                <div class="flex items-center gap-2 bg-white/5 p-1 rounded-lg">
-                                    <input type="date" id="date-start" onchange="applyDateFilter()" class="bg-transparent border-0 text-white text-[10px] w-24 cursor-pointer">
-                                    <span class="text-gray-500 text-[10px]">-</span>
-                                    <input type="date" id="date-end" onchange="applyDateFilter()" class="bg-transparent border-0 text-white text-[10px] w-24 cursor-pointer">
-                                </div>
-                                <div class="flex gap-1">
-                                    <button onclick="zoomPreset(7)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded">7J</button>
-                                    <button onclick="zoomPreset(30)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded">30J</button>
-                                    <button onclick="zoomPreset('all')" class="px-2 py-1 bg-cyan-500/20 text-cyan-500 text-[10px] rounded">TOUT</button>
-                                </div>
-                            </div>
-                            <div class="h-64 w-full relative"><canvas id="testChart"></canvas></div>
-                            
-                            <div class="flex justify-between mt-4 pt-4 border-t border-white/5">
-                                <div><div class="text-[10px] text-gray-500 uppercase">Conso. Période</div><div class="text-xl font-mono font-bold text-white" id="dyn-conso">--</div></div>
-                                <div><div class="text-[10px] text-gray-500 uppercase">Puissance Max</div><div class="text-xl font-mono font-bold text-white" id="dyn-pmax">--</div></div>
-                                <div class="text-right"><div class="text-[10px] text-gray-500 uppercase">Points</div><div class="text-xl font-mono text-cyan" id="dyn-points">--</div></div>
-                            </div>
-                        </div>
-
-                        <!-- KPI GRID (NOUVEAU DESIGN) -->
-                        <div class="grid grid-cols-4 gap-4">
-                            <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-red-500/5">
-                                <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">GHOST BUSTER</span><i class="fa-solid fa-ghost text-gray-600"></i></div>
-                                <div class="text-xl font-mono font-bold text-white" id="kpi-talon">-- kW</div>
-                                <div class="text-[10px] text-red-400 mt-1" id="kpi-waste">--</div>
-                            </div>
-                            <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-yellow-500/5">
-                                <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">SOLAIRE</span><i class="fa-solid fa-sun text-yellow-500/50"></i></div>
-                                <div class="text-lg font-mono font-bold text-white" id="kpi-solar-pot">--</div>
-                                <div class="text-[10px] text-cyan mt-1" id="kpi-solar-gain">--</div>
-                            </div>
-                            <div class="bento-card p-4 rounded-xl border border-white/5">
-                                <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">SANTÉ</span><i class="fa-solid fa-heart-pulse text-gray-600"></i></div>
-                                <div class="text-sm font-bold text-white" id="kpi-drift-status">--</div>
-                                <div class="text-[10px] text-gray-400 mt-1" id="kpi-drift-val">--</div>
-                            </div>
-                            <div class="bento-card p-4 rounded-xl border border-white/5">
-                                <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">RATIO W.E</span><i class="fa-solid fa-calendar-week text-gray-600"></i></div>
-                                <div class="text-xl font-mono font-bold text-white" id="kpi-ratio">-- %</div>
-                                <div class="text-[10px] text-gray-400 mt-1">Activité Sam/Dim</div>
-                            </div>
-                        </div>
+                    <!-- UPLOAD FIXÉ : DIV CLICKABLE + INPUT CACHÉ -->
+                    <div class="upload-box" onclick="document.getElementById('real-upload').click()">
+                        <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 mb-2"></i>
+                        <span class="text-xs font-bold text-white">Cliquer pour charger CSV</span>
+                        <span class="text-[9px] text-gray-500 mt-1">Format SGE Enedis</span>
                     </div>
+                    <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
+
+                    <button onclick="loadGroupView()" class="w-full bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 text-[10px] font-bold py-2 rounded border border-purple-500/30">
+                        AGRÉGATION GROUPE
+                    </button>
+                </div>
+
+                <div id="upload-result" class="hidden mt-4 bg-green-900/10 border border-green-500/30 p-3 rounded-xl">
+                    <div class="text-[10px] text-gray-400">Succès :</div>
+                    <a id="res-link" href="#" target="_blank" class="block w-full bg-cyan text-black font-bold text-xs py-2 rounded text-center mt-2">VOIR DASHBOARD</a>
                 </div>
             </div>
 
-            <!-- TAB 2: FINANCE LAB (4 POSTES COMPLET) -->
-            <div id="view-finlab" class="page-content p-8 custom-scrollbar">
-                <div class="grid grid-cols-12 gap-6">
-                    <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Finance Lab (4 Postes)</h3></div>
-                    
-                    <!-- SIMULATEUR 4 POSTES (AJOUT V15) -->
-                    <div class="col-span-4 bento-card p-6 rounded-2xl border-t-4 border-finance">
-                        <h4 class="font-bold text-white mb-4 text-xs uppercase tracking-wider">Tarification Saisonnière</h4>
-                        <div class="space-y-4">
-                            <!-- HIVER -->
-                            <div class="bg-blue-900/10 p-3 rounded-lg border border-blue-500/20">
-                                <div class="text-[10px] text-blue-400 font-bold mb-2 uppercase">Hiver (Nov-Mars)</div>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div><label class="text-[9px] text-gray-500">Plein (HPH)</label><input type="number" id="price-hph" value="0.22" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs"></div>
-                                    <div><label class="text-[9px] text-gray-500">Creux (HCH)</label><input type="number" id="price-hch" value="0.14" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs"></div>
-                                </div>
-                            </div>
-                            <!-- ETE -->
-                            <div class="bg-orange-900/10 p-3 rounded-lg border border-orange-500/20">
-                                <div class="text-[10px] text-orange-400 font-bold mb-2 uppercase">Été (Avril-Oct)</div>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div><label class="text-[9px] text-gray-500">Plein (HPE)</label><input type="number" id="price-hpe" value="0.14" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs"></div>
-                                    <div><label class="text-[9px] text-gray-500">Creux (HCE)</label><input type="number" id="price-hce" value="0.09" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs"></div>
-                                </div>
-                            </div>
-                            <button onclick="updateFinance4P()" class="w-full bg-finance text-black font-bold text-xs py-3 rounded hover:bg-white transition flex items-center justify-center gap-2"><i class="fa-solid fa-calculator"></i> RECALCULER BUDGET</button>
-                        </div>
-                    </div>
-
-                    <!-- RESULTATS -->
-                    <div class="col-span-8">
-                        <div class="grid grid-cols-2 gap-6 mb-6">
-                            <div class="bento-card p-6 rounded-2xl flex flex-col justify-center items-center bg-gradient-to-b from-card to-finance/5">
-                                <div class="text-xs text-gray-500 uppercase font-bold mb-2">Budget Annuel Estimé</div>
-                                <div class="text-4xl font-mono font-bold text-finance" id="fin-budget">-- €</div>
-                                <div class="text-[10px] text-gray-400 mt-2">Basé sur les 4 postes ci-contre</div>
-                            </div>
-                            <div class="bento-card p-6 rounded-2xl">
-                                <div class="text-xs text-gray-500 uppercase font-bold mb-4">Performance Achat</div>
-                                <div class="flex justify-between items-center mb-2"><span class="text-xs text-white">Prix Moyen Payé</span><span class="text-sm font-mono text-white" id="fin-avg-price">-- €/kWh</span></div>
-                                <div class="mt-4 pt-4 border-t border-white/10 text-center"><span class="px-2 py-1 bg-green-900/30 text-green-400 text-[10px] rounded border border-green-500/30" id="fin-status">ANALYSE REQUISE</span></div>
-                            </div>
-                        </div>
-                        <!-- TABLEAU 4 POSTES -->
-                        <div class="bento-card p-0 rounded-2xl overflow-hidden">
-                            <table class="w-full text-xs text-left">
-                                <thead class="bg-white/5 text-gray-400 font-mono"><tr><th class="p-3">Saison</th><th class="p-3">Poste</th><th class="p-3 text-right">Volume (kWh)</th><th class="p-3 text-right">Coût Est.</th></tr></thead>
-                                <tbody class="text-white" id="table-4p-body">
-                                    <tr><td colspan="4" class="p-4 text-center text-gray-600 italic">Charger un fichier pour voir la répartition 4 postes</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+            <div class="col-span-8 bento-card p-6">
+                <div class="flex justify-between mb-4">
+                    <h3 class="font-bold text-white">Signature</h3>
+                    <div class="flex gap-2">
+                        <button onclick="zoomPreset(7)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded">7J</button>
+                        <button onclick="zoomPreset(30)" class="px-2 py-1 bg-white/10 text-[10px] text-white rounded">30J</button>
+                        <button onclick="zoomPreset('all')" class="px-2 py-1 bg-cyan-500/20 text-cyan-500 text-[10px] rounded">TOUT</button>
                     </div>
                 </div>
+                <div class="h-64 relative"><canvas id="testChart"></canvas></div>
             </div>
-
-            <!-- TAB 3: AUDIT -->
-            <div id="view-auditlab" class="page-content p-8 custom-scrollbar">
-                <div class="grid grid-cols-12 gap-6">
-                    <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Audit Expert</h3></div>
-                    <div class="col-span-6 bento-card p-6 rounded-2xl border border-red-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">FACTURE (PDF)</label><input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
-                    <div class="col-span-6 bento-card p-6 rounded-2xl border border-blue-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">CONTRAT (PDF)</label><input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
-                    <div class="col-span-12"><button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl text-sm hover:scale-[1.01]">LANCER AUDIT DOC</button></div>
-                    <div class="col-span-12 bento-card p-0 rounded-2xl bg-abysse border border-white/10 mt-4 overflow-hidden"><table class="audit-table"><thead><tr class="bg-white/5"><th>Point de Contrôle</th><th>Facture</th><th>Contrat</th><th class="text-right">Résultat</th></tr></thead><tbody id="audit-results"><tr><td colspan="4" class="text-center py-8 text-gray-500 italic">En attente des documents...</td></tr></tbody></table></div>
-                </div>
+            
+            <!-- KPI -->
+            <div class="col-span-3 bento-card p-4 border-l-4 border-red-500">
+                <div class="text-[10px] text-gray-500 font-bold">GHOST BUSTER</div>
+                <div class="text-xl font-bold text-white" id="kpi-talon">--</div>
+                <div class="text-[10px] text-red-400 mt-1" id="kpi-waste">--</div>
             </div>
-
-            <!-- TAB 4: CHAOS -->
-            <div id="view-scenarios" class="page-content p-8 custom-scrollbar">
-                <div class="col-span-12 bento-card p-6 rounded-2xl border-l-4 border-red-500"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-white">Chaos Monkey</h3><button onclick="runTest()" class="px-4 py-2 bg-red-600 text-white font-bold rounded text-xs">TESTER INFRA</button></div><div id="chaos-results" class="grid grid-cols-3 gap-4"></div></div>
+            <div class="col-span-3 bento-card p-4 border-l-4 border-yellow-500">
+                <div class="text-[10px] text-gray-500 font-bold">SOLAIRE</div>
+                <div class="text-xl font-bold text-white" id="kpi-solar">--</div>
+                <div class="text-[10px] text-cyan mt-1" id="kpi-solar-gain">--</div>
+            </div>
+            <div class="col-span-3 bento-card p-4 border-l-4 border-green-500">
+                <div class="text-[10px] text-gray-500 font-bold">SANTÉ</div>
+                <div class="text-xl font-bold text-white" id="kpi-health">--</div>
+                <div class="text-[10px] text-gray-400 mt-1" id="kpi-drift-val">--</div>
+            </div>
+            <div class="col-span-3 bento-card p-4 border-l-4 border-blue-500">
+                <div class="text-[10px] text-gray-500 font-bold">RATIO W.E</div>
+                <div class="text-xl font-bold text-white" id="kpi-ratio">--</div>
             </div>
         </div>
-        
-        <!-- FOOTER LOGS -->
-        <div class="h-40 bg-[#02050a] border-t border-white/10 p-4 overflow-hidden flex flex-col z-40 shrink-0">
-            <div class="flex justify-between items-center mb-1 border-b border-white/5 pb-1"><span class="text-slate-500 font-bold uppercase tracking-widest text-[10px]">>> SYSTEM LOGS</span><button onclick="document.getElementById('terminal').innerHTML=''" class="text-[10px] text-gray-600 hover:text-white">CLEAR</button></div>
-            <div id="terminal" class="flex-1 overflow-y-auto space-y-1"></div>
+
+        <!-- FINANCE LAB -->
+        <div id="view-finlab" class="page-content grid grid-cols-12 gap-6">
+            <div class="col-span-4 bento-card p-6 border-t-4 border-yellow-500">
+                <h3 class="font-bold text-white mb-4">4 Postes</h3>
+                <div class="space-y-4">
+                    <div class="bg-blue-900/10 p-3 rounded border border-blue-500/20">
+                        <div class="text-[10px] text-blue-400 font-bold mb-2">HIVER</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><label class="text-[9px] text-gray-500">HPH</label><input type="number" id="price-hph" value="0.22" class="w-full bg-abysse border border-white/10 rounded p-1 text-xs text-white"></div>
+                            <div><label class="text-[9px] text-gray-500">HCH</label><input type="number" id="price-hch" value="0.14" class="w-full bg-abysse border border-white/10 rounded p-1 text-xs text-white"></div>
+                        </div>
+                    </div>
+                    <div class="bg-orange-900/10 p-3 rounded border border-orange-500/20">
+                        <div class="text-[10px] text-orange-400 font-bold mb-2">ÉTÉ</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><label class="text-[9px] text-gray-500">HPE</label><input type="number" id="price-hpe" value="0.14" class="w-full bg-abysse border border-white/10 rounded p-1 text-xs text-white"></div>
+                            <div><label class="text-[9px] text-gray-500">HCE</label><input type="number" id="price-hce" value="0.09" class="w-full bg-abysse border border-white/10 rounded p-1 text-xs text-white"></div>
+                        </div>
+                    </div>
+                    <button onclick="updateFinance4P()" class="w-full bg-finance text-black font-bold text-xs py-2 rounded">RECALCULER</button>
+                </div>
+            </div>
+            <div class="col-span-8 bento-card p-6 flex flex-col justify-center items-center">
+                <div class="text-4xl font-bold text-yellow-500 mb-2" id="fin-budget">-- €</div>
+                <div class="text-xs text-gray-400 mb-6">Budget Annuel Estimé</div>
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-white/5 text-gray-400"><tr><th class="p-3">Poste</th><th class="p-3 text-right">Volume</th><th class="p-3 text-right">Coût</th></tr></thead>
+                    <tbody class="text-white" id="table-4p-body"></tbody>
+                </table>
+            </div>
         </div>
+
+        <!-- AUDIT LAB -->
+        <div id="view-auditlab" class="page-content grid grid-cols-12 gap-6">
+            <div class="col-span-6 bento-card p-6"><label class="text-xs font-bold text-gray-400 block mb-2">FACTURE</label><input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:rounded-full px-4 py-1"></div>
+            <div class="col-span-6 bento-card p-6"><label class="text-xs font-bold text-gray-400 block mb-2">CONTRAT</label><input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:rounded-full px-4 py-1"></div>
+            <div class="col-span-12"><button onclick="runRealAudit()" class="w-full py-3 bg-cyan text-black font-bold rounded">LANCER AUDIT</button></div>
+            <div class="col-span-12 bento-card p-0"><table class="audit-table"><tbody id="audit-results"></tbody></table></div>
+        </div>
+
+        <!-- CHAOS LAB -->
+        <div id="view-scenarios" class="page-content grid grid-cols-12 gap-6">
+            <div class="col-span-12 bento-card p-6"><button onclick="runTest()" class="px-4 py-2 bg-red-600 text-white font-bold rounded text-xs">CHAOS MONKEY</button><div id="chaos-results" class="mt-4 grid grid-cols-3 gap-4"></div></div>
+        </div>
+
     </main>
 
-    <!-- 3. CORTEX SIDEBAR -->
-    <aside class="bg-[#0B0F19] border-l border-white/5 flex flex-col w-[350px] z-30 shrink-0">
-        <div class="p-4 border-b border-white/5 bg-ai/5 flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-ai flex items-center justify-center text-white font-bold"><i class="fa-solid fa-robot"></i></div><h3 class="font-bold text-white text-sm">CORTEX AI</h3></div>
+    <!-- CORTEX CHAT -->
+    <aside class="bg-[#0B0F19] border-l border-white/5 w-[350px] flex flex-col z-50">
+        <div class="p-4 border-b border-white/5 font-bold text-white text-sm">CORTEX AI</div>
         <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-container"></div>
-        <div class="p-4 border-t border-white/5"><input type="text" id="chat-input" placeholder="Message..." class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none" onkeypress="if(event.key==='Enter') sendChat()"></div>
+        <div class="p-4 border-t border-white/5"><input type="text" id="chat-input" placeholder="Message..." class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-xs text-white" onkeypress="if(event.key==='Enter') sendChat()"></div>
     </aside>
 
     <script>
         let adminPin = sessionStorage.getItem('admin_pin');
-        if (!adminPin) { adminPin = prompt("PIN Ops :"); sessionStorage.setItem('admin_pin', adminPin); }
+        if (!adminPin) { adminPin = "BOSS_V5"; sessionStorage.setItem('admin_pin', adminPin); }
 
         function navTo(pageId) {
             document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active'));
@@ -266,14 +190,12 @@
             document.getElementById('view-' + pageId).classList.add('active');
         }
 
-        // --- BLINDAGE ANTI-CRASH JS ---
         function safeSetText(id, val) { const el = document.getElementById(id); if (el) el.innerText = val; }
-        function safeSetVal(id, val) { const el = document.getElementById(id); if (el) el.value = val; }
         function safeLoc(val, suffix='') { if (val === undefined || val === null || isNaN(val)) return '--'; return Math.round(val).toLocaleString() + suffix; }
 
-        let testChart = null;
-        let masterData = { labels: [], values: [], average: [], talon: 0 };
-        let currentFinanceData = null;
+        function log(msg, type='info') { const term = document.getElementById('terminal'); const color = type==='success'?'text-green-400':(type==='error'?'text-red-400':'text-gray-400'); term.innerHTML += `<div class="${color}">[${new Date().toLocaleTimeString()}] ${msg}</div>`; term.scrollTop = term.scrollHeight; }
+
+        let testChart, masterData = { labels: [], values: [] }, currentFinanceData = null;
 
         function initChart() {
             const ctx = document.getElementById('testChart').getContext('2d');
@@ -282,164 +204,73 @@
 
         async function handleFileSelect(file) {
             if (!file) return;
-            document.getElementById('real-upload').value = '';
-            
-            const target = document.getElementById('target-client').value;
-            const site = document.getElementById('target-site').value || "Site_Principal";
-            const formData = new FormData(); formData.append('file', file); formData.append('target', target); formData.append('site_name', site);
+            const fd = new FormData(); fd.append('file', file); fd.append('target', 'demo'); fd.append('site_name', 'Site_1');
             log(`Upload SGE: ${file.name}...`, 'info');
-            App.toast("Analyse en cours...", "info");
             
             try {
-                const res = await fetch('/api/ops/analyze', { method: 'POST', headers: { 'x-admin-token': adminPin }, body: formData });
+                const res = await fetch('/api/ops/analyze', { method: 'POST', headers: { 'x-admin-token': adminPin }, body: fd });
                 const data = await res.json();
                 
                 if (data.success) {
-                    log("Analyse V26 Terminée.", 'success');
+                    log("Analyse Terminée.", 'success');
                     document.getElementById('upload-result').classList.remove('hidden');
-                    document.getElementById('res-link').style.display = 'block';
                     document.getElementById('res-link').href = data.secure_link;
                     
                     if(data.kpi) {
                         safeSetText('kpi-talon', safeLoc(data.kpi.talon, " kW"));
                         safeSetText('kpi-ratio', safeLoc(data.kpi.inactivity_ratio, " %"));
+                        safeSetText('kpi-solar', data.kpi.solar.status === "OPPORTUNITÉ DÉTECTÉE" ? data.kpi.solar.puissance_kwc + " kWc" : "Non");
+                        safeSetText('kpi-health', data.kpi.drift.status);
                         
                         const waste = data.kpi.ghost_buster ? data.kpi.ghost_buster.cout_talon_annuel : 0;
                         safeSetText('kpi-waste', "Coût vide: " + safeLoc(waste, " €/an"));
+
+                        safeSetText('fin-budget', Math.round(data.kpi.finance.budget_total).toLocaleString() + " €");
                         
-                        const solar = data.kpi.solar || {};
-                        if(solar.status === "OPPORTUNITÉ DÉTECTÉE") {
-                            safeSetText('kpi-solar-pot', solar.puissance_kwc + " kWc");
-                            safeSetText('kpi-solar-gain', "Gain: " + safeLoc(solar.economie_annuelle_euro, " €"));
-                        } else {
-                            safeSetText('kpi-solar-pot', "Non Pertinent");
-                            safeSetText('kpi-solar-gain', "-");
-                        }
-                        
-                        const drift = data.kpi.drift || {};
-                        safeSetText('kpi-drift-status', drift.status || "Inconnu");
-                        
-                        // FINANCE 4 POSTES
-                        if (data.kpi.finance) {
+                        if (data.kpi.finance.detail_4p) {
                             currentFinanceData = data.kpi.finance;
-                            updateFinanceDisplay(data.kpi.finance);
                             render4PostTable(data.kpi.finance.detail_4p);
                         }
                     }
-                    if (data.ai_insight) {
-                        const cortexBox = document.getElementById('chat-container');
-                        cortexBox.innerHTML += `<div class="ai-msg">${data.ai_insight}</div>`;
-                    }
+                    if (data.ai_insight) document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.ai_insight}</div>`;
+                    
                     if (data.chart) {
-                        masterData = { labels: data.chart.labels, values: data.chart.values, average: data.chart.average, talon: data.kpi.talon };
-                        if(data.chart.labels.length > 0) {
-                            safeSetVal('date-start', data.chart.labels[0].substring(0, 10));
-                            safeSetVal('date-end', data.chart.labels[data.chart.labels.length - 1].substring(0, 10));
-                        }
-                        updateChartDisplay(data.chart.labels, data.chart.values, data.chart.average, data.kpi.talon);
+                        masterData = { labels: data.chart.labels, values: data.chart.values };
+                        testChart.data.labels = data.chart.labels;
+                        testChart.data.datasets = [{ label: 'Puissance', data: data.chart.values, borderColor: '#00E5FF', borderWidth: 1, fill: true, backgroundColor: 'rgba(0, 229, 255, 0.1)' }];
+                        testChart.update();
                     }
-                } else throw new Error(data.error);
-            } catch (e) { log(e.message, 'error'); App.toast("Erreur Lecture", "error"); }
+                } else log("Erreur Cortex: " + data.error, 'error');
+            } catch (e) { log("Erreur Réseau: " + e, 'error'); }
         }
 
-        // --- CHARTS & UI ---
-        function updateChartDisplay(labels, values, average, talon) {
-            const talonLine = new Array(values.length).fill(talon);
-            testChart.data.labels = labels;
-            testChart.data.datasets = [
-                { label: 'Puissance (kW)', data: values, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, pointRadius: 0, borderWidth: 1.5 },
-                { label: 'Talon', data: talonLine, borderColor: '#10B981', borderWidth: 1, pointRadius: 0, fill: false }
-            ];
-            testChart.update();
-            const sum = values.reduce((a, b) => a + b, 0);
-            const max = Math.max(...values);
-            safeSetText('dyn-conso', Math.round(sum * (values.length > 8000 ? 0.166 : 1)).toLocaleString() + " kWh");
-            safeSetText('dyn-pmax', Math.round(max).toLocaleString() + " kW");
-            safeSetText('dyn-points', values.length);
-        }
-
-        function zoomPreset(range) {
-            if(!masterData.labels.length) return;
-            let sl, sv;
-            if (range === 'all') { sl=masterData.labels; sv=masterData.values; }
-            else { 
-                const points = range * 24 * 6; 
-                sl = masterData.labels.slice(-points);
-                sv = masterData.values.slice(-points);
-            }
-            if(sl.length > 0) {
-                safeSetVal('date-start', sl[0].substring(0, 10));
-                safeSetVal('date-end', sl[sl.length - 1].substring(0, 10));
-            }
-            updateChartDisplay(sl, sv, masterData.average, masterData.talon);
-        }
-
-        function applyDateFilter() {
-            const sVal = document.getElementById('date-start').value;
-            const eVal = document.getElementById('date-end').value;
-            if(!sVal || !eVal) return;
-            const filteredIndices = [];
-            for(let i=0; i<masterData.labels.length; i++) {
-                const d = masterData.labels[i].substring(0, 10);
-                if(d >= sVal && d <= eVal) filteredIndices.push(i);
-            }
-            if(filteredIndices.length === 0) return App.toast("Aucune donnée.", "error");
-            const startIdx = filteredIndices[0];
-            const endIdx = filteredIndices[filteredIndices.length - 1];
-            const sl = masterData.labels.slice(startIdx, endIdx + 1);
-            const sv = masterData.values.slice(startIdx, endIdx + 1);
-            updateChartDisplay(sl, sv, masterData.average, masterData.talon);
-        }
-
-        // --- FINANCE 4 POSTES ---
         function render4PostTable(detail) {
-            if(!detail) return;
             let html = '';
-            for (const [key, val] of Object.entries(detail)) {
-                let badge = key.includes('H') && !key.includes('E') ? '<span class="text-blue-400 border border-blue-500/30 px-1 rounded text-[9px]">HIVER</span>' : '<span class="text-orange-400 border border-orange-500/30 px-1 rounded text-[9px]">ETE</span>';
-                if (key === 'HPE' || key === 'HCE') badge = '<span class="text-orange-400 border border-orange-500/30 px-1 rounded text-[9px]">ETE</span>';
-                html += `<tr class="border-b border-white/5 hover:bg-white/5"><td class="p-2">${badge}</td><td class="p-2 font-bold text-gray-300 text-xs">${key}</td><td class="p-2 text-right font-mono text-xs">${val.vol.toLocaleString()}</td><td class="p-2 text-right font-mono text-cyan text-xs">${Math.round(val.cout).toLocaleString()} €</td></tr>`;
+            for (const [k, v] of Object.entries(detail)) {
+                let badge = k.includes('H') && !k.includes('E') ? '<span class="badge-hph">HIVER</span>' : '<span class="badge-hpe">ETE</span>';
+                if (k === 'HPE' || k === 'HCE') badge = '<span class="badge-hpe">ETE</span>';
+                html += `<tr class="border-b border-white/5"><td class="p-3 font-bold text-gray-300">${badge} ${k}</td><td class="p-3 text-right font-mono">${v.vol.toLocaleString()}</td><td class="p-3 text-right font-mono text-cyan">${v.cout.toLocaleString()} €</td></tr>`;
             }
             document.getElementById('table-4p-body').innerHTML = html;
         }
 
         function updateFinance4P() {
-            if(!currentFinanceData || !currentFinanceData.detail_4p) { alert("Veuillez charger un fichier."); return; }
+            if(!currentFinanceData) return alert("Chargez un fichier d'abord");
             const pHPH = parseFloat(document.getElementById('price-hph').value);
             const pHCH = parseFloat(document.getElementById('price-hch').value);
             const pHPE = parseFloat(document.getElementById('price-hpe').value);
             const pHCE = parseFloat(document.getElementById('price-hce').value);
             
             const d = currentFinanceData.detail_4p;
-            const c1 = d.HPH.vol * pHPH;
-            const c2 = d.HCH.vol * pHCH;
-            const c3 = d.HPE.vol * pHPE;
-            const c4 = d.HCE.vol * pHCE;
-            
-            const totalBudget = c1 + c2 + c3 + c4;
-            safeSetText('fin-budget', Math.round(totalBudget).toLocaleString() + " €");
-            
-            const totalVol = d.HPH.vol + d.HCH.vol + d.HPE.vol + d.HCE.vol;
-            const avg = totalVol > 0 ? (totalBudget / totalVol) : 0;
-            safeSetText('fin-avg-price', avg.toFixed(3) + " €/kWh");
-            
-            App.toast("Budget Recalculé.", "success");
+            const total = (d.HPH.vol*pHPH) + (d.HCH.vol*pHCH) + (d.HPE.vol*pHPE) + (d.HCE.vol*pHCE);
+            safeSetText('fin-budget', Math.round(total).toLocaleString() + " €");
         }
 
-        function updateFinanceDisplay(finData) {
-            const budget = finData.budget_total || 0;
-            safeSetText('fin-budget', Math.round(budget).toLocaleString() + " €");
-            const avg = finData.prix_moyen_calcule || 0;
-            safeSetText('fin-avg-price', avg.toFixed(3) + " €/kWh");
-        }
-
-        // --- AUDIT & CHAT ---
         async function runRealAudit() {
             const inv = document.getElementById('invoice-file').files[0];
-            const ctr = document.getElementById('contract-file').files[0];
             if(!inv) return alert("Fichier manquant");
-            log("Audit PDF...", "info");
-            const fd = new FormData(); fd.append('invoice', inv); if(ctr) fd.append('contract', ctr);
+            log("Audit PDF en cours...", "info");
+            const fd = new FormData(); fd.append('invoice', inv);
             try {
                 const res = await fetch('/api/ops/audit', { method:'POST', headers: { 'x-admin-token': adminPin }, body:fd });
                 const data = await res.json();
@@ -447,12 +278,14 @@
                     let html = '';
                     data.checks.forEach(c => {
                         const color = c.error ? 'text-red-500' : 'text-green-500';
-                        html += `<tr><td class="p-2 border-b border-white/5 text-gray-400">${c.point}</td><td class="p-2 border-b border-white/5 text-white">${c.a}</td><td class="p-2 border-b border-white/5 text-white">${c.b}</td><td class="p-2 border-b border-white/5 text-right font-bold ${color}">${c.status}</td></tr>`;
+                        html += `<tr><td class="p-3 text-gray-400">${c.point}</td><td class="p-3 text-white">${c.a}</td><td class="p-3 text-white">${c.b}</td><td class="p-3 text-right font-bold ${color}">${c.status}</td></tr>`;
                     });
                     document.getElementById('audit-results').innerHTML = html;
                     log("Audit Terminé.", "success");
+                } else {
+                    log("Audit Échoué ou Vide: " + (data.error || "Rien trouvé"), "error");
                 }
-            } catch(e) { log("Erreur Audit", "error"); }
+            } catch(e) { log("Erreur Réseau Audit", "error"); }
         }
 
         async function runTest() {
@@ -474,10 +307,22 @@
             document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.response}</div>`;
         }
 
-        async function loadGroupView() { App.toast("Module Groupe en cours...", "info"); }
+        function zoomPreset(days) {
+            if(!masterData.labels.length) return;
+            let sl, sv;
+            if (days !== 'all') {
+                const points = days * 24 * 6; 
+                sl = masterData.labels.slice(-points);
+                sv = masterData.values.slice(-points);
+            } else {
+                sl = masterData.labels; sv = masterData.values;
+            }
+            testChart.data.labels = sl;
+            testChart.data.datasets[0].data = sv;
+            testChart.update();
+        }
 
         document.addEventListener('DOMContentLoaded', () => { initChart(); navTo('datalab'); });
-        log('Ops V15.0 Enterprise Ready.', 'success');
     </script>
 </body>
 </html>
