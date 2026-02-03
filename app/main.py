@@ -1,18 +1,19 @@
-# app/main.py V11.0 - SAFE BOOT (DIAGNOSTIC MODE)
+# app/main.py V12.0 - PRODUCTION (FULL CONNECTIVITY)
 import os
-import sys
 import secrets
-import traceback
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Header
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
-# --- 1. INITIALISATION SÉCURISÉE ---
-app = FastAPI(title="ENERGISTRAT V3", version="SAFE_BOOT")
+# IMPORT DES MOTEURS (Validés par le Safe Boot)
+from app.core.storage_engine import storage
+from app.core.cortex_engine import cortex
 
-# CORS
+app = FastAPI(title="ENERGISTRAT V3", version="PROD")
+
+# 1. MIDDLEWARE
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,67 +22,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 2. CHARGEMENT DES COMPOSANTS (AVEC PROTECTION) ---
-GLOBAL_STATUS = {"status": "STARTING", "errors": []}
+# 2. STATIC & TEMPLATES
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# A. Moteur de Stockage
-try:
-    from app.core.storage_engine import storage
-    GLOBAL_STATUS["storage"] = "OK"
-except Exception as e:
-    GLOBAL_STATUS["storage"] = f"ERROR: {str(e)}"
-    print(f"CRITICAL STORAGE ERROR: {e}")
+templates = Jinja2Templates(directory="app/templates")
 
-# B. Moteur Cortex
-cortex = None
-try:
-    from app.core.cortex_engine import cortex
-    GLOBAL_STATUS["cortex"] = "OK"
-except Exception as e:
-    GLOBAL_STATUS["cortex"] = f"ERROR: {str(e)}"
-    # On capture la trace complète pour le log
-    traceback.print_exc()
-
-# C. Templates & Static
-templates = None
-try:
-    if os.path.exists("static"):
-        app.mount("/static", StaticFiles(directory="static"), name="static")
-    
-    # Vérification dossier templates
-    if os.path.exists("app/templates"):
-        templates = Jinja2Templates(directory="app/templates")
-        GLOBAL_STATUS["templates"] = "OK"
-    else:
-        GLOBAL_STATUS["templates"] = "MISSING DIR app/templates"
-except Exception as e:
-    GLOBAL_STATUS["templates"] = f"ERROR: {str(e)}"
-
-# --- 3. ROUTES DE DIAGNOSTIC ---
-
-@app.get("/")
-async def root(request: Request):
-    # Si tout va bien, on affiche l'index ou Ops
-    if templates and GLOBAL_STATUS["cortex"] == "OK":
-        if os.path.exists("app/templates/ops.html"):
-            return templates.TemplateResponse("ops.html", {"request": request})
-    
-    # Sinon, page de secours
-    return JSONResponse(GLOBAL_STATUS)
-
+# 3. SYSTEM HEALTH
 @app.get("/health")
 async def health_check():
-    # Cette route nous dira EXACTEMENT pourquoi ça plantait
     return {
-        "system": "SAFE_MODE",
-        "components": GLOBAL_STATUS,
-        "python_path": sys.path,
-        "cwd": os.getcwd(),
-        "files_in_app": os.listdir("app") if os.path.exists("app") else "MISSING"
+        "status": "ONLINE",
+        "version": "V3.0-PROD",
+        "cortex": cortex.version,
+        "storage": "WRITABLE" if os.access("/app/data", os.W_OK) else "READ_ONLY"
     }
 
-# --- 4. ROUTES MÉTIER (PROTÉGÉES) ---
-
+# 4. API : ANALYSE SGE (CSV/EXCEL)
 @app.post("/api/ops/analyze")
 async def api_analyze(
     file: UploadFile = File(...), 
@@ -90,47 +47,82 @@ async def api_analyze(
     x_admin_token: str = Header(None)
 ):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
-    
-    # Si Cortex a planté au démarrage
-    if not cortex:
-        return JSONResponse({"success": False, "error": f"Cortex Offline: {GLOBAL_STATUS['cortex']}"})
 
     try:
         content = await file.read()
         token = secrets.token_urlsafe(6)
         
+        # Appel Cortex V26
         analysis_result = cortex.analyze_file(content, file.filename, target_profile=target)
         
         if not analysis_result.get("success"):
             return JSONResponse(analysis_result)
 
-        return JSONResponse({
-            "success": True,
-            "filename": file.filename,
-            "token": token,
-            "secure_link": f"/dashboard/{target}?file={file.filename}",
-            "kpi": analysis_result.get('kpi', {}),
-            "chart": analysis_result.get('chart', {}),
-            "ai_insight": analysis_result.get('ai_insight', "")
-        })
+        # Lien dashboard
+        analysis_result["token"] = token
+        analysis_result["secure_link"] = f"/dashboard/{target}?site={site_name}"
+        
+        return JSONResponse(analysis_result)
+
     except Exception as e:
+        print(f"[API ERROR] {e}")
         return JSONResponse({"success": False, "error": str(e)})
 
-# Routes Placeholder pour éviter 404 si l'interface appelle
+# 5. API : AUDIT PDF (Connecté au V26)
 @app.post("/api/ops/audit")
-async def api_audit(): return JSONResponse({"score": 0, "checks": []})
+async def api_audit(
+    invoice: UploadFile = File(...),
+    contract: UploadFile = File(None),
+    x_admin_token: str = Header(None)
+):
+    if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
+    
+    try:
+        inv_content = await invoice.read()
+        ctr_content = await contract.read() if contract else None
+        
+        # Appel Cortex
+        result = cortex.analyze_invoice_real(inv_content, ctr_content)
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"score": 0, "checks": [], "error": str(e)})
 
+# 6. API : CHAT & CHAOS
 @app.post("/api/ops/chat")
-async def api_chat(): return JSONResponse({"response": "Mode Safe: Chat indisponible"})
+async def api_chat(message: str = Form(...), x_admin_token: str = Header(None)):
+    if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
+    return JSONResponse({"response": cortex.ask_agent(message)})
 
 @app.post("/api/ops/chaos")
-async def api_chaos(): return JSONResponse({"results": []})
+async def api_chaos(x_admin_token: str = Header(None)):
+    if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
+    return JSONResponse(cortex.run_chaos_monkey())
 
-# Catch-all pour les templates
+@app.get("/api/ops/aggregate/{client}")
+async def api_aggregate(client: str, x_admin_token: str = Header(None)):
+    if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
+    return JSONResponse({"success": False, "error": "Module Agrégation en cours"})
+
+# 7. ROUTAGE FRONT
+@app.get("/dashboard/{profile}")
+async def client_dashboard(request: Request, profile: str):
+    clean_name = profile.replace(".html", "")
+    filename = f"{clean_name}.html"
+    if os.path.exists(f"app/templates/{filename}"):
+        return templates.TemplateResponse(filename, {"request": request})
+    if os.path.exists("app/templates/dashboard.html"):
+        return templates.TemplateResponse("dashboard.html", {"request": request})
+    return HTMLResponse("Dashboard introuvable", 404)
+
 @app.get("/{path_name:path}")
 async def catch_all(request: Request, path_name: str):
-    if templates:
-        clean_name = path_name if path_name.endswith(".html") else f"{path_name}.html"
-        if os.path.exists(f"app/templates/{clean_name}"):
-            return templates.TemplateResponse(clean_name, {"request": request})
-    return JSONResponse({"error": "Page not found or Templates offline"}, 404)
+    if path_name == "" or path_name == "/":
+        # On renvoie vers Ops par défaut pour la démo
+        return templates.TemplateResponse("ops.html", {"request": request})
+        
+    clean_name = path_name if path_name.endswith(".html") else f"{path_name}.html"
+    
+    if os.path.exists(f"app/templates/{clean_name}"):
+        return templates.TemplateResponse(clean_name, {"request": request})
+        
+    return JSONResponse({"error": "Page not found"}, 404)
