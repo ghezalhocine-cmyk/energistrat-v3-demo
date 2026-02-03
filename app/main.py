@@ -1,4 +1,4 @@
-# app/main.py V9.0 - ARCHITECTURE V3 (CLEAN & ROBUST)
+# app/main.py V10.0 - ARCHITECTURE V3 (ENTERPRISE BRIDGE)
 import os
 import secrets
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Header
@@ -41,7 +41,7 @@ async def health_check():
         "cortex_version": cortex.version
     }
 
-# 4. API OPS : LE CŒUR DU SYSTÈME (Anciennement /api/ops/analyze)
+# 4. API OPS : ANALYSE FICHIER (CSV/SGE)
 @app.post("/api/ops/analyze")
 async def api_analyze(
     file: UploadFile = File(...), 
@@ -49,7 +49,7 @@ async def api_analyze(
     site_name: str = Form("Site_Principal"), 
     x_admin_token: str = Header(None)
 ):
-    # Sécurité (PIN codé en dur pour l'instant, on passera en ENV plus tard)
+    # Sécurité (PIN codé en dur pour l'instant)
     if x_admin_token != "BOSS_V5": 
         return JSONResponse({"success": False, "error": "PIN Incorrect"}, 401)
 
@@ -57,17 +57,13 @@ async def api_analyze(
         content = await file.read()
         token = secrets.token_urlsafe(6)
         
-        # Appel au Cerveau (Cortex Engine V13)
-        # Note: Nous réimplémenterons analyze_file dans cortex_engine.py juste après
+        # Appel au Cerveau (Cortex Engine V26)
         analysis_result = cortex.analyze_file(content, file.filename, target_profile=target)
         
         if not analysis_result.get("success"):
             return JSONResponse(analysis_result)
 
-        # Sauvegarde via Storage Engine (Le nouveau standard)
-        # On adapte la logique pour qu'elle corresponde au nouveau stockage
-        # TODO: Connecter le résultat au master_index.json
-        
+        # Sauvegarde simulée et réponse
         return JSONResponse({
             "success": True,
             "filename": file.filename,
@@ -81,6 +77,43 @@ async def api_analyze(
     except Exception as e:
         print(f"[ERROR] Pipeline Failed: {e}")
         return JSONResponse({"success": False, "error": str(e)})
+
+# --- NOUVELLES ROUTES (POUR OPS V15) ---
+
+@app.post("/api/ops/audit")
+async def api_audit(
+    invoice: UploadFile = File(...),
+    contract: UploadFile = File(None),
+    x_admin_token: str = Header(None)
+):
+    if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
+    
+    # Lecture des fichiers en mémoire
+    inv_content = await invoice.read()
+    ctr_content = await contract.read() if contract else None
+    
+    # Appel Cortex Audit
+    return JSONResponse(cortex.analyze_invoice_real(inv_content, ctr_content))
+
+@app.post("/api/ops/chat")
+async def api_chat(message: str = Form(...), x_admin_token: str = Header(None)):
+    if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
+    # Appel Cortex IA
+    return JSONResponse({"response": cortex.ask_agent(message)})
+
+@app.post("/api/ops/chaos")
+async def api_chaos(x_admin_token: str = Header(None)):
+    if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
+    # Appel Cortex Tests
+    return JSONResponse(cortex.run_chaos_monkey())
+
+@app.get("/api/ops/aggregate/{client}")
+async def api_aggregate(client: str, x_admin_token: str = Header(None)):
+    if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
+    # Placeholder pour éviter l'erreur 404 côté JS
+    return JSONResponse({"success": False, "error": "Module Agrégation en cours de construction"})
+
+# ---------------------------------------
 
 # 5. ROUTAGE INTELLIGENT (DASHBOARDS)
 @app.get("/dashboard/{profile}")
@@ -110,4 +143,4 @@ async def catch_all(request: Request, path_name: str):
     if os.path.exists(f"app/templates/{clean_name}"):
         return templates.TemplateResponse(clean_name, {"request": request})
         
-    return JSONResponse({"error": "Page not found"}, 404)
+    return JSONResponse({"error": "Page not found"}, 404)404)
