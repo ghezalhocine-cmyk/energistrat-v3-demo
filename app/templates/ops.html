@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script>
-        tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', ops: '#F43F5E', ai: '#A855F7', cyan: '#00E5FF', success: '#10B981', finance: '#F59E0B', winter: '#3B82F6', summer: '#F97316' }, fontFamily: { sans: ['Inter'], mono: ['JetBrains Mono'] } } } }
+        tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', ops: '#F43F5E', ai: '#A855F7', cyan: '#00E5FF', success: '#10B981', finance: '#F59E0B' }, fontFamily: { sans: ['Inter'], mono: ['JetBrains Mono'] } } } }
     </script>
     
     <style>
@@ -20,26 +20,27 @@
         .nav-icon.active { background: rgba(244, 63, 94, 0.1); color: #F43F5E; box-shadow: 0 0 10px rgba(244, 63, 94, 0.2); }
         .nav-icon:hover { color: white; background: rgba(255,255,255,0.05); }
         
-        /* Gestion des Vues */
         .page-content { display: none; height: 100%; overflow-y: auto; padding-bottom: 50px; } 
         .page-content.active { display: grid; }
         
-        /* Upload Zone Fix */
         #drop-zone { transition: all 0.3s ease; cursor: pointer; }
         #drop-zone:hover { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.05); }
         
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
         .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         
-        /* Badges & Scroll */
-        .badge-hph { background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid #3B82F6; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
-        .badge-hpe { background: rgba(249, 115, 22, 0.2); color: #FB923C; border: 1px solid #F97316; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+        .ai-msg { background: rgba(168, 85, 247, 0.1); border-left: 3px solid #A855F7; padding: 10px; font-size: 0.75rem; margin-bottom: 10px; border-radius: 4px; line-height: 1.4; }
+        .user-msg { text-align: right; color: #94a3b8; font-size: 0.75rem; margin-bottom: 8px; }
+        
+        /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #050505; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
         
-        .ai-msg { background: rgba(168, 85, 247, 0.1); border-left: 3px solid #A855F7; padding: 10px; font-size: 0.75rem; margin-bottom: 10px; border-radius: 4px; line-height: 1.4; }
-        .user-msg { text-align: right; color: #94a3b8; font-size: 0.75rem; margin-bottom: 8px; }
+        /* Tableaux */
+        .audit-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        .audit-table th { text-align: left; padding: 12px; color: #64748B; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .audit-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
     </style>
 </head>
 <body class="ops-grid">
@@ -50,10 +51,10 @@
     <aside class="bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-50 relative">
         <div class="w-10 h-10 rounded-lg bg-ops/20 text-ops flex items-center justify-center font-bold mb-8 shadow-lg shadow-ops/20">OP</div>
         <nav class="flex flex-col w-full items-center gap-2">
-            <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active" title="Data Lab"><i class="fa-solid fa-server text-xl"></i></div>
-            <div onclick="navTo('finlab')" id="nav-finlab" class="nav-icon" title="Finance 4 Postes"><i class="fa-solid fa-euro-sign text-xl"></i></div>
-            <div onclick="navTo('auditlab')" id="nav-auditlab" class="nav-icon" title="Audit PDF"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></div>
-            <div onclick="navTo('scenarios')" id="nav-scenarios" class="nav-icon" title="Tests"><i class="fa-solid fa-bomb text-xl"></i></div>
+            <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active"><i class="fa-solid fa-server text-xl"></i></div>
+            <div onclick="navTo('finlab')" id="nav-finlab" class="nav-icon"><i class="fa-solid fa-euro-sign text-xl"></i></div>
+            <div onclick="navTo('auditlab')" id="nav-auditlab" class="nav-icon"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></div>
+            <div onclick="navTo('scenarios')" id="nav-scenarios" class="nav-icon"><i class="fa-solid fa-bomb text-xl"></i></div>
         </nav>
         <a href="/" class="mt-auto nav-icon"><i class="fa-solid fa-house"></i></a>
     </aside>
@@ -61,40 +62,40 @@
     <!-- 2. MAIN CONTENT -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6 shrink-0">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V15.0 (FULL)</span></div>
-            <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CORTEX V23 READY</div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V15.0 (FUSION)</span></div>
+            <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CORTEX V26 READY</div>
         </header>
 
         <div class="flex-1 overflow-hidden relative">
             <!-- TAB 1: DATA LAB -->
             <div id="view-datalab" class="page-content active p-8 custom-scrollbar">
                 <div class="grid grid-cols-12 gap-6">
-                    <!-- UPLOAD ZONE -->
+                    <!-- UPLOAD -->
                     <div class="col-span-12 md:col-span-4 bento-card p-6 rounded-2xl border-t-4 border-cyan flex flex-col">
                         <h3 class="font-bold text-white mb-4">Ingestion Données</h3>
                         
                         <div class="space-y-3">
                             <div>
                                 <label class="text-[10px] text-gray-500 uppercase font-bold">Client / Groupe</label>
+                                <!-- TON MENU COMPLET CONSERVÉ -->
                                 <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 focus:border-cyan outline-none">
                                     <option value="demo">Test / Démo</option>
                                     <option value="retail">Retail / Franchise</option>
                                     <option value="industry">Industrie</option>
-                                    <option value="mairie">Collectivité / Mairie</option>
+                                    <option value="mairie">Collectivité</option>
                                     <option value="pme">PME / Artisan</option>
                                     <option value="sde">Syndicat (SDE)</option>
                                     <option value="oph">Bailleur (OPH)</option>
-                                    <option value="syndic">Syndic de Copro</option>
+                                    <option value="syndic">Syndic</option>
                                     <option value="citoyen">Particulier</option>
                                     <option value="supplier">Partenaire</option>
                                 </select>
                             </div>
                             
-                            <!-- INPUT CACHÉ + LABEL CLICABLE -->
+                            <!-- UPLOAD FIXÉ -->
                             <label for="real-upload" id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center py-6">
                                 <i class="fa-solid fa-folder-tree text-3xl text-gray-500 mb-2"></i>
                                 <span class="text-xs font-bold text-white" id="upload-label">Cliquer pour charger CSV</span>
-                                <span class="text-[9px] text-gray-500 mt-1">Format SGE Enedis supporté</span>
                             </label>
                             <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
 
@@ -140,12 +141,12 @@
                             </div>
                         </div>
 
-                        <!-- TITAN GRID -->
+                        <!-- KPI GRID (NOUVEAU DESIGN) -->
                         <div class="grid grid-cols-4 gap-4">
                             <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-red-500/5">
                                 <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">GHOST BUSTER</span><i class="fa-solid fa-ghost text-gray-600"></i></div>
                                 <div class="text-xl font-mono font-bold text-white" id="kpi-talon">-- kW</div>
-                                <div class="text-[10px] text-red-400 mt-1" id="kpi-waste">Coût vide: -- €</div>
+                                <div class="text-[10px] text-red-400 mt-1" id="kpi-waste">--</div>
                             </div>
                             <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-yellow-500/5">
                                 <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">SOLAIRE</span><i class="fa-solid fa-sun text-yellow-500/50"></i></div>
@@ -167,49 +168,32 @@
                 </div>
             </div>
 
-            <!-- TAB 2: FINANCE LAB (SIMULATION RESTAURÉE) -->
+            <!-- TAB 2: FINANCE LAB (4 POSTES COMPLET) -->
             <div id="view-finlab" class="page-content p-8 custom-scrollbar">
                 <div class="grid grid-cols-12 gap-6">
                     <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Finance Lab (4 Postes)</h3></div>
                     
-                    <!-- SIMULATEUR 4 POSTES (RESTAURÉ) -->
+                    <!-- SIMULATEUR 4 POSTES (AJOUT V15) -->
                     <div class="col-span-4 bento-card p-6 rounded-2xl border-t-4 border-finance">
                         <h4 class="font-bold text-white mb-4 text-xs uppercase tracking-wider">Tarification Saisonnière</h4>
-                        
                         <div class="space-y-4">
                             <!-- HIVER -->
                             <div class="bg-blue-900/10 p-3 rounded-lg border border-blue-500/20">
                                 <div class="text-[10px] text-blue-400 font-bold mb-2 uppercase">Hiver (Nov-Mars)</div>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label class="text-[9px] text-gray-500">Plein (HPH)</label>
-                                        <input type="number" id="price-hph" value="0.22" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs">
-                                    </div>
-                                    <div>
-                                        <label class="text-[9px] text-gray-500">Creux (HCH)</label>
-                                        <input type="number" id="price-hch" value="0.14" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs">
-                                    </div>
+                                    <div><label class="text-[9px] text-gray-500">Plein (HPH)</label><input type="number" id="price-hph" value="0.22" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs"></div>
+                                    <div><label class="text-[9px] text-gray-500">Creux (HCH)</label><input type="number" id="price-hch" value="0.14" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs"></div>
                                 </div>
                             </div>
-
                             <!-- ETE -->
                             <div class="bg-orange-900/10 p-3 rounded-lg border border-orange-500/20">
                                 <div class="text-[10px] text-orange-400 font-bold mb-2 uppercase">Été (Avril-Oct)</div>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label class="text-[9px] text-gray-500">Plein (HPE)</label>
-                                        <input type="number" id="price-hpe" value="0.14" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs">
-                                    </div>
-                                    <div>
-                                        <label class="text-[9px] text-gray-500">Creux (HCE)</label>
-                                        <input type="number" id="price-hce" value="0.09" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs">
-                                    </div>
+                                    <div><label class="text-[9px] text-gray-500">Plein (HPE)</label><input type="number" id="price-hpe" value="0.14" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs"></div>
+                                    <div><label class="text-[9px] text-gray-500">Creux (HCE)</label><input type="number" id="price-hce" value="0.09" step="0.01" class="w-full bg-abysse border border-white/10 rounded p-1 text-white font-mono text-xs"></div>
                                 </div>
                             </div>
-
-                            <button onclick="updateFinance4P()" class="w-full bg-finance text-black font-bold text-xs py-3 rounded hover:bg-white transition flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-calculator"></i> RECALCULER BUDGET
-                            </button>
+                            <button onclick="updateFinance4P()" class="w-full bg-finance text-black font-bold text-xs py-3 rounded hover:bg-white transition flex items-center justify-center gap-2"><i class="fa-solid fa-calculator"></i> RECALCULER BUDGET</button>
                         </div>
                     </div>
 
@@ -227,7 +211,6 @@
                                 <div class="mt-4 pt-4 border-t border-white/10 text-center"><span class="px-2 py-1 bg-green-900/30 text-green-400 text-[10px] rounded border border-green-500/30" id="fin-status">ANALYSE REQUISE</span></div>
                             </div>
                         </div>
-
                         <!-- TABLEAU 4 POSTES -->
                         <div class="bento-card p-0 rounded-2xl overflow-hidden">
                             <table class="w-full text-xs text-left">
@@ -274,16 +257,13 @@
 
     <script>
         let adminPin = sessionStorage.getItem('admin_pin');
-        if (!adminPin) { adminPin = prompt("🔒 PIN Ops Requis :"); if (adminPin) sessionStorage.setItem('admin_pin', adminPin); else { alert("Accès Refusé"); throw new Error("Stop"); } }
+        if (!adminPin) { adminPin = prompt("PIN Ops :"); sessionStorage.setItem('admin_pin', adminPin); }
 
-        function log(msg, type='info') { const term = document.getElementById('terminal'); const color = type==='success'?'log-success':(type==='error'?'log-error':'log-info'); term.innerHTML += `<div class="log-line ${color}">[${new Date().toLocaleTimeString()}] ${msg}</div>`; term.scrollTop = term.scrollHeight; }
-        const App = { toast: function(msg, type='info') { const el = document.createElement('div'); el.className = 'toast'; el.style.borderLeftColor = type==='success'?'#10B981':(type==='error'?'#EF4444':'#00E5FF'); el.innerText = msg; document.getElementById('toast-container').appendChild(el); setTimeout(() => el.remove(), 4000); } };
-        
-        function navTo(pageId) { 
-            document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active')); 
-            document.getElementById('nav-' + pageId).classList.add('active'); 
-            document.querySelectorAll('.page-content').forEach(e => e.classList.remove('active')); 
-            document.getElementById('view-' + pageId).classList.add('active'); 
+        function navTo(pageId) {
+            document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active'));
+            document.getElementById('nav-' + pageId).classList.add('active');
+            document.querySelectorAll('.page-content').forEach(e => e.classList.remove('active'));
+            document.getElementById('view-' + pageId).classList.add('active');
         }
 
         // --- BLINDAGE ANTI-CRASH JS ---
@@ -300,12 +280,10 @@
             testChart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: '#ffffff10' } } }, elements: { point: { radius: 0 } } } });
         }
 
-        // --- UPLOAD LOGIC ---
-        function triggerUpload() { document.getElementById('real-upload').click(); }
-
         async function handleFileSelect(file) {
             if (!file) return;
-            document.getElementById('real-upload').value = ''; // Reset
+            document.getElementById('real-upload').value = '';
+            
             const target = document.getElementById('target-client').value;
             const site = document.getElementById('target-site').value || "Site_Principal";
             const formData = new FormData(); formData.append('file', file); formData.append('target', target); formData.append('site_name', site);
@@ -317,7 +295,7 @@
                 const data = await res.json();
                 
                 if (data.success) {
-                    log("Analyse V22 Terminée.", 'success');
+                    log("Analyse V26 Terminée.", 'success');
                     document.getElementById('upload-result').classList.remove('hidden');
                     document.getElementById('res-link').style.display = 'block';
                     document.getElementById('res-link').href = data.secure_link;
@@ -364,7 +342,7 @@
             } catch (e) { log(e.message, 'error'); App.toast("Erreur Lecture", "error"); }
         }
 
-        // --- CHART UPDATE ---
+        // --- CHARTS & UI ---
         function updateChartDisplay(labels, values, average, talon) {
             const talonLine = new Array(values.length).fill(talon);
             testChart.data.labels = labels;
@@ -413,19 +391,14 @@
             updateChartDisplay(sl, sv, masterData.average, masterData.talon);
         }
 
-        // --- FINANCE 4 POSTES LOGIC ---
+        // --- FINANCE 4 POSTES ---
         function render4PostTable(detail) {
             if(!detail) return;
             let html = '';
             for (const [key, val] of Object.entries(detail)) {
-                let badge = key.includes('H') && !key.includes('E') ? '<span class="badge-hph px-1 rounded text-[10px]">HIVER</span>' : '<span class="badge-hpe px-1 rounded text-[10px]">ETE</span>';
-                if (key === 'HPE' || key === 'HCE') badge = '<span class="badge-hpe px-1 rounded text-[10px]">ETE</span>';
-                html += `<tr class="border-b border-white/5 last:border-0 hover:bg-white/5">
-                    <td class="p-3">${badge}</td>
-                    <td class="p-3 font-bold text-gray-300">${key}</td>
-                    <td class="p-3 text-right font-mono">${val.vol.toLocaleString()}</td>
-                    <td class="p-3 text-right font-mono text-cyan">${Math.round(val.cout).toLocaleString()} €</td>
-                </tr>`;
+                let badge = key.includes('H') && !key.includes('E') ? '<span class="text-blue-400 border border-blue-500/30 px-1 rounded text-[9px]">HIVER</span>' : '<span class="text-orange-400 border border-orange-500/30 px-1 rounded text-[9px]">ETE</span>';
+                if (key === 'HPE' || key === 'HCE') badge = '<span class="text-orange-400 border border-orange-500/30 px-1 rounded text-[9px]">ETE</span>';
+                html += `<tr class="border-b border-white/5 hover:bg-white/5"><td class="p-2">${badge}</td><td class="p-2 font-bold text-gray-300 text-xs">${key}</td><td class="p-2 text-right font-mono text-xs">${val.vol.toLocaleString()}</td><td class="p-2 text-right font-mono text-cyan text-xs">${Math.round(val.cout).toLocaleString()} €</td></tr>`;
             }
             document.getElementById('table-4p-body').innerHTML = html;
         }
@@ -438,8 +411,12 @@
             const pHCE = parseFloat(document.getElementById('price-hce').value);
             
             const d = currentFinanceData.detail_4p;
-            const totalBudget = (d.HPH.vol * pHPH) + (d.HCH.vol * pHCH) + (d.HPE.vol * pHPE) + (d.HCE.vol * pHCE);
+            const c1 = d.HPH.vol * pHPH;
+            const c2 = d.HCH.vol * pHCH;
+            const c3 = d.HPE.vol * pHPE;
+            const c4 = d.HCE.vol * pHCE;
             
+            const totalBudget = c1 + c2 + c3 + c4;
             safeSetText('fin-budget', Math.round(totalBudget).toLocaleString() + " €");
             
             const totalVol = d.HPH.vol + d.HCH.vol + d.HPE.vol + d.HCE.vol;
@@ -456,12 +433,12 @@
             safeSetText('fin-avg-price', avg.toFixed(3) + " €/kWh");
         }
 
-        // --- AUDIT & CHAT & CHAOS ---
+        // --- AUDIT & CHAT ---
         async function runRealAudit() {
             const inv = document.getElementById('invoice-file').files[0];
             const ctr = document.getElementById('contract-file').files[0];
             if(!inv) return alert("Fichier manquant");
-            log("Audit PDF en cours...", "info");
+            log("Audit PDF...", "info");
             const fd = new FormData(); fd.append('invoice', inv); if(ctr) fd.append('contract', ctr);
             try {
                 const res = await fetch('/api/ops/audit', { method:'POST', headers: { 'x-admin-token': adminPin }, body:fd });
@@ -470,7 +447,7 @@
                     let html = '';
                     data.checks.forEach(c => {
                         const color = c.error ? 'text-red-500' : 'text-green-500';
-                        html += `<tr><td class="p-3 text-gray-400">${c.point}</td><td class="p-3 text-white">${c.a}</td><td class="p-3 text-white">${c.b}</td><td class="p-3 text-right font-bold ${color}">${c.status}</td></tr>`;
+                        html += `<tr><td class="p-2 border-b border-white/5 text-gray-400">${c.point}</td><td class="p-2 border-b border-white/5 text-white">${c.a}</td><td class="p-2 border-b border-white/5 text-white">${c.b}</td><td class="p-2 border-b border-white/5 text-right font-bold ${color}">${c.status}</td></tr>`;
                     });
                     document.getElementById('audit-results').innerHTML = html;
                     log("Audit Terminé.", "success");
