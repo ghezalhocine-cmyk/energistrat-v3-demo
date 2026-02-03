@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V13.1 | Ops Enterprise</title>
+    <title>ENERGISTRAT V13.2 | Ops Enterprise</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -25,8 +25,8 @@
         .page-content.active { display: grid; }
         
         /* Upload Zone Fix */
-        #drop-zone { transition: all 0.3s ease; }
-        #drop-zone.drag-active { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.1); transform: scale(1.02); }
+        #drop-zone { transition: all 0.3s ease; cursor: pointer; }
+        #drop-zone:hover { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.05); }
         
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
         .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
@@ -61,8 +61,8 @@
     <!-- 2. MAIN CONTENT -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6 shrink-0">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V13.1 (FULL MENU)</span></div>
-            <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CORTEX V21 READY</div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V13.2 (STABLE)</span></div>
+            <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CORTEX V21.2 READY</div>
         </header>
 
         <div class="flex-1 overflow-hidden relative">
@@ -76,36 +76,35 @@
                         <div class="space-y-3">
                             <div>
                                 <label class="text-[10px] text-gray-500 uppercase font-bold">Client / Groupe</label>
-                                <!-- MENU COMPLET RESTAURÉ -->
+                                <!-- MENU COMPLET 10 PROFILS -->
                                 <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 focus:border-cyan outline-none">
                                     <option value="demo">Test / Démo</option>
                                     <option value="retail">Retail / Franchise</option>
                                     <option value="industry">Industrie</option>
-                                    <option value="mairie">Collectivité</option>
+                                    <option value="mairie">Collectivité / Mairie</option>
                                     <option value="pme">PME / Artisan</option>
                                     <option value="sde">Syndicat (SDE)</option>
                                     <option value="oph">Bailleur (OPH)</option>
-                                    <option value="syndic">Syndic</option>
+                                    <option value="syndic">Syndic de Copro</option>
                                     <option value="citoyen">Particulier</option>
-                                    <option value="supplier">Partenaire</option>
+                                    <option value="supplier">Partenaire / Fournisseur</option>
                                 </select>
                             </div>
                             
-                            <!-- INPUT CACHÉ HORS DU DROPZONE POUR EVITER LES CONFLITS DE CLIC -->
-                            <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
-
-                            <!-- ZONE DE CLIC / DROP -->
-                            <div id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan transition py-6" onclick="triggerUpload()">
+                            <!-- ZONE DE CLIC FIABLE (LABEL POUR INPUT) -->
+                            <label for="real-upload" id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center py-6">
                                 <i class="fa-solid fa-folder-tree text-3xl text-gray-500 mb-2"></i>
-                                <span class="text-xs font-bold text-white" id="upload-label">Glisser CSV SGE</span>
-                                <span class="text-[9px] text-gray-500 mt-1">(ou cliquer ici)</span>
-                            </div>
+                                <span class="text-xs font-bold text-white" id="upload-label">Cliquer pour charger CSV</span>
+                                <span class="text-[9px] text-gray-500 mt-1">Format SGE Enedis supporté</span>
+                            </label>
+                            <!-- INPUT CACHÉ MAIS ACTIF -->
+                            <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
 
                             <button onclick="loadGroupView()" class="w-full bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 text-[10px] font-bold py-2 rounded border border-purple-500/30 transition flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-layer-group"></i> AGRÉGATION GROUPE
                             </button>
                             
-                            <!-- CHAMP NOM DU SITE PRÉSERVÉ -->
+                            <!-- CHAMP NOM DU SITE -->
                             <div>
                                 <label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site</label>
                                 <input type="text" id="target-site" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 focus:border-cyan outline-none font-mono" placeholder="ex: Magasin_Paris_Nord">
@@ -125,12 +124,18 @@
                             <div class="flex justify-between items-center mb-4">
                                 <h3 class="font-bold text-white">Signature de Charge</h3>
                                 <div class="flex items-center gap-2 bg-white/5 p-1 rounded-lg">
-                                    <input type="date" id="date-start" onchange="applyDateFilter()" class="bg-transparent border-0 text-white text-[10px] w-24">
+                                    <input type="date" id="date-start" onchange="applyDateFilter()" class="bg-transparent border-0 text-white text-[10px] w-24 cursor-pointer">
                                     <span class="text-gray-500 text-[10px]">-</span>
-                                    <input type="date" id="date-end" onchange="applyDateFilter()" class="bg-transparent border-0 text-white text-[10px] w-24">
+                                    <input type="date" id="date-end" onchange="applyDateFilter()" class="bg-transparent border-0 text-white text-[10px] w-24 cursor-pointer">
                                 </div>
                             </div>
                             <div class="h-64 w-full relative"><canvas id="testChart"></canvas></div>
+                            
+                            <div class="flex justify-between mt-4 pt-4 border-t border-white/5">
+                                <div><div class="text-[10px] text-gray-500 uppercase">Conso. Période</div><div class="text-xl font-mono font-bold text-white" id="dyn-conso">--</div></div>
+                                <div><div class="text-[10px] text-gray-500 uppercase">Puissance Max</div><div class="text-xl font-mono font-bold text-white" id="dyn-pmax">--</div></div>
+                                <div class="text-right"><div class="text-[10px] text-gray-500 uppercase">Points</div><div class="text-xl font-mono text-cyan" id="dyn-points">--</div></div>
+                            </div>
                         </div>
 
                         <!-- TITAN GRID (4 KPI) -->
@@ -279,6 +284,11 @@
             document.getElementById('view-' + pageId).classList.add('active'); 
         }
 
+        // --- BLINDAGE ANTI-CRASH JS (LE FIX) ---
+        function safeSetText(id, val) {
+            const el = document.getElementById(id);
+            if (el) el.innerText = val;
+        }
         function safeSetVal(id, val) { const el = document.getElementById(id); if (el) el.value = val; }
         function safeLoc(val, suffix='') { if (val === undefined || val === null || isNaN(val)) return '--'; return Math.round(val).toLocaleString() + suffix; }
 
@@ -289,11 +299,6 @@
         function initChart() {
             const ctx = document.getElementById('testChart').getContext('2d');
             testChart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true }, title: { display: false } }, scales: { x: { ticks: { color: '#64748B', maxTicksLimit: 10 } }, y: { ticks: { color: '#64748B' } } } } });
-        }
-
-        // --- FIX UPLOAD : TRIGGER SÉPARÉ ---
-        function triggerUpload() {
-            document.getElementById('real-upload').click();
         }
 
         async function handleFileSelect(file) {
@@ -312,32 +317,30 @@
                 const data = await res.json();
                 
                 if (data.success) {
-                    log("Analyse V21 Terminée.", 'success');
+                    log("Analyse V21.2 Terminée.", 'success');
                     document.getElementById('upload-result').classList.remove('hidden');
                     document.getElementById('res-link').style.display = 'block';
                     document.getElementById('res-link').href = data.secure_link;
                     
                     if(data.kpi) {
-                        document.getElementById('kpi-talon').innerText = safeLoc(data.kpi.talon, " kW");
-                        document.getElementById('kpi-ratio').innerText = safeLoc(data.kpi.inactivity_ratio, " %");
+                        safeSetText('kpi-talon', safeLoc(data.kpi.talon, " kW"));
+                        safeSetText('kpi-ratio', safeLoc(data.kpi.inactivity_ratio, " %"));
                         
                         const waste = data.kpi.ghost_buster ? data.kpi.ghost_buster.cout_talon_annuel : 0;
-                        document.getElementById('kpi-waste').innerText = "Coût vide: " + safeLoc(waste, " €/an");
+                        safeSetText('kpi-waste', "Coût vide: " + safeLoc(waste, " €/an"));
                         
                         const solar = data.kpi.solar || {};
                         if(solar.status === "OPPORTUNITÉ DÉTECTÉE") {
-                            document.getElementById('kpi-solar-pot').innerText = solar.puissance_kwc + " kWc";
-                            document.getElementById('kpi-solar-gain').innerText = "Gain: " + safeLoc(solar.economie_annuelle_euro, " €");
+                            safeSetText('kpi-solar-pot', solar.puissance_kwc + " kWc");
+                            safeSetText('kpi-solar-gain', "Gain: " + safeLoc(solar.economie_annuelle_euro, " €"));
                         } else {
-                            document.getElementById('kpi-solar-pot').innerText = "Non Pertinent";
-                            document.getElementById('kpi-solar-gain').innerText = "-";
+                            safeSetText('kpi-solar-pot', "Non Pertinent");
+                            safeSetText('kpi-solar-gain', "-");
                         }
                         
                         const drift = data.kpi.drift || {};
-                        document.getElementById('kpi-drift-status').innerText = drift.status || "Inconnu";
-                        document.getElementById('kpi-drift-status').className = drift.status === "DÉRIVE CRITIQUE" ? "text-sm font-bold text-red-500" : "text-sm font-bold text-green-400";
-                        document.getElementById('kpi-drift-val').innerText = "Var: " + (drift.variation_pct || 0) + "%";
-
+                        safeSetText('kpi-drift-status', drift.status || "Inconnu");
+                        
                         // FINANCE 4 POSTES
                         if (data.kpi.finance) {
                             currentFinanceData = data.kpi.finance;
@@ -372,9 +375,10 @@
             testChart.update();
             const sum = values.reduce((a, b) => a + b, 0);
             const max = Math.max(...values);
-            document.getElementById('dyn-conso').innerText = Math.round(sum * (values.length > 8000 ? 0.166 : 1)).toLocaleString() + " kWh";
-            document.getElementById('dyn-pmax').innerText = Math.round(max).toLocaleString() + " kW";
-            document.getElementById('dyn-points').innerText = values.length;
+            // Fix: Use safeSetText to avoid null error if elements are missing/loading
+            safeSetText('dyn-conso', Math.round(sum * (values.length > 8000 ? 0.166 : 1)).toLocaleString() + " kWh");
+            safeSetText('dyn-pmax', Math.round(max).toLocaleString() + " kW");
+            safeSetText('dyn-points', values.length);
         }
 
         function zoomPreset(range) {
@@ -406,6 +410,7 @@
             const sv = masterData.values.slice(startIdx, endIdx + 1);
             const sa = masterData.average.slice(startIdx, endIdx + 1);
             updateChartDisplay(sl, sv, sa, masterData.talon);
+            App.toast("Filtre appliqué.", "success");
         }
 
         // --- FINANCE 4 POSTES LOGIC ---
@@ -449,9 +454,9 @@
 
         function updateFinanceDisplay(finData) {
             const budget = finData.budget_total || 0;
-            document.getElementById('fin-budget').innerText = Math.round(budget).toLocaleString() + " €";
+            safeSetText('fin-budget', Math.round(budget).toLocaleString() + " €");
             const avg = finData.prix_moyen_calcule || 0;
-            document.getElementById('fin-avg-price').innerText = avg.toFixed(3) + " €/kWh";
+            safeSetText('fin-avg-price', avg.toFixed(3) + " €/kWh");
         }
 
         // --- AUDIT & CHAT ---
@@ -496,12 +501,11 @@
         async function loadGroupView() {
             const client = document.getElementById('target-client').value;
             log(`Chargement Vision Groupe : ${client}...`, 'info');
-            // ... (Logique groupe simulée pour l'instant)
             App.toast("Module Groupe en cours de connexion...", "info");
         }
 
         document.addEventListener('DOMContentLoaded', () => { initChart(); navTo('datalab'); });
-        log('Ops V13.1 Enterprise Ready.', 'success');
+        log('Ops V13.2 Stable Ready.', 'success');
     </script>
 </body>
 </html>
