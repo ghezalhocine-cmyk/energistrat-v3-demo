@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V13.0 | Ops Enterprise</title>
+    <title>ENERGISTRAT V13.1 | Ops Enterprise</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -24,9 +24,12 @@
         .page-content { display: none; height: 100%; overflow-y: auto; padding-bottom: 50px; } 
         .page-content.active { display: grid; }
         
-        #drop-zone.drag-active { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.1); }
+        /* Upload Zone Fix */
+        #drop-zone { transition: all 0.3s ease; }
+        #drop-zone.drag-active { border-color: #00E5FF; background-color: rgba(0, 229, 255, 0.1); transform: scale(1.02); }
+        
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
-        .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; }
+        .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         
         /* Badges & Scroll */
         .badge-hph { background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid #3B82F6; }
@@ -43,7 +46,7 @@
 
     <div id="toast-container"></div>
 
-    <!-- 1. SIDEBAR (Navigation Fixée) -->
+    <!-- 1. SIDEBAR (Navigation Fixée z-50) -->
     <aside class="bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-50 relative">
         <div class="w-10 h-10 rounded-lg bg-ops/20 text-ops flex items-center justify-center font-bold mb-8 shadow-lg shadow-ops/20">OP</div>
         <nav class="flex flex-col w-full items-center gap-2">
@@ -58,38 +61,55 @@
     <!-- 2. MAIN CONTENT -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6 shrink-0">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V13.0 (ENTERPRISE)</span></div>
-            <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CORTEX V20.2 READY</div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V13.1 (FULL MENU)</span></div>
+            <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CORTEX V21 READY</div>
         </header>
 
         <div class="flex-1 overflow-hidden relative">
             <!-- TAB 1: DATA LAB -->
             <div id="view-datalab" class="page-content active p-8 custom-scrollbar">
                 <div class="grid grid-cols-12 gap-6">
-                    <!-- UPLOAD -->
+                    <!-- UPLOAD ZONE (CORRIGÉE) -->
                     <div class="col-span-12 md:col-span-4 bento-card p-6 rounded-2xl border-t-4 border-cyan flex flex-col">
                         <h3 class="font-bold text-white mb-4">Ingestion Données</h3>
                         
                         <div class="space-y-3">
                             <div>
-                                <label class="text-[10px] text-gray-500 uppercase font-bold">Client</label>
+                                <label class="text-[10px] text-gray-500 uppercase font-bold">Client / Groupe</label>
+                                <!-- MENU COMPLET RESTAURÉ -->
                                 <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 focus:border-cyan outline-none">
                                     <option value="demo">Test / Démo</option>
                                     <option value="retail">Retail / Franchise</option>
                                     <option value="industry">Industrie</option>
                                     <option value="mairie">Collectivité</option>
+                                    <option value="pme">PME / Artisan</option>
+                                    <option value="sde">Syndicat (SDE)</option>
+                                    <option value="oph">Bailleur (OPH)</option>
+                                    <option value="syndic">Syndic</option>
+                                    <option value="citoyen">Particulier</option>
+                                    <option value="supplier">Partenaire</option>
                                 </select>
                             </div>
                             
-                            <div id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan transition py-6" onclick="document.getElementById('real-upload').click()">
-                                <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
+                            <!-- INPUT CACHÉ HORS DU DROPZONE POUR EVITER LES CONFLITS DE CLIC -->
+                            <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
+
+                            <!-- ZONE DE CLIC / DROP -->
+                            <div id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan transition py-6" onclick="triggerUpload()">
                                 <i class="fa-solid fa-folder-tree text-3xl text-gray-500 mb-2"></i>
                                 <span class="text-xs font-bold text-white" id="upload-label">Glisser CSV SGE</span>
+                                <span class="text-[9px] text-gray-500 mt-1">(ou cliquer ici)</span>
                             </div>
 
                             <button onclick="loadGroupView()" class="w-full bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 text-[10px] font-bold py-2 rounded border border-purple-500/30 transition flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-layer-group"></i> AGRÉGATION GROUPE
                             </button>
+                            
+                            <!-- CHAMP NOM DU SITE PRÉSERVÉ -->
+                            <div>
+                                <label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site</label>
+                                <input type="text" id="target-site" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 focus:border-cyan outline-none font-mono" placeholder="ex: Magasin_Paris_Nord">
+                            </div>
                         </div>
 
                         <div id="upload-result" class="hidden mt-4 bg-green-900/10 border border-green-500/30 p-3 rounded-xl">
@@ -113,7 +133,7 @@
                             <div class="h-64 w-full relative"><canvas id="testChart"></canvas></div>
                         </div>
 
-                        <!-- TITAN GRID -->
+                        <!-- TITAN GRID (4 KPI) -->
                         <div class="grid grid-cols-4 gap-4">
                             <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-red-500/5">
                                 <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">GHOST BUSTER</span><i class="fa-solid fa-ghost text-gray-600"></i></div>
@@ -218,10 +238,10 @@
             <div id="view-auditlab" class="page-content p-8 custom-scrollbar">
                 <div class="grid grid-cols-12 gap-6">
                     <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Audit Expert</h3></div>
-                    <div class="col-span-6 bento-card p-6 rounded-2xl border border-red-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">FACTURE</label><input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
-                    <div class="col-span-6 bento-card p-6 rounded-2xl border border-blue-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">CONTRAT</label><input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
-                    <div class="col-span-12"><button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl text-sm hover:scale-[1.01]">AUDITER</button></div>
-                    <div class="col-span-12 bento-card p-0 rounded-2xl bg-abysse border border-white/10 mt-4 overflow-hidden"><table class="audit-table"><thead><tr class="bg-white/5"><th>Point</th><th>Facture</th><th>Contrat</th><th class="text-right">Résultat</th></tr></thead><tbody id="audit-results"><tr><td colspan="4" class="text-center py-8 text-gray-500 italic">En attente...</td></tr></tbody></table></div>
+                    <div class="col-span-6 bento-card p-6 rounded-2xl border border-red-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">FACTURE (PDF)</label><input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
+                    <div class="col-span-6 bento-card p-6 rounded-2xl border border-blue-500/30"><label class="text-xs font-bold text-gray-400 block mb-1">CONTRAT (PDF)</label><input type="file" id="contract-file" class="block w-full text-xs text-slate-500 file:bg-white/10 file:text-white file:border-0 file:rounded-full file:px-4 file:py-1"></div>
+                    <div class="col-span-12"><button onclick="runRealAudit()" class="w-full py-4 bg-gradient-to-r from-cyan to-blue-600 text-white font-bold rounded-xl text-sm hover:scale-[1.01]">LANCER AUDIT DOC</button></div>
+                    <div class="col-span-12 bento-card p-0 rounded-2xl bg-abysse border border-white/10 mt-4 overflow-hidden"><table class="audit-table"><thead><tr class="bg-white/5"><th>Point de Contrôle</th><th>Facture</th><th>Contrat</th><th class="text-right">Résultat</th></tr></thead><tbody id="audit-results"><tr><td colspan="4" class="text-center py-8 text-gray-500 italic">En attente des documents...</td></tr></tbody></table></div>
                 </div>
             </div>
 
@@ -252,7 +272,6 @@
         function log(msg, type='info') { const term = document.getElementById('terminal'); const color = type==='success'?'log-success':(type==='error'?'log-error':'log-info'); term.innerHTML += `<div class="log-line ${color}">[${new Date().toLocaleTimeString()}] ${msg}</div>`; term.scrollTop = term.scrollHeight; }
         const App = { toast: function(msg, type='info') { const el = document.createElement('div'); el.className = 'toast'; el.style.borderLeftColor = type==='success'?'#10B981':(type==='error'?'#EF4444':'#00E5FF'); el.innerText = msg; document.getElementById('toast-container').appendChild(el); setTimeout(() => el.remove(), 4000); } };
         
-        // --- NAVIGATION FIX ---
         function navTo(pageId) { 
             document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active')); 
             document.getElementById('nav-' + pageId).classList.add('active'); 
@@ -272,29 +291,28 @@
             testChart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true }, title: { display: false } }, scales: { x: { ticks: { color: '#64748B', maxTicksLimit: 10 } }, y: { ticks: { color: '#64748B' } } } } });
         }
 
-        function updateChartDisplay(labels, values, average, talon) {
-            const talonLine = new Array(values.length).fill(talon);
-            testChart.data.labels = labels;
-            testChart.data.datasets = [
-                { label: 'Puissance (kW)', data: values, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, pointRadius: 0, borderWidth: 1.5 },
-                { label: 'Talon', data: talonLine, borderColor: '#10B981', borderWidth: 1, pointRadius: 0, fill: false }
-            ];
-            testChart.update();
+        // --- FIX UPLOAD : TRIGGER SÉPARÉ ---
+        function triggerUpload() {
+            document.getElementById('real-upload').click();
         }
 
         async function handleFileSelect(file) {
             if (!file) return;
+            // Reset input value to allow re-uploading same file
+            document.getElementById('real-upload').value = '';
+            
             const target = document.getElementById('target-client').value;
             const site = document.getElementById('target-site').value || "Site_Principal";
             const formData = new FormData(); formData.append('file', file); formData.append('target', target); formData.append('site_name', site);
             log(`Upload SGE: ${file.name}...`, 'info');
+            App.toast("Analyse en cours...", "info");
             
             try {
                 const res = await fetch('/api/ops/analyze', { method: 'POST', headers: { 'x-admin-token': adminPin }, body: formData });
                 const data = await res.json();
                 
                 if (data.success) {
-                    log("Analyse V20 Terminée.", 'success');
+                    log("Analyse V21 Terminée.", 'success');
                     document.getElementById('upload-result').classList.remove('hidden');
                     document.getElementById('res-link').style.display = 'block';
                     document.getElementById('res-link').href = data.secure_link;
@@ -317,6 +335,7 @@
                         
                         const drift = data.kpi.drift || {};
                         document.getElementById('kpi-drift-status').innerText = drift.status || "Inconnu";
+                        document.getElementById('kpi-drift-status').className = drift.status === "DÉRIVE CRITIQUE" ? "text-sm font-bold text-red-500" : "text-sm font-bold text-green-400";
                         document.getElementById('kpi-drift-val').innerText = "Var: " + (drift.variation_pct || 0) + "%";
 
                         // FINANCE 4 POSTES
@@ -342,16 +361,60 @@
             } catch (e) { log(e.message, 'error'); App.toast("Erreur Lecture", "error"); }
         }
 
-        // --- FINANCE 4 POSTES LOGIC (NEW) ---
+        // --- CHARTS & UI LOGIC ---
+        function updateChartDisplay(labels, values, average, talon) {
+            const talonLine = new Array(values.length).fill(talon);
+            testChart.data.labels = labels;
+            testChart.data.datasets = [
+                { label: 'Puissance (kW)', data: values, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, pointRadius: 0, borderWidth: 1.5 },
+                { label: 'Talon', data: talonLine, borderColor: '#10B981', borderWidth: 1, pointRadius: 0, fill: false }
+            ];
+            testChart.update();
+            const sum = values.reduce((a, b) => a + b, 0);
+            const max = Math.max(...values);
+            document.getElementById('dyn-conso').innerText = Math.round(sum * (values.length > 8000 ? 0.166 : 1)).toLocaleString() + " kWh";
+            document.getElementById('dyn-pmax').innerText = Math.round(max).toLocaleString() + " kW";
+            document.getElementById('dyn-points').innerText = values.length;
+        }
+
+        function zoomPreset(range) {
+            if(!masterData.values.length) return;
+            let sl, sv, sa;
+            if (range === 'all') { sl=masterData.labels; sv=masterData.values; sa=masterData.average; }
+            else { 
+                sl=masterData.labels.slice(-range * 24 * 6); 
+                if (sl.length > masterData.labels.length) sl = masterData.labels;
+                const idx = masterData.labels.length - sl.length;
+                sv = masterData.values.slice(idx); sa = masterData.average.slice(idx); 
+            }
+            updateChartDisplay(sl, sv, sa, masterData.talon);
+        }
+
+        function applyDateFilter() {
+            const sVal = document.getElementById('date-start').value;
+            const eVal = document.getElementById('date-end').value;
+            if(!sVal || !eVal) return;
+            const filteredIndices = [];
+            for(let i=0; i<masterData.labels.length; i++) {
+                const d = masterData.labels[i].substring(0, 10);
+                if(d >= sVal && d <= eVal) filteredIndices.push(i);
+            }
+            if(filteredIndices.length === 0) { App.toast("Aucune donnée.", "error"); return; }
+            const startIdx = filteredIndices[0];
+            const endIdx = filteredIndices[filteredIndices.length - 1];
+            const sl = masterData.labels.slice(startIdx, endIdx + 1);
+            const sv = masterData.values.slice(startIdx, endIdx + 1);
+            const sa = masterData.average.slice(startIdx, endIdx + 1);
+            updateChartDisplay(sl, sv, sa, masterData.talon);
+        }
+
+        // --- FINANCE 4 POSTES LOGIC ---
         function render4PostTable(detail) {
             if(!detail) return;
             let html = '';
-            // On s'attend à recevoir HPH, HCH, HPE, HCE
             for (const [key, val] of Object.entries(detail)) {
                 let badge = key.includes('H') && !key.includes('E') ? '<span class="badge-hph px-1 rounded text-[10px]">HIVER</span>' : '<span class="badge-hpe px-1 rounded text-[10px]">ETE</span>';
-                // Si la clé contient 'E' (Eté)
                 if (key === 'HPE' || key === 'HCE') badge = '<span class="badge-hpe px-1 rounded text-[10px]">ETE</span>';
-                
                 html += `<tr class="border-b border-white/5 last:border-0 hover:bg-white/5">
                     <td class="p-3">${badge}</td>
                     <td class="p-3 font-bold text-gray-300">${key}</td>
@@ -364,30 +427,23 @@
 
         function updateFinance4P() {
             if(!currentFinanceData || !currentFinanceData.detail_4p) { alert("Veuillez charger un fichier."); return; }
-            
             const pHPH = parseFloat(document.getElementById('price-hph').value);
             const pHCH = parseFloat(document.getElementById('price-hch').value);
             const pHPE = parseFloat(document.getElementById('price-hpe').value);
             const pHCE = parseFloat(document.getElementById('price-hce').value);
             
             const d = currentFinanceData.detail_4p;
-            
-            // Recalcul local
             const c1 = d.HPH.vol * pHPH;
             const c2 = d.HCH.vol * pHCH;
             const c3 = d.HPE.vol * pHPE;
             const c4 = d.HCE.vol * pHCE;
             
-            const totalBudget = c1 + c2 + c3 + c4; // + Taxes/Abo (fixe pour l'instant)
-            
-            // Mise à jour Affichage
+            const totalBudget = c1 + c2 + c3 + c4;
             document.getElementById('fin-budget').innerText = Math.round(totalBudget).toLocaleString() + " €";
             
-            // Recalcul Prix Moyen
             const totalVol = d.HPH.vol + d.HCH.vol + d.HPE.vol + d.HCE.vol;
             const avg = totalVol > 0 ? (totalBudget / totalVol) : 0;
             document.getElementById('fin-avg-price').innerText = avg.toFixed(3) + " €/kWh";
-            
             App.toast("Budget 4 Postes Recalculé.", "success");
         }
 
@@ -398,9 +454,54 @@
             document.getElementById('fin-avg-price').innerText = avg.toFixed(3) + " €/kWh";
         }
 
-        // Init
+        // --- AUDIT & CHAT ---
+        async function runRealAudit() {
+            const inv = document.getElementById('invoice-file').files[0];
+            const ctr = document.getElementById('contract-file').files[0];
+            if(!inv || !ctr) return App.toast("Manque Fichier", "error");
+            log("Audit PDF...", "info");
+            const fd = new FormData(); fd.append('invoice', inv); fd.append('contract', ctr);
+            try {
+                const res = await fetch('/api/ops/audit', { method:'POST', headers: { 'x-admin-token': adminPin }, body:fd });
+                const data = await res.json();
+                let html = '';
+                if(data.checks) {
+                    data.checks.forEach(c => {
+                        const color = c.error ? 'text-red-400 font-bold' : 'text-green-400';
+                        html += `<tr><td class="p-2 border-b border-white/5">${c.point}</td><td class="p-2 border-b border-white/5">${c.a}</td><td class="p-2 border-b border-white/5 text-right ${color}">${c.status}</td></tr>`;
+                    });
+                    document.getElementById('audit-results').innerHTML = html;
+                }
+            } catch(e) { log("Erreur Audit", "error"); }
+        }
+
+        async function runTest() {
+            const res = await fetch('/api/ops/chaos', { method:'POST', headers: { 'x-admin-token': adminPin } });
+            const data = await res.json();
+            const div = document.getElementById('chaos-results'); div.innerHTML = '';
+            data.results.forEach(r => div.innerHTML += `<div class="border p-2 rounded text-xs text-white">${r.test}: ${r.status}</div>`);
+        }
+
+        async function sendChat() {
+            const txt = document.getElementById('chat-input').value;
+            if(!txt) return;
+            document.getElementById('chat-input').value = '';
+            document.getElementById('chat-container').innerHTML += `<div class="user-msg">${txt}</div>`;
+            const fd = new FormData(); fd.append('message', txt);
+            const res = await fetch('/api/ops/chat', { method:'POST', headers: { 'x-admin-token': adminPin }, body:fd });
+            const data = await res.json();
+            document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.response}</div>`;
+        }
+
+        async function loadGroupView() {
+            const client = document.getElementById('target-client').value;
+            log(`Chargement Vision Groupe : ${client}...`, 'info');
+            // ... (Logique groupe simulée pour l'instant)
+            App.toast("Module Groupe en cours de connexion...", "info");
+        }
+
         document.addEventListener('DOMContentLoaded', () => { initChart(); navTo('datalab'); });
-        log('Ops V13.0 Enterprise Ready.', 'success');
+        log('Ops V13.1 Enterprise Ready.', 'success');
     </script>
 </body>
 </html>
