@@ -1,11 +1,10 @@
-# app/core/cortex_engine.py V26.0 - SGE CERTIFIED (SAMPLE BASED)
+# app/core/cortex_engine.py V26.0 - SGE CERTIFIED (PRM FIX) & PDF DETECTIVE
 import pandas as pd
 import numpy as np
 import io
 import re
 import math
 import os
-import requests
 from datetime import datetime
 
 # 1. GESTION DES DÉPENDANCES
@@ -14,6 +13,7 @@ try:
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
+    print("⚠️ ERREUR CRITIQUE : pdfplumber manquant malgré requirements.txt")
 
 try:
     import vertexai
@@ -26,19 +26,15 @@ except Exception:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "26.0 (SGE Certified)"
-        
-        # --- BASE DE CONNAISSANCE ---
+        self.version = "26.0 (SGE PRM Certified)"
         self.NAF_DB = {
             "85.": {"label": "Enseignement", "profile": "SCHOOL"},
-            "85.10Z": {"label": "École Maternelle", "profile": "SCHOOL"},
-            "85.20Z": {"label": "École Primaire", "profile": "SCHOOL"},
-            "85.31Z": {"label": "Collège/Lycée", "profile": "SCHOOL"},
-            "10.": {"label": "Industrie Agro.", "profile": "INDUSTRY"},
-            "47.": {"label": "Grand Commerce", "profile": "COMMERCE"},
-            "55.": {"label": "Hôtellerie", "profile": "CONTINUOUS"},
-            "68.": {"label": "Immobilier/Bureaux", "profile": "OFFICE"},
-            "EP":  {"label": "Éclairage Public", "profile": "INVERSE"}
+            "85.10Z": {"label": "Maternelle", "profile": "SCHOOL"},
+            "85.20Z": {"label": "Primaire", "profile": "SCHOOL"},
+            "10.": {"label": "Industrie", "profile": "INDUSTRY"},
+            "47.": {"label": "Commerce", "profile": "COMMERCE"},
+            "68.": {"label": "Bureaux", "profile": "OFFICE"},
+            "EP":  {"label": "Eclairage Public", "profile": "INVERSE"}
         }
 
     def _safe_int(self, value):
@@ -49,25 +45,20 @@ class CortexEngine:
         try: return 0.0 if pd.isna(value) or np.isinf(value) else float(value)
         except: return 0.0
 
-    # ==========================================================================
-    # 1. ORCHESTRATEUR
-    # ==========================================================================
+    # --- ORCHESTRATEUR ---
     def analyze_file(self, file_content, filename, target_profile="demo"):
         try:
-            # A. PARSING STRICT (BASÉ SUR TON ECHANTILLON)
+            # 1. PARSING STRICT (CALIBRÉ SUR TON ECHANTILLON)
             df, time_step = self._parse_data(file_content, filename)
-            if df is None or df.empty: return {"success": False, "error": "Format SGE non reconnu"}
+            if df is None or df.empty: return {"success": False, "error": "Format SGE non reconnu (Vérifier ; et Latin-1)"}
             
-            # Nettoyage
             df['val'] = df['val'].fillna(0)
 
-            # B. CONTEXTE
-            zip_code = self._extract_zipcode(filename)
+            # 2. CONTEXTE
             naf_info = self._detect_naf(filename)
-            geo = self._fetch_geo(zip_code)
-
-            # C. CALCULS
             profiling = self._universal_profiler(df, naf_info)
+            
+            # 3. CALCULS
             base = self._module_socle(df, time_step)
             
             # FINANCE 4 POSTES (Le coeur du sujet)
@@ -79,7 +70,7 @@ class CortexEngine:
             opti = self._module_turpe(df, base['p_max'])
             carbon = self._module_carbon(base['conso_totale'])
 
-            # D. DATA VIZ
+            # 4. DATA VIZ
             step = max(1, len(df)//2000)
             df_chart = df.iloc[::step].copy()
             chart = {
@@ -91,7 +82,7 @@ class CortexEngine:
 
             full_kpi = {
                 **base, **solar, **drift, **waste, **finance, **opti, **carbon,
-                "profiling": profiling, "sectoriel": naf_info, "geo": geo,
+                "profiling": profiling, "sectoriel": naf_info,
                 "meta": {"filename": filename}
             }
             
@@ -102,63 +93,60 @@ class CortexEngine:
             print(f"[CRITICAL ERROR] {e}")
             return {"success": False, "error": str(e)}
 
-    # ==========================================================================
-    # 2. PARSER SGE SUR MESURE (LE FIX)
-    # ==========================================================================
+    # --- PARSER SGE DÉDIÉ (CALIBRÉ SUR TON IMAGE) ---
     def _parse_data(self, content, filename):
         try:
-            # 1. Lecture Brute
+            # Lecture brute
+            content_str = content.decode('latin-1', errors='ignore')
             buffer = io.BytesIO(content)
             df = None
 
-            # On teste d'abord le format SGE (CSV ; Latin-1)
-            try:
-                # 'Identifiant' est le premier mot de ton fichier
-                buffer.seek(0)
-                # On lit avec le séparateur ; et encodage latin-1 (standard Enedis)
-                df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip')
-                
-                # Vérif : Si on a qu'une colonne, le séparateur a échoué
-                if len(df.columns) < 2: raise ValueError("Mauvais séparateur")
-            except:
-                # Fallback Excel ou CSV standard
+            # SIGNATURE SGE ENEDIS : "Identifiant PR" ou "PRM"
+            if "Identifiant" in content_str and "Horodate" in content_str:
+                try:
+                    # SÉPARATEUR POINT-VIRGULE + LATIN-1 (Ton format)
+                    df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip', low_memory=False)
+                except: pass
+
+            # Fallback Excel/CSV
+            if df is None:
                 buffer.seek(0)
                 if filename.lower().endswith('.xlsx'):
                     df = pd.read_excel(buffer)
                 else:
                     df = pd.read_csv(buffer, sep=None, engine='python')
 
-            # 2. Nettoyage Colonnes (Suppr espaces et accents)
-            # Ex: "Unité" -> "unite", "Horodate" -> "horodate"
-            df.columns = [str(c).lower().strip().replace('é','e').replace('è','e').replace('ê','e') for c in df.columns]
+            # Normalisation colonnes
+            df.columns = [str(c).lower().strip().replace('é','e').replace('è','e') for c in df.columns]
             
-            # 3. Mapping Colonnes (Basé sur ton échantillon)
+            # Recherche colonnes clés
             c_date = next((c for c in df.columns if 'horodate' in c or 'date' in c), None)
-            c_val = next((c for c in df.columns if 'valeur' in c or 'puiss' in c), None)
-            c_unit = next((c for c in df.columns if 'unit' in c), None) # Pour lire "W"
+            c_val = next((c for c in df.columns if 'valeur' in c or 'puiss' in c or 'conso' in c), None)
+            c_unit = next((c for c in df.columns if 'unit' in c), None)
             
             if not c_date or not c_val: return None, 0
 
-            # 4. Parsing Date STRICT (JJ/MM/AAAA HH:MM)
-            # C'est ici que se jouait le bug des 4 postes
-            df['date'] = pd.to_datetime(df[c_date], format='%d/%m/%Y %H:%M', errors='coerce')
-            
-            # Si échec (format différent ?), on tente le mode flexible
-            if df['date'].isna().sum() > len(df) * 0.5:
+            # 1. PARSING DATE STRICT (Ton format: 30/12/2024 00:00)
+            # On force le format Français
+            try:
+                df['date'] = pd.to_datetime(df[c_date], format='%d/%m/%Y %H:%M', errors='coerce')
+                # Fallback si format mixte
+                if df['date'].isna().sum() > len(df) * 0.5:
+                    df['date'] = pd.to_datetime(df[c_date], dayfirst=True, errors='coerce')
+            except:
                 df['date'] = pd.to_datetime(df[c_date], dayfirst=True, errors='coerce')
 
             df = df.dropna(subset=['date'])
             
-            # 5. Parsing Valeur
+            # 2. PARSING VALEURS (Ton format: 1000 ou 1000,5)
             if df[c_val].dtype == object:
-                # Enedis peut mettre des virgules "1000,0"
-                df['val'] = pd.to_numeric(df[c_val].astype(str).str.replace(',', '.'), errors='coerce')
+                df['val'] = pd.to_numeric(df[c_val].astype(str).str.replace(',', '.').replace(r'\s+', '', regex=True), errors='coerce')
             else:
                 df['val'] = pd.to_numeric(df[c_val], errors='coerce')
             
             df['val'] = df['val'].fillna(0)
             
-            # 6. Gestion Unité (W -> kW)
+            # 3. GESTION UNITÉ (W -> kW)
             # Ton fichier a une colonne 'Unité' = 'W'
             is_watt = False
             if c_unit:
@@ -166,19 +154,17 @@ class CortexEngine:
                 u = str(df[c_unit].iloc[0]).upper()
                 if 'W' in u and 'KW' not in u: is_watt = True
             
-            # Sécurité : si médiane > 2000, c'est surement des Watts
-            if is_watt or df['val'].median() > 2000:
+            # Sécurité : si médiane > 1000, c'est des Watts
+            if is_watt or df['val'].median() > 1000:
                 df['val'] = df['val'] / 1000
             
             df = df.sort_values(by='date')
             
-            # 7. Calcul du Pas de Temps Réel (PT5M = 5 min)
+            # 4. PAS DE TEMPS (Ton fichier: PT5M = 5 min)
             time_step = 0.166 # Par défaut 10 min
             if len(df) > 1:
-                # Différence entre 2 lignes consécutives
                 delta = (df.iloc[1]['date'] - df.iloc[0]['date']).total_seconds()
-                if delta > 0: 
-                    time_step = delta / 3600 # Heures décimales (ex: 300s / 3600 = 0.0833h)
+                if delta > 0: time_step = delta / 3600
 
             df['date_str'] = df['date'].dt.strftime('%Y-%m-%d %H:%M')
             return df[['date', 'val', 'date_str']], time_step
@@ -187,9 +173,7 @@ class CortexEngine:
             print(f"Parse Error: {e}")
             return None, 0
 
-    # ==========================================================================
-    # 3. MODULE FINANCE 4 POSTES
-    # ==========================================================================
+    # --- FINANCE 4 POSTES (SUR DATES CORRIGEES) ---
     def _module_finance_4p(self, df, ts, pmax):
         df['m'] = df['date'].dt.month
         df['h'] = df['date'].dt.hour
@@ -209,7 +193,7 @@ class CortexEngine:
         return {
             "finance": {
                 "budget_total": self._safe_int(cost),
-                "budget_total_estime": self._safe_int(cost), # Compat V11
+                "budget_total_estime": self._safe_int(cost),
                 "prix_moyen_calcule": round(cost/(v_hph+v_hch+v_hpe+v_hce), 3) if cost>0 else 0,
                 "detail_4p": {
                     "HPH": {"vol": self._safe_int(v_hph), "cout": self._safe_int(v_hph*0.22)},
@@ -220,28 +204,35 @@ class CortexEngine:
             }
         }
 
-    # --- AUDIT PDF (REGEX CORRIGÉE) ---
+    # --- AUDIT PDF (MODE DÉTECTIVE) ---
     def analyze_invoice_real(self, inv_b, ctr_b):
         txt = ""
+        # 1. Extraction Texte
         if PDF_AVAILABLE:
             try:
                 with pdfplumber.open(io.BytesIO(inv_b)) as pdf:
                     for p in pdf.pages: txt += p.extract_text() + "\n"
-            except: pass
+                print(f"[PDF LOG] Extraction réussie : {len(txt)} chars")
+            except Exception as e:
+                print(f"[PDF ERROR] Echec lecture : {e}")
+        else:
+            print("[PDF ERROR] Librairie absente")
         
-        # Regex large pour capter "Puissance souscrite : 36" avec espaces ou tabulations
+        # 2. Analyse Regex (Très large)
+        # On cherche un chiffre après "souscrite" (même s'il y a du texte entre)
         m_sous = re.search(r"souscrite.*?(\d+[.,]?\d*)", txt, re.I | re.DOTALL)
         m_max = re.search(r"(?:atteinte|max|pointe).*?(\d+[.,]?\d*)", txt, re.I | re.DOTALL)
         
         p_sous = float(m_sous.group(1).replace(',', '.')) if m_sous else 0
         p_att = float(m_max.group(1).replace(',', '.')) if m_max else 0
         
+        # 3. Résultat (Même si échec, on renvoie une structure valide)
         checks = [{"point": "Puissance", "a": f"{p_sous} kVA", "b": f"{p_att} kVA", "status": "OK" if p_att<=p_sous else "ALERTE", "error": p_att>p_sous}]
         return {"score": 80, "checks": checks}
 
     # --- UTILS & CHAOS ---
     def run_chaos_monkey(self):
-        # Retourne une liste de dicts pour le JS
+        # Format LISTE pour compatibilité Ops V14
         return [
             {"test": "PDF Engine", "status": "OK" if PDF_AVAILABLE else "MISSING"},
             {"test": "Vertex AI", "status": "OK" if AI_AVAILABLE else "OFFLINE"},
