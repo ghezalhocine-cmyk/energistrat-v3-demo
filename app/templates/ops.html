@@ -2,20 +2,21 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V11.2 | Ops Sectorial</title>
+    <title>ENERGISTRAT V12.0 | Ops Titan</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script>
-        tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', ops: '#F43F5E', ai: '#A855F7', cyan: '#00E5FF', success: '#10B981', finance: '#F59E0B' }, fontFamily: { sans: ['Inter'], mono: ['JetBrains Mono'] } } } }
+        tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', ops: '#F43F5E', ai: '#A855F7', cyan: '#00E5FF', success: '#10B981', finance: '#F59E0B', winter: '#3B82F6', summer: '#F97316' }, fontFamily: { sans: ['Inter'], mono: ['JetBrains Mono'] } } } }
     </script>
     
     <style>
         body { background: #050505; color: #e2e8f0; overflow: hidden; }
         .ops-grid { display: grid; grid-template-columns: 70px 1fr 350px; height: 100vh; }
-        .bento-card { background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255,255,255,0.1); }
+        .bento-card { background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
+        .bento-card:hover { border-color: rgba(255,255,255,0.2); }
         .nav-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #64748B; cursor: pointer; transition: all 0.2s; margin-bottom: 1rem; }
         .nav-icon.active { background: rgba(244, 63, 94, 0.1); color: #F43F5E; }
         .page-content { display: none; } .page-content.active { display: grid; }
@@ -24,20 +25,14 @@
         .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00E5FF; }
         #terminal { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
         .log-success { color: #4ade80; } .log-error { color: #f87171; } .log-info { color: #94a3b8; }
-        input[type="date"], input[type="number"] { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; padding: 4px; font-size: 10px; font-family: 'JetBrains Mono'; cursor: pointer; }
-        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
         
-        .audit-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-        .audit-table th { text-align: left; padding: 12px; color: #64748B; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .audit-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e2e8f0; }
-
-        /* AJOUTS V11 : Styles pour l'IA et le Diag */
         .ai-msg { background: rgba(168, 85, 247, 0.1); border-left: 3px solid #A855F7; padding: 10px; font-size: 0.75rem; margin-bottom: 10px; border-radius: 4px; line-height: 1.4; }
         .ai-msg b { color: #A855F7; }
         .user-msg { text-align: right; color: #94a3b8; font-size: 0.75rem; margin-bottom: 8px; }
-        #kpi-diag { max-height: 85px; overflow-y: auto; padding-right: 5px; }
-        #kpi-diag::-webkit-scrollbar { width: 4px; }
-        #kpi-diag::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+        
+        /* NOUVEAU : Badges 4 Postes */
+        .badge-hph { background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid #3B82F6; }
+        .badge-hpe { background: rgba(249, 115, 22, 0.2); color: #FB923C; border: 1px solid #F97316; }
     </style>
 </head>
 <body class="ops-grid">
@@ -49,7 +44,6 @@
         <div class="w-10 h-10 rounded-lg bg-ops/20 text-ops flex items-center justify-center font-bold mb-8">OP</div>
         <nav class="flex flex-col w-full items-center">
             <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active"><i class="fa-solid fa-server text-xl"></i></div>
-            <!-- AJOUT FINANCE -->
             <div onclick="navTo('finlab')" id="nav-finlab" class="nav-icon"><i class="fa-solid fa-euro-sign text-xl"></i></div>
             <div onclick="navTo('auditlab')" id="nav-auditlab" class="nav-icon"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></div>
             <div onclick="navTo('scenarios')" id="nav-scenarios" class="nav-icon"><i class="fa-solid fa-bomb text-xl"></i></div>
@@ -60,46 +54,35 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         <header class="h-12 border-b border-white/5 bg-yellow-500/5 flex items-center justify-between px-6">
-            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V11.2 (PATCHED)</span></div>
-            <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CHECK DB</div>
+            <div class="flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold"></i><span class="text-xs font-bold text-gold uppercase">OPS V12.0 (TITAN UI)</span></div>
+            <div class="text-[10px] font-mono text-gray-400 cursor-pointer hover:text-white" onclick="checkStorage()"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block mr-2"></span>CORTEX V20.1 CONNECTED</div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-8 custom-scrollbar">
 
-            <!-- TAB 1: DATA LAB -->
+            <!-- TAB 1: DATA LAB (Visualisation & Stratégie) -->
             <div id="view-datalab" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
                 
-                <!-- COLONNE GAUCHE -->
+                <!-- UPLOAD ZONE -->
                 <div class="col-span-12 md:col-span-4 bento-card p-6 rounded-2xl border-t-4 border-cyan flex flex-col">
                     <h3 class="font-bold text-white mb-2">Ingestion & Groupe</h3>
-                    
                     <label class="text-[10px] text-gray-500 uppercase font-bold">Client / Groupe</label>
                     <select id="target-client" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 mb-2 focus:border-cyan outline-none">
                         <option value="demo">Test / Démo</option>
                         <option value="retail">Retail / Franchise</option>
                         <option value="industry">Industrie</option>
                         <option value="mairie">Collectivité</option>
-                        <option value="pme">PME / Artisan</option>
-                        <option value="sde">Syndicat (SDE)</option>
-                        <option value="oph">Bailleur (OPH)</option>
-                        <option value="syndic">Syndic</option>
-                        <option value="citoyen">Particulier</option>
-                        <option value="supplier">Partenaire</option>
                     </select>
-
                     <button onclick="loadGroupView()" class="w-full mb-4 bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 text-[10px] font-bold py-2 rounded border border-purple-500/30 transition flex items-center justify-center gap-2">
                         <i class="fa-solid fa-layer-group"></i> CALCULER TOTAL GROUPE
                     </button>
-
-                    <label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site (Pour Upload)</label>
+                    <label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site</label>
                     <input type="text" id="target-site" class="w-full bg-abysse border border-white/20 rounded-lg text-xs text-white p-2 mb-4 focus:border-cyan outline-none font-mono" placeholder="ex: Magasin_Paris_Nord">
-
                     <div id="drop-zone" class="flex-1 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan transition py-8" onclick="document.getElementById('real-upload').click()">
                         <input type="file" id="real-upload" class="hidden" accept=".csv, .xlsx" onchange="handleFileSelect(this.files[0])">
                         <i class="fa-solid fa-folder-tree text-3xl text-gray-500 mb-2"></i>
                         <span class="text-xs font-bold text-white" id="upload-label">Glisser CSV SGE</span>
                     </div>
-
                     <div id="upload-result" class="hidden mt-4 bg-green-900/10 border border-green-500/30 p-3 rounded-xl">
                         <div class="text-[10px] text-gray-400">Statut :</div>
                         <div id="res-path" class="text-[10px] font-mono text-white mb-2 break-all">...</div>
@@ -107,25 +90,18 @@
                     </div>
                 </div>
 
-                <!-- COLONNE DROITE : GRAPHIQUE -->
+                <!-- CHART ZONE -->
                 <div class="col-span-12 md:col-span-8">
                     <div class="bento-card p-6 rounded-2xl mb-6">
-                        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
-                            <h3 class="font-bold text-white">Visualisation Site</h3>
-                            
-                            <div class="flex items-center gap-2 bg-white/5 p-1 rounded-lg border border-white/10">
-                                <input type="date" id="date-start" onchange="applyDateFilter()"> <span class="text-gray-500 text-xs">au</span> <input type="date" id="date-end" onchange="applyDateFilter()">
-                                <button onclick="applyDateFilter()" class="bg-cyan/20 text-cyan px-2 rounded text-xs hover:bg-cyan/40 h-6"><i class="fa-solid fa-filter"></i></button>
-                            </div>
-                            
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-white">Signature de Charge</h3>
                             <div class="flex gap-1">
-                                <button onclick="zoomPreset(7)" class="px-3 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20 transition border border-white/5">7J</button>
-                                <button onclick="zoomPreset(30)" class="px-3 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20 transition border border-white/5">30J</button>
-                                <button onclick="zoomPreset('all')" class="px-3 py-1 bg-cyan/20 text-[10px] text-cyan rounded hover:bg-cyan/30 transition border border-cyan/30">TOUT</button>
+                                <button onclick="zoomPreset(7)" class="px-3 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20">7J</button>
+                                <button onclick="zoomPreset(30)" class="px-3 py-1 bg-white/10 text-[10px] text-white rounded hover:bg-white/20">30J</button>
+                                <button onclick="zoomPreset('all')" class="px-3 py-1 bg-cyan/20 text-[10px] text-cyan rounded hover:bg-cyan/30">TOUT</button>
                             </div>
                         </div>
                         <div class="h-64 w-full relative"><canvas id="testChart"></canvas></div>
-                        
                         <div class="flex justify-between mt-4 pt-4 border-t border-white/5">
                             <div><div class="text-[10px] text-gray-500 uppercase">Conso. Période</div><div class="text-xl font-mono font-bold text-white" id="dyn-conso">--</div></div>
                             <div><div class="text-[10px] text-gray-500 uppercase">Puissance Max</div><div class="text-xl font-mono font-bold text-white" id="dyn-pmax">--</div></div>
@@ -133,56 +109,74 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-6">
-                        <div class="bento-card p-4 rounded-xl border border-white/5"><div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Talon (Baseload)</div><div class="text-2xl font-mono font-bold text-white" id="kpi-talon">-- kW</div></div>
-                        <div class="bento-card p-4 rounded-xl border border-white/5"><div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Ratio W.E</div><div class="text-2xl font-mono font-bold text-white" id="kpi-ratio">-- %</div></div>
-                        <!-- ANALYSE EXPERTE -->
-                        <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-ai/10">
-                            <div class="text-[10px] text-ai uppercase font-bold mb-1">Analyse Experte</div>
-                            <div class="text-xs text-white leading-relaxed" id="kpi-diag">En attente...</div>
+                    <!-- STRATEGIC GRID (TITAN FEATURES) -->
+                    <div class="grid grid-cols-4 gap-4">
+                        <!-- 1. Talon / Ghost Buster -->
+                        <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-red-500/5">
+                            <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">GHOST BUSTER</span><i class="fa-solid fa-ghost text-gray-600"></i></div>
+                            <div class="text-2xl font-mono font-bold text-white" id="kpi-talon">-- kW</div>
+                            <div class="text-[10px] text-red-400 mt-1" id="kpi-waste">Coût vide: -- €</div>
+                        </div>
+
+                        <!-- 2. Solaire (Nouveau) -->
+                        <div class="bento-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-card to-yellow-500/5">
+                            <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">SOLAIRE</span><i class="fa-solid fa-sun text-yellow-500/50"></i></div>
+                            <div class="text-xl font-mono font-bold text-white" id="kpi-solar-pot">--</div>
+                            <div class="text-[10px] text-cyan mt-1" id="kpi-solar-gain">Gain: -- €/an</div>
+                        </div>
+
+                        <!-- 3. Santé / Dérive (Nouveau) -->
+                        <div class="bento-card p-4 rounded-xl border border-white/5">
+                            <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">SANTÉ</span><i class="fa-solid fa-heart-pulse text-gray-600"></i></div>
+                            <div class="text-sm font-bold text-white" id="kpi-drift-status">--</div>
+                            <div class="text-[10px] text-gray-400 mt-1" id="kpi-drift-val">Variation: -- %</div>
+                        </div>
+
+                        <!-- 4. Ratio -->
+                        <div class="bento-card p-4 rounded-xl border border-white/5">
+                            <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase">RATIO W.E</span><i class="fa-solid fa-calendar-week text-gray-600"></i></div>
+                            <div class="text-2xl font-mono font-bold text-white" id="kpi-ratio">-- %</div>
+                            <div class="text-[10px] text-gray-400 mt-1">Activité Sam/Dim</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- TAB 2: FINANCE LAB (AJOUTÉ SUR LA BASE V7.4) -->
+            <!-- TAB 2: FINANCE LAB (4 POSTES READY) -->
             <div id="view-finlab" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Finance Lab</h3></div>
+                <div class="col-span-12 mb-2"><h3 class="font-bold text-white text-lg">Finance Lab (4 Postes)</h3></div>
                 
                 <div class="col-span-4 bento-card p-6 rounded-2xl border-t-4 border-finance">
-                    <h4 class="font-bold text-white mb-4 text-sm">Paramètres Contrat</h4>
+                    <h4 class="font-bold text-white mb-4 text-sm">Simulation Tarifaire</h4>
                     <div class="space-y-4">
-                        <div>
-                            <label class="text-[10px] text-gray-500 uppercase font-bold">Prix HP (€/kWh)</label>
-                            <input type="number" id="price-hp" value="0.18" step="0.01" class="w-full bg-abysse border border-white/20 rounded p-2 text-white font-mono text-xs">
-                        </div>
-                        <div>
-                            <label class="text-[10px] text-gray-500 uppercase font-bold">Prix HC (€/kWh)</label>
-                            <input type="number" id="price-hc" value="0.12" step="0.01" class="w-full bg-abysse border border-white/20 rounded p-2 text-white font-mono text-xs">
-                        </div>
+                        <div><label class="text-[10px] text-gray-500 uppercase font-bold">Prix HP (€/kWh)</label><input type="number" id="price-hp" value="0.18" step="0.01" class="w-full bg-abysse border border-white/20 rounded p-2 text-white font-mono text-xs"></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase font-bold">Prix HC (€/kWh)</label><input type="number" id="price-hc" value="0.12" step="0.01" class="w-full bg-abysse border border-white/20 rounded p-2 text-white font-mono text-xs"></div>
                         <button onclick="updateFinance()" class="w-full bg-finance text-black font-bold text-xs py-2 rounded hover:bg-white transition">RECALCULER BUDGET</button>
                     </div>
                 </div>
 
-                <div class="col-span-8 grid grid-cols-2 gap-6">
-                    <div class="bento-card p-6 rounded-2xl flex flex-col justify-center items-center">
-                        <div class="text-xs text-gray-500 uppercase font-bold mb-2">Budget Annuel Estimé</div>
-                        <div class="text-4xl font-mono font-bold text-finance" id="fin-budget">-- €</div>
-                        <div class="text-[10px] text-gray-400 mt-2">Basé sur les données chargées</div>
+                <div class="col-span-8">
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <div class="bento-card p-6 rounded-2xl flex flex-col justify-center items-center bg-gradient-to-b from-card to-finance/5">
+                            <div class="text-xs text-gray-500 uppercase font-bold mb-2">Budget Annuel Estimé</div>
+                            <div class="text-4xl font-mono font-bold text-finance" id="fin-budget">-- €</div>
+                            <div class="text-[10px] text-gray-400 mt-2">Basé sur TURPE 4 Postes</div>
+                        </div>
+                        <div class="bento-card p-6 rounded-2xl">
+                            <div class="text-xs text-gray-500 uppercase font-bold mb-4">Performance Achat</div>
+                            <div class="flex justify-between items-center mb-2"><span class="text-xs text-white">Prix Moyen Payé</span><span class="text-sm font-mono text-white" id="fin-avg-price">-- €/kWh</span></div>
+                            <div class="mt-4 pt-4 border-t border-white/10 text-center"><span class="px-2 py-1 bg-green-900/30 text-green-400 text-[10px] rounded border border-green-500/30" id="fin-status">ANALYSE REQUISE</span></div>
+                        </div>
                     </div>
-                    <div class="bento-card p-6 rounded-2xl">
-                        <div class="text-xs text-gray-500 uppercase font-bold mb-4">Performance Achat</div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-xs text-white">Prix Moyen Payé</span>
-                            <span class="text-sm font-mono text-white" id="fin-avg-price">-- €/kWh</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-xs text-gray-400">Prix Marché (Ref)</span>
-                            <span class="text-sm font-mono text-gray-400">0.145 €/kWh</span>
-                        </div>
-                        <div class="mt-4 pt-4 border-t border-white/10 text-center">
-                            <span class="px-2 py-1 bg-green-900/30 text-green-400 text-[10px] rounded border border-green-500/30" id="fin-status">ANALYSE REQUISE</span>
-                        </div>
+
+                    <!-- TABLEAU 4 POSTES (NOUVEAU) -->
+                    <div class="bento-card p-0 rounded-2xl overflow-hidden">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-white/5 text-gray-400 font-mono"><tr><th class="p-3">Saison</th><th class="p-3">Poste</th><th class="p-3 text-right">Volume (kWh)</th><th class="p-3 text-right">Coût Est.</th></tr></thead>
+                            <tbody class="text-white" id="table-4p-body">
+                                <tr><td colspan="4" class="p-4 text-center text-gray-600 italic">Charger un fichier pour voir la répartition 4 postes</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -205,7 +199,7 @@
         <div class="h-40 bg-[#02050a] border-t border-white/10 p-4 overflow-hidden flex flex-col z-20"><div class="flex justify-between items-center mb-1 border-b border-white/5 pb-1"><span class="text-slate-500 font-bold uppercase tracking-widest text-[10px]">>> SYSTEM LOGS</span><button onclick="document.getElementById('terminal').innerHTML=''" class="text-[10px] text-gray-600 hover:text-white">CLEAR</button></div><div id="terminal" class="flex-1 overflow-y-auto space-y-1"></div></div>
     </main>
 
-    <aside class="bg-[#0B0F19] border-l border-white/5 flex flex-col w-[350px] z-30"><div class="p-4 border-b border-white/5 bg-ai/5 flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-ai flex items-center justify-center text-white font-bold"><i class="fa-solid fa-robot"></i></div><h3 class="font-bold text-white text-sm">CORTEX</h3></div><div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-container"></div><div class="p-4 border-t border-white/5"><input type="text" id="chat-input" placeholder="Message..." class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none" onkeypress="if(event.key==='Enter') sendChat()"></div></aside>
+    <aside class="bg-[#0B0F19] border-l border-white/5 flex flex-col w-[350px] z-30"><div class="p-4 border-b border-white/5 bg-ai/5 flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-ai flex items-center justify-center text-white font-bold"><i class="fa-solid fa-robot"></i></div><h3 class="font-bold text-white text-sm">CORTEX V20</h3></div><div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-container"></div><div class="p-4 border-t border-white/5"><input type="text" id="chat-input" placeholder="Message..." class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none" onkeypress="if(event.key==='Enter') sendChat()"></div></aside>
 
     <script>
         let adminPin = sessionStorage.getItem('admin_pin');
@@ -215,7 +209,6 @@
         const App = { toast: function(msg, type='info') { const el = document.createElement('div'); el.className = 'toast'; el.style.borderLeftColor = type==='success'?'#10B981':(type==='error'?'#EF4444':'#00E5FF'); el.innerText = msg; document.getElementById('toast-container').appendChild(el); setTimeout(() => el.remove(), 4000); } };
         function navTo(pageId) { document.querySelectorAll('.nav-icon').forEach(e => e.classList.remove('active')); document.getElementById('nav-' + pageId).classList.add('active'); document.querySelectorAll('.page-content').forEach(e => e.classList.remove('active')); document.getElementById('view-' + pageId).classList.add('active'); }
 
-        // --- FONCTION DE SÉCURITÉ ANTI-CRASH (NOUVEAU) ---
         function safeLoc(val, suffix='') {
             if (val === undefined || val === null || isNaN(val)) return '--';
             return Math.round(val).toLocaleString() + suffix;
@@ -230,24 +223,11 @@
             testChart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true }, title: { display: false } }, scales: { x: { ticks: { color: '#64748B', maxTicksLimit: 10 } }, y: { ticks: { color: '#64748B' } } } } });
         }
 
-        function calculateStats(values) {
-            if (!values || values.length === 0) return;
-            const sum = values.reduce((a, b) => a + b, 0);
-            const max = values.reduce((a, b) => Math.max(a, b), -Infinity);
-            let factor = 1; if (values.length > 8000) factor = 0.166; 
-            const energy = Math.round(sum * factor);
-            document.getElementById('dyn-conso').innerText = energy.toLocaleString() + " kWh";
-            document.getElementById('dyn-pmax').innerText = Math.round(max).toLocaleString() + " kW";
-            document.getElementById('dyn-points').innerText = values.length;
-        }
-
         function loadChartData(labels, values, average, talon) {
             masterData = { labels, values, average, talon };
             if(labels.length > 0) {
-                const start = labels[0].substring(0, 10);
-                const end = labels[labels.length - 1].substring(0, 10);
-                document.getElementById('date-start').value = start;
-                document.getElementById('date-end').value = end;
+                document.getElementById('date-start').value = labels[0].substring(0, 10);
+                document.getElementById('date-end').value = labels[labels.length - 1].substring(0, 10);
             }
             updateChartDisplay(labels, values, average, talon);
         }
@@ -260,7 +240,13 @@
                 { label: 'Talon', data: talonLine, borderColor: '#10B981', borderWidth: 1, pointRadius: 0, fill: false }
             ];
             testChart.update();
-            calculateStats(values);
+            
+            // Stats rapides
+            const sum = values.reduce((a, b) => a + b, 0);
+            const max = Math.max(...values);
+            document.getElementById('dyn-conso').innerText = Math.round(sum * (values.length > 8000 ? 0.166 : 1)).toLocaleString() + " kWh";
+            document.getElementById('dyn-pmax').innerText = Math.round(max).toLocaleString() + " kW";
+            document.getElementById('dyn-points').innerText = values.length;
         }
 
         function zoomPreset(range) {
@@ -273,47 +259,7 @@
                 const idx = masterData.labels.length - sl.length;
                 sv = masterData.values.slice(idx); sa = masterData.average.slice(idx); 
             }
-            if(sl.length > 0) {
-                 document.getElementById('date-start').value = sl[0].substring(0, 10);
-                 document.getElementById('date-end').value = sl[sl.length - 1].substring(0, 10);
-            }
             updateChartDisplay(sl, sv, sa, masterData.talon);
-        }
-
-        function applyDateFilter() {
-            const sVal = document.getElementById('date-start').value;
-            const eVal = document.getElementById('date-end').value;
-            if(!sVal || !eVal) return;
-            const filteredIndices = [];
-            for(let i=0; i<masterData.labels.length; i++) {
-                const d = masterData.labels[i].substring(0, 10);
-                if(d >= sVal && d <= eVal) filteredIndices.push(i);
-            }
-            if(filteredIndices.length === 0) { App.toast("Aucune donnée.", "error"); return; }
-            const startIdx = filteredIndices[0];
-            const endIdx = filteredIndices[filteredIndices.length - 1];
-            const sl = masterData.labels.slice(startIdx, endIdx + 1);
-            const sv = masterData.values.slice(startIdx, endIdx + 1);
-            const sa = masterData.average.slice(startIdx, endIdx + 1);
-            updateChartDisplay(sl, sv, sa, masterData.talon);
-            App.toast("Filtre appliqué.", "success");
-        }
-
-        async function loadGroupView() {
-            const client = document.getElementById('target-client').value;
-            log(`Chargement Vision Groupe : ${client}...`, 'info');
-            try {
-                const res = await fetch(`/api/ops/aggregate/${client}`, { headers: { 'x-admin-token': adminPin } });
-                if(res.status === 401) { alert("PIN Incorrect"); return; }
-                const data = await res.json();
-                if (data.success) {
-                    log(`Groupe ${data.client} : ${data.site_count} sites trouvés.`, 'success');
-                    document.getElementById('upload-result').classList.remove('hidden');
-                    document.getElementById('res-path').innerHTML = `<span class="text-purple-400 font-bold">TOTAL GROUPE (V7.4)</span><br>Sites: ${data.site_count}<br>Conso: ${data.global_conso.toLocaleString()} kWh<br>Pmax: ${data.global_pmax.toLocaleString()} kW`;
-                    document.getElementById('res-link').style.display = 'none';
-                    data.sites.forEach(s => log(`> ${s.site}: ${s.conso.toLocaleString()} kWh`, 'info'));
-                } else { log(`Info: ${data.error || 'Pas de données'}`, 'info'); alert("Aucune donnée trouvée pour ce groupe."); }
-            } catch (e) { log("Erreur Agrégation", 'error'); }
         }
 
         async function handleFileSelect(file) {
@@ -325,92 +271,91 @@
             formData.append('target', target);
             formData.append('site_name', site);
             log(`Upload SGE: ${file.name}...`, 'info');
-            App.toast('Analyse Expert V11...', 'info');
+            
             try {
                 const res = await fetch('/api/ops/analyze', { method: 'POST', headers: { 'x-admin-token': adminPin }, body: formData });
-                if (res.status === 401) { sessionStorage.removeItem('admin_pin'); location.reload(); return; }
                 const data = await res.json();
                 
                 if (data.success) {
-                    log("Analyse Terminée.", 'success');
+                    log("Analyse V20 Terminée.", 'success');
                     document.getElementById('upload-result').classList.remove('hidden');
                     document.getElementById('res-link').style.display = 'block';
-                    document.getElementById('res-path').innerText = `${target}/${site}`;
                     document.getElementById('res-link').href = data.secure_link;
                     
                     if(data.kpi) {
-                        // --- FIX AFFICHAGE (V18 Compatible) ---
+                        // 1. MAJ KPI TITAN
                         document.getElementById('kpi-talon').innerText = safeLoc(data.kpi.talon, " kW");
+                        document.getElementById('kpi-ratio').innerText = safeLoc(data.kpi.inactivity_ratio, " %");
                         
-                        // Ratio W.E (Peut être inactiviy_ratio ou ratio_we)
-                        const ratio = data.kpi.inactivity_ratio !== undefined ? data.kpi.inactivity_ratio : 0;
-                        document.getElementById('kpi-ratio').innerText = safeLoc(ratio, " %");
+                        // Ghost Buster
+                        const waste = data.kpi.ghost_buster ? data.kpi.ghost_buster.cout_talon_annuel : 0;
+                        document.getElementById('kpi-waste').innerText = "Coût vide: " + safeLoc(waste, " €/an");
                         
-                        // --- INTEGRATION AFFICHAGE V11 (HTML) ---
-                        const diagContent = data.ai_insight ? data.ai_insight : data.kpi.diagnosis;
-                        document.getElementById('kpi-diag').innerHTML = diagContent;
+                        // Solaire
+                        const solar = data.kpi.solar || {};
+                        if(solar.status === "OPPORTUNITÉ DÉTECTÉE") {
+                            document.getElementById('kpi-solar-pot').innerText = solar.puissance_kwc + " kWc";
+                            document.getElementById('kpi-solar-gain').innerText = "Gain: " + safeLoc(solar.economie_annuelle_euro, " €");
+                        } else {
+                            document.getElementById('kpi-solar-pot').innerText = "Non Pertinent";
+                            document.getElementById('kpi-solar-gain').innerText = "-";
+                        }
                         
-                        // FINANCE LAB DATA (Compatible V18 & V11)
+                        // Drift / Santé
+                        const drift = data.kpi.drift || {};
+                        document.getElementById('kpi-drift-status').innerText = drift.status || "Inconnu";
+                        document.getElementById('kpi-drift-status').className = drift.status === "DÉRIVE CRITIQUE" ? "text-sm font-bold text-red-500" : "text-sm font-bold text-green-400";
+                        document.getElementById('kpi-drift-val').innerText = "Var: " + (drift.variation_pct || 0) + "%";
+
+                        // FINANCE 4 POSTES
                         if (data.kpi.finance) {
                             currentFinanceData = data.kpi.finance;
                             updateFinanceDisplay(data.kpi.finance);
+                            render4PostTable(data.kpi.finance.detail_4p);
                         }
                     }
                     if (data.ai_insight) {
                         const cortexBox = document.getElementById('chat-container');
                         cortexBox.innerHTML += `<div class="ai-msg">${data.ai_insight}</div>`;
-                        cortexBox.scrollTop = cortexBox.scrollHeight;
                     }
                     if (data.chart) loadChartData(data.chart.labels, data.chart.values, data.chart.average, data.kpi.talon);
                 } else throw new Error(data.error);
             } catch (e) { log(e.message, 'error'); App.toast("Erreur Lecture", "error"); }
         }
 
-        // --- FINANCE LOGIC (PATCHED) ---
+        // --- FINANCE LOGIC (4 POSTES) ---
         function updateFinanceDisplay(finData) {
-            if(!finData) return;
-            
-            // COMPATIBILITÉ V18 (budget_total) / V11 (budget_total_estime)
-            const budget = finData.budget_total !== undefined ? finData.budget_total : (finData.budget_total_estime || 0);
-            
-            // Calcul Prix Moyen si absent
-            let avg = finData.prix_moyen_calcule;
-            if (avg === undefined) {
-                // Si V18 ne renvoie pas le prix moyen, on le calcule à la volée si on a la conso
-                // (Mais pour l'affichage simple, on met -- si pas dispo)
-                avg = 0; 
-            }
-
+            const budget = finData.budget_total || finData.budget_total_estime || 0;
             document.getElementById('fin-budget').innerText = Math.round(budget).toLocaleString() + " €";
-            document.getElementById('fin-avg-price').innerText = avg ? avg.toFixed(3) + " €/kWh" : "-- €/kWh";
-            
-            const refPrice = 0.145;
-            if(avg > refPrice) {
-                document.getElementById('fin-status').innerText = "SURCOÛT DÉTECTÉ";
-                document.getElementById('fin-status').className = "px-2 py-1 bg-red-900/30 text-red-400 text-[10px] rounded border border-red-500/30";
-            } else {
-                document.getElementById('fin-status').innerText = "TARIF COMPÉTITIF";
-                document.getElementById('fin-status').className = "px-2 py-1 bg-green-900/30 text-green-400 text-[10px] rounded border border-green-500/30";
+            const avg = finData.prix_moyen_calcule || 0;
+            document.getElementById('fin-avg-price').innerText = avg.toFixed(3) + " €/kWh";
+        }
+
+        function render4PostTable(detail) {
+            if(!detail) return;
+            let html = '';
+            for (const [key, val] of Object.entries(detail)) {
+                let badge = key.includes('H') ? '<span class="badge-hph px-1 rounded text-[10px]">HIVER</span>' : '<span class="badge-hpe px-1 rounded text-[10px]">ETE</span>';
+                html += `<tr class="border-b border-white/5 last:border-0 hover:bg-white/5">
+                    <td class="p-3">${badge}</td>
+                    <td class="p-3 font-bold text-gray-300">${key}</td>
+                    <td class="p-3 text-right font-mono">${val.vol.toLocaleString()}</td>
+                    <td class="p-3 text-right font-mono text-cyan">${val.cout.toLocaleString()} €</td>
+                </tr>`;
             }
+            document.getElementById('table-4p-body').innerHTML = html;
         }
 
         function updateFinance() {
-            if(!currentFinanceData) { alert("Veuillez d'abord charger un fichier."); return; }
+            // Recalcul simple local pour l'instant
+            if(!currentFinanceData) return;
             const pHP = parseFloat(document.getElementById('price-hp').value);
             const pHC = parseFloat(document.getElementById('price-hc').value);
-            
-            // Note: En V18, on devrait idéalement refaire un appel API pour recalculer précisément
-            // Mais pour l'instant, on fait une estimation locale si on a les consos HP/HC
-            if (currentFinanceData.conso_hp !== undefined) {
-                const budget = (currentFinanceData.conso_hp * pHP) + (currentFinanceData.conso_hc * pHC);
-                const totalKwh = currentFinanceData.conso_hp + currentFinanceData.conso_hc;
-                const avg = budget / totalKwh;
-                document.getElementById('fin-budget').innerText = Math.round(budget).toLocaleString() + " €";
-                document.getElementById('fin-avg-price').innerText = avg.toFixed(3) + " €/kWh";
-                App.toast("Budget Recalculé (Local).", "success");
-            } else {
-                App.toast("Données détaillées manquantes pour recalcul local.", "error");
-            }
+            const consoHP = currentFinanceData.conso_hp;
+            const consoHC = currentFinanceData.conso_hc;
+            const budget = (consoHP * pHP) + (consoHC * pHC);
+            document.getElementById('fin-budget').innerText = Math.round(budget).toLocaleString() + " €";
+            App.toast("Budget Recalculé (Estimation Locale)", "success");
         }
 
         async function runRealAudit() {
@@ -426,37 +371,16 @@
                 if(data.checks) {
                     data.checks.forEach(c => {
                         const color = c.error ? 'text-red-400 font-bold' : 'text-green-400';
-                        const icon = c.error ? '<i class="fa-solid fa-triangle-exclamation"></i>' : '<i class="fa-solid fa-check"></i>';
-                        html += `<tr class="hover:bg-white/5 transition"><td class="font-mono text-cyan-200">${c.point}</td><td>${c.a}</td><td>${c.b}</td><td class="text-right ${color}">${icon} ${c.status}</td></tr>`;
+                        html += `<tr><td class="p-2 border-b border-white/5">${c.point}</td><td class="p-2 border-b border-white/5">${c.a}</td><td class="p-2 border-b border-white/5 text-right ${color}">${c.status}</td></tr>`;
                     });
                     document.getElementById('audit-results').innerHTML = html;
                 }
             } catch(e) { log("Erreur Audit", "error"); }
         }
 
-        async function runTest() {
-            const res = await fetch('/api/ops/chaos', { method:'POST', headers: { 'x-admin-token': adminPin } });
-            const data = await res.json();
-            const div = document.getElementById('chaos-results'); div.innerHTML = '';
-            data.results.forEach(r => div.innerHTML += `<div class="border p-2 rounded text-xs text-white">${r.test}: ${r.status}</div>`);
-        }
-
-        async function sendChat() {
-            const txt = document.getElementById('chat-input').value;
-            if(!txt) return;
-            document.getElementById('chat-input').value = '';
-            document.getElementById('chat-container').innerHTML += `<div class="user-msg">${txt}</div>`;
-            const fd = new FormData(); fd.append('message', txt);
-            const res = await fetch('/api/ops/chat', { method:'POST', headers: { 'x-admin-token': adminPin }, body:fd });
-            const data = await res.json();
-            document.getElementById('chat-container').innerHTML += `<div class="ai-msg">${data.response}</div>`;
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            initChart();
-            navTo('datalab');
-        });
-        log('Ops V11.2 Sectorial Ready.', 'success');
+        // Init
+        document.addEventListener('DOMContentLoaded', () => { initChart(); navTo('datalab'); });
+        log('Ops V12.0 Titan Ready.', 'success');
     </script>
 </body>
 </html>
