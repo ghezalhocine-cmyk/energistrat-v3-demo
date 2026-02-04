@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V3 | Paramètres</title>
+    <title>ENERGISTRAT V20.0 | Settings ERP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -15,7 +15,10 @@
                         card: '#0F172A',
                         cyan: '#00E5FF',
                         purple: '#A855F7',
-                        success: '#10B981'
+                        success: '#10B981',
+                        orange: '#F97316',
+                        yellow: '#EAB308',
+                        danger: '#EF4444'
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
@@ -32,7 +35,9 @@
             background: rgba(15, 23, 42, 0.6);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
         }
+        .nav-item { cursor: pointer; }
         .nav-item.active {
             background: rgba(0, 229, 255, 0.1);
             border-left: 3px solid #00E5FF;
@@ -49,152 +54,286 @@
             outline: none;
             box-shadow: 0 0 15px rgba(0, 229, 255, 0.1);
         }
+        .suggestions-list {
+            position: absolute; background: #0F172A; border: 1px solid #334155;
+            width: 100%; z-index: 50; max-height: 200px; overflow-y: auto; border-radius: 0 0 8px 8px;
+        }
+        .suggestion-item { padding: 8px 12px; cursor: pointer; font-size: 0.75rem; }
+        .suggestion-item:hover { background: #00E5FF; color: black; }
+        
+        /* Badges Segments */
+        .badge-c5 { color: #60A5FA; border: 1px solid #3B82F6; background: rgba(59, 130, 246, 0.1); }
+        .badge-c4 { color: #FACC15; border: 1px solid #EAB308; background: rgba(234, 179, 8, 0.1); }
+        .badge-hta { color: #4ADE80; border: 1px solid #22C55E; background: rgba(34, 197, 94, 0.1); }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden text-sm">
 
-    <!-- SIDEBAR SETTINGS -->
+    <!-- SIDEBAR -->
     <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col z-50">
         <div class="p-6 flex items-center gap-3 mb-4">
-            <a href="/nexus" class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition">
+            <a href="/ops" class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition">
                 <i class="fa-solid fa-arrow-left"></i>
             </a>
             <h1 class="font-bold text-lg">Paramètres</h1>
         </div>
-        
         <nav class="flex-1 px-4 space-y-1">
-            <button onclick="switchTab('general')" id="nav-general" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3">
-                <i class="fa-solid fa-user w-5 text-center"></i> Profil & Compte
+            <button onclick="switchTab('clients')" id="nav-clients" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
+                <i class="fa-solid fa-sitemap w-5 text-center text-cyan"></i> Structure & Parc
             </button>
-            <button onclick="switchTab('security')" id="nav-security" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3">
-                <i class="fa-solid fa-shield-halved w-5 text-center"></i> Sécurité & 2FA
-            </button>
-            <button onclick="switchTab('api')" id="nav-api" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3">
-                <i class="fa-solid fa-code w-5 text-center"></i> Clés API
-            </button>
-            <button onclick="switchTab('billing')" id="nav-billing" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3">
-                <i class="fa-solid fa-credit-card w-5 text-center"></i> Facturation
+            <button onclick="switchTab('general')" id="nav-general" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
+                <i class="fa-solid fa-user w-5 text-center"></i> Profil Admin
             </button>
         </nav>
-
-        <div class="p-6">
-            <a href="/" class="flex items-center gap-2 text-red-400 hover:text-red-300 text-xs font-bold transition">
-                <i class="fa-solid fa-power-off"></i> Déconnexion
-            </a>
-        </div>
+        <div class="p-6"><a href="/" class="flex items-center gap-2 text-red-400 text-xs font-bold"><i class="fa-solid fa-power-off"></i> Déconnexion</a></div>
     </aside>
 
     <!-- CONTENT -->
-    <main class="flex-1 overflow-y-auto p-10 relative">
+    <main class="flex-1 overflow-y-auto p-10 relative bg-abysse">
         
-        <!-- TAB 1: GENERAL -->
-        <div id="tab-general" class="tab-content max-w-3xl mx-auto space-y-8">
-            <header>
-                <h2 class="text-2xl font-bold text-white mb-1">Mon Profil</h2>
-                <p class="text-gray-400 text-xs">Gérez vos informations personnelles.</p>
-            </header>
-
-            <div class="bento-card rounded-bento p-8 flex items-center gap-6">
-                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-cyan to-blue-600 p-[2px]">
-                    <img src="https://ui-avatars.com/api/?name=User+V3&background=050505&color=fff" class="w-full h-full rounded-full object-cover">
-                </div>
+        <!-- TAB CLIENTS -->
+        <div id="tab-clients" class="tab-content max-w-6xl mx-auto space-y-6">
+            <header class="flex justify-between items-end">
                 <div>
-                    <button class="bg-white text-abysse px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan hover:scale-105 transition">Changer l'avatar</button>
-                    <p class="text-[10px] text-gray-500 mt-2">JPG, PNG ou GIF. Max 2MB.</p>
-                </div>
-            </div>
-
-            <div class="bento-card rounded-bento p-8 space-y-6">
-                <div class="grid grid-cols-2 gap-6">
-                    <div class="space-y-2">
-                        <label class="text-xs text-gray-400 font-bold uppercase">Prénom</label>
-                        <input type="text" value="Jean" class="w-full input-dark px-4 py-3 rounded-xl text-sm">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-xs text-gray-400 font-bold uppercase">Nom</label>
-                        <input type="text" value="Dupont" class="w-full input-dark px-4 py-3 rounded-xl text-sm">
-                    </div>
-                </div>
-                <div class="space-y-2">
-                    <label class="text-xs text-gray-400 font-bold uppercase">Email Professionnel</label>
-                    <input type="email" value="jean.dupont@company.com" class="w-full input-dark px-4 py-3 rounded-xl text-sm">
-                </div>
-                <div class="pt-4 flex justify-end">
-                    <button class="bg-cyan text-abysse px-6 py-3 rounded-xl font-bold text-sm hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.3)]">Enregistrer</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- TAB 2: SECURITY -->
-        <div id="tab-security" class="tab-content max-w-3xl mx-auto space-y-8 hidden">
-            <header>
-                <h2 class="text-2xl font-bold text-white mb-1">Sécurité</h2>
-                <p class="text-gray-400 text-xs">Protégez votre accès Tiers de Confiance.</p>
-            </header>
-
-            <div class="bento-card rounded-bento p-8 border-l-4 border-green-500 flex justify-between items-center">
-                <div>
-                    <h3 class="font-bold text-white text-lg">Authentification à 2 facteurs (2FA)</h3>
-                    <p class="text-xs text-gray-400 mt-1">Sécurisez votre compte avec Google Authenticator.</p>
-                </div>
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" value="" class="sr-only peer" checked>
-                    <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                </label>
-            </div>
-
-            <div class="bento-card rounded-bento p-8 space-y-6">
-                <h3 class="font-bold text-white mb-4">Changer de mot de passe</h3>
-                <div class="space-y-2">
-                    <label class="text-xs text-gray-400 font-bold uppercase">Actuel</label>
-                    <input type="password" class="w-full input-dark px-4 py-3 rounded-xl text-sm">
-                </div>
-                <div class="space-y-2">
-                    <label class="text-xs text-gray-400 font-bold uppercase">Nouveau</label>
-                    <input type="password" class="w-full input-dark px-4 py-3 rounded-xl text-sm">
-                </div>
-                <div class="pt-4 flex justify-end">
-                    <button class="border border-white/20 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-white/10 transition">Mettre à jour</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- TAB 3: API -->
-        <div id="tab-api" class="tab-content max-w-3xl mx-auto space-y-8 hidden">
-            <header>
-                <h2 class="text-2xl font-bold text-white mb-1">Développeurs & API</h2>
-                <p class="text-gray-400 text-xs">Connectez CORTEX à vos outils (ERP, CRM, GTC).</p>
-            </header>
-
-            <div class="bento-card rounded-bento p-8 bg-gradient-to-br from-card to-purple-900/20 border-purple-500/30">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="font-bold text-white">Clé API Production</h3>
-                    <span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-[10px] font-bold">ACTIVE</span>
+                    <h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2>
+                    <p class="text-gray-400 text-xs">Gestion Multi-Sites, Segments Enedis et Lots d'Achat.</p>
                 </div>
                 <div class="flex gap-2">
-                    <input type="text" value="sk_live_51Mz...Xy9q" readonly class="w-full bg-abysse border border-purple-500/30 rounded-xl px-4 py-3 text-xs font-mono text-purple-300">
-                    <button class="bg-purple-600 text-white px-4 rounded-xl hover:bg-purple-500 transition"><i class="fa-regular fa-copy"></i></button>
+                    <button onclick="toggleImportModal()" class="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg text-xs font-bold border border-white/10 transition">
+                        <i class="fa-solid fa-file-csv mr-2"></i>Import Masse (V2)
+                    </button>
+                    <button class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20">
+                        <i class="fa-solid fa-plus mr-2"></i>Ajouter Site
+                    </button>
                 </div>
-                <p class="text-[10px] text-gray-500 mt-4"><i class="fa-solid fa-circle-info mr-1"></i> Ne partagez jamais cette clé. Utilisez les variables d'environnement.</p>
+            </header>
+
+            <!-- 1. IDENTITÉ -->
+            <div class="bento-card rounded-bento p-6 border-l-4 border-cyan">
+                <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded bg-cyan/20 text-cyan flex items-center justify-center text-[10px]">1</span>
+                    ENTITÉ JURIDIQUE
+                </h3>
+                <div class="flex gap-4 mb-4">
+                    <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="entity_type" value="company" checked class="accent-cyan" onchange="updateFormType()"><span class="text-xs text-white">Entreprise / Public (SIRET)</span></label>
+                    <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="entity_type" value="copro" class="accent-orange" onchange="updateFormType()"><span class="text-xs text-white">Copropriété (RNC)</span></label>
+                </div>
+                <div class="grid grid-cols-12 gap-4">
+                    <div class="col-span-3">
+                        <label id="lbl-id" class="text-[10px] text-gray-500 font-bold uppercase">SIRET</label>
+                        <div class="relative"><input type="text" id="id-input" placeholder="123..." class="w-full input-dark p-2 rounded text-xs font-mono" onblur="checkIdentity()"><div id="id-status" class="absolute right-2 top-2 text-[10px]"></div></div>
+                    </div>
+                    <div class="col-span-5"><label class="text-[10px] text-gray-500 font-bold uppercase">Raison Sociale</label><input type="text" id="company-name" placeholder="Auto..." class="w-full input-dark p-2 rounded text-xs bg-white/5"></div>
+                    <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Groupe / Réseau</label><select class="w-full input-dark p-2 rounded text-xs"><option value="none">Aucun</option><option value="sde">Syndicat Énergie (SDE)</option><option value="retail">Réseau Retail</option></select></div>
+                </div>
+            </div>
+
+            <!-- 2. TECHNIQUE -->
+            <div class="bento-card rounded-bento p-6 border-l-4 border-purple-500">
+                <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px]">2</span>
+                    LOCALISATION & TECHNIQUE
+                </h3>
+                <div class="grid grid-cols-12 gap-4">
+                    <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Usage</label><select class="w-full input-dark p-2 rounded text-xs"><option value="batiment">Bâtiment</option><option value="ep">Éclairage Public</option><option value="process">Industrie</option></select></div>
+                    <div class="col-span-5 relative"><label class="text-[10px] text-gray-500 font-bold uppercase">Adresse (BAN)</label><input type="text" id="address-input" class="w-full input-dark p-2 rounded text-xs" oninput="searchAddress()"><div id="address-suggestions" class="suggestions-list hidden"></div></div>
+                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">PDL / PRM</label><input type="text" class="w-full input-dark p-2 rounded text-xs font-mono"></div>
+                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Surface (m²)</label><input type="number" class="w-full input-dark p-2 rounded text-xs"></div>
+                </div>
+            </div>
+
+            <!-- 3. SEGMENTATION & CONTRATS (NEW) -->
+            <div class="bento-card rounded-bento p-6 border-l-4 border-yellow-500">
+                <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-[10px]">3</span>
+                    SEGMENTATION & MARCHÉS
+                </h3>
+                <div class="grid grid-cols-12 gap-4">
+                    
+                    <!-- BLOC SEGMENT AUTOMATIQUE -->
+                    <div class="col-span-2">
+                        <label class="text-[10px] text-gray-500 font-bold uppercase">Puissance (kVA)</label>
+                        <input type="number" id="power-input" placeholder="Ex: 250" class="w-full input-dark p-2 rounded text-xs font-mono text-yellow-500 font-bold" oninput="inferSegment()">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="text-[10px] text-gray-500 font-bold uppercase">Segment (Détecté)</label>
+                        <select id="segment-select" class="w-full input-dark p-2 rounded text-xs font-bold text-gray-300">
+                            <option value="c5">C5 (Bleu)</option>
+                            <option value="c4">C4 (Jaune)</option>
+                            <option value="hta">C3/C2 (Vert)</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="text-[10px] text-gray-500 font-bold uppercase">Option Tarif.</label>
+                        <select class="w-full input-dark p-2 rounded text-xs">
+                            <option value="base">Base</option>
+                            <option value="hphc">HP / HC</option>
+                            <option value="pte">Pointe Mobile</option>
+                        </select>
+                    </div>
+
+                    <!-- BLOC LOTS & ACHATS -->
+                    <div class="col-span-3">
+                        <label class="text-[10px] text-gray-500 font-bold uppercase">Lot / Marché (Analytique)</label>
+                        <input type="text" placeholder="Ex: Lot 1 - Ecoles" class="w-full input-dark p-2 rounded text-xs bg-white/5">
+                    </div>
+                    <div class="col-span-3">
+                        <label class="text-[10px] text-gray-500 font-bold uppercase">Fournisseur & Échéance</label>
+                        <div class="flex gap-2">
+                            <select class="w-1/2 input-dark p-2 rounded text-xs">
+                                <option>EDF</option><option>TotalEnergies</option><option>Engie</option><option>Autre</option>
+                            </select>
+                            <input type="date" class="w-1/2 input-dark p-2 rounded text-xs text-gray-400">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MANDAT -->
+            <div class="bg-white/5 p-4 rounded-xl border border-white/5 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded bg-green-500/20 text-green-500 flex items-center justify-center"><i class="fa-solid fa-file-signature"></i></div>
+                    <div>
+                        <div class="text-xs font-bold text-white">Mandat de Collecte (Consentement)</div>
+                        <div class="text-[10px] text-gray-500">Requis pour connecter l'API Enedis.</div>
+                    </div>
+                </div>
+                <button class="text-xs bg-white/10 hover:bg-white/20 px-3 py-2 rounded text-white transition"><i class="fa-solid fa-upload mr-2"></i>Joindre PDF</button>
+            </div>
+
+        </div>
+
+        <!-- TAB GENERAL -->
+        <div id="tab-general" class="tab-content max-w-3xl mx-auto space-y-8 hidden">
+            <header><h2 class="text-2xl font-bold text-white mb-1">Profil Admin</h2></header>
+            <div class="bento-card rounded-bento p-8 flex items-center gap-6">
+                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-cyan to-blue-600 p-[2px]">
+                    <img src="https://ui-avatars.com/api/?name=Admin+V3&background=050505&color=fff" class="w-full h-full rounded-full object-cover">
+                </div>
+                <div><div class="text-white font-bold">Administrateur Principal</div></div>
             </div>
         </div>
 
     </main>
 
+    <!-- IMPORT MODAL UPDATED -->
+    <div id="import-modal" class="fixed inset-0 bg-black/90 z-[99] hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bento-card p-8 rounded-bento w-[600px] relative">
+            <button onclick="toggleImportModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-xl font-bold text-white mb-2"><i class="fa-solid fa-table-columns text-cyan mr-2"></i>Import de Parc (V2)</h3>
+            <p class="text-xs text-gray-400 mb-6">Mise à jour V20 : Nouveaux champs Segments & Lots supportés.</p>
+            
+            <div class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-cyan hover:bg-cyan/5 transition cursor-pointer mb-4">
+                <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 mb-2"></i>
+                <div class="text-sm font-bold text-white">Glisser fichier CSV</div>
+            </div>
+            
+            <div class="flex justify-between items-center bg-white/5 p-4 rounded-lg border border-white/5">
+                <div class="text-xs">
+                    <div class="font-bold text-white mb-1">Structure du Fichier CSV :</div>
+                    <div class="text-[10px] text-gray-500 font-mono">SIRET;SITE;ADRESSE;PDL;PUISSANCE;SEGMENT;LOT;FOURNISSEUR;DATE_FIN</div>
+                </div>
+                <button onclick="downloadTemplate()" class="text-cyan text-xs font-bold hover:underline border border-cyan/30 px-3 py-1 rounded bg-cyan/10">
+                    <i class="fa-solid fa-download mr-1"></i>Modèle
+                </button>
+            </div>
+            
+            <button class="w-full bg-cyan text-black font-bold py-3 rounded-lg mt-6 hover:bg-cyan/90">LANCER L'IMPORTATION</button>
+        </div>
+    </div>
+
     <script>
         function switchTab(tabId) {
-            // Nav
-            document.querySelectorAll('.nav-item').forEach(el => {
-                el.classList.remove('active', 'text-white');
-                el.classList.add('text-gray-400');
-            });
-            document.getElementById('nav-' + tabId).classList.add('active', 'text-white');
-            document.getElementById('nav-' + tabId).classList.remove('text-gray-400');
-
-            // Content
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white', 'border-cyan'); el.classList.add('text-gray-400', 'border-transparent'); });
+            const btn = document.getElementById('nav-' + tabId); btn.classList.add('active', 'text-white', 'border-cyan'); btn.classList.remove('text-gray-400', 'border-transparent');
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden')); document.getElementById('tab-' + tabId).classList.remove('hidden');
         }
+        function toggleImportModal() { document.getElementById('import-modal').classList.toggle('hidden'); }
+
+        // --- SMART INFERENCE (LOGIQUE METIER) ---
+        function inferSegment() {
+            const p = parseFloat(document.getElementById('power-input').value);
+            const sel = document.getElementById('segment-select');
+            
+            // Logique Enedis Standard
+            if (p <= 36) { sel.value = 'c5'; sel.className = "w-full input-dark p-2 rounded text-xs font-bold badge-c5"; }
+            else if (p <= 250) { sel.value = 'c4'; sel.className = "w-full input-dark p-2 rounded text-xs font-bold badge-c4"; }
+            else { sel.value = 'hta'; sel.className = "w-full input-dark p-2 rounded text-xs font-bold badge-hta"; }
+        }
+
+        // --- CSV TEMPLATE GENERATOR ---
+        function downloadTemplate() {
+            const headers = "SIRET;NOM_SITE;ADRESSE;CODE_POSTAL;VILLE;PDL_PRM;PUISSANCE_KVA;SEGMENT_ENEDIS;LOT_MARCHE;FOURNISSEUR;DATE_FIN_CONTRAT";
+            const row1 = "12345678900012;Ecole A;10 Rue de la Paix;75000;Paris;12345678901234;36;C5;Lot 1 Ecoles;EDF;2026-12-31";
+            const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + row1;
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "ENERGISTRAT_TEMPLATE_IMPORT_V2.csv");
+            document.body.appendChild(link);
+            link.click();
+        }
+
+        // --- POLYMORPHIC LOGIC (SAME AS V19) ---
+        function updateFormType() {
+            const type = document.querySelector('input[name="entity_type"]:checked').value;
+            const lbl = document.getElementById('lbl-id'); const inp = document.getElementById('id-input');
+            if(type === 'company') { lbl.innerText = "SIRET"; inp.placeholder = "123..."; } 
+            else { lbl.innerText = "Numéro RNC"; inp.placeholder = "AA123..."; }
+        }
+
+        async function checkIdentity() {
+            const type = document.querySelector('input[name="entity_type"]:checked').value;
+            const val = document.getElementById('id-input').value.replace(/\s/g, '');
+            const status = document.getElementById('id-status');
+            status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i>';
+            if(type === 'company') {
+                try {
+                    const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${val}`);
+                    const data = await res.json();
+                    if(data.results && data.results.length > 0) {
+                        status.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>';
+                        document.getElementById('company-name').value = data.results[0].nom_complet;
+                    } else status.innerHTML = '<i class="fa-solid fa-xmark text-red-500"></i>';
+                } catch(e) { status.innerHTML = '?'; }
+            } else {
+                if(val.length > 5) { status.innerHTML = '<i class="fa-solid fa-check text-orange-500"></i>'; document.getElementById('company-name').value = "Syndicat Copro (Détecté)"; }
+                else status.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-yellow-500"></i>';
+            }
+        }
+
+        // ADDRESS AUTOCOMPLETE
+        let timeout = null;
+        async function searchAddress() {
+            const query = document.getElementById('address-input').value;
+            const list = document.getElementById('address-suggestions');
+            if(query.length < 4) { list.classList.add('hidden'); return; }
+            clearTimeout(timeout);
+            timeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`);
+                    const data = await res.json();
+                    list.innerHTML = '';
+                    if(data.features && data.features.length > 0) {
+                        list.classList.remove('hidden');
+                        data.features.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item text-gray-300';
+                            div.innerText = item.properties.label;
+                            div.onclick = () => { document.getElementById('address-input').value = item.properties.label; list.classList.add('hidden'); };
+                            list.appendChild(div);
+                        });
+                    }
+                } catch(e) {}
+            }, 300);
+        }
+        document.addEventListener('click', function(e) { if (!document.getElementById('address-input').contains(e.target)) document.getElementById('address-suggestions').classList.add('hidden'); });
+
+        switchTab('clients');
     </script>
 </body>
 </html>
