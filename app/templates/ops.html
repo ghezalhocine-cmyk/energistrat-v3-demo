@@ -2,20 +2,16 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V16.6 | Ops Master</title>
+    <title>ENERGISTRAT V17.1 | Ops Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* STYLE GLOBAL */
         body { background: #001529; color: #e2e8f0; font-family: 'Inter', sans-serif; overflow: hidden; }
-        
-        /* LAYOUT */
         .ops-grid { display: grid; grid-template-columns: 70px 1fr 350px; height: 100vh; }
         .page-content { display: none; height: 100%; overflow-y: auto; padding: 20px; gap: 20px; } 
         .page-content.active { display: grid; }
         
-        /* BENTO CARDS */
         .bento-card { 
             background: rgba(15, 23, 42, 0.6); 
             border: 1px solid rgba(255,255,255,0.05); 
@@ -23,76 +19,67 @@
             backdrop-filter: blur(10px);
         }
 
-        /* NAVIGATION */
         .nav-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #64748B; cursor: pointer; margin-bottom: 1rem; border-radius: 12px; transition: 0.2s; }
         .nav-icon.active { background: rgba(0, 229, 255, 0.1); color: #00E5FF; box-shadow: 0 0 15px rgba(0, 229, 255, 0.2); }
 
-        /* INPUTS */
         .input-dark { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 8px; font-size: 0.75rem; }
-        
-        /* CHART BUTTONS */
         .chart-btn { padding: 4px 12px; font-size: 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; background: transparent; color: #94a3b8; }
         .chart-btn.active { background: #00E5FF; color: #001529; border-color: #00E5FF; font-weight: bold; }
 
-        /* AUTH MODAL */
         #auth-modal { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body class="ops-grid">
 
-    <!-- 1. AUTHENTIFICATION -->
+    <!-- AUTH -->
     <div id="auth-modal">
-        <div class="mb-6 w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/50">
-            <i class="fa-solid fa-bolt text-2xl text-white"></i>
-        </div>
+        <div class="mb-6 w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/50"><i class="fa-solid fa-bolt text-2xl text-white"></i></div>
         <h1 class="text-white font-bold text-xl mb-6 tracking-widest">ENERGISTRAT V3</h1>
         <div class="flex flex-col gap-3 w-64">
-            <input type="password" id="auth-input" placeholder="Code Administrateur" class="p-3 rounded-lg bg-white/10 border border-white/20 text-white text-center focus:border-cyan-400 outline-none transition">
+            <input type="password" id="auth-input" placeholder="Code Admin" class="p-3 rounded-lg bg-white/10 border border-white/20 text-white text-center focus:border-cyan-400 outline-none transition">
             <button onclick="checkAuth()" class="bg-cyan-500 hover:bg-cyan-400 text-[#001529] font-bold py-3 rounded-lg transition shadow-lg shadow-cyan-500/20">DÉVERROUILLER</button>
         </div>
         <p id="auth-error" class="text-red-500 text-xs mt-4 hidden animate-pulse">Accès Refusé</p>
     </div>
 
-    <!-- 2. SIDEBAR -->
+    <!-- SIDEBAR -->
     <aside class="bg-[#000f1f] border-r border-white/5 flex flex-col items-center py-6 z-50">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center font-bold mb-8 text-xs shadow-lg shadow-cyan-500/20">V3</div>
         <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active"><i class="fa-solid fa-chart-line text-lg"></i></div>
         <div onclick="navTo('finlab')" id="nav-finlab" class="nav-icon"><i class="fa-solid fa-coins text-lg"></i></div>
         <div onclick="navTo('auditlab')" id="nav-auditlab" class="nav-icon"><i class="fa-solid fa-file-contract text-lg"></i></div>
+        <div onclick="navTo('scenarios')" id="nav-scenarios" class="nav-icon text-red-500"><i class="fa-solid fa-bug text-lg"></i></div>
     </aside>
 
-    <!-- 3. MAIN CONTENT -->
+    <!-- MAIN -->
     <main class="flex-1 flex flex-col bg-[#001529] relative overflow-hidden">
         <header class="h-14 border-b border-white/5 flex items-center justify-between px-8 shrink-0 bg-[#000f1f]/50 backdrop-blur">
             <div class="flex items-center gap-3">
                 <span class="text-cyan-400 font-bold tracking-wider text-sm">ENERGISTRAT</span>
-                <span class="px-2 py-0.5 rounded-full bg-white/5 text-[10px] text-gray-400 border border-white/10">OPS V16.6</span>
+                <span class="px-2 py-0.5 rounded-full bg-white/5 text-[10px] text-gray-400 border border-white/10">OPS V17.1</span>
             </div>
-            <div class="text-[10px] text-gray-500 font-mono flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> CORTEX READY
-            </div>
+            <div class="text-[10px] text-gray-500 font-mono flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> CORTEX INTELLIGENCE</div>
         </header>
 
         <!-- DATA LAB -->
         <div id="view-datalab" class="page-content active grid-cols-12 auto-rows-min">
             <!-- IMPORT -->
             <div class="col-span-3 bento-card p-5 flex flex-col gap-4">
-                <div class="flex items-center gap-2 text-cyan-400 mb-1"><i class="fa-solid fa-database"></i><span class="text-xs font-bold uppercase">Import Données</span></div>
+                <div class="flex items-center gap-2 text-cyan-400 mb-1"><i class="fa-solid fa-database"></i><span class="text-xs font-bold uppercase">Import</span></div>
                 
                 <select id="target-client" class="w-full input-dark p-2 mt-1">
-                    <option value="demo">Démo / Test</option>
-                    <option value="sde">Syndicat d'Énergie (SDE)</option>
-                    <option value="mairie">Mairie / Collectivité</option>
-                    <option value="ecole">École / Enseignement</option>
-                    <option value="syndic">Syndic / Copropriété</option>
-                    <option value="oph">Bailleur Social (OPH)</option>
-                    <option value="industry">Industrie / Usine</option>
-                    <option value="retail">Commerce / Retail</option>
-                    <option value="citoyen">Particulier (B2C)</option>
+                    <option value="industrie">Industrie (ISO 50001)</option>
+                    <option value="retail">Retail / Franchise</option>
+                    <option value="artisan">Artisan / PME</option>
+                    <option value="collectivite">Collectivité / Mairie</option>
+                    <option value="sde">Syndicat (SDE)</option>
+                    <option value="bailleur">Bailleur Social (OPH)</option>
+                    <option value="syndic">Syndic Copro</option>
+                    <option value="particulier">Particulier</option>
+                    <option value="partenaire">Partenaire</option>
                 </select>
                 
                 <input type="text" id="target-site" class="w-full input-dark p-2" placeholder="Nom du site...">
-                
                 <label for="real-upload" id="drop-zone" class="flex flex-col items-center justify-center py-8 mt-2 flex-1 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:border-cyan-400 hover:bg-cyan-500/5 transition">
                     <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-500 mb-2"></i>
                     <span class="text-xs font-bold text-gray-300">Fichier SGE (.csv)</span>
@@ -103,14 +90,14 @@
             <!-- KPI GRID -->
             <div class="col-span-9 grid grid-cols-4 gap-4">
                 <div class="bento-card p-4 border-l-2 border-white/20">
-                    <div class="text-[9px] text-gray-500 font-bold uppercase mb-2">Période</div>
-                    <div class="text-sm font-bold text-white mb-1" id="meta-dates">-- / --</div>
-                    <div class="text-[10px] text-cyan-400" id="meta-points">--</div>
+                    <div class="text-[9px] text-gray-500 font-bold uppercase mb-2">Contexte</div>
+                    <div class="text-sm font-bold text-white mb-1" id="meta-geo">--</div>
+                    <div class="text-[10px] text-cyan-400 truncate" id="meta-naf">--</div>
                 </div>
                 <div class="bento-card p-4 border-l-2 border-red-500">
-                    <div class="text-[9px] text-gray-500 font-bold uppercase mb-2">Talon (Min)</div>
+                    <div class="text-[9px] text-gray-500 font-bold uppercase mb-2">Talon (Nuit)</div>
                     <div class="text-2xl font-bold text-white" id="kpi-talon">--</div>
-                    <div class="text-[10px] text-red-400 mt-1" id="kpi-waste">--</div>
+                    <div class="text-[10px] text-red-400 mt-1" id="kpi-thermo">Thermo: --</div>
                 </div>
                 <div class="bento-card p-4 border-l-2 border-purple-500">
                     <div class="text-[9px] text-gray-500 font-bold uppercase mb-2">POINTE MAX</div>
@@ -159,10 +146,8 @@
                 <h3 class="font-bold text-white mb-4">Audit Facture PDF</h3>
                 <label class="text-[10px] font-bold text-gray-500 block mb-2">FACTURE (OBLIGATOIRE)</label>
                 <input type="file" id="invoice-file" class="block w-full text-xs text-slate-500 mb-4 file:rounded-full file:bg-cyan-500/10 file:text-cyan-400 file:border-0 file:px-4 file:py-2">
-                
                 <label class="text-[10px] font-bold text-gray-500 block mb-2">CONTRAT (OPTIONNEL)</label>
                 <input type="file" id="contract-file" class="block w-full text-xs text-slate-500 mb-6 file:rounded-full file:bg-white/10 file:text-white file:border-0 file:px-4 file:py-2">
-                
                 <button onclick="runRealAudit()" class="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-[#001529] font-bold rounded">LANCER AUDIT</button>
             </div>
             <div class="col-span-8 bento-card p-0 overflow-hidden">
@@ -172,22 +157,29 @@
                 </table>
             </div>
         </div>
+
+        <!-- CHAOS LAB -->
+        <div id="view-scenarios" class="page-content grid-cols-12">
+            <div class="col-span-12 bento-card p-6">
+                <h3 class="text-red-500 font-bold mb-4">ZONE DE DANGER (CHAOS MONKEY)</h3>
+                <button onclick="runTest()" class="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded text-xs transition-colors">LANCER LE CRASH TEST</button>
+                <div id="chaos-results" class="mt-6 grid grid-cols-4 gap-4"></div>
+            </div>
+        </div>
     </main>
 
-    <!-- 4. CORTEX CHAT -->
-    <aside class="bg-[#0b121e] border-l border-white/5 w-[350px] flex flex-col z-50 shadow-2xl">
+    <!-- CHAT -->
+    <aside class="bg-[#0b121e] border-l border-white/5 w-[350px] flex flex-col z-50">
         <div class="p-4 border-b border-white/5 font-bold text-white text-sm">CORTEX AI</div>
         <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-container"></div>
         <div class="p-4"><input type="text" id="chat-input" placeholder="Message..." class="w-full bg-black/30 border border-white/10 rounded px-3 py-3 text-xs text-white" onkeypress="if(event.key==='Enter') sendChat()"></div>
     </aside>
 
     <script>
-        // --- CONFIGURATION ---
         const ADMIN_PIN = "BOSS_V5";
         let mainChart;
         let store = { labels: [], values: [] };
 
-        // --- AUTHENTIFICATION ---
         function checkAuth() {
             const pin = document.getElementById('auth-input').value;
             if(pin === ADMIN_PIN) {
@@ -197,12 +189,8 @@
                 document.getElementById('auth-error').classList.remove('hidden');
             }
         }
-        // Auto-login si déjà connecté
-        if(sessionStorage.getItem('admin_pin') === ADMIN_PIN) {
-            document.getElementById('auth-modal').style.display = 'none';
-        }
+        if(sessionStorage.getItem('admin_pin') === ADMIN_PIN) document.getElementById('auth-modal').style.display = 'none';
 
-        // --- NAVIGATION ---
         function navTo(pageId) {
             document.querySelectorAll('.page-content').forEach(e => e.classList.remove('active'));
             document.getElementById('view-' + pageId).classList.add('active');
@@ -210,186 +198,113 @@
             document.getElementById('nav-' + pageId).classList.add('active');
         }
 
-        // --- GRAPHIQUE ---
         function initChart() {
             const ctx = document.getElementById('mainChart').getContext('2d');
-            mainChart = new Chart(ctx, { 
-                type: 'line', 
-                data: { labels: [], datasets: [] }, 
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } }, 
-                    scales: { x: { display: false }, y: { grid: { color: '#ffffff10' } } }, 
-                    elements: { point: { radius: 0 } } 
-                } 
-            });
+            mainChart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: '#ffffff10' } } }, elements: { point: { radius: 0 } } } });
         }
 
         function filterChart(range) {
-            // UI Boutons
             document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
-            if(range === 'MAX') document.getElementById('btn-max').classList.add('active');
-            else document.getElementById('btn-' + range).classList.add('active');
-
+            if(range === 'MAX') document.getElementById('btn-max').classList.add('active'); else document.getElementById('btn-' + range).classList.add('active');
             if (store.values.length === 0) return;
-
-            // Logique de découpe
             let limit = store.values.length;
-            if (range === 7) limit = Math.min(store.values.length, 1000); // Zoom 7J (approx)
-            if (range === 30) limit = Math.min(store.values.length, 4000); // Zoom 30J
-
+            if (range === 7) limit = Math.min(store.values.length, 1000);
+            if (range === 30) limit = Math.min(store.values.length, 4000);
             let start = range === 'MAX' ? 0 : store.values.length - limit;
-
             mainChart.data.labels = store.labels.slice(start);
             mainChart.data.datasets[0].data = store.values.slice(start);
             mainChart.update();
         }
 
-        // --- HELPERS ---
-        function safeLoc(val, suffix='') { 
-            if (val === undefined || val === null || isNaN(val)) return '--';
-            return Math.round(val).toLocaleString('fr-FR') + suffix; 
-        }
+        function safeLoc(val, suffix='') { return (val === undefined || val === null || isNaN(val)) ? '--' : Math.round(val).toLocaleString('fr-FR') + suffix; }
 
-        // --- MAIN LOGIC (UPLOAD) ---
         async function handleFileSelect(file) {
             if(!file) return;
-            
-            // Loading State
             document.getElementById('drop-zone').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan-400 text-2xl"></i>';
-
-            const fd = new FormData(); 
-            fd.append('file', file); 
-            fd.append('target', document.getElementById('target-client').value); 
-            fd.append('site_name', document.getElementById('target-site').value);
+            const fd = new FormData(); fd.append('file', file); fd.append('target', document.getElementById('target-client').value); fd.append('site_name', document.getElementById('target-site').value);
             
             try {
                 const res = await fetch('/api/ops/analyze', { method: 'POST', headers: { 'x-admin-token': ADMIN_PIN }, body: fd });
                 const data = await res.json();
                 
                 if(data.success) {
-                    // 1. CHART
                     if(data.chart) {
-                        store.labels = data.chart.labels;
-                        store.values = data.chart.values;
-                        
+                        store.labels = data.chart.labels; store.values = data.chart.values;
                         mainChart.data.labels = store.labels;
-                        mainChart.data.datasets = [{ 
-                            label: 'Puissance (kW)', 
-                            data: store.values, 
-                            borderColor: '#00E5FF', 
-                            borderWidth: 1, 
-                            fill: true, 
-                            backgroundColor: 'rgba(0, 229, 255, 0.1)' 
-                        }];
+                        mainChart.data.datasets = [{ label: 'Puissance (kW)', data: store.values, borderColor: '#00E5FF', borderWidth: 1, fill: true, backgroundColor: 'rgba(0, 229, 255, 0.1)' }];
                         mainChart.update();
-                        
                         document.getElementById('chart-controls').style.display = 'flex';
-                        if(store.labels.length > 0) {
-                            document.getElementById('meta-dates').innerText = store.labels[0].substring(0,10) + " -> " + store.labels[store.labels.length-1].substring(0,10);
-                        }
-                        document.getElementById('meta-points').innerText = store.values.length + " pts";
                     }
-                    
-                    // 2. KPIS
                     if(data.kpi) {
                         document.getElementById('kpi-talon').innerText = safeLoc(data.kpi.talon, " kW");
-                        document.getElementById('kpi-pmax').innerText = safeLoc(data.kpi.p_max, " kW"); // NEW
+                        document.getElementById('kpi-pmax').innerText = safeLoc(data.kpi.p_max, " kW");
                         
-                        if(data.kpi.ghost_buster) {
-                            document.getElementById('kpi-waste').innerText = "Coût: " + safeLoc(data.kpi.ghost_buster.cout_talon_annuel, " €/an");
-                        }
-                        
-                        if(data.kpi.solar) {
-                            const s = data.kpi.solar;
-                            document.getElementById('kpi-solar').innerText = s.status === "OPPORTUNITÉ DÉTECTÉE" ? s.puissance_kwc + " kWc" : "NON";
-                            document.getElementById('kpi-solar-gain').innerText = s.economie_annuelle_euro ? "Gain: " + safeLoc(s.economie_annuelle_euro, " €/an") : "";
+                        // GEO & NAF (AFFICHAGE LABEL INTELLIGENT)
+                        if(data.kpi.profiling) {
+                            document.getElementById('meta-geo').innerText = "CP: " + (data.kpi.profiling.geo || "Inconnu");
+                            // Si Label connu (ex: Boulangerie), on l'affiche. Sinon le code.
+                            const nafDisplay = (data.kpi.profiling.naf_label && data.kpi.profiling.naf_label !== "Inconnu") 
+                                ? data.kpi.profiling.naf_label 
+                                : (data.kpi.profiling.naf_code || "Inconnu");
+                            document.getElementById('meta-naf').innerText = nafDisplay;
                         }
 
+                        if(data.kpi.thermo_score) {
+                            document.getElementById('kpi-thermo').innerText = "Thermo: " + data.kpi.thermo_score;
+                        }
+
+                        if(data.kpi.solar) {
+                            document.getElementById('kpi-solar').innerText = data.kpi.solar.status === "OPPORTUNITÉ DÉTECTÉE" ? data.kpi.solar.puissance_kwc + " kWc" : "NON";
+                            document.getElementById('kpi-solar-gain').innerText = data.kpi.solar.economie_annuelle_euro ? "Gain: " + safeLoc(data.kpi.solar.economie_annuelle_euro, " €/an") : "";
+                        }
                         if(data.kpi.finance) {
                             document.getElementById('fin-budget').innerText = safeLoc(data.kpi.finance.budget_total, " €");
-                            
-                            let html = '';
-                            const d = data.kpi.finance.detail_4p;
-                            ['HPH', 'HCH', 'HPE', 'HCE'].forEach(k => {
-                                if(d[k]) {
-                                    html += `<tr class="border-b border-white/5"><td class="p-3 text-gray-300 font-bold">${k}</td><td class="p-3 text-right text-gray-400 font-mono">${safeLoc(d[k].vol)}</td><td class="p-3 text-right text-cyan-400 font-bold font-mono">${safeLoc(d[k].cout, " €")}</td></tr>`;
-                                }
-                            });
+                            let html = ''; const d = data.kpi.finance.detail_4p;
+                            ['HPH', 'HCH', 'HPE', 'HCE'].forEach(k => { if(d[k]) html += `<tr class="border-b border-white/5"><td class="p-3 text-gray-300 font-bold">${k}</td><td class="p-3 text-right text-gray-400 font-mono">${safeLoc(d[k].vol)}</td><td class="p-3 text-right text-cyan-400 font-bold font-mono">${safeLoc(d[k].cout, " €")}</td></tr>`; });
                             document.getElementById('table-4p-body').innerHTML = html;
                         }
                     }
-
-                    // 3. AI
-                    if(data.ai_insight) {
-                        document.getElementById('chat-container').innerHTML += `<div class="bg-purple-900/20 p-3 rounded mb-2 text-xs border-l-2 border-purple-500 text-gray-200">${data.ai_insight}</div>`;
-                    }
-                    
+                    if(data.ai_insight) document.getElementById('chat-container').innerHTML += `<div class="bg-purple-900/20 p-3 rounded mb-2 text-xs border-l-2 border-purple-500 text-gray-200">${data.ai_insight}</div>`;
                     document.getElementById('drop-zone').innerHTML = '<i class="fa-solid fa-check text-green-500 text-2xl"></i>';
-                } else {
-                    alert(data.error);
-                    document.getElementById('drop-zone').innerHTML = 'ERREUR';
-                }
-            } catch(e) { 
-                alert("Erreur Réseau"); 
-            }
+                } else { alert(data.error); document.getElementById('drop-zone').innerHTML = 'ERREUR'; }
+            } catch(e) { alert("Erreur Réseau"); }
         }
 
-        // --- AUDIT ---
         async function runRealAudit() {
             const inv = document.getElementById('invoice-file').files[0];
             const ctr = document.getElementById('contract-file').files[0];
-            
             if(!inv) return alert("Facture manquante");
-            
-            const fd = new FormData(); 
-            fd.append('invoice', inv); 
-            if(ctr) fd.append('contract', ctr);
-            
+            const fd = new FormData(); fd.append('invoice', inv); if(ctr) fd.append('contract', ctr);
             try {
                 const res = await fetch('/api/ops/audit', { method:'POST', headers: { 'x-admin-token': ADMIN_PIN }, body:fd });
                 const data = await res.json();
-                
                 let html = '';
-                if(data.checks) {
-                    data.checks.forEach(c => {
-                        const col = c.error ? 'text-red-500' : 'text-green-500';
-                        html += `<tr class="border-b border-white/5"><td class="p-3 text-gray-300">${c.point}</td><td class="p-3 text-gray-400 font-mono">${c.a}</td><td class="p-3 text-gray-400 font-mono">${c.b}</td><td class="p-3 text-right font-bold ${col}">${c.status}</td></tr>`;
-                    });
-                }
+                if(data.checks) data.checks.forEach(c => { const col = c.error ? 'text-red-500' : 'text-green-500'; html += `<tr class="border-b border-white/5"><td class="p-3 text-gray-300">${c.point}</td><td class="p-3 text-gray-400 font-mono">${c.a}</td><td class="p-3 text-gray-400 font-mono">${c.b}</td><td class="p-3 text-right font-bold ${col}">${c.status}</td></tr>`; });
                 document.getElementById('audit-results').innerHTML = html;
-            } catch(e) { 
-                alert(e); 
-            }
+            } catch(e) { alert(e); }
         }
 
-        // --- CHAT ---
-        async function sendChat() {
-            const i = document.getElementById('chat-input');
-            const txt = i.value;
-            if(!txt) return;
-            
-            i.value = '';
-            document.getElementById('chat-container').innerHTML += `<div class="bg-white/10 p-3 rounded mb-2 text-xs text-white text-right ml-8">${txt}</div>`;
-            
-            const fd = new FormData(); 
-            fd.append('message', txt);
-            
+        async function runTest() {
             try {
-                const res = await fetch('/api/ops/chat', { method:'POST', headers: { 'x-admin-token': ADMIN_PIN }, body:fd });
+                const res = await fetch('/api/ops/chaos', { method:'POST', headers: { 'x-admin-token': ADMIN_PIN } });
                 const data = await res.json();
-                if(data.response) {
-                    document.getElementById('chat-container').innerHTML += `<div class="bg-purple-900/20 p-3 rounded mb-2 text-xs border-l-2 border-purple-500 text-gray-200">${data.response}</div>`;
-                }
-            } catch(e) {}
+                const div = document.getElementById('chaos-results'); div.innerHTML = '';
+                const list = data.results || data; 
+                list.forEach(r => {
+                    const color = r.status === 'OK' ? 'border-green-500 text-green-500' : 'border-red-500 text-red-500';
+                    div.innerHTML += `<div class="border ${color} p-2 rounded text-[10px] bg-white/5 font-mono flex justify-between"><span>${r.test}</span><span class="font-bold">${r.status}</span></div>`;
+                });
+            } catch (e) { alert("Erreur Chaos"); }
         }
 
-        // --- INIT ---
-        document.addEventListener('DOMContentLoaded', () => { 
-            initChart(); 
-            navTo('datalab'); 
-        });
+        async function sendChat() {
+            const i = document.getElementById('chat-input'); const txt = i.value; if(!txt) return; i.value = '';
+            document.getElementById('chat-container').innerHTML += `<div class="bg-white/10 p-3 rounded mb-2 text-xs text-white text-right ml-8">${txt}</div>`;
+            const fd = new FormData(); fd.append('message', txt);
+            try { const res = await fetch('/api/ops/chat', { method:'POST', headers: { 'x-admin-token': ADMIN_PIN }, body:fd }); const data = await res.json(); if(data.response) document.getElementById('chat-container').innerHTML += `<div class="bg-purple-900/20 p-3 rounded mb-2 text-xs border-l-2 border-purple-500 text-gray-200">${data.response}</div>`; } catch(e) {}
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { initChart(); navTo('datalab'); });
     </script>
 </body>
 </html>
