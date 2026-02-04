@@ -1,89 +1,54 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>ENERGISTRAT — Analyse CORTEX</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    body { background: #050505; color: #00E5FF; font-family: 'JetBrains Mono', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-    .loader { width: 200px; height: 2px; background: rgba(0, 229, 255, 0.2); margin-top: 20px; position: relative; overflow: hidden; }
-    .loader::after { content: ''; position: absolute; left: -50%; width: 50%; height: 100%; background: #00E5FF; animation: load 2s infinite linear; }
-    @keyframes load { 0% { left: -50%; } 100% { left: 100%; } }
-    .log-item { opacity: 0; animation: fadeUp 0.5s forwards; margin-bottom: 5px; font-size: 0.8rem; }
-    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-  </style>
+    <meta charset="UTF-8">
+    <title>CORTEX | Calibrage</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>body { background: #000; color: #00E5FF; font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; }</style>
 </head>
 <body>
-    <div class="text-4xl font-bold mb-2">CORTEX AI</div>
-    <!-- Affichage dynamique du profil détecté pour confirmer que ça marche -->
-    <div class="text-xs text-gray-500 mb-8 font-bold tracking-widest" id="profile-label">INITIALISATION...</div>
-    
-    <div class="loader"></div>
-    <div id="logs" class="mt-8 text-center h-32 flex flex-col justify-end"></div>
+    <div class="text-center">
+        <div class="text-5xl font-bold mb-2 tracking-tighter">CORTEX AI</div>
+        <div class="text-xs text-gray-500 uppercase tracking-[0.3em] mb-8">Calibrage Profil : <span id="lbl-target" class="text-white">...</span></div>
+        
+        <div class="w-64 h-1 bg-gray-800 mx-auto rounded overflow-hidden mb-8">
+            <div id="bar" class="h-full bg-cyan-500 w-0 transition-all duration-[2500ms] ease-out"></div>
+        </div>
+
+        <div id="logs" class="text-[10px] text-gray-400 space-y-1 h-20 overflow-hidden"></div>
+    </div>
 
     <script>
-        // 1. Récupération du paramètre (target OU role)
-        const urlParams = new URLSearchParams(window.location.search);
-        let target = urlParams.get("target") || urlParams.get("role") || "citoyen";
-        
-        // Sécurité : on met tout en minuscule pour éviter les erreurs
-        target = target.toLowerCase();
+        const params = new URLSearchParams(window.location.search);
+        const target = params.get('target') || 'demo';
+        document.getElementById('lbl-target').innerText = target.toUpperCase();
 
-        // 2. CARTOGRAPHIE DES ROUTES (Les 9 Profils)
-        const routes = {
-            // Entreprises
-            'industry': '/dashboard/industry',
-            'retail':   '/dashboard/retail',
-            'pme':      '/dashboard/pme',
-            
-            // Public
-            'mairie':   '/dashboard/mairie',
-            'sde':      '/dashboard/sde',
-            'oph':      '/dashboard/oph',
-            
-            // Habitat & Partenaires
-            'syndic':   '/dashboard/syndic',
-            'citoyen':  '/dashboard/citoyen',
-            'supplier': '/dashboard/supplier'
-        };
+        // Animation Barre
+        setTimeout(() => document.getElementById('bar').style.width = '100%', 100);
 
-        // 3. Détermination de l'URL finale
-        // Si le profil est inconnu, on redirige vers Citoyen par sécurité
-        const redirectUrl = routes[target] || '/dashboard/citoyen';
-
-        // Mise à jour de l'affichage pour le debug visuel
-        document.getElementById('profile-label').innerText = `CALIBRAGE PROFIL : ${target.toUpperCase()}`;
-
-        // 4. Animation des Logs
-        const messages = [
-            "Connexion sécurisée aux API...",
-            "Récupération des courbes de charge...",
-            "Analyse des pics de puissance...",
-            "Calcul du Score Vitality...",
-            "Comparaison marchés Spot...",
-            "Génération du Dashboard..."
+        // Animation Logs
+        const logs = [
+            "> Connexion sécurisée aux API...",
+            "> Récupération des courbes de charge...",
+            "> Analyse des pics de puissance...",
+            "> Calcul du Score Vitalité...",
+            "> Comparaison marchés Spot...",
+            "> Génération du Dashboard..."
         ];
-
-        const logsDiv = document.getElementById('logs');
-        let delay = 0;
-
-        messages.forEach((msg, index) => {
-            delay += Math.random() * 600 + 200; 
-            setTimeout(() => {
-                const div = document.createElement('div');
-                div.className = 'log-item';
-                div.innerText = `> ${msg}`;
-                logsDiv.appendChild(div);
-                
-                if (index === messages.length - 1) {
-                    setTimeout(() => {
-                        // LA REDIRECTION SE FAIT ICI
-                        window.location.href = redirectUrl;
-                    }, 1000);
-                }
-            }, delay);
-        });
+        
+        let i = 0;
+        const logContainer = document.getElementById('logs');
+        const interval = setInterval(() => {
+            if(i < logs.length) {
+                logContainer.innerHTML += `<div class="text-cyan-400/80">${logs[i]}</div>`;
+                i++;
+            } else {
+                clearInterval(interval);
+                // REDIRECTION VERS LE ROUTEUR INTELLIGENT
+                window.location.href = `/dashboard/${target}`;
+            }
+        }, 400); // Vitesse des logs
     </script>
 </body>
 </html>
