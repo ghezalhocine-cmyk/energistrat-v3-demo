@@ -51,35 +51,34 @@ async def api_chaos(x_admin_token: str = Header(None)):
 
 @app.get("/onboarding")
 async def view_onboarding(request: Request):
-    # Correspond à votre Capture 2
     return templates.TemplateResponse("onboarding.html", {"request": request})
 
 @app.get("/login/{profile}")
 async def view_login(request: Request, profile: str):
-    # Correspond à votre Capture 3 (Login spécifique)
     return templates.TemplateResponse("login.html", {"request": request, "profile": profile})
 
 @app.get("/processing")
 async def view_processing(request: Request, target: str = "demo"):
-    # Correspond à votre Capture 4
     return templates.TemplateResponse("processing.html", {"request": request, "target": target})
 
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str):
-    """
-    Routeur Intelligent V2 :
-    Redirige vers le fichier spécifique (ex: retail.html) s'il existe.
-    """
+    """Routeur Intelligent V2"""
     specific_file = f"{profile}.html"
-    
     if os.path.exists(f"app/templates/{specific_file}"):
         return templates.TemplateResponse(specific_file, {"request": request})
-    
-    # Fallback si le fichier spécifique n'existe pas encore
     if os.path.exists("app/templates/dashboard.html"):
         return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
-        
     return JSONResponse({"error": f"Template introuvable: {specific_file}"}, 404)
+
+# --- ROUTE PARTENAIRE (DISSOCIATION STRICTE) ---
+@app.get("/partner/settings")
+async def view_partner_settings(request: Request):
+    """
+    Route dédiée aux fournisseurs/courtiers.
+    Charge un fichier template physiquement séparé (settings_partner.html).
+    """
+    return templates.TemplateResponse("settings_partner.html", {"request": request})
 
 # --- CATCH-ALL (Sécurité) ---
 @app.get("/{path_name:path}")
