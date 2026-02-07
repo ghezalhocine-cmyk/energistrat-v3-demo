@@ -1,4 +1,5 @@
 import os
+import re
 from fastapi import FastAPI, Request, UploadFile, File, Form, Header
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,32 +16,41 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 if os.path.exists("static"): app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-# --- SYSTÈME ---
 @app.get("/health")
 async def health_check(): return {"status": "ONLINE", "cortex": cortex.version, "storage": storage.version}
 
-# --- API OPS (ADMIN & ANALYSE - ÉVOLUTION V19) ---
+# --- API OPS (ADMIN & ANALYSE - RECONCILIATION ACTIVE) ---
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), site_name: str = Form("Site_1"), x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     try:
+        # 1. LECTURE DU FICHIER
         content = await file.read()
         
-        # 1. RECHERCHE INTELLIGENTE DU SITE (Préparation V34)
-        # On regarde si on connait ce site dans le Storage pour injecter son contrat réel
-        site_data = None
-        # (Ici, on pourrait interroger storage.index avec site_name, pour l'instant on prépare le slot)
-        
-        # 2. APPEL CORTEX (SOFT HANDOVER)
+        # 2. PRE-SCAN PDL (POUR RECONCILIATION)
+        # On cherche un motif de 14 chiffres dans le contenu brut
         try:
-            # Tentative V34 : On passe les données du site (Contrat, Tarif)
-            res = cortex.analyze_file(content, file.filename, target_profile=target, known_site_data=site_data)
-        except TypeError:
-            # Fallback V33 : Si Cortex n'est pas encore à jour, on appelle l'ancienne signature
-            res = cortex.analyze_file(content, file.filename, target_profile=target)
+            content_str = content.decode('latin-1', errors='ignore')[:1000] # On lit juste le début pour aller vite
+            pdl_match = re.search(r'\b(\d{14})\b', content_str)
+            detected_pdl = pdl_match.group(1) if pdl_match else None
+        except:
+            detected_pdl = None
+
+        # 3. INTERROGATION DU STORAGE
+        site_data = None
+        if detected_pdl:
+            # On demande à la mémoire si on connait ce PDL
+            site_data = storage.find_site_by_pdl(detected_pdl)
+            if site_data:
+                print(f"[RECONCILIATION] Site trouvé : {site_data.get('client_name')} ({detected_pdl})")
+
+        # 4. APPEL CORTEX AVEC DONNÉES ENRICHIES
+        res = cortex.analyze_file(content, file.filename, target_profile=target, known_site_data=site_data)
         
         if res.get("success"): 
             res["secure_link"] = f"/dashboard/{target}?site={site_name}"
+            # Si réconcilié, on ajoute un flag
+            if site_data: res["reconciled"] = True
             
         return JSONResponse(res)
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
@@ -64,7 +74,7 @@ async def api_chaos(x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
-# --- API TICKETING (SUPPORT V21.4) ---
+# --- API TICKETING ---
 @app.post("/api/support/ticket")
 async def create_ticket(request: Request):
     try:
@@ -78,11 +88,13 @@ async def get_tickets():
     tickets = storage.list_tickets()
     return JSONResponse({"tickets": tickets})
 
-# --- API SETTINGS (ERP V21) ---
+# --- API SETTINGS ---
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
     try:
         data = await request.json()
+        # On utilise le SIRET/RNC comme ID
+        # Note : Le JS envoie {identity: {id: ...}}
         client_id = data.get("identity", {}).get("id") or "draft_client"
         res = storage.save_client_settings(client_id, data)
         return JSONResponse(res)
