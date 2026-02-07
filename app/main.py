@@ -4,7 +4,9 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+# IMPORT DES MOTEURS
 from app.core.cortex_engine import cortex
+from app.core.storage_engine import storage 
 
 app = FastAPI(title="ENERGISTRAT V3", version="PROD")
 
@@ -15,9 +17,9 @@ templates = Jinja2Templates(directory="app/templates")
 
 # --- SYSTÈME ---
 @app.get("/health")
-async def health_check(): return {"status": "ONLINE", "cortex": cortex.version}
+async def health_check(): return {"status": "ONLINE", "cortex": cortex.version, "storage": storage.version}
 
-# --- API OPS ---
+# --- API OPS (ADMIN & ANALYSE) ---
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), site_name: str = Form("Site_1"), x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
@@ -47,6 +49,32 @@ async def api_chaos(x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
+# --- API SETTINGS (SAUVEGARDE ERP) ---
+# Ces routes recevront les données des formulaires Settings V21/V22
+
+@app.post("/api/settings/save_client")
+async def api_save_client(request: Request):
+    """Sauvegarde la configuration d'un Client (Multi-sites/Fluides)"""
+    try:
+        data = await request.json()
+        # On utilise le SIRET/RNC comme ID, sinon un ID temporaire
+        client_id = data.get("identity", {}).get("id") or "draft_client"
+        res = storage.save_client_settings(client_id, data)
+        return JSONResponse(res)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
+
+@app.post("/api/partner/save_config")
+async def api_save_partner(request: Request):
+    """Sauvegarde la configuration Partenaire (Branding/Pricing)"""
+    try:
+        data = await request.json()
+        partner_id = "main_partner" # Pour l'instant unique, évolutif plus tard
+        res = storage.save_partner_config(partner_id, data)
+        return JSONResponse(res)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
+
 # --- PARCOURS CLIENT (ONBOARDING -> LOGIN -> DASHBOARD) ---
 
 @app.get("/onboarding")
@@ -74,10 +102,6 @@ async def view_dashboard(request: Request, profile: str):
 # --- ROUTE PARTENAIRE (DISSOCIATION STRICTE) ---
 @app.get("/partner/settings")
 async def view_partner_settings(request: Request):
-    """
-    Route dédiée aux fournisseurs/courtiers.
-    Charge un fichier template physiquement séparé (settings_partner.html).
-    """
     return templates.TemplateResponse("settings_partner.html", {"request": request})
 
 # --- CATCH-ALL (Sécurité) ---
