@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V21.5 | Settings Service</title>
+    <title>ENERGISTRAT V21.6 | Settings Live</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -177,7 +177,7 @@
         </div>
 
         <!-- NEW: TAB SUPPORT (TICKETING RÉEL) -->
-        <div id="tab-support" class="tab-content max-w-6xl mx-auto space-y-6 hidden">
+        <div id="tab-support" class="tab-content max-w-5xl mx-auto space-y-6 hidden">
             <header class="flex justify-between items-end">
                 <div><h2 class="text-2xl font-bold text-white mb-1">Centre d'Assistance</h2><p class="text-gray-400 text-xs">Un problème ? Ouvrez un ticket directement vers nos équipes Ops.</p></div>
                 <button onclick="openTicketModal()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20"><i class="fa-solid fa-plus mr-2"></i>Nouveau Ticket</button>
@@ -294,7 +294,6 @@
     </div>
 
     <script>
-        // NAVIGATION
         function switchTab(id) {
             document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
             document.getElementById('tab-' + id).classList.remove('hidden');
@@ -305,7 +304,7 @@
         }
         function toggleImportModal() { document.getElementById('import-modal').classList.toggle('hidden'); }
 
-        // --- TICKETING REAL ---
+        // --- TICKETING REAL (CORRECTIF API) ---
         function openTicketModal() {
             document.getElementById('ticket-modal').classList.remove('hidden');
         }
@@ -365,87 +364,34 @@
             } catch(e) { document.getElementById('loading-tickets').innerText = "Erreur chargement"; }
         }
 
-        // --- CLIENT SAVE REAL ---
-        async function saveSite() {
-            const btn = document.activeElement;
-            const original = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>...';
-
-            const data = {
-                identity: {
-                    id: document.getElementById('id-input').value || "draft",
-                    siret: document.getElementById('id-input').value,
-                    name: document.getElementById('company-name').value
-                }
-            };
-            
-            try {
-                const res = await fetch('/api/settings/save_client', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
-                });
-                if((await res.json()).success) showToast("Sauvegardé sur le serveur !");
-            } catch(e) { alert("Erreur réseau"); }
-
-            btn.innerHTML = original;
-        }
-
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`;
-            t.className = "show";
-            setTimeout(() => t.className = "", 3000);
-        }
-
-        // --- ENERGY SWITCHER ---
-        let currentEnergy = 'elec';
-        function setEnergy(type) {
-            currentEnergy = type;
-            const btnElec = document.getElementById('btn-elec');
-            const btnGaz = document.getElementById('btn-gaz');
-            const lblRef = document.getElementById('lbl-ref');
-            const lblPuiss = document.getElementById('lbl-puiss');
-            const card = document.getElementById('card-energy');
-
-            if(type === 'elec') {
-                btnElec.className = "px-3 py-1 text-[10px] font-bold rounded bg-cyan text-black transition shadow-[0_0_10px_rgba(0,229,255,0.5)]";
-                btnGaz.className = "px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
-                lblRef.innerText = "PDL / PRM (14)";
-                lblPuiss.innerText = "Puissance (kVA)";
-                card.style.borderColor = "#00E5FF";
-            } else {
-                btnGaz.className = "px-3 py-1 text-[10px] font-bold rounded bg-gas text-white transition shadow-[0_0_10px_rgba(239,68,68,0.5)]";
-                btnElec.className = "px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
-                lblRef.innerText = "PCE (14)";
-                lblPuiss.innerText = "CAR (MWh/an)";
-                card.style.borderColor = "#EF4444";
-            }
-            document.getElementById('val-input').value = '';
-            document.getElementById('segment-display').value = '--';
-        }
-
-        // --- SMART INFERENCE ---
-        function inferContract() {
-            const val = parseFloat(document.getElementById('val-input').value);
-            const disp = document.getElementById('segment-display');
-            if(isNaN(val)) { disp.value = '--'; return; }
-            if(currentEnergy === 'elec') {
-                if (val <= 36) disp.value = "C5 (Bleu)"; else if (val <= 250) disp.value = "C4 (Jaune)"; else disp.value = "HTA (Vert)";
-            } else {
-                if (val < 6) disp.value = "T1 (Base/B0)"; else if (val < 300) disp.value = "T2 (B1)"; else if (val < 5000) disp.value = "T3 (B2i)"; else disp.value = "T4 (GT)";
-            }
-        }
-
-        // --- IDENTITY & ADDRESS ---
+        // --- IDENTITY & ADDRESS (API GOUV ACTIVE) ---
         function updateFormType() {
             const type = document.querySelector('input[name="entity_type"]:checked').value;
             if(type === 'company') { document.getElementById('lbl-id').innerText = "SIRET"; document.getElementById('id-input').placeholder = "123..."; } 
             else { document.getElementById('lbl-id').innerText = "RNC"; document.getElementById('id-input').placeholder = "AA123..."; }
         }
-        async function checkIdentity() { 
-            const val = document.getElementById('id-input').value; 
-            if(val.length > 5) document.getElementById('id-status').innerHTML = '<i class="fa-solid fa-check text-green-500"></i>'; 
+
+        async function checkIdentity() {
+            const type = document.querySelector('input[name="entity_type"]:checked').value;
+            const val = document.getElementById('id-input').value.replace(/\s/g, '');
+            const status = document.getElementById('id-status');
+            
+            if(type === 'company') {
+                status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i>';
+                try {
+                    const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${val}`);
+                    const data = await res.json();
+                    if(data.results && data.results.length > 0) {
+                        status.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>';
+                        document.getElementById('company-name').value = data.results[0].nom_complet;
+                    } else {
+                        status.innerHTML = '<i class="fa-solid fa-xmark text-red-500"></i>';
+                    }
+                } catch(e) { status.innerHTML = '?'; }
+            }
         }
         
+        // --- ADDRESS AUTOCOMPLETE (BAN) ---
         let timeout = null;
         async function searchAddress() {
             const query = document.getElementById('address-input').value;
@@ -457,7 +403,7 @@
                     const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`);
                     const data = await res.json();
                     list.innerHTML = '';
-                    if(data.features) {
+                    if(data.features && data.features.length > 0) {
                         list.classList.remove('hidden');
                         data.features.forEach(item => {
                             const div = document.createElement('div');
@@ -471,6 +417,73 @@
             }, 300);
         }
         document.addEventListener('click', function(e) { if (!document.getElementById('address-input').contains(e.target)) document.getElementById('address-suggestions').classList.add('hidden'); });
+
+        // --- SAVE CLIENT ---
+        async function saveSite() {
+            const btn = document.activeElement;
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>...';
+
+            const data = {
+                identity: {
+                    id: document.getElementById('id-input').value || "draft",
+                    siret: document.getElementById('id-input').value,
+                    name: document.getElementById('company-name').value
+                },
+                contract: {
+                    pdl: document.getElementById('ref-input').value,
+                    power: document.getElementById('val-input').value,
+                    segment: document.getElementById('segment-display').value
+                }
+            };
+            
+            try {
+                const res = await fetch('/api/settings/save_client', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+                });
+                if((await res.json()).success) showToast("Sauvegardé sur le serveur !");
+            } catch(e) { alert("Erreur réseau"); }
+
+            btn.innerHTML = original;
+        }
+
+        // --- UTILS ---
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`;
+            t.className = "show";
+            setTimeout(() => t.className = "", 3000);
+        }
+
+        // --- ENERGY SWITCHER & SMART INFERENCE (UNCHANGED) ---
+        let currentEnergy = 'elec';
+        function setEnergy(type) {
+            currentEnergy = type;
+            const btnElec = document.getElementById('btn-elec'); const btnGaz = document.getElementById('btn-gaz');
+            const lblRef = document.getElementById('lbl-ref'); const lblPuiss = document.getElementById('lbl-puiss');
+            const card = document.getElementById('card-energy');
+            if(type === 'elec') {
+                btnElec.className = "px-3 py-1 text-[10px] font-bold rounded bg-cyan text-black transition shadow-lg";
+                btnGaz.className = "px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
+                lblRef.innerText = "PDL / PRM (14)"; lblPuiss.innerText = "Puissance (kVA)"; card.style.borderColor = "#00E5FF";
+            } else {
+                btnGaz.className = "px-3 py-1 text-[10px] font-bold rounded bg-gas text-white transition shadow-lg";
+                btnElec.className = "px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
+                lblRef.innerText = "PCE (14)"; lblPuiss.innerText = "CAR (MWh/an)"; card.style.borderColor = "#EF4444";
+            }
+            document.getElementById('val-input').value = ''; document.getElementById('segment-display').value = '--';
+        }
+
+        function inferContract() {
+            const val = parseFloat(document.getElementById('val-input').value);
+            const disp = document.getElementById('segment-display');
+            if(isNaN(val)) { disp.value = '--'; return; }
+            if(currentEnergy === 'elec') {
+                if (val <= 36) disp.value = "C5 (Bleu)"; else if (val <= 250) disp.value = "C4 (Jaune)"; else disp.value = "HTA (Vert)";
+            } else {
+                if (val < 6) disp.value = "T1 (Base/B0)"; else if (val < 300) disp.value = "T2 (B1)"; else if (val < 5000) disp.value = "T3 (B2i)"; else disp.value = "T4 (GT)";
+            }
+        }
 
         switchTab('clients');
     </script>
