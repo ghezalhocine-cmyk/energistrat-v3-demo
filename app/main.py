@@ -49,15 +49,28 @@ async def api_chaos(x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
-# --- API SETTINGS (SAUVEGARDE ERP) ---
-# Ces routes recevront les données des formulaires Settings V21/V22
-
-@app.post("/api/settings/save_client")
-async def api_save_client(request: Request):
-    """Sauvegarde la configuration d'un Client (Multi-sites/Fluides)"""
+# --- API TICKETING (NOUVEAU : INDISPENSABLE POUR SETTINGS V21.4) ---
+@app.post("/api/support/ticket")
+async def create_ticket(request: Request):
+    """Crée un ticket physique dans /data/tickets"""
     try:
         data = await request.json()
-        # On utilise le SIRET/RNC comme ID, sinon un ID temporaire
+        res = storage.create_ticket(data)
+        return JSONResponse(res)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
+
+@app.get("/api/support/tickets")
+async def get_tickets():
+    """Liste les tickets existants"""
+    tickets = storage.list_tickets()
+    return JSONResponse({"tickets": tickets})
+
+# --- API SETTINGS (SAUVEGARDE ERP) ---
+@app.post("/api/settings/save_client")
+async def api_save_client(request: Request):
+    try:
+        data = await request.json()
         client_id = data.get("identity", {}).get("id") or "draft_client"
         res = storage.save_client_settings(client_id, data)
         return JSONResponse(res)
@@ -66,17 +79,14 @@ async def api_save_client(request: Request):
 
 @app.post("/api/partner/save_config")
 async def api_save_partner(request: Request):
-    """Sauvegarde la configuration Partenaire (Branding/Pricing)"""
     try:
         data = await request.json()
-        partner_id = "main_partner" # Pour l'instant unique, évolutif plus tard
-        res = storage.save_partner_config(partner_id, data)
+        res = storage.save_partner_config("main_partner", data)
         return JSONResponse(res)
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)})
 
-# --- PARCOURS CLIENT (ONBOARDING -> LOGIN -> DASHBOARD) ---
-
+# --- PARCOURS CLIENT ---
 @app.get("/onboarding")
 async def view_onboarding(request: Request):
     return templates.TemplateResponse("onboarding.html", {"request": request})
@@ -91,7 +101,6 @@ async def view_processing(request: Request, target: str = "demo"):
 
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str):
-    """Routeur Intelligent V2"""
     specific_file = f"{profile}.html"
     if os.path.exists(f"app/templates/{specific_file}"):
         return templates.TemplateResponse(specific_file, {"request": request})
@@ -99,12 +108,11 @@ async def view_dashboard(request: Request, profile: str):
         return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
     return JSONResponse({"error": f"Template introuvable: {specific_file}"}, 404)
 
-# --- ROUTE PARTENAIRE (DISSOCIATION STRICTE) ---
 @app.get("/partner/settings")
 async def view_partner_settings(request: Request):
     return templates.TemplateResponse("settings_partner.html", {"request": request})
 
-# --- CATCH-ALL (Sécurité) ---
+# --- CATCH-ALL ---
 @app.get("/{path_name:path}")
 async def catch_all(request: Request, path_name: str):
     if path_name == "" or path_name == "/": 
