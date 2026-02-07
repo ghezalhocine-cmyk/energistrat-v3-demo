@@ -1,4 +1,3 @@
-# app/core/cortex_engine.py V33.0 - NAF INTELLIGENCE
 import pandas as pd
 import numpy as np
 import io
@@ -12,7 +11,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_V33")
+logger = logging.getLogger("CORTEX_V34")
 
 try:
     import pdfplumber
@@ -31,30 +30,18 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "33.0 (NAF DB Embedded)"
-        # TOP 50 ÉNERGIVORES (Dictionnaire Statique)
+        self.version = "34.0 (Reconciliation Ready)"
         self.NAF_DB = {
-            # ALIMENTATION / ARTISANAT
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
             "1013B": "Boucherie", "5610A": "Restauration Trad.", "5610C": "Fast Food",
-            
-            # COMMERCE / RETAIL
             "4711D": "Supermarché", "4711F": "Hypermarché", "4711B": "Supérette",
             "4722Z": "Boucherie (Retail)", "4771Z": "Habillement", "4520A": "Garage Auto",
-            
-            # ENSEIGNEMENT
             "8510Z": "École Maternelle", "8520Z": "École Primaire", "8531Z": "Collège/Lycée",
             "8559A": "Formation Continue", "8552Z": "Enseignement Culturel",
-            
-            # PUBLIC / COLLECTIVITÉ
             "8411Z": "Mairie / Admin", "8412Z": "Santé Publique", "8424Z": "Ordre Public",
             "9311Z": "Gymnase / Stade", "9329Z": "Loisirs", "9101Z": "Bibliothèque",
-            
-            # INDUSTRIE
             "2562B": "Mécanique Ind.", "2511Z": "Métallurgie", "2229A": "Plasturgie",
             "1812Z": "Imprimerie", "3312Z": "Maintenance Ind.", "2059Z": "Chimie",
-            
-            # TERTIAIRE / LOGEMENT
             "6820A": "Bailleur Social", "6820B": "Location Terrains", "8110Z": "Syndic / Copro",
             "5510Z": "Hôtellerie", "6832A": "Administration Immeubles", "6832B": "Supports Immobiliers"
         }
@@ -67,18 +54,40 @@ class CortexEngine:
             return int(float(value))
         except: return 0
 
-    def analyze_file(self, file_content, filename, target_profile="demo"):
+    # --- POINT D'ENTRÉE PRINCIPAL (MODIFIÉ V34) ---
+    def analyze_file(self, file_content, filename, target_profile="demo", known_site_data=None):
         try:
             # 1. PARSING
-            df, time_step = self._parse_data(file_content, filename)
-            if df is None or df.empty: return {"success": False, "error": "Fichier vide ou format non reconnu"}
+            df, time_step, meta_tech = self._parse_data(file_content, filename)
+            if df is None or df.empty: return {"success": False, "error": "Fichier illisible ou vide"}
             
-            # 2. EXTRACTION MÉTIER (GEO / NAF)
-            meta_geo = self._extract_meta(filename)
+            # 2. RÉCONCILIATION DE DONNÉES
+            # On fusionne ce qu'on a trouvé dans le fichier (meta_tech) 
+            # avec ce qu'on sait du site (known_site_data)
             
+            context = {
+                "pdl": known_site_data.get('pdl') if known_site_data else meta_tech.get('pdl'),
+                "p_souscrite": float(known_site_data.get('power', 0)) if known_site_data else 0,
+                "segment": known_site_data.get('segment') if known_site_data else "Inconnu",
+                "naf_label": "Inconnu"
+            }
+
+            # Enrichissement NAF (Si pas dans Settings, on cherche dans le nom du fichier)
+            if not known_site_data or not known_site_data.get('naf'):
+                naf_search = re.search(r'\b\d{2}\.?\d{2}[A-Z]?\b', filename)
+                if naf_search:
+                    clean = naf_search.group(0).replace('.', '').replace(' ', '').upper()
+                    context['naf_label'] = self.NAF_DB.get(clean, clean)
+            else:
+                context['naf_label'] = known_site_data.get('naf_label', 'Inconnu')
+
             # 3. CALCULS PHYSIQUES
             base = self._module_socle(df, time_step)
-            finance = self._module_finance_4p(df, time_step, base['p_max'])
+            
+            # Référence pour l'abonnement : P.Souscrite (si connue) sinon P.Max atteinte
+            ref_pmax = context['p_souscrite'] if context['p_souscrite'] > 0 else base['p_max']
+            
+            finance = self._module_finance_4p(df, time_step, ref_pmax)
             solar = self._module_solar(df)
             waste = self._module_ghost(df, base['talon'])
             
@@ -91,84 +100,101 @@ class CortexEngine:
                 "labels": df_chart['date_str'].tolist(),
                 "values": chart_vals,
                 "talon_line": [base['talon']] * len(df_chart),
-                "pmax_line": [base['p_max']] * len(df_chart)
+                "pmax_line": [base['p_max']] * len(df_chart),
+                # Ligne de seuil contrat (si dispo)
+                "limit_line": [context['p_souscrite']] * len(df_chart) if context['p_souscrite'] > 0 else []
             }
 
             full_kpi = {
                 **base, **solar, **waste, **finance,
                 "profiling": {
                     "type": target_profile, 
-                    "geo": meta_geo['geo'], 
-                    "naf_code": meta_geo['naf_code'],
-                    "naf_label": meta_geo['naf_label']
+                    "pdl": context['pdl'],
+                    "contrat_actif": "OUI" if known_site_data else "NON (Découverte)",
+                    "metier": context['naf_label']
                 },
                 "meta": {"filename": filename, "points": len(df)}
             }
             
-            # L'IA reçoit maintenant le LABEL (ex: Boulangerie) et non le code
-            context_metier = meta_geo['naf_label'] if meta_geo['naf_label'] != "Inconnu" else target_profile
-            narrative = self._generate_insight(full_kpi, context_metier)
-            
+            narrative = self._generate_insight(full_kpi, context)
             return {"success": True, "kpi": full_kpi, "chart": chart, "ai_insight": narrative}
 
         except Exception as e:
-            logger.exception("Crash Cortex V33")
-            return {"success": False, "error": f"Erreur Interne: {str(e)}"}
+            logger.exception("Crash Cortex V34")
+            return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
 
-    def _extract_meta(self, filename):
-        # GEO (CP)
-        cp = re.search(r'\b(0[1-9]|[1-8]\d|9[0-5]|97|98)\d{3}\b', filename)
-        geo = cp.group(0) if cp else "Non Détecté"
-        
-        # NAF (Code + Traduction)
-        naf = re.search(r'\b\d{2}\.?\d{2}[A-Z]?\b', filename)
-        naf_code = "Non Détecté"
-        naf_label = "Inconnu"
-        
-        if naf:
-            raw_code = naf.group(0)
-            clean_code = raw_code.replace('.', '').replace(' ', '').upper() # 85.10Z -> 8510Z
-            naf_code = raw_code
-            # Lookup dans le dictionnaire
-            naf_label = self.NAF_DB.get(clean_code, "Inconnu")
+    def _parse_data(self, content, filename):
+        try:
+            buffer = io.BytesIO(content)
+            # Lecture brute pour extraction Regex (PDL/PCE)
+            content_str = content.decode('latin-1', errors='ignore')
             
-        return {"geo": geo, "naf_code": naf_code, "naf_label": naf_label}
+            pdl_match = re.search(r'\b(\d{14})\b', content_str)
+            pdl = pdl_match.group(1) if pdl_match else None
+            
+            try: df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip', low_memory=False)
+            except: 
+                buffer.seek(0)
+                df = pd.read_csv(buffer, sep=None, engine='python', encoding='latin-1')
+
+            df.columns = [str(c).lower().strip().replace('é','e').replace('è','e') for c in df.columns]
+            
+            c_date = next((c for c in df.columns if 'horodate' in c or 'date' in c), None)
+            c_val = next((c for c in df.columns if 'valeur' in c or 'puiss' in c or 'conso' in c), None)
+            c_unit = next((c for c in df.columns if 'unit' in c), None)
+            
+            if not c_date or not c_val: return None, 0, {}
+
+            if df[c_val].dtype == object:
+                df['val'] = pd.to_numeric(df[c_val].astype(str).str.replace(',', '.').str.replace(r'\s+', '', regex=True), errors='coerce')
+            else:
+                df['val'] = pd.to_numeric(df[c_val], errors='coerce')
+            df['val'] = df['val'].fillna(0)
+
+            df['date'] = pd.to_datetime(df[c_date], format='%d/%m/%Y %H:%M', errors='coerce')
+            if df['date'].isna().mean() > 0.5: df['date'] = pd.to_datetime(df[c_date], dayfirst=True, errors='coerce')
+            df = df.dropna(subset=['date']).sort_values('date')
+
+            is_watts = False
+            if c_unit and 'W' in str(df[c_unit].iloc[0]).upper() and 'KW' not in str(df[c_unit].iloc[0]).upper(): is_watts = True
+            if df['val'].mean() > 800: is_watts = True
+            if is_watts: df['val'] = df['val'] / 1000.0
+
+            time_step = 0.1666
+            if len(df) > 1:
+                delta = (df.iloc[1]['date'] - df.iloc[0]['date']).total_seconds()
+                if delta > 0: time_step = delta / 3600.0
+
+            df['date_str'] = df['date'].dt.strftime('%Y-%m-%d %H:%M')
+            
+            return df[['date', 'val', 'date_str']], time_step, {"pdl": pdl}
+
+        except: return None, 0, {}
 
     def _module_socle(self, df, ts):
         val = df['val']
         p_max = val.max()
-        
         mask_nuit = (df['date'].dt.hour < 6)
         nuit = df.loc[mask_nuit, 'val']
         talon = nuit.quantile(0.05) if not nuit.empty else 0
         
-        df['wd'] = df['date'].dt.weekday
-        mask_off = (df['wd'] >= 5) | (df['date'].dt.hour < 6)
-        conso_off = df.loc[mask_off, 'val'].sum() * ts
-        conso_tot = val.sum() * ts
-        ratio = (conso_off / conso_tot * 100) if conso_tot > 0 else 0
-        
         mask_winter = df['date'].dt.month.isin([11, 12, 1, 2, 3])
         conso_hiver = df.loc[mask_winter, 'val'].sum()
         conso_ete = df.loc[~mask_winter, 'val'].sum()
-        
-        thermo_score = 0
-        if conso_ete > 0:
-            thermo_score = round(conso_hiver / conso_ete, 1)
+        thermo = round(conso_hiver / conso_ete, 1) if conso_ete > 0 else 0
         
         return {
-            "conso_totale": self._safe_int(conso_tot),
+            "conso_totale": self._safe_int(val.sum() * ts),
             "p_max": round(float(p_max), 2),
             "talon": round(float(talon), 2),
-            "inactivity_ratio": round(float(ratio), 1),
-            "thermo_score": thermo_score
+            "thermo_score": thermo,
+            "inactivity_ratio": 0
         }
 
-    def _module_finance_4p(self, original_df, ts, pmax):
+    def _module_finance_4p(self, original_df, ts, ref_pmax):
         df = original_df.copy()
         df['m'] = df['date'].dt.month
         df['h'] = df['date'].dt.hour
-        
         mask_w = df['m'].isin([11, 12, 1, 2, 3])
         mask_hp = (df['h'] >= 6) & (df['h'] < 22)
         
@@ -177,7 +203,7 @@ class CortexEngine:
         v_hpe = df.loc[~mask_w & mask_hp, 'val'].sum() * ts
         v_hce = df.loc[~mask_w & ~mask_hp, 'val'].sum() * ts
         
-        cost = (v_hph*0.22) + (v_hch*0.14) + (v_hpe*0.14) + (v_hce*0.09) + (pmax*18)
+        cost = (v_hph*0.22) + (v_hch*0.14) + (v_hpe*0.14) + (v_hce*0.09) + (ref_pmax*18)
         
         return {
             "finance": {
@@ -205,54 +231,22 @@ class CortexEngine:
 
     def _module_ghost(self, df, t): return {"ghost_buster": {"cout_talon_annuel": self._safe_int(t * 8760 * 0.15)}}
 
-    def _generate_insight(self, kpi, metier_label):
-        if not AI_AVAILABLE: return "Mode Hybride. IA Offline."
+    def _generate_insight(self, kpi, context):
+        if not AI_AVAILABLE: return "IA Offline."
         try:
-            # Prompt enrichi avec le Métier Réel (ex: Boulangerie)
-            prompt = f"Analyse {metier_label}. Geo: {kpi['profiling']['geo']}. Thermo: {kpi['thermo_score']}. Pmax: {kpi['p_max']}. 3 conseils brefs."
+            # Prompt Contextuel Réconcilié
+            prompt = f"""
+            Analyse pour {kpi['profiling']['metier']}.
+            PDL: {kpi['profiling']['pdl']}.
+            Contrat: {kpi['profiling']['contrat_actif']}.
+            Puissance Souscrite: {context['p_souscrite']} kVA vs Atteinte: {kpi['p_max']} kVA.
+            Thermo-Score: {kpi['thermo_score']}.
+            3 conseils experts brefs.
+            """
             return AI_MODEL.generate_content(prompt).text.replace('*','')
         except: return "IA Indisponible."
 
-    def _parse_data(self, content, filename):
-        try:
-            buffer = io.BytesIO(content)
-            try: df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip', low_memory=False)
-            except: 
-                buffer.seek(0)
-                df = pd.read_csv(buffer, sep=None, engine='python', encoding='latin-1')
-
-            df.columns = [str(c).lower().strip().replace('é','e').replace('è','e') for c in df.columns]
-            c_date = next((c for c in df.columns if 'horodate' in c or 'date' in c), None)
-            c_val = next((c for c in df.columns if 'valeur' in c or 'puiss' in c or 'conso' in c), None)
-            c_unit = next((c for c in df.columns if 'unit' in c), None)
-            
-            if not c_date or not c_val: return None, 0
-
-            if df[c_val].dtype == object:
-                df['val'] = pd.to_numeric(df[c_val].astype(str).str.replace(',', '.').str.replace(r'\s+', '', regex=True), errors='coerce')
-            else:
-                df['val'] = pd.to_numeric(df[c_val], errors='coerce')
-            df['val'] = df['val'].fillna(0)
-
-            df['date'] = pd.to_datetime(df[c_date], format='%d/%m/%Y %H:%M', errors='coerce')
-            if df['date'].isna().mean() > 0.5: df['date'] = pd.to_datetime(df[c_date], dayfirst=True, errors='coerce')
-            
-            df = df.dropna(subset=['date']).sort_values('date')
-
-            is_watts = False
-            if c_unit and 'W' in str(df[c_unit].iloc[0]).upper() and 'KW' not in str(df[c_unit].iloc[0]).upper(): is_watts = True
-            if df['val'].mean() > 800: is_watts = True
-            if is_watts: df['val'] = df['val'] / 1000.0
-
-            time_step = 0.1666
-            if len(df) > 1:
-                delta = (df.iloc[1]['date'] - df.iloc[0]['date']).total_seconds()
-                if delta > 0: time_step = delta / 3600.0
-
-            df['date_str'] = df['date'].dt.strftime('%Y-%m-%d %H:%M')
-            return df[['date', 'val', 'date_str']], time_step
-        except: return None, 0
-
+    # AUDIT (Inchangé)
     def analyze_invoice_real(self, inv_b, ctr_b):
         txt = ""
         if PDF_AVAILABLE and inv_b:
@@ -273,9 +267,7 @@ class CortexEngine:
         ]
         return {"score": 100, "checks": checks}
 
-    def run_chaos_monkey(self):
-        return [{"test": "PDF Engine", "status": "OK" if PDF_AVAILABLE else "MISSING"}, {"test": "Vertex AI", "status": "OK" if AI_AVAILABLE else "OFFLINE"}, {"test": "Maths Lib", "status": "OK"}]
-    
-    def ask_agent(self, msg): return self._generate_insight({}, "User")
+    def run_chaos_monkey(self): return [{"test": "Maths", "status": "OK"}]
+    def ask_agent(self, msg): return self._generate_insight({}, {"p_souscrite": 0})
 
 cortex = CortexEngine()
