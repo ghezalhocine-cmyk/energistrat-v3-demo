@@ -41,17 +41,18 @@
                 <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                 <span class="text-[10px] text-green-400 font-mono">DATA LIVE</span>
             </div>
-            <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center cursor-pointer hover:bg-white/20 transition">
+            
+            <!-- CORRECTION ICI : LIEN ACTIF VERS SETTINGS -->
+            <a href="/settings" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center cursor-pointer hover:bg-white/20 transition text-white" title="Paramètres">
                 <i class="fa-solid fa-user text-xs"></i>
-            </div>
+            </a>
         </div>
     </header>
 
     <!-- MAIN GRID -->
     <main class="flex-1 p-6 grid grid-cols-12 gap-6 overflow-y-auto fade-in">
         
-        <!-- 1. IDENTITÉ TECHNIQUE (NOUVEAU V2) -->
-        <!-- Ce bloc affiche les données récupérées du Settings via Cortex -->
+        <!-- 1. IDENTITÉ TECHNIQUE -->
         <div class="col-span-3 bento-card p-6 border-l-4 border-cyan-500 flex flex-col justify-between">
             <div>
                 <h3 class="text-gray-400 text-[10px] font-bold uppercase mb-2">Site & Contrat</h3>
@@ -96,7 +97,7 @@
             <p class="text-[10px] text-red-400" id="kpi-depassement"></p>
         </div>
 
-        <!-- 4. THERMO SCORE (V34) -->
+        <!-- 4. THERMO SCORE -->
         <div class="col-span-3 bento-card p-6 border-t-4 border-blue-500">
             <h3 class="text-gray-400 text-[10px] font-bold uppercase mb-2">Thermo-Sensibilité</h3>
             <div class="text-3xl font-bold text-white mb-2" id="kpi-thermo">--</div>
@@ -153,27 +154,18 @@
             });
         }
 
-        // --- 2. FONCTION D'INJECTION (CORTEX V34 COMPATIBLE) ---
-        // Cette fonction est appelée par votre script d'upload ou au chargement
+        // --- 2. FONCTION D'INJECTION ---
         function updateDashboard(data) {
             if(!data || !data.success) return;
 
             console.log("CORTEX PAYLOAD:", data);
 
-            // A. Identité & Contrat (La Réconciliation)
+            // A. Identité & Contrat
             const profil = data.kpi.profiling || {};
             
-            // Affichage PDL
-            if(profil.pdl) {
-                document.getElementById('site-pdl').innerText = "PDL: " + profil.pdl;
-            }
-            
-            // Affichage Métier (NAF)
-            if(profil.metier) {
-                document.getElementById('site-naf').innerText = profil.metier;
-            }
+            if(profil.pdl) document.getElementById('site-pdl').innerText = "PDL: " + profil.pdl;
+            if(profil.metier) document.getElementById('site-naf').innerText = profil.metier;
 
-            // Statut du Contrat (Réconcilié ou Non)
             const contractBadge = document.getElementById('badge-contract');
             if(profil.contrat_actif && profil.contrat_actif.includes("OUI")) {
                 contractBadge.className = "badge-sync";
@@ -181,37 +173,26 @@
                 document.getElementById('sync-status').classList.remove('hidden');
             } else {
                 contractBadge.className = "badge-warn";
-                contractBadge.innerText = "MODE DÉCOUVERTE (NON LIÉ)";
+                contractBadge.innerText = "MODE DÉCOUVERTE";
             }
 
             // B. Données Techniques
-            if(data.kpi.p_max) {
-                document.getElementById('kpi-pmax').innerText = Math.round(data.kpi.p_max) + " kW";
-            }
-            
-            if(data.kpi.thermo_score) {
-                document.getElementById('kpi-thermo').innerText = data.kpi.thermo_score;
-            }
-
-            if(data.kpi.finance) {
-                document.getElementById('kpi-budget').innerText = Math.round(data.kpi.finance.budget_total).toLocaleString() + " €";
-            }
+            if(data.kpi.p_max) document.getElementById('kpi-pmax').innerText = Math.round(data.kpi.p_max) + " kW";
+            if(data.kpi.thermo_score) document.getElementById('kpi-thermo').innerText = data.kpi.thermo_score;
+            if(data.kpi.finance) document.getElementById('kpi-budget').innerText = Math.round(data.kpi.finance.budget_total).toLocaleString() + " €";
 
             // C. Graphique
             if(data.chart) {
                 mainChart.data.labels = data.chart.labels;
-                mainChart.data.datasets = [
-                    {
-                        label: 'Puissance (kW)',
-                        data: data.chart.values,
-                        borderColor: '#00E5FF',
-                        borderWidth: 1.5,
-                        backgroundColor: 'rgba(0, 229, 255, 0.1)',
-                        fill: true
-                    }
-                ];
+                mainChart.data.datasets = [{
+                    label: 'Puissance (kW)',
+                    data: data.chart.values,
+                    borderColor: '#00E5FF',
+                    borderWidth: 1.5,
+                    backgroundColor: 'rgba(0, 229, 255, 0.1)',
+                    fill: true
+                }];
                 
-                // Ajout ligne P.Souscrite si dispo
                 if(data.chart.limit_line && data.chart.limit_line.length > 0) {
                     mainChart.data.datasets.push({
                         label: 'Contrat',
@@ -223,11 +204,9 @@
                         fill: false
                     });
                     
-                    // Mise à jour Puissance affichée
                     const pSouscrite = data.chart.limit_line[0];
                     document.getElementById('site-power').innerText = pSouscrite + " kVA";
                     
-                    // Calcul Dépassement
                     if(data.kpi.p_max > pSouscrite) {
                         const depassement = Math.round(data.kpi.p_max - pSouscrite);
                         document.getElementById('kpi-depassement').innerText = `⚠️ Dépassement : +${depassement} kVA`;
@@ -236,32 +215,21 @@
                         document.getElementById('kpi-depassement').className = "text-[10px] text-green-400";
                     }
                 }
-                
                 mainChart.update();
             }
 
             // D. IA Insight
             if(data.ai_insight) {
-                document.getElementById('ai-content').innerHTML = `
-                    <div class="bg-purple-500/10 p-3 rounded border-l-2 border-purple-500">
-                        ${data.ai_insight}
-                    </div>
-                `;
+                document.getElementById('ai-content').innerHTML = `<div class="bg-purple-500/10 p-3 rounded border-l-2 border-purple-500">${data.ai_insight}</div>`;
             }
         }
 
-        // --- 3. AUTO-LOAD (SIMULATION POUR DEMO) ---
-        // Dans la vraie vie, ce JSON viendrait de l'appel API.
-        // Ici, on attend que l'utilisateur upload ou que l'API réponde.
+        // --- 3. AUTO-LOAD ---
         document.addEventListener('DOMContentLoaded', () => {
             initChart();
-            
-            // Si on vient du Processing avec un résultat en cache (localStorage), on l'affiche
             const cachedResult = localStorage.getItem('last_cortex_result');
             if(cachedResult) {
-                try {
-                    updateDashboard(JSON.parse(cachedResult));
-                } catch(e) { console.error("Erreur lecture cache"); }
+                try { updateDashboard(JSON.parse(cachedResult)); } catch(e) {}
             }
         });
     </script>
