@@ -15,7 +15,8 @@
                         card: '#0F172A',
                         partner: '#F43F5E', // Rose Partner
                         partnerDark: '#881337',
-                        success: '#10B981'
+                        success: '#10B981',
+                        blue: { 500: '#3B82F6' }
                     },
                     fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
                     borderRadius: { 'bento': '1.5rem' }
@@ -35,16 +36,18 @@
         /* Table Styles */
         .bill-table th { font-size: 10px; text-transform: uppercase; color: #94a3b8; padding: 12px; text-align: left; }
         .bill-table td { padding: 12px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 12px; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden text-sm">
 
-    <div id="toast"><i class="fa-solid fa-check-circle mr-2"></i>Mise à jour effectuée !</div>
+    <div id="toast"><i class="fa-solid fa-check-circle mr-2"></i>Configuration sauvegardée !</div>
 
     <!-- SIDEBAR PARTNER -->
     <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col z-50">
         <div class="p-6 flex items-center gap-3 mb-4">
-            <!-- CORRECTION ICI : RETOUR VERS LE DASHBOARD SUPPLIER -->
             <a href="/dashboard/supplier" class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition">
                 <i class="fa-solid fa-arrow-left"></i>
             </a>
@@ -81,7 +84,7 @@
         <div id="tab-branding" class="tab-content max-w-5xl mx-auto space-y-6">
             <header class="flex justify-between items-end">
                 <div><h2 class="text-2xl font-bold text-white mb-1">Identité Visuelle</h2><p class="text-gray-400 text-xs">Personnalisez l'expérience client.</p></div>
-                <button onclick="save()" class="bg-partner text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-partner/90 transition shadow-lg shadow-partner/20">Sauvegarder</button>
+                <button onclick="saveConfig()" class="bg-partner text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-partner/90 transition shadow-lg shadow-partner/20">Sauvegarder</button>
             </header>
             <div class="bento-card rounded-bento p-8 border-l-4 border-partner grid grid-cols-12 gap-8">
                 <div class="col-span-4 flex flex-col items-center justify-center border-2 border-dashed border-gray-700 rounded-xl p-6 hover:border-partner cursor-pointer transition bg-black/20">
@@ -89,10 +92,10 @@
                     <div class="text-xs font-bold text-white">Logo Principal</div>
                 </div>
                 <div class="col-span-8 space-y-4">
-                    <div><label class="text-[10px] text-gray-500 font-bold uppercase">Nom de l'offre</label><input type="text" placeholder="Ex: Green Energy Pro" class="w-full input-dark p-3 rounded-lg text-sm"></div>
+                    <div><label class="text-[10px] text-gray-500 font-bold uppercase">Nom de l'offre</label><input type="text" id="offer-name" placeholder="Ex: Green Energy Pro" class="w-full input-dark p-3 rounded-lg text-sm"></div>
                     <div class="grid grid-cols-2 gap-4">
-                        <div><label class="text-[10px] text-gray-500 font-bold uppercase">Couleur Primaire</label><div class="flex gap-2 items-center"><input type="color" value="#F43F5E" class="h-10 w-12 bg-transparent border-0"><input type="text" value="#F43F5E" class="w-full input-dark p-2 rounded text-xs font-mono"></div></div>
-                        <div><label class="text-[10px] text-gray-500 font-bold uppercase">Domaine (CNAME)</label><input type="text" placeholder="app.mon-entreprise.com" class="w-full input-dark p-3 rounded-lg text-xs font-mono"></div>
+                        <div><label class="text-[10px] text-gray-500 font-bold uppercase">Couleur Primaire</label><div class="flex gap-2 items-center"><input type="color" id="offer-color-picker" value="#F43F5E" class="h-10 w-12 bg-transparent border-0"><input type="text" id="offer-color" value="#F43F5E" class="w-full input-dark p-2 rounded text-xs font-mono"></div></div>
+                        <div><label class="text-[10px] text-gray-500 font-bold uppercase">Domaine (CNAME)</label><input type="text" id="offer-domain" placeholder="app.mon-entreprise.com" class="w-full input-dark p-3 rounded-lg text-xs font-mono"></div>
                     </div>
                 </div>
             </div>
@@ -102,14 +105,14 @@
         <div id="tab-pricing" class="tab-content max-w-5xl mx-auto space-y-6 hidden">
             <header class="flex justify-between items-end">
                 <div><h2 class="text-2xl font-bold text-white mb-1">Moteur de Prix</h2><p class="text-gray-400 text-xs">Configurez vos grilles et marges.</p></div>
-                <button class="border border-white/20 text-white px-4 py-2 rounded-lg text-xs hover:bg-white/10"><i class="fa-solid fa-download mr-2"></i>Modèle CSV</button>
+                <button onclick="saveConfig()" class="bg-partner text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-partner/90 transition shadow-lg shadow-partner/20">Sauvegarder</button>
             </header>
             <div class="grid grid-cols-2 gap-6">
                 <div class="bento-card rounded-bento p-6 border-t-4 border-blue-500">
                     <h3 class="font-bold text-white mb-4">Structure de Marge</h3>
                     <div class="space-y-4">
-                        <div class="flex justify-between items-center"><label class="text-xs text-gray-400">Marge Commerciale (€/MWh)</label><input type="number" value="2.5" class="w-24 input-dark p-2 rounded text-right font-bold text-blue-400"></div>
-                        <div class="flex justify-between items-center"><label class="text-xs text-gray-400">Frais de Gestion (€/an)</label><input type="number" value="120" class="w-24 input-dark p-2 rounded text-right"></div>
+                        <div class="flex justify-between items-center"><label class="text-xs text-gray-400">Marge Commerciale (€/MWh)</label><input type="number" id="margin-kwh" value="2.5" class="w-24 input-dark p-2 rounded text-right font-bold text-blue-500"></div>
+                        <div class="flex justify-between items-center"><label class="text-xs text-gray-400">Frais de Gestion (€/an)</label><input type="number" id="margin-fix" value="120" class="w-24 input-dark p-2 rounded text-right"></div>
                     </div>
                 </div>
                 <div class="bento-card rounded-bento p-6 border-t-4 border-green-500">
@@ -123,26 +126,19 @@
             </div>
         </div>
 
-        <!-- TAB 3: CONTRACT & FINANCE -->
+        <!-- TAB 3: CONTRACT & FINANCE (RESTAURÉ COMPLET) -->
         <div id="tab-contract" class="tab-content max-w-5xl mx-auto space-y-6 hidden">
             <header><h2 class="text-2xl font-bold text-white mb-1">Juridique & Financier</h2><p class="text-gray-400 text-xs">Votre relation avec Energistrat.</p></header>
-            
             <div class="grid grid-cols-12 gap-6">
-                <!-- CONVENTION -->
                 <div class="col-span-4 bento-card rounded-bento p-6 border-l-4 border-yellow-500">
                     <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-file-contract text-yellow-500"></i> CONVENTION PARTENAIRE</h3>
                     <div class="bg-white/5 p-4 rounded-xl mb-4">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-xs text-gray-400">Statut</span>
-                            <span class="bg-green-500/20 text-green-400 px-2 py-0.5 rounded text-[10px] font-bold">SIGNÉE</span>
-                        </div>
+                        <div class="flex justify-between items-center mb-2"><span class="text-xs text-gray-400">Statut</span><span class="bg-green-500/20 text-green-400 px-2 py-0.5 rounded text-[10px] font-bold">SIGNÉE</span></div>
                         <div class="text-xs text-white font-bold">Ref: CP_2026_0042</div>
                         <div class="text-[10px] text-gray-500">Validité: 31/12/2028</div>
                     </div>
                     <button class="w-full border border-white/20 text-white py-2 rounded-lg text-xs hover:bg-white/10 transition"><i class="fa-solid fa-download mr-2"></i>Télécharger PDF</button>
                 </div>
-
-                <!-- FACTURATION -->
                 <div class="col-span-8 bento-card rounded-bento p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-sm font-bold text-white">HISTORIQUE FACTURES (Commissions & SaaS)</h3>
@@ -151,23 +147,15 @@
                     <table class="w-full bill-table">
                         <thead><tr><th>Réf</th><th>Date</th><th>Montant HT</th><th>Type</th><th>Statut</th><th></th></tr></thead>
                         <tbody>
-                            <tr>
-                                <td class="font-mono text-white">INV-2026-02</td><td>01/02/2026</td><td class="font-bold">450.00 €</td><td>Licence SaaS</td>
-                                <td><span class="text-green-400">Payée</span></td>
-                                <td class="text-right"><i class="fa-solid fa-download cursor-pointer hover:text-white"></i></td>
-                            </tr>
-                            <tr>
-                                <td class="font-mono text-white">COM-2026-01</td><td>15/01/2026</td><td class="font-bold text-partner">+ 2,450.00 €</td><td>Commission</td>
-                                <td><span class="text-yellow-500">En cours</span></td>
-                                <td class="text-right"><i class="fa-solid fa-download cursor-pointer hover:text-white"></i></td>
-                            </tr>
+                            <tr><td class="font-mono text-white">INV-2026-02</td><td>01/02/2026</td><td class="font-bold">450.00 €</td><td>Licence SaaS</td><td><span class="text-green-400">Payée</span></td><td class="text-right"><i class="fa-solid fa-download cursor-pointer hover:text-white"></i></td></tr>
+                            <tr><td class="font-mono text-white">COM-2026-01</td><td>15/01/2026</td><td class="font-bold text-partner">+ 2,450.00 €</td><td>Commission</td><td><span class="text-yellow-500">En cours</span></td><td class="text-right"><i class="fa-solid fa-download cursor-pointer hover:text-white"></i></td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- TAB 4: TECH -->
+        <!-- TAB 4: TECH (RESTAURÉ COMPLET) -->
         <div id="tab-tech" class="tab-content max-w-5xl mx-auto space-y-6 hidden">
             <header><h2 class="text-2xl font-bold text-white mb-1">Connectivité</h2></header>
             <div class="bento-card rounded-bento p-8">
@@ -185,7 +173,7 @@
             </div>
         </div>
 
-        <!-- TAB 5: TEAM -->
+        <!-- TAB 5: TEAM (RESTAURÉ COMPLET) -->
         <div id="tab-team" class="tab-content max-w-5xl mx-auto space-y-6 hidden">
             <header><h2 class="text-2xl font-bold text-white mb-1">Équipe Commerciale</h2></header>
             <div class="bento-card rounded-bento p-0 overflow-hidden">
@@ -210,16 +198,49 @@
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden')); document.getElementById('tab-' + tabId).classList.remove('hidden');
         }
 
-        function save() {
+        // --- SAVE REAL (API CABLEE) ---
+        async function saveConfig() {
             const btn = document.activeElement;
-            const original = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            setTimeout(() => {
-                document.getElementById('toast').className = "show";
-                setTimeout(() => document.getElementById('toast').className = "", 3000);
-                btn.innerHTML = original;
-            }, 800);
+            const original = btn.innerText;
+            btn.innerText = "Sauvegarde...";
+            btn.disabled = true;
+
+            const data = {
+                branding: {
+                    name: document.getElementById('offer-name').value,
+                    color: document.getElementById('offer-color').value,
+                    domain: document.getElementById('offer-domain').value
+                },
+                pricing: {
+                    margin_kwh: document.getElementById('margin-kwh').value,
+                    margin_fix: document.getElementById('margin-fix').value
+                }
+            };
+
+            try {
+                const res = await fetch('/api/partner/save_config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                
+                if((await res.json()).success) {
+                    const t = document.getElementById('toast');
+                    t.className = "show";
+                    setTimeout(() => t.className = "", 3000);
+                } else {
+                    alert("Erreur serveur");
+                }
+            } catch(e) { alert("Erreur réseau"); }
+            
+            btn.innerText = original;
+            btn.disabled = false;
         }
+
+        // Sync Color Picker
+        document.getElementById('offer-color-picker').addEventListener('input', (e) => {
+            document.getElementById('offer-color').value = e.target.value;
+        });
 
         switchTab('branding');
     </script>
