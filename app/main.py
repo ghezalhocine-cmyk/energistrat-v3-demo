@@ -19,14 +19,29 @@ templates = Jinja2Templates(directory="app/templates")
 @app.get("/health")
 async def health_check(): return {"status": "ONLINE", "cortex": cortex.version, "storage": storage.version}
 
-# --- API OPS (ADMIN & ANALYSE) ---
+# --- API OPS (ADMIN & ANALYSE - ÉVOLUTION V19) ---
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), site_name: str = Form("Site_1"), x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     try:
         content = await file.read()
-        res = cortex.analyze_file(content, file.filename, target_profile=target)
-        if res.get("success"): res["secure_link"] = f"/dashboard/{target}?site={site_name}"
+        
+        # 1. RECHERCHE INTELLIGENTE DU SITE (Préparation V34)
+        # On regarde si on connait ce site dans le Storage pour injecter son contrat réel
+        site_data = None
+        # (Ici, on pourrait interroger storage.index avec site_name, pour l'instant on prépare le slot)
+        
+        # 2. APPEL CORTEX (SOFT HANDOVER)
+        try:
+            # Tentative V34 : On passe les données du site (Contrat, Tarif)
+            res = cortex.analyze_file(content, file.filename, target_profile=target, known_site_data=site_data)
+        except TypeError:
+            # Fallback V33 : Si Cortex n'est pas encore à jour, on appelle l'ancienne signature
+            res = cortex.analyze_file(content, file.filename, target_profile=target)
+        
+        if res.get("success"): 
+            res["secure_link"] = f"/dashboard/{target}?site={site_name}"
+            
         return JSONResponse(res)
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
@@ -49,24 +64,21 @@ async def api_chaos(x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
-# --- API TICKETING (NOUVEAU : INDISPENSABLE POUR SETTINGS V21.4) ---
+# --- API TICKETING (SUPPORT V21.4) ---
 @app.post("/api/support/ticket")
 async def create_ticket(request: Request):
-    """Crée un ticket physique dans /data/tickets"""
     try:
         data = await request.json()
         res = storage.create_ticket(data)
         return JSONResponse(res)
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.get("/api/support/tickets")
 async def get_tickets():
-    """Liste les tickets existants"""
     tickets = storage.list_tickets()
     return JSONResponse({"tickets": tickets})
 
-# --- API SETTINGS (SAUVEGARDE ERP) ---
+# --- API SETTINGS (ERP V21) ---
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
     try:
@@ -74,8 +86,7 @@ async def api_save_client(request: Request):
         client_id = data.get("identity", {}).get("id") or "draft_client"
         res = storage.save_client_settings(client_id, data)
         return JSONResponse(res)
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/partner/save_config")
 async def api_save_partner(request: Request):
@@ -83,43 +94,28 @@ async def api_save_partner(request: Request):
         data = await request.json()
         res = storage.save_partner_config("main_partner", data)
         return JSONResponse(res)
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 # --- PARCOURS CLIENT ---
 @app.get("/onboarding")
-async def view_onboarding(request: Request):
-    return templates.TemplateResponse("onboarding.html", {"request": request})
-
+async def view_onboarding(request: Request): return templates.TemplateResponse("onboarding.html", {"request": request})
 @app.get("/login/{profile}")
-async def view_login(request: Request, profile: str):
-    return templates.TemplateResponse("login.html", {"request": request, "profile": profile})
-
+async def view_login(request: Request, profile: str): return templates.TemplateResponse("login.html", {"request": request, "profile": profile})
 @app.get("/processing")
-async def view_processing(request: Request, target: str = "demo"):
-    return templates.TemplateResponse("processing.html", {"request": request, "target": target})
+async def view_processing(request: Request, target: str = "demo"): return templates.TemplateResponse("processing.html", {"request": request, "target": target})
+@app.get("/partner/settings")
+async def view_partner_settings(request: Request): return templates.TemplateResponse("settings_partner.html", {"request": request})
 
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str):
-    specific_file = f"{profile}.html"
-    if os.path.exists(f"app/templates/{specific_file}"):
-        return templates.TemplateResponse(specific_file, {"request": request})
-    if os.path.exists("app/templates/dashboard.html"):
-        return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
-    return JSONResponse({"error": f"Template introuvable: {specific_file}"}, 404)
+    f = f"{profile}.html"
+    if os.path.exists(f"app/templates/{f}"): return templates.TemplateResponse(f, {"request": request})
+    if os.path.exists("app/templates/dashboard.html"): return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
+    return JSONResponse({"error": f"Template missing: {f}"}, 404)
 
-@app.get("/partner/settings")
-async def view_partner_settings(request: Request):
-    return templates.TemplateResponse("settings_partner.html", {"request": request})
-
-# --- CATCH-ALL ---
 @app.get("/{path_name:path}")
 async def catch_all(request: Request, path_name: str):
-    if path_name == "" or path_name == "/": 
-        return templates.TemplateResponse("index.html", {"request": request})
-    
-    clean_name = path_name if path_name.endswith(".html") else f"{path_name}.html"
-    if os.path.exists(f"app/templates/{clean_name}"): 
-        return templates.TemplateResponse(clean_name, {"request": request})
-    
+    if path_name in ["", "/"]: return templates.TemplateResponse("index.html", {"request": request})
+    clean = path_name if path_name.endswith(".html") else f"{path_name}.html"
+    if os.path.exists(f"app/templates/{clean}"): return templates.TemplateResponse(clean, {"request": request})
     return JSONResponse({"error": "Page not found"}, 404)
