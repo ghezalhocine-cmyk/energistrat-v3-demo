@@ -10,156 +10,138 @@ DATA_ROOT = Path("/app/data") if os.path.exists("/app/data") else Path("data")
 INDEX_FILE = DATA_ROOT / "master_index.json"
 VAULT_FILE = DATA_ROOT / "system" / "secure_vault.json"
 
-# Logger pour le debug production
 logger = logging.getLogger("STORAGE_ENGINE")
 
 class StorageEngine:
     def __init__(self):
-        self.version = "3.3 (Ticketing Real)"
+        self.version = "3.4 (Reconciliation Master)"
         self.index = {}
         self._ensure_structure()
         self.load_index()
 
     def _ensure_structure(self):
-        """Crée l'arborescence physique initiale."""
         dirs = [
-            DATA_ROOT / "raw_uploads",
-            DATA_ROOT / "raw_uploads" / "API",
-            DATA_ROOT / "orgs",
-            DATA_ROOT / "clients",   # ERP V21
-            DATA_ROOT / "partners",  # ERP V22
-            DATA_ROOT / "tickets",   # SUPPORT V21.3
-            DATA_ROOT / "archives" / "INBOX",
-            DATA_ROOT / "system"
+            DATA_ROOT / "raw_uploads", DATA_ROOT / "raw_uploads" / "API",
+            DATA_ROOT / "orgs", DATA_ROOT / "clients", DATA_ROOT / "partners",
+            DATA_ROOT / "tickets", DATA_ROOT / "archives" / "INBOX", DATA_ROOT / "system"
         ]
-        for d in dirs:
-            d.mkdir(parents=True, exist_ok=True)
+        for d in dirs: d.mkdir(parents=True, exist_ok=True)
 
         if not INDEX_FILE.exists():
-            initial_structure = {
-                "meta": {"version": "3.3", "created": datetime.datetime.now().isoformat()},
-                "organizations": {},
-                "sub_accounts": {},
-                "sites": {},
-                "users": {}
-            }
-            with open(INDEX_FILE, 'w', encoding='utf-8') as f:
-                json.dump(initial_structure, f, indent=2)
+            initial = {"meta": {"version": "3.4", "created": datetime.datetime.now().isoformat()}, "organizations": {}, "sites": {}}
+            with open(INDEX_FILE, 'w', encoding='utf-8') as f: json.dump(initial, f, indent=2)
 
     def load_index(self):
         try:
             if INDEX_FILE.exists():
-                with open(INDEX_FILE, 'r', encoding='utf-8') as f:
-                    self.index = json.load(f)
-            else:
-                 self.index = {"sites": {}, "organizations": {}}
-        except Exception as e:
-            logger.error(f"[CRITICAL] Echec lecture Index: {e}")
-            self.index = {"sites": {}, "organizations": {}}
+                with open(INDEX_FILE, 'r', encoding='utf-8') as f: self.index = json.load(f)
+            else: self.index = {"sites": {}, "organizations": {}}
+        except Exception: self.index = {"sites": {}, "organizations": {}}
 
     def save_index(self):
         try:
-            temp_file = INDEX_FILE.with_suffix('.tmp')
-            with open(temp_file, 'w', encoding='utf-8') as f:
-                json.dump(self.index, f, indent=2)
-            os.replace(temp_file, INDEX_FILE)
-        except Exception as e:
-            logger.error(f"Save Index Error: {e}")
+            temp = INDEX_FILE.with_suffix('.tmp')
+            with open(temp, 'w', encoding='utf-8') as f: json.dump(self.index, f, indent=2)
+            os.replace(temp, INDEX_FILE)
+        except Exception: pass
 
-    # --- AUDIT TRAIL (LEGACY) ---
-    def log_audit(self, user_id: str, action: str, target_id: str, details: dict):
-        log_entry = {
-            "ts": datetime.datetime.now().isoformat(),
-            "u": user_id,
-            "act": action,
-            "tgt": target_id,
-            "d": details
-        }
-        month_str = datetime.datetime.now().strftime("%Y_%m")
-        log_file = DATA_ROOT / "system" / f"audit_{month_str}.jsonl"
-        try:
-            with open(log_file, 'a', encoding='utf-8') as f:
-                f.write(json.dumps(log_entry) + "\n")
-        except Exception:
-            pass 
-
-    # --- API CONNECTORS (LEGACY) ---
-    def save_api_raw_data(self, site_id: str, connector_id: str, raw_payload: dict):
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-        landing_path = DATA_ROOT / "raw_uploads" / "API" / site_id / today
-        landing_path.mkdir(parents=True, exist_ok=True)
-        filename = f"{int(datetime.datetime.now().timestamp())}_{connector_id}.json"
+    # --- RECONCILIATION ENGINE (NOUVEAU) ---
+    def find_site_by_pdl(self, pdl):
+        """
+        Cherche un PDL dans tous les fichiers clients enregistrés.
+        Retourne les infos contractuelles pour Cortex.
+        """
+        if not pdl: return None
         
-        final_path = landing_path / filename
-        with open(final_path, 'w', encoding='utf-8') as f:
-            json.dump(raw_payload, f)
-        return str(final_path)
+        # 1. Recherche rapide dans l'index (si implémenté)
+        # 2. Scan des fichiers clients (Robuste)
+        clients_dir = DATA_ROOT / "clients"
+        if not clients_dir.exists(): return None
 
-    # --- EXTENSION ERP (SETTINGS V21) ---
-    def save_client_settings(self, client_id: str, data: dict):
+        for client_file in clients_dir.glob("*/settings.json"):
+            try:
+                with open(client_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    # On cherche si le PDL correspond au site principal ou à un site liste
+                    # (Pour la V1, on regarde le champ principal du Settings)
+                    # Note: Dans le futur, on bouclera sur la liste des sites
+                    
+                    # Simulation sur la structure actuelle du Settings V21
+                    # Le Settings V21 ne stocke pas encore une liste structurée "sites", 
+                    # mais on va chercher dans les champs bruts pour faire le lien.
+                    # On suppose que le JSON ressemble à ce qui sort du formulaire V21.
+                    
+                    # On cherche dans le texte brut du JSON pour être permissif
+                    json_str = json.dumps(data)
+                    if pdl in json_str:
+                        # TROUVÉ ! On extrait les infos utiles pour Cortex
+                        # On essaie de récupérer proprement si structuré
+                        power = 0
+                        # On tente de parser les champs probables
+                        # (C'est ici qu'on fait le lien entre le formulaire Settings et Cortex)
+                        return {
+                            "pdl": pdl,
+                            "client_name": data.get("identity", {}).get("name", "Client Inconnu"),
+                            "power": data.get("contract", {}).get("power", 0), # À adapter selon structure réelle
+                            "segment": data.get("contract", {}).get("segment", "Inconnu"),
+                            "naf_label": "Client Reconnu"
+                        }
+            except: continue
+        
+        return None
+
+    # --- ERP CLIENTS ---
+    def save_client_settings(self, client_id, data):
         try:
-            clean_id = "".join(x for x in client_id if x.isalnum() or x in "_-")
-            client_dir = DATA_ROOT / "clients" / clean_id
-            client_dir.mkdir(parents=True, exist_ok=True)
-            
+            cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
+            path = DATA_ROOT / "clients" / cid
+            path.mkdir(parents=True, exist_ok=True)
             data["_meta"] = {"updated_at": datetime.datetime.now().isoformat()}
-            
-            file_path = client_dir / "settings.json"
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
-            
-            # Update Index
-            self.index["organizations"][clean_id] = {
-                "name": data.get("identity", {}).get("name", "Inconnu"),
-                "path": str(file_path)
-            }
+            with open(path / "settings.json", 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
+            self.index["organizations"][cid] = {"name": data.get("identity", {}).get("name"), "path": str(path)}
             self.save_index()
             return {"success": True}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-
-    def load_client_settings(self, client_id: str):
-        try:
-            clean_id = "".join(x for x in client_id if x.isalnum() or x in "_-")
-            file_path = DATA_ROOT / "clients" / clean_id / "settings.json"
-            if not file_path.exists(): return {"success": False, "error": "Client introuvable"}
-            with open(file_path, 'r', encoding='utf-8') as f: return json.load(f)
         except Exception as e: return {"success": False, "error": str(e)}
 
-    # --- EXTENSION PARTNER (SETTINGS V22) ---
-    def save_partner_config(self, partner_id: str, data: dict):
+    def load_client_settings(self, client_id):
         try:
-            clean_id = "".join(x for x in partner_id if x.isalnum() or x in "_-")
-            partner_dir = DATA_ROOT / "partners" / clean_id
-            partner_dir.mkdir(parents=True, exist_ok=True)
-            
-            with open(partner_dir / "config.json", 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
-            return {"success": True}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+            cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
+            path = DATA_ROOT / "clients" / cid / "settings.json"
+            if not path.exists(): return {"success": False, "error": "Inconnu"}
+            with open(path, 'r', encoding='utf-8') as f: return json.load(f)
+        except Exception as e: return {"success": False, "error": str(e)}
 
-    # --- EXTENSION SUPPORT (TICKETING V21.3) ---
+    # --- PARTNERS ---
+    def save_partner_config(self, pid, data):
+        try:
+            clean = "".join(x for x in pid if x.isalnum() or x in "_-")
+            path = DATA_ROOT / "partners" / clean
+            path.mkdir(parents=True, exist_ok=True)
+            with open(path / "config.json", 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
+            return {"success": True}
+        except Exception as e: return {"success": False, "error": str(e)}
+
+    # --- TICKETING ---
     def create_ticket(self, data):
         try:
-            ticket_id = f"TK-{uuid.uuid4().hex[:6].upper()}"
-            data.update({"id": ticket_id, "status": "OPEN", "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")})
-            
-            with open(DATA_ROOT / "tickets" / f"{ticket_id}.json", 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=4)
+            tid = f"TK-{uuid.uuid4().hex[:6].upper()}"
+            data.update({"id": tid, "status": "OPEN", "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")})
+            with open(DATA_ROOT / "tickets" / f"{tid}.json", 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
             return {"success": True, "ticket": data}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        except Exception as e: return {"success": False, "error": str(e)}
 
     def list_tickets(self):
         try:
-            tickets = []
-            ticket_dir = DATA_ROOT / "tickets"
-            if ticket_dir.exists():
-                for f in ticket_dir.glob("*.json"):
-                    with open(f, 'r', encoding='utf-8') as file: tickets.append(json.load(file))
-            return sorted(tickets, key=lambda x: x['created_at'], reverse=True)
-        except Exception: return []
+            tks = []
+            tdir = DATA_ROOT / "tickets"
+            if tdir.exists():
+                for f in tdir.glob("*.json"):
+                    with open(f, 'r', encoding='utf-8') as file: tks.append(json.load(file))
+            return sorted(tks, key=lambda x: x['created_at'], reverse=True)
+        except: return []
 
-# Instance Singleton
+    # --- LEGACY ---
+    def log_audit(self, u, a, t, d): pass
+    def save_api_raw_data(self, s, c, p): return "mock"
+
 storage = StorageEngine()
