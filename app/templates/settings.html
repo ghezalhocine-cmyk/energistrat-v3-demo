@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V21.6 | Settings Live</title>
+    <title>ENERGISTRAT V21.8 | Settings Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -93,7 +93,6 @@
                 <i class="fa-solid fa-user w-5 text-center"></i> Profil Admin
             </button>
             
-            <!-- NEW: SUPPORT TAB -->
             <button onclick="switchTab('support')" id="nav-support" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
                 <i class="fa-solid fa-headset w-5 text-center"></i> Assistance & Tickets
             </button>
@@ -145,13 +144,9 @@
                     <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Usage</label><select class="w-full input-dark p-2 rounded text-xs"><option value="batiment">Bâtiment</option><option value="ep">Éclairage Public</option><option value="process">Industrie</option></select></div>
                     <div class="col-span-6 relative"><label class="text-[10px] text-gray-500 font-bold uppercase">Adresse (BAN)</label><input type="text" id="address-input" class="w-full input-dark p-2 rounded text-xs" oninput="searchAddress()"><div id="address-suggestions" class="suggestions-list hidden"></div></div>
                     <div class="col-span-3">
-                        <!-- SWITCH SITE PRINCIPAL -->
                         <div class="flex items-center justify-between bg-white/5 p-2 rounded-lg mt-1 border border-white/10">
                             <span class="text-[9px] text-gray-400 uppercase font-bold">Siège / Principal</span>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" class="sr-only peer">
-                                <div class="w-8 h-4 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-cyan"></div>
-                            </label>
+                            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" class="sr-only peer"><div class="w-8 h-4 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-cyan"></div></label>
                         </div>
                     </div>
                 </div>
@@ -304,7 +299,7 @@
         }
         function toggleImportModal() { document.getElementById('import-modal').classList.toggle('hidden'); }
 
-        // --- TICKETING REAL (CORRECTIF API) ---
+        // --- TICKETING REAL ---
         function openTicketModal() {
             document.getElementById('ticket-modal').classList.remove('hidden');
         }
@@ -382,11 +377,17 @@
                     const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${val}`);
                     const data = await res.json();
                     if(data.results && data.results.length > 0) {
+                        const etab = data.results[0];
                         status.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>';
-                        document.getElementById('company-name').value = data.results[0].nom_complet;
-                    } else {
-                        status.innerHTML = '<i class="fa-solid fa-xmark text-red-500"></i>';
-                    }
+                        document.getElementById('company-name').value = etab.nom_complet;
+                        
+                        // FIX: RECUPERATION ADRESSE
+                        if(etab.siege && etab.siege.adresse) {
+                            document.getElementById('address-input').value = etab.siege.adresse;
+                        } else if (etab.adresse) {
+                            document.getElementById('address-input').value = etab.adresse;
+                        }
+                    } else { status.innerHTML = '<i class="fa-solid fa-xmark text-red-500"></i>'; }
                 } catch(e) { status.innerHTML = '?'; }
             }
         }
@@ -430,6 +431,9 @@
                     siret: document.getElementById('id-input').value,
                     name: document.getElementById('company-name').value
                 },
+                location: {
+                    address: document.getElementById('address-input').value
+                },
                 contract: {
                     pdl: document.getElementById('ref-input').value,
                     power: document.getElementById('val-input').value,
@@ -455,7 +459,7 @@
             setTimeout(() => t.className = "", 3000);
         }
 
-        // --- ENERGY SWITCHER & SMART INFERENCE (UNCHANGED) ---
+        // --- ENERGY SWITCHER & SMART INFERENCE ---
         let currentEnergy = 'elec';
         function setEnergy(type) {
             currentEnergy = type;
