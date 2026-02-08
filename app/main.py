@@ -158,7 +158,7 @@ async def get_import_template():
     response.headers["Content-Disposition"] = "attachment; filename=template_import_v5.csv"
     return response
 
-# --- NOUVEAU : GENERATEUR DE TEMPLATE CSV GAZ (V1) ---
+# --- GENERATEUR DE TEMPLATE CSV GAZ (V1) ---
 @app.get("/api/settings/template_csv_gaz")
 async def get_import_template_gaz():
     """
@@ -186,6 +186,33 @@ async def get_import_template_gaz():
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=template_import_gaz_v1.csv"
     return response
+
+# --- ENDPOINT D'IMPORT MASSE (V35.5 - LA LIGNE QUI VA BIEN) ---
+@app.post("/api/settings/import_csv")
+async def api_import_csv(file: UploadFile = File(...)):
+    """
+    Reçoit le fichier CSV, appelle Cortex pour le parsing (Smart Switch),
+    et sauvegarde chaque site via Storage.
+    """
+    try:
+        content = await file.read()
+        # 1. Parsing Intelligent (Gaz ou Elec) via Cortex V36
+        sites = cortex.parse_mass_import_v5(content)
+        
+        if not sites:
+            return JSONResponse({"success": False, "error": "Aucun site valide trouvé ou format CSV incorrect."})
+
+        # 2. Sauvegarde en masse via Storage
+        saved_count = 0
+        for site_data in sites:
+            # On utilise le SIRET comme ID unique
+            client_id = site_data['identity']['id']
+            storage.save_client_settings(client_id, site_data)
+            saved_count += 1
+            
+        return JSONResponse({"success": True, "imported": saved_count, "total": len(sites)})
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
 
 # --- ENDPOINT DE PROPAGATION (V35.2) ---
 @app.post("/api/settings/propagate_tariff")
