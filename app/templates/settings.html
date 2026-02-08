@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V22.6 | Settings Guaranteed</title>
+    <title>ENERGISTRAT V22.7 | Settings ERP Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -113,7 +113,7 @@
     <!-- CONTENT -->
     <main class="flex-1 overflow-y-auto p-10 relative bg-abysse">
         
-        <!-- TAB 1: CLIENTS & PARC (AVEC PRICING V22) -->
+        <!-- TAB 1: CLIENTS & PARC (V22.7 - AVEC LOTS & PROPAGATION) -->
         <div id="tab-clients" class="tab-content max-w-6xl mx-auto space-y-6">
             <header class="flex justify-between items-end">
                 <div><h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2><p class="text-gray-400 text-xs">Gestion Multi-Sites, Gaz/Élec et Lots.</p></div>
@@ -137,7 +137,9 @@
                         <input type="hidden" id="naf-input">
                     </div>
                     <div class="col-span-5"><label class="text-[10px] text-gray-500 font-bold uppercase">Raison Sociale</label><input type="text" id="company-name" placeholder="Auto..." class="w-full input-dark p-2 rounded text-xs bg-white/5"></div>
-                    <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Groupe / Réseau</label><select class="w-full input-dark p-2 rounded text-xs"><option value="none">Aucun</option><option value="sde">Syndicat Énergie</option><option value="retail">Réseau Retail</option></select></div>
+                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Groupe / Réseau</label><select class="w-full input-dark p-2 rounded text-xs"><option value="none">Aucun</option><option value="sde">Syndicat Énergie</option><option value="retail">Réseau Retail</option></select></div>
+                    <!-- NOUVEAU CHAMP : LOT / GRAPPE -->
+                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Nom du Lot / Grappe</label><input type="text" id="lot-input" placeholder="Ex: Lot 1..." class="w-full input-dark p-2 rounded text-xs text-cyan border-cyan/20"></div>
                 </div>
             </div>
 
@@ -174,7 +176,8 @@
                 <div class="bg-white/5 p-4 rounded-xl border border-white/5">
                     <div class="text-[10px] font-bold text-gray-400 uppercase mb-3 flex justify-between">
                         <span>Structure Tarifaire (€ HT)</span>
-                        <span class="text-cyan cursor-pointer hover:underline" onclick="showToast('Tarif dupliqué')"><i class="fa-solid fa-copy mr-1"></i>Dupliquer</span>
+                        <!-- UPDATE : BOUTON DUPLIQUER OUVRE LE MODAL -->
+                        <span class="text-cyan cursor-pointer hover:underline" onclick="openPropagationModal()"><i class="fa-solid fa-copy mr-1"></i>Dupliquer</span>
                     </div>
                     <div class="grid grid-cols-5 gap-4">
                         <div><label class="text-[9px] text-gray-500 uppercase">Abonnement /an</label><input type="number" id="price-fix" placeholder="0.00" class="w-full input-dark p-2 rounded text-xs text-right text-yellow-500"></div>
@@ -187,7 +190,7 @@
             </div>
         </div>
 
-        <!-- AUTRES ONGLETS (COMPLETS) -->
+        <!-- AUTRES ONGLETS (INCHANGÉS) -->
         <div id="tab-general" class="tab-content hidden">
             <div class="bento-card rounded-bento p-8 flex items-center gap-6 mb-6">
                 <div class="w-20 h-20 rounded-full bg-gradient-to-br from-cyan to-blue-600 p-[2px]"><img src="https://ui-avatars.com/api/?name=Admin+V3&background=050505&color=fff" class="w-full h-full rounded-full object-cover"></div>
@@ -274,6 +277,33 @@
         </div>
     </div>
 
+    <!-- MODAL PROPAGATION (NOUVEAU V22.7) -->
+    <div id="propagate-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bento-card p-8 rounded-bento w-[500px] border border-cyan/30 shadow-2xl shadow-cyan/10">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-full bg-cyan/20 flex items-center justify-center"><i class="fa-solid fa-network-wired text-cyan"></i></div>
+                <div><h3 class="text-lg font-bold text-white">Propagation Tarifaire</h3><p class="text-xs text-gray-400">Appliquer ce tarif au groupe.</p></div>
+            </div>
+            
+            <div class="bg-white/5 p-4 rounded-xl border border-white/5 mb-6">
+                <div class="flex justify-between text-xs mb-2"><span class="text-gray-500">Segment :</span><span class="text-white font-bold" id="prop-segment">--</span></div>
+                <div class="flex justify-between text-xs mb-2"><span class="text-gray-500">Lot Cible :</span><span class="text-cyan font-bold" id="prop-lot">--</span></div>
+                <div class="h-px bg-white/10 my-2"></div>
+                <p class="text-[10px] text-gray-400 italic"><i class="fa-solid fa-triangle-exclamation mr-1 text-yellow-500"></i> Seuls les sites compatibles (même Segment & Lot) seront mis à jour.</p>
+            </div>
+
+            <div class="mb-6">
+                <label class="text-[10px] text-gray-500 font-bold uppercase mb-1 block">Date d'effet du nouveau prix</label>
+                <input type="date" id="prop-date" class="w-full input-dark p-3 rounded-xl text-sm text-white border-cyan/50 focus:border-cyan">
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button onclick="document.getElementById('propagate-modal').classList.add('hidden')" class="text-gray-400 text-xs font-bold px-4 py-3 hover:text-white transition">ANNULER</button>
+                <button onclick="confirmPropagation()" class="bg-cyan text-black text-xs font-bold px-6 py-3 rounded-xl hover:bg-cyan/90 transition shadow-lg shadow-cyan/20">CONFIRMER</button>
+            </div>
+        </div>
+    </div>
+
     <!-- IMPORT MODAL -->
     <div id="import-modal" class="fixed inset-0 bg-black/90 z-[99] hidden flex items-center justify-center backdrop-blur-sm">
         <div class="bento-card p-8 rounded-bento w-[600px] relative">
@@ -298,6 +328,78 @@
         }
         function toggleImportModal() { document.getElementById('import-modal').classList.toggle('hidden'); }
         function openTicketModal() { document.getElementById('ticket-modal').classList.remove('hidden'); }
+
+        // --- PROPAGATION LOGIC (V22.7) ---
+        function openPropagationModal() {
+            // 1. Récupérer le contexte actuel
+            const segment = document.getElementById('segment-display').value;
+            const lot = document.getElementById('lot-input').value;
+            
+            if(segment === '--' || !lot) {
+                alert("Impossible de propager : Le Segment ou le Lot n'est pas défini.");
+                return;
+            }
+
+            // 2. Remplir le modal
+            document.getElementById('prop-segment').innerText = segment;
+            document.getElementById('prop-lot').innerText = lot;
+            
+            // 3. Afficher
+            document.getElementById('propagate-modal').classList.remove('hidden');
+        }
+
+        async function confirmPropagation() {
+            const dateEffet = document.getElementById('prop-date').value;
+            const segment = document.getElementById('segment-display').value;
+            const lot = document.getElementById('lot-input').value;
+            const sourceId = document.getElementById('id-input').value;
+
+            if(!dateEffet) return alert("Date d'effet requise pour l'historisation.");
+            if(!sourceId) return alert("Veuillez d'abord enregistrer ce site (ID requis).");
+
+            const btn = document.querySelector('#propagate-modal button:last-child');
+            const originalText = btn.innerText;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> TRAITEMENT';
+            
+            // Payload Réel
+            const payload = {
+                source_client_id: sourceId,
+                target_date: dateEffet,
+                filters: {
+                    segment: segment,
+                    lot_name: lot
+                },
+                pricing_data: {
+                    fix: document.getElementById('price-fix').value,
+                    hph: document.getElementById('price-p').value,
+                    hch: document.getElementById('price-hp').value,
+                    hce: document.getElementById('price-hc').value
+                }
+            };
+
+            try {
+                // APPEL API RÉEL (NO FAKE)
+                const res = await fetch('/api/settings/propagate_tariff', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+
+                const response = await res.json();
+
+                if(response.success) {
+                    document.getElementById('propagate-modal').classList.add('hidden');
+                    showToast(`Succès : ${response.updated_count} sites mis à jour au ${dateEffet}`);
+                } else {
+                    alert("Erreur propagation : " + (response.error || "Inconnue"));
+                }
+            } catch(e) {
+                console.error(e);
+                alert("Erreur réseau : Impossible de joindre le Cortex.");
+            }
+
+            btn.innerHTML = originalText;
+        }
 
         // --- 1. API GOUV (COMPLET) ---
         async function checkIdentity() {
@@ -368,7 +470,7 @@
             } catch(e) {}
         }
 
-        // --- 4. SAUVEGARDE CLIENT (AVEC PRIX) ---
+        // --- 4. SAUVEGARDE CLIENT (AVEC PRIX & LOT) ---
         async function saveSite() {
             const btn = document.activeElement;
             const original = btn.innerHTML;
@@ -379,7 +481,8 @@
                     id: document.getElementById('id-input').value || "draft",
                     siret: document.getElementById('id-input').value,
                     name: document.getElementById('company-name').value,
-                    naf: document.getElementById('naf-input').value
+                    naf: document.getElementById('naf-input').value,
+                    lot_name: document.getElementById('lot-input').value // NEW FIELD
                 },
                 location: { address: document.getElementById('address-input').value },
                 contract: {
@@ -411,8 +514,10 @@
         let currentEnergy = 'elec';
         function setEnergy(type) {
             currentEnergy = type;
-            const btnElec = document.getElementById('btn-elec'); const btnGaz = document.getElementById('btn-gaz');
-            const lblRef = document.getElementById('lbl-ref'); const lblPuiss = document.getElementById('lbl-puiss');
+            constconst btnElec = document.getElementById('btn-elec'); 
+            const btnGaz = document.getElementById('btn-gaz');
+            const lblRef = document.getElementById('lbl-ref'); 
+            const lblPuiss = document.getElementById('lbl-puiss');
             const lblTax = document.getElementById('lbl-tax');
             const card = document.getElementById('card-energy');
 
@@ -441,6 +546,7 @@
             }
         }
 
+        // Initialisation
         switchTab('clients');
     </script>
 </body>
