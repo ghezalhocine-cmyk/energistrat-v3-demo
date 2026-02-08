@@ -11,7 +11,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_V35")
+logger = logging.getLogger("CORTEX_V36")
 
 try:
     import pdfplumber
@@ -30,7 +30,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "35.3 (Mass Import V5)"
+        self.version = "36.0 (Dual Flux Gaz/Elec)"
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
             "1013B": "Boucherie", "5610A": "Restauration Trad.", "5610C": "Fast Food",
@@ -120,7 +120,7 @@ class CortexEngine:
             return {"success": True, "kpi": full_kpi, "chart": chart, "ai_insight": narrative}
 
         except Exception as e:
-            logger.exception("Crash Cortex V35")
+            logger.exception("Crash Cortex V36")
             return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
 
     def _parse_data(self, content, filename):
@@ -262,11 +262,11 @@ class CortexEngine:
         ]
         return {"score": 100, "checks": checks}
 
-    # --- NOUVEAU : IMPORT DE MASSE CSV V5 ---
+    # --- NOUVEAU : IMPORT DE MASSE (V36 SMART SWITCH) ---
     def parse_mass_import_v5(self, file_content):
         """
         Parse le CSV V5 (Template Officiel) pour création de JSONs clients.
-        Structure attendue : SIRET;RAISON_SOCIALE;NOM_SITE;...
+        Détecte automatiquement si ÉLEC (PDL) ou GAZ (PCE).
         """
         try:
             buffer = io.BytesIO(file_content)
@@ -277,22 +277,44 @@ class CortexEngine:
                 buffer.seek(0)
                 df = pd.read_csv(buffer, sep=';', encoding='latin-1', dtype=str)
             
+            # DÉTECTION DU FLUX (ELEC VS GAZ)
+            headers = [str(c).upper() for c in df.columns]
+            is_gaz = "PCE" in headers
+            
             sites = []
             for _, row in df.iterrows():
                 # Nettoyage critique
                 siret = str(row.get('SIRET', '')).replace(' ', '').strip()
-                pdl = str(row.get('PDL', '')).replace(' ', '').strip()
-                
-                if len(siret) < 9: continue # Ligne vide ou invalide
+                if len(siret) < 9: continue 
 
-                # Mapping V22.11
+                # Mapping commun
                 site_name = row.get('NOM_SITE', row.get('RAISON_SOCIALE', '')).strip()
                 if not site_name: site_name = "Site Inconnu"
+                
+                # Mapping spécifique
+                if is_gaz:
+                    ref_id = str(row.get('PCE', '')).replace(' ', '').strip()
+                    power = self._safe_int(row.get('CAR_MWH', 0))
+                    segment = row.get('SEGMENT_GAZ', '--').strip()
+                    # Gaz = Prix Unique mappé dans HPH
+                    p_hph = str(row.get('PRIX_MWH', '0')).replace(',', '.').strip()
+                    p_hch = "0"
+                    p_hpe = "0"
+                    p_hce = "0"
+                else:
+                    ref_id = str(row.get('PDL', '')).replace(' ', '').strip()
+                    power = self._safe_int(row.get('PUISSANCE', 0))
+                    segment = row.get('SEGMENT', '--').strip()
+                    # Elec = 4 Postes
+                    p_hph = str(row.get('PRIX_HPH', '0')).replace(',', '.').strip()
+                    p_hch = str(row.get('PRIX_HCH', '0')).replace(',', '.').strip()
+                    p_hpe = str(row.get('PRIX_HPE', '0')).replace(',', '.').strip()
+                    p_hce = str(row.get('PRIX_HCE', '0')).replace(',', '.').strip()
 
                 site = {
-                    "client_name": site_name, # Dashboard Title
+                    "client_name": site_name, 
                     "identity": {
-                        "id": siret, # ID = SIRET
+                        "id": siret,
                         "siret": siret,
                         "name": row.get('RAISON_SOCIALE', '').strip(),
                         "site_name": site_name,
@@ -300,17 +322,17 @@ class CortexEngine:
                     },
                     "location": { "address": row.get('ADRESSE', '').strip() },
                     "contract": {
-                        "pdl": pdl,
-                        "power": self._safe_int(row.get('PUISSANCE', 0)),
-                        "segment": row.get('SEGMENT', '--').strip(),
+                        "pdl": ref_id, # PDL ou PCE
+                        "power": power, # kVA ou CAR
+                        "segment": segment,
                         "provider": "Import CSV"
                     },
                     "pricing": {
                         "fix": str(row.get('ABO_AN', '0')).replace(',', '.').strip(),
-                        "hph": str(row.get('PRIX_HPH', '0')).replace(',', '.').strip(),
-                        "hch": str(row.get('PRIX_HCH', '0')).replace(',', '.').strip(),
-                        "hpe": str(row.get('PRIX_HPE', '0')).replace(',', '.').strip(),
-                        "hce": str(row.get('PRIX_HCE', '0')).replace(',', '.').strip(),
+                        "hph": p_hph,
+                        "hch": p_hch,
+                        "hpe": p_hpe,
+                        "hce": p_hce,
                         "tax": str(row.get('TAXES', '0')).replace(',', '.').strip()
                     }
                 }
