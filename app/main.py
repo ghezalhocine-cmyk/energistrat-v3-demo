@@ -133,7 +133,7 @@ async def api_save_client(request: Request):
         return JSONResponse(res)
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# --- NOUVEAU : GENERATEUR DE TEMPLATE CSV (V5) ---
+# --- GENERATEUR DE TEMPLATE CSV ELEC (V5) ---
 @app.get("/api/settings/template_csv")
 async def get_import_template():
     """
@@ -156,6 +156,35 @@ async def get_import_template():
     stream.seek(0)
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=template_import_v5.csv"
+    return response
+
+# --- NOUVEAU : GENERATEUR DE TEMPLATE CSV GAZ (V1) ---
+@app.get("/api/settings/template_csv_gaz")
+async def get_import_template_gaz():
+    """
+    Génère le Template CSV Spécifique GAZ (V1).
+    Structure : PCE, CAR, Prix Unique.
+    """
+    headers = [
+        "SIRET", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", 
+        "PCE", "CAR_MWH", "SEGMENT_GAZ", "LOT",
+        "ABO_AN", "PRIX_MWH", "TAXES" 
+    ]
+    
+    stream = io.StringIO()
+    writer = csv.writer(stream, delimiter=';')
+    writer.writerow(headers)
+    
+    # Exemple Gaz
+    writer.writerow([
+        "12345678900012", "Mon Entreprise", "Chaufferie Bât A", "10 Rue de la Paix",
+        "04500000000000", "150", "T2", "Lot Chauffage",
+        "250.00", "45.50", "8.44"
+    ])
+    
+    stream.seek(0)
+    response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=template_import_gaz_v1.csv"
     return response
 
 # --- ENDPOINT DE PROPAGATION (V35.2) ---
