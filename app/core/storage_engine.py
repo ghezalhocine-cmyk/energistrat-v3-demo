@@ -14,7 +14,7 @@ logger = logging.getLogger("STORAGE_ENGINE")
 
 class StorageEngine:
     def __init__(self):
-        self.version = "3.5 (Precision Extraction)"
+        self.version = "3.6 (Full Context Extraction)"
         self.index = {}
         self._ensure_structure()
         self.load_index()
@@ -28,7 +28,7 @@ class StorageEngine:
         for d in dirs: d.mkdir(parents=True, exist_ok=True)
 
         if not INDEX_FILE.exists():
-            initial = {"meta": {"version": "3.5", "created": datetime.datetime.now().isoformat()}, "organizations": {}, "sites": {}}
+            initial = {"meta": {"version": "3.6", "created": datetime.datetime.now().isoformat()}, "organizations": {}, "sites": {}}
             with open(INDEX_FILE, 'w', encoding='utf-8') as f: json.dump(initial, f, indent=2)
 
     def load_index(self):
@@ -45,10 +45,10 @@ class StorageEngine:
             os.replace(temp, INDEX_FILE)
         except Exception: pass
 
-    # --- RECONCILIATION ENGINE (PRECISION V3.5) ---
+    # --- RECONCILIATION ENGINE (EVOLUTION V3.6) ---
     def find_site_by_pdl(self, pdl):
         """
-        Cherche un PDL et extrait les métadonnées précises (NAF, Nom, Puissance).
+        Cherche un PDL et extrait TOUT le contexte (NAF, Puissance, Adresse).
         """
         if not pdl: return None
         
@@ -61,22 +61,23 @@ class StorageEngine:
                 with open(client_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     
-                    # Lecture structurée (Settings V21.9 Structure)
+                    # Lecture structurée
                     contract = data.get("contract", {})
                     stored_pdl = str(contract.get("pdl", "")).strip()
                     
-                    # Comparaison robuste
+                    # Comparaison
                     if str(pdl) in stored_pdl:
                         identity = data.get("identity", {})
+                        location = data.get("location", {}) # AJOUT V3.6
                         
-                        # Extraction des champs réels
                         return {
                             "pdl": pdl,
                             "client_name": identity.get("name", "Client Inconnu"),
                             "power": contract.get("power", 0),
                             "segment": contract.get("segment", "Inconnu"),
-                            # On renvoie le NAF capturé par l'API Gouv
-                            "naf_label": identity.get("naf", "Métier Détecté") 
+                            "naf_label": identity.get("naf", "Métier Détecté"),
+                            # NOUVEAU : On passe l'adresse pour le calcul DJU
+                            "address": location.get("address", "")
                         }
             except Exception as e:
                 continue
