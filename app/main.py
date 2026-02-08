@@ -24,16 +24,17 @@ templates = Jinja2Templates(directory="app/templates")
 @app.get("/health")
 async def health_check(): return {"status": "ONLINE", "cortex": cortex.version, "storage": storage.version}
 
-# --- MODELES DE DONNEES (NOUVEAU : PROPAGATION TARIFAIRE V35.1) ---
+# --- MODELES DE DONNEES (PROPAGATION TARIFAIRE V35.2 - 4 POSTES) ---
 class PropagationFilters(BaseModel):
     segment: str
     lot_name: str
 
 class PricingData(BaseModel):
     fix: Optional[str] = "0.00"
-    hph: Optional[str] = "0.00"
-    hch: Optional[str] = "0.00"
-    hce: Optional[str] = "0.00"
+    hph: Optional[str] = "0.00" # Hiver Pleines
+    hch: Optional[str] = "0.00" # Hiver Creuses
+    hpe: Optional[str] = "0.00" # ETE PLEINES (AJOUTÉ POUR V22.8)
+    hce: Optional[str] = "0.00" # ETE Creuses
     tax: Optional[str] = "0.00"
 
 class PropagationRequest(BaseModel):
@@ -203,7 +204,7 @@ async def propagate_tariff(payload: PropagationRequest):
                 }
                 client['tariff_history'].append(history_entry)
 
-            # 2. Mettre à jour
+            # 2. Mettre à jour (Avec support des 4 postes)
             client['pricing'] = payload.pricing_data.dict()
             client['last_update'] = datetime.now().isoformat()
             client['sync_status'] = "PROPAGATED"
