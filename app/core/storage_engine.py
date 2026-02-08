@@ -14,7 +14,7 @@ logger = logging.getLogger("STORAGE_ENGINE")
 
 class StorageEngine:
     def __init__(self):
-        self.version = "3.4 (Reconciliation Master)"
+        self.version = "3.5 (Precision Extraction)"
         self.index = {}
         self._ensure_structure()
         self.load_index()
@@ -28,7 +28,7 @@ class StorageEngine:
         for d in dirs: d.mkdir(parents=True, exist_ok=True)
 
         if not INDEX_FILE.exists():
-            initial = {"meta": {"version": "3.4", "created": datetime.datetime.now().isoformat()}, "organizations": {}, "sites": {}}
+            initial = {"meta": {"version": "3.5", "created": datetime.datetime.now().isoformat()}, "organizations": {}, "sites": {}}
             with open(INDEX_FILE, 'w', encoding='utf-8') as f: json.dump(initial, f, indent=2)
 
     def load_index(self):
@@ -45,48 +45,41 @@ class StorageEngine:
             os.replace(temp, INDEX_FILE)
         except Exception: pass
 
-    # --- RECONCILIATION ENGINE (NOUVEAU) ---
+    # --- RECONCILIATION ENGINE (PRECISION V3.5) ---
     def find_site_by_pdl(self, pdl):
         """
-        Cherche un PDL dans tous les fichiers clients enregistrés.
-        Retourne les infos contractuelles pour Cortex.
+        Cherche un PDL et extrait les métadonnées précises (NAF, Nom, Puissance).
         """
         if not pdl: return None
         
-        # 1. Recherche rapide dans l'index (si implémenté)
-        # 2. Scan des fichiers clients (Robuste)
         clients_dir = DATA_ROOT / "clients"
         if not clients_dir.exists(): return None
 
+        # Scan des dossiers clients
         for client_file in clients_dir.glob("*/settings.json"):
             try:
                 with open(client_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    # On cherche si le PDL correspond au site principal ou à un site liste
-                    # (Pour la V1, on regarde le champ principal du Settings)
-                    # Note: Dans le futur, on bouclera sur la liste des sites
                     
-                    # Simulation sur la structure actuelle du Settings V21
-                    # Le Settings V21 ne stocke pas encore une liste structurée "sites", 
-                    # mais on va chercher dans les champs bruts pour faire le lien.
-                    # On suppose que le JSON ressemble à ce qui sort du formulaire V21.
+                    # Lecture structurée (Settings V21.9 Structure)
+                    contract = data.get("contract", {})
+                    stored_pdl = str(contract.get("pdl", "")).strip()
                     
-                    # On cherche dans le texte brut du JSON pour être permissif
-                    json_str = json.dumps(data)
-                    if pdl in json_str:
-                        # TROUVÉ ! On extrait les infos utiles pour Cortex
-                        # On essaie de récupérer proprement si structuré
-                        power = 0
-                        # On tente de parser les champs probables
-                        # (C'est ici qu'on fait le lien entre le formulaire Settings et Cortex)
+                    # Comparaison robuste
+                    if str(pdl) in stored_pdl:
+                        identity = data.get("identity", {})
+                        
+                        # Extraction des champs réels
                         return {
                             "pdl": pdl,
-                            "client_name": data.get("identity", {}).get("name", "Client Inconnu"),
-                            "power": data.get("contract", {}).get("power", 0), # À adapter selon structure réelle
-                            "segment": data.get("contract", {}).get("segment", "Inconnu"),
-                            "naf_label": "Client Reconnu"
+                            "client_name": identity.get("name", "Client Inconnu"),
+                            "power": contract.get("power", 0),
+                            "segment": contract.get("segment", "Inconnu"),
+                            # On renvoie le NAF capturé par l'API Gouv
+                            "naf_label": identity.get("naf", "Métier Détecté") 
                         }
-            except: continue
+            except Exception as e:
+                continue
         
         return None
 
