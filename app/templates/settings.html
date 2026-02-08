@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V22.9 | Settings ERP Master</title>
+    <title>ENERGISTRAT V22.10 | Settings ERP Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -113,7 +113,7 @@
     <!-- CONTENT -->
     <main class="flex-1 overflow-y-auto p-10 relative bg-abysse">
         
-        <!-- TAB 1: CLIENTS & PARC (V22.9 - 4 POSTES & FIX DASHBOARD) -->
+        <!-- TAB 1: CLIENTS & PARC (V22.10 - AVEC NOM DU SITE & 4 POSTES) -->
         <div id="tab-clients" class="tab-content max-w-6xl mx-auto space-y-6">
             <header class="flex justify-between items-end">
                 <div><h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2><p class="text-gray-400 text-xs">Gestion Multi-Sites, Gaz/Élec et Lots.</p></div>
@@ -123,7 +123,7 @@
                 </div>
             </header>
 
-            <!-- 1. IDENTITÉ -->
+            <!-- 1. IDENTITÉ (MODIFIÉ V22.10) -->
             <div class="bento-card rounded-bento p-6 border-l-4 border-cyan">
                 <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span class="w-6 h-6 rounded bg-cyan/20 text-cyan flex items-center justify-center text-[10px]">1</span> ENTITÉ JURIDIQUE</h3>
                 <div class="flex gap-4 mb-4">
@@ -131,14 +131,21 @@
                     <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="entity_type" value="copro" class="accent-orange" onchange="updateFormType()"><span class="text-xs text-white">Copropriété (RNC)</span></label>
                 </div>
                 <div class="grid grid-cols-12 gap-4">
-                    <div class="col-span-3">
+                    <!-- SIRET (2 cols) -->
+                    <div class="col-span-2">
                         <label id="lbl-id" class="text-[10px] text-gray-500 font-bold uppercase">SIRET *</label>
                         <div class="relative"><input type="text" id="id-input" placeholder="123..." class="w-full input-dark p-2 rounded text-xs font-mono" onblur="checkIdentity()"><div id="id-status" class="absolute right-2 top-2 text-[10px]"></div></div>
                         <input type="hidden" id="naf-input">
                     </div>
-                    <div class="col-span-5"><label class="text-[10px] text-gray-500 font-bold uppercase">Raison Sociale</label><input type="text" id="company-name" placeholder="Auto..." class="w-full input-dark p-2 rounded text-xs bg-white/5"></div>
+                    <!-- RAISON SOCIALE (3 cols) -->
+                    <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Raison Sociale</label><input type="text" id="company-name" placeholder="Juridique..." class="w-full input-dark p-2 rounded text-xs bg-white/5"></div>
+                    
+                    <!-- NOUVEAU CHAMP : NOM DU SITE (3 cols) -->
+                    <div class="col-span-3"><label class="text-[10px] text-cyan font-bold uppercase">NOM DU SITE (Dashboard)</label><input type="text" id="site-name-input" placeholder="Ex: École Jules Ferry..." class="w-full input-dark p-2 rounded text-xs border border-cyan/30 text-white font-bold"></div>
+                    
+                    <!-- GROUPE (2 cols) -->
                     <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Groupe / Réseau</label><select class="w-full input-dark p-2 rounded text-xs"><option value="none">Aucun</option><option value="sde">Syndicat Énergie</option><option value="retail">Réseau Retail</option></select></div>
-                    <!-- CHAMP : LOT / GRAPPE -->
+                    <!-- LOT (2 cols) -->
                     <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Nom du Lot / Grappe</label><input type="text" id="lot-input" placeholder="Ex: Lot 1..." class="w-full input-dark p-2 rounded text-xs text-cyan border-cyan/20"></div>
                 </div>
             </div>
@@ -323,7 +330,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT CORRIGÉ V22.9 -->
+    <!-- SCRIPT CORRIGÉ V22.10 (NOM DU SITE + 4 POSTES) -->
     <script>
         function switchTab(id) {
             document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
@@ -335,7 +342,7 @@
         function toggleImportModal() { document.getElementById('import-modal').classList.toggle('hidden'); }
         function openTicketModal() { document.getElementById('ticket-modal').classList.remove('hidden'); }
 
-        // --- PROPAGATION LOGIC (CORRECTIF V22.9) ---
+        // --- PROPAGATION LOGIC ---
         function openPropagationModal() {
             const segment = document.getElementById('segment-display').value;
             const lot = document.getElementById('lot-input').value;
@@ -386,7 +393,6 @@
                     document.getElementById('propagate-modal').classList.add('hidden');
                     showToast(`Succès : ${response.updated_count} sites mis à jour !`);
                 } else {
-                    // AFFICHAGE DE LA VRAIE ERREUR
                     alert("Erreur propagation : " + (response.detail || response.error || "Erreur inconnue"));
                 }
             } catch(e) { 
@@ -409,6 +415,10 @@
                         const etab = data.results[0];
                         status.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>';
                         document.getElementById('company-name').value = etab.nom_complet;
+                        // Auto-fill site name if empty
+                        if(!document.getElementById('site-name-input').value) {
+                             document.getElementById('site-name-input').value = etab.nom_complet;
+                        }
                         if(etab.siege && etab.siege.adresse) document.getElementById('address-input').value = etab.siege.adresse;
                         else if (etab.adresse) document.getElementById('address-input').value = etab.adresse;
                         if(etab.activite_principale) document.getElementById('naf-input').value = etab.activite_principale;
@@ -465,22 +475,25 @@
             } catch(e) {}
         }
 
-        // --- 4. SAUVEGARDE CLIENT (CORRECTIF V22.9 - NOM & 4 POSTES) ---
+        // --- 4. SAUVEGARDE CLIENT (CORRECTIF V22.10) ---
         async function saveSite() {
             const btn = document.activeElement;
             const original = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>...';
 
             const rawId = document.getElementById('id-input').value;
-            const cleanId = rawId ? rawId.replace(/\s/g, '') : "draft"; // NETTOYAGE SIRET
+            const cleanId = rawId ? rawId.replace(/\s/g, '') : "draft";
             const companyName = document.getElementById('company-name').value;
+            // PRIORITÉ AU NOM DU SITE, SINON RAISON SOCIALE
+            const siteName = document.getElementById('site-name-input').value || companyName;
 
             const data = {
-                client_name: companyName, // FIX DASHBOARD DISPLAY
+                client_name: siteName, // Dashboard title
                 identity: {
                     id: cleanId,
                     siret: cleanId,
                     name: companyName,
+                    site_name: siteName, // New field stored
                     naf: document.getElementById('naf-input').value,
                     lot_name: document.getElementById('lot-input').value
                 },
@@ -504,7 +517,7 @@
                 const res = await fetch('/api/settings/save_client', {
                     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
                 });
-                if((await res.json()).success) showToast("Sauvegardé ! (Nom & Prix)");
+                if((await res.json()).success) showToast("Sauvegardé !");
             } catch(e) { alert("Erreur réseau"); }
             btn.innerHTML = original;
         }
