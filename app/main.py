@@ -2,11 +2,13 @@ import os
 import re
 import json
 import glob
+import io
+import csv
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
 from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,7 +35,7 @@ class PricingData(BaseModel):
     fix: Optional[str] = "0.00"
     hph: Optional[str] = "0.00" # Hiver Pleines
     hch: Optional[str] = "0.00" # Hiver Creuses
-    hpe: Optional[str] = "0.00" # ETE PLEINES (AJOUTÉ POUR V22.8)
+    hpe: Optional[str] = "0.00" # ETE PLEINES
     hce: Optional[str] = "0.00" # ETE Creuses
     tax: Optional[str] = "0.00"
 
@@ -131,11 +133,36 @@ async def api_save_client(request: Request):
         return JSONResponse(res)
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# --- NOUVEAU : ENDPOINT DE PROPAGATION ---
+# --- NOUVEAU : GENERATEUR DE TEMPLATE CSV (V5) ---
+@app.get("/api/settings/template_csv")
+async def get_import_template():
+    """
+    Génère le Template CSV Officiel V5 (Compatible 4 Postes & Site Name).
+    """
+    headers = [
+        "SIRET", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", 
+        "PDL", "PUISSANCE", "SEGMENT", "LOT",
+        "ABO_AN", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES"
+    ]
+    stream = io.StringIO()
+    writer = csv.writer(stream, delimiter=';') # Excel France standard
+    writer.writerow(headers)
+    # Exemple
+    writer.writerow([
+        "12345678900012", "Mon Entreprise", "Site Principal", "10 Rue de la Paix 75000 Paris",
+        "30000000000000", "36", "C5", "Lot 1",
+        "150.00", "0.15", "0.10", "0.08", "0.04", "22.5"
+    ])
+    stream.seek(0)
+    response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=template_import_v5.csv"
+    return response
+
+# --- ENDPOINT DE PROPAGATION (V35.2) ---
 @app.post("/api/settings/propagate_tariff")
 async def propagate_tariff(payload: PropagationRequest):
     """
-    Moteur de Propagation Tarifaire Intelligent V35.1.
+    Moteur de Propagation Tarifaire Intelligent V35.2.
     Règle : On ne propage que au sein de la même entité (SIREN) et sur le même profil technique (Segment + Lot).
     Feature : Historisation automatique des anciens prix.
     """
@@ -143,10 +170,9 @@ async def propagate_tariff(payload: PropagationRequest):
     updated_count = 0
     errors = []
 
-    # 1. CHARGEMENT SOURCE (Pour vérifier le SIREN)
+    # 1. CHARGEMENT SOURCE
     source_path = os.path.join(DATA_DIR, f"{payload.source_client_id}.json")
     if not os.path.exists(source_path):
-        # Fallback : Si l'ID est un SIRET complet, on cherche le fichier correspondant
         found = glob.glob(os.path.join(DATA_DIR, f"*{payload.source_client_id}*.json"))
         if found:
             source_path = found[0]
@@ -156,7 +182,6 @@ async def propagate_tariff(payload: PropagationRequest):
     try:
         with open(source_path, 'r') as f:
             source_data = json.load(f)
-            # Sécurité : On définit le périmètre de propagation (Les 9 premiers chiffres = SIREN)
             scope_siren = source_data.get('identity', {}).get('siret', '')[:9] 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lecture source: {str(e)}")
@@ -164,7 +189,7 @@ async def propagate_tariff(payload: PropagationRequest):
     if not scope_siren or len(scope_siren) < 9:
         raise HTTPException(status_code=400, detail="Impossible de définir le périmètre (SIREN source invalide)")
 
-    # 2. SCAN DU PARC (Smart Scan)
+    # 2. SCAN DU PARC
     all_files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     
     for file_path in all_files:
@@ -174,24 +199,17 @@ async def propagate_tariff(payload: PropagationRequest):
             with open(file_path, 'r') as f:
                 client = json.load(f)
 
-            # --- FILTRES DE SÉCURITÉ ---
-            
-            # A. Filtre PÉRIMÈTRE (Même Entreprise/Groupe)
+            # FILTRES DE SÉCURITÉ
             client_siret = client.get('identity', {}).get('siret', '')
             if not client_siret.startswith(scope_siren): continue 
 
-            # B. Filtre TECHNIQUE (Même Segment : C5, C4...)
             client_segment = client.get('contract', {}).get('segment', '--')
             if client_segment != payload.filters.segment: continue
 
-            # C. Filtre MÉTIER (Même Lot : "Lot 1", "Ecoles"...)
-            # Gestion safe si le champ n'existe pas encore
             client_lot = client.get('identity', {}).get('lot_name', '')
             if client_lot != payload.filters.lot_name: continue
 
-            # --- APPLICATION & HISTORISATION ---
-
-            # 1. Historiser
+            # APPLICATION & HISTORISATION
             if 'tariff_history' not in client: client['tariff_history'] = []
             
             current_pricing = client.get('pricing', {})
@@ -204,12 +222,10 @@ async def propagate_tariff(payload: PropagationRequest):
                 }
                 client['tariff_history'].append(history_entry)
 
-            # 2. Mettre à jour (Avec support des 4 postes)
             client['pricing'] = payload.pricing_data.dict()
             client['last_update'] = datetime.now().isoformat()
             client['sync_status'] = "PROPAGATED"
 
-            # 3. Sauvegarder
             with open(file_path, 'w') as f:
                 json.dump(client, f, indent=4)
             
