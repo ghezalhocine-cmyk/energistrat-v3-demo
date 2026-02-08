@@ -11,7 +11,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_V34")
+logger = logging.getLogger("CORTEX_V35")
 
 try:
     import pdfplumber
@@ -30,7 +30,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "34.0 (Reconciliation Ready)"
+        self.version = "35.0 (Context Aware)"
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
             "1013B": "Boucherie", "5610A": "Restauration Trad.", "5610C": "Fast Food",
@@ -54,26 +54,23 @@ class CortexEngine:
             return int(float(value))
         except: return 0
 
-    # --- POINT D'ENTRÉE PRINCIPAL (MODIFIÉ V34) ---
     def analyze_file(self, file_content, filename, target_profile="demo", known_site_data=None):
         try:
             # 1. PARSING
             df, time_step, meta_tech = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible ou vide"}
             
-            # 2. RÉCONCILIATION DE DONNÉES
-            # On fusionne ce qu'on a trouvé dans le fichier (meta_tech) 
-            # avec ce qu'on sait du site (known_site_data)
-            
+            # 2. CONTEXTE
             context = {
                 "pdl": known_site_data.get('pdl') if known_site_data else meta_tech.get('pdl'),
                 "p_souscrite": float(known_site_data.get('power', 0)) if known_site_data else 0,
                 "segment": known_site_data.get('segment') if known_site_data else "Inconnu",
-                "naf_label": "Inconnu"
+                "naf_label": "Inconnu",
+                "address": known_site_data.get('address', "") if known_site_data else ""
             }
 
-            # Enrichissement NAF (Si pas dans Settings, on cherche dans le nom du fichier)
-            if not known_site_data or not known_site_data.get('naf'):
+            # Enrichissement NAF
+            if not known_site_data or not known_site_data.get('naf_label'):
                 naf_search = re.search(r'\b\d{2}\.?\d{2}[A-Z]?\b', filename)
                 if naf_search:
                     clean = naf_search.group(0).replace('.', '').replace(' ', '').upper()
@@ -81,17 +78,18 @@ class CortexEngine:
             else:
                 context['naf_label'] = known_site_data.get('naf_label', 'Inconnu')
 
-            # 3. CALCULS PHYSIQUES
+            # Extraction CP pour Météo
+            cp_match = re.search(r'\b\d{5}\b', context['address'])
+            zip_code = cp_match.group(0) if cp_match else "Inconnu"
+
+            # 3. CALCULS
             base = self._module_socle(df, time_step)
-            
-            # Référence pour l'abonnement : P.Souscrite (si connue) sinon P.Max atteinte
             ref_pmax = context['p_souscrite'] if context['p_souscrite'] > 0 else base['p_max']
-            
             finance = self._module_finance_4p(df, time_step, ref_pmax)
             solar = self._module_solar(df)
             waste = self._module_ghost(df, base['talon'])
             
-            # 4. CHART OPTIMISÉ
+            # 4. CHART
             step = max(1, len(df)//2000)
             df_chart = df.iloc[::step].copy()
             chart_vals = df_chart['val'].fillna(0).tolist()
@@ -101,7 +99,6 @@ class CortexEngine:
                 "values": chart_vals,
                 "talon_line": [base['talon']] * len(df_chart),
                 "pmax_line": [base['p_max']] * len(df_chart),
-                # Ligne de seuil contrat (si dispo)
                 "limit_line": [context['p_souscrite']] * len(df_chart) if context['p_souscrite'] > 0 else []
             }
 
@@ -111,7 +108,9 @@ class CortexEngine:
                     "type": target_profile, 
                     "pdl": context['pdl'],
                     "contrat_actif": "OUI" if known_site_data else "NON (Découverte)",
-                    "metier": context['naf_label']
+                    "metier": context['naf_label'],
+                    "geo": zip_code,
+                    "segment": context['segment']
                 },
                 "meta": {"filename": filename, "points": len(df)}
             }
@@ -120,15 +119,13 @@ class CortexEngine:
             return {"success": True, "kpi": full_kpi, "chart": chart, "ai_insight": narrative}
 
         except Exception as e:
-            logger.exception("Crash Cortex V34")
+            logger.exception("Crash Cortex V35")
             return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
 
     def _parse_data(self, content, filename):
         try:
             buffer = io.BytesIO(content)
-            # Lecture brute pour extraction Regex (PDL/PCE)
             content_str = content.decode('latin-1', errors='ignore')
-            
             pdl_match = re.search(r'\b(\d{14})\b', content_str)
             pdl = pdl_match.group(1) if pdl_match else None
             
@@ -138,7 +135,6 @@ class CortexEngine:
                 df = pd.read_csv(buffer, sep=None, engine='python', encoding='latin-1')
 
             df.columns = [str(c).lower().strip().replace('é','e').replace('è','e') for c in df.columns]
-            
             c_date = next((c for c in df.columns if 'horodate' in c or 'date' in c), None)
             c_val = next((c for c in df.columns if 'valeur' in c or 'puiss' in c or 'conso' in c), None)
             c_unit = next((c for c in df.columns if 'unit' in c), None)
@@ -166,9 +162,7 @@ class CortexEngine:
                 if delta > 0: time_step = delta / 3600.0
 
             df['date_str'] = df['date'].dt.strftime('%Y-%m-%d %H:%M')
-            
             return df[['date', 'val', 'date_str']], time_step, {"pdl": pdl}
-
         except: return None, 0, {}
 
     def _module_socle(self, df, ts):
@@ -234,10 +228,10 @@ class CortexEngine:
     def _generate_insight(self, kpi, context):
         if not AI_AVAILABLE: return "IA Offline."
         try:
-            # Prompt Contextuel Réconcilié
             prompt = f"""
             Analyse pour {kpi['profiling']['metier']}.
             PDL: {kpi['profiling']['pdl']}.
+            Ville (CP): {kpi['profiling']['geo']}.
             Contrat: {kpi['profiling']['contrat_actif']}.
             Puissance Souscrite: {context['p_souscrite']} kVA vs Atteinte: {kpi['p_max']} kVA.
             Thermo-Score: {kpi['thermo_score']}.
