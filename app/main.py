@@ -19,37 +19,46 @@ templates = Jinja2Templates(directory="app/templates")
 @app.get("/health")
 async def health_check(): return {"status": "ONLINE", "cortex": cortex.version, "storage": storage.version}
 
-# --- API OPS (ADMIN & ANALYSE - RECONCILIATION ACTIVE) ---
+# --- API OPS (ADMIN & ANALYSE - SMART SCAN V19.2) ---
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), site_name: str = Form("Site_1"), x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     try:
-        # 1. LECTURE DU FICHIER
         content = await file.read()
         
-        # 2. PRE-SCAN PDL (POUR RECONCILIATION)
-        # On cherche un motif de 14 chiffres dans le contenu brut
-        try:
-            content_str = content.decode('latin-1', errors='ignore')[:1000] # On lit juste le début pour aller vite
-            pdl_match = re.search(r'\b(\d{14})\b', content_str)
-            detected_pdl = pdl_match.group(1) if pdl_match else None
-        except:
-            detected_pdl = None
+        # 1. SCAN DU PDL (AMÉLIORÉ : NOM DE FICHIER D'ABORD)
+        detected_pdl = None
+        
+        # A. On cherche D'ABORD dans le nom du fichier (Ex: ..._30000930316907.csv)
+        # C'est la ligne critique qui manquait
+        filename_match = re.search(r'(\d{14})', file.filename)
+        if filename_match:
+            detected_pdl = filename_match.group(1)
+            print(f"[SCAN] PDL trouvé dans le nom de fichier : {detected_pdl}")
+        
+        # B. Sinon, on cherche dans le contenu (Entête)
+        if not detected_pdl:
+            try:
+                content_str = content.decode('latin-1', errors='ignore')[:1000]
+                content_match = re.search(r'\b(\d{14})\b', content_str)
+                if content_match: detected_pdl = content_match.group(1)
+            except: pass
 
-        # 3. INTERROGATION DU STORAGE
+        # 2. RECONCILIATION
         site_data = None
         if detected_pdl:
-            # On demande à la mémoire si on connait ce PDL
             site_data = storage.find_site_by_pdl(detected_pdl)
             if site_data:
-                print(f"[RECONCILIATION] Site trouvé : {site_data.get('client_name')} ({detected_pdl})")
+                print(f"[RECONCILIATION] SUCCÈS : {site_data.get('client_name')} lié au PDL {detected_pdl}")
+            else:
+                print(f"[RECONCILIATION] ÉCHEC : Le PDL {detected_pdl} est inconnu dans Settings.")
 
-        # 4. APPEL CORTEX AVEC DONNÉES ENRICHIES
+        # 3. APPEL CORTEX
         res = cortex.analyze_file(content, file.filename, target_profile=target, known_site_data=site_data)
         
         if res.get("success"): 
             res["secure_link"] = f"/dashboard/{target}?site={site_name}"
-            # Si réconcilié, on ajoute un flag
+            # Flag pour le frontend
             if site_data: res["reconciled"] = True
             
         return JSONResponse(res)
@@ -94,7 +103,6 @@ async def api_save_client(request: Request):
     try:
         data = await request.json()
         # On utilise le SIRET/RNC comme ID
-        # Note : Le JS envoie {identity: {id: ...}}
         client_id = data.get("identity", {}).get("id") or "draft_client"
         res = storage.save_client_settings(client_id, data)
         return JSONResponse(res)
