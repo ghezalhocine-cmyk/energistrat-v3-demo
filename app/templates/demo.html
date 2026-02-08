@@ -36,13 +36,10 @@
             </div>
         </div>
         <div class="flex items-center gap-6">
-            <!-- STATUS RECONCILIATION -->
             <div id="sync-status" class="hidden flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                 <span class="text-[10px] text-green-400 font-mono">DATA LIVE</span>
             </div>
-            
-            <!-- CORRECTION ICI : LIEN ACTIF VERS SETTINGS -->
             <a href="/settings" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center cursor-pointer hover:bg-white/20 transition text-white" title="Paramètres">
                 <i class="fa-solid fa-user text-xs"></i>
             </a>
@@ -56,7 +53,7 @@
         <div class="col-span-3 bento-card p-6 border-l-4 border-cyan-500 flex flex-col justify-between">
             <div>
                 <h3 class="text-gray-400 text-[10px] font-bold uppercase mb-2">Site & Contrat</h3>
-                <div class="text-xl font-bold text-white mb-1" id="site-name">--</div>
+                <div class="text-xl font-bold text-white mb-1 truncate" id="site-name">--</div>
                 <div class="text-xs text-cyan-400 font-mono mb-4" id="site-pdl">PDL: --</div>
             </div>
             
@@ -71,7 +68,7 @@
                 </div>
                 <div class="flex justify-between items-center bg-white/5 p-2 rounded">
                     <span class="text-[10px] text-gray-400">MÉTIER</span>
-                    <span class="text-xs font-bold text-white" id="site-naf">--</span>
+                    <span class="text-xs font-bold text-white truncate max-w-[120px]" id="site-naf">--</span>
                 </div>
             </div>
             
@@ -154,7 +151,7 @@
             });
         }
 
-        // --- 2. FONCTION D'INJECTION ---
+        // --- 2. FONCTION D'INJECTION (CORRECTIF V2.3) ---
         function updateDashboard(data) {
             if(!data || !data.success) return;
 
@@ -162,15 +159,33 @@
 
             // A. Identité & Contrat
             const profil = data.kpi.profiling || {};
+            const meta = data.kpi.meta || {};
             
+            // PDL
             if(profil.pdl) document.getElementById('site-pdl').innerText = "PDL: " + profil.pdl;
-            if(profil.metier) document.getElementById('site-naf').innerText = profil.metier;
+            
+            // MÉTIER (NAF) - Priorité au label
+            if(profil.metier && profil.metier !== "Inconnu") {
+                document.getElementById('site-naf').innerText = profil.metier;
+            } else if (profil.naf_label) {
+                document.getElementById('site-naf').innerText = profil.naf_label;
+            }
 
+            // SEGMENT (CORRECTIF : Câblage ajouté)
+            if(profil.segment) {
+                document.getElementById('site-segment').innerText = profil.segment;
+            }
+
+            // STATUT CONTRAT
             const contractBadge = document.getElementById('badge-contract');
             if(profil.contrat_actif && profil.contrat_actif.includes("OUI")) {
                 contractBadge.className = "badge-sync";
                 contractBadge.innerText = "CONTRAT SYNCHRONISÉ";
                 document.getElementById('sync-status').classList.remove('hidden');
+                
+                // Si on a un nom de client réconcilié, on l'affiche
+                // Note: Le backend V34 ne renvoie pas encore explicitement le "client_name" dans le top level
+                // Mais on peut le déduire si besoin. Pour l'instant on garde le nom du fichier ou un défaut.
             } else {
                 contractBadge.className = "badge-warn";
                 contractBadge.innerText = "MODE DÉCOUVERTE";
@@ -178,7 +193,12 @@
 
             // B. Données Techniques
             if(data.kpi.p_max) document.getElementById('kpi-pmax').innerText = Math.round(data.kpi.p_max) + " kW";
-            if(data.kpi.thermo_score) document.getElementById('kpi-thermo').innerText = data.kpi.thermo_score;
+            
+            // THERMO (CORRECTIF : Gestion du 0)
+            if(data.kpi.thermo_score !== undefined && data.kpi.thermo_score !== null) {
+                document.getElementById('kpi-thermo').innerText = data.kpi.thermo_score;
+            }
+
             if(data.kpi.finance) document.getElementById('kpi-budget').innerText = Math.round(data.kpi.finance.budget_total).toLocaleString() + " €";
 
             // C. Graphique
