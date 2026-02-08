@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V22.10 | Settings ERP Master</title>
+    <title>ENERGISTRAT V22.11 | Settings ERP Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -113,7 +113,7 @@
     <!-- CONTENT -->
     <main class="flex-1 overflow-y-auto p-10 relative bg-abysse">
         
-        <!-- TAB 1: CLIENTS & PARC (V22.10 - AVEC NOM DU SITE & 4 POSTES) -->
+        <!-- TAB 1: CLIENTS & PARC (V22.11 - COMPLET) -->
         <div id="tab-clients" class="tab-content max-w-6xl mx-auto space-y-6">
             <header class="flex justify-between items-end">
                 <div><h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2><p class="text-gray-400 text-xs">Gestion Multi-Sites, Gaz/Élec et Lots.</p></div>
@@ -123,7 +123,7 @@
                 </div>
             </header>
 
-            <!-- 1. IDENTITÉ (MODIFIÉ V22.10) -->
+            <!-- 1. IDENTITÉ (AVEC NOM DU SITE) -->
             <div class="bento-card rounded-bento p-6 border-l-4 border-cyan">
                 <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span class="w-6 h-6 rounded bg-cyan/20 text-cyan flex items-center justify-center text-[10px]">1</span> ENTITÉ JURIDIQUE</h3>
                 <div class="flex gap-4 mb-4">
@@ -140,7 +140,7 @@
                     <!-- RAISON SOCIALE (3 cols) -->
                     <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Raison Sociale</label><input type="text" id="company-name" placeholder="Juridique..." class="w-full input-dark p-2 rounded text-xs bg-white/5"></div>
                     
-                    <!-- NOUVEAU CHAMP : NOM DU SITE (3 cols) -->
+                    <!-- NOM DU SITE (3 cols) -->
                     <div class="col-span-3"><label class="text-[10px] text-cyan font-bold uppercase">NOM DU SITE (Dashboard)</label><input type="text" id="site-name-input" placeholder="Ex: École Jules Ferry..." class="w-full input-dark p-2 rounded text-xs border border-cyan/30 text-white font-bold"></div>
                     
                     <!-- GROUPE (2 cols) -->
@@ -316,21 +316,33 @@
         </div>
     </div>
 
-    <!-- IMPORT MODAL -->
+    <!-- IMPORT MODAL (V22.11 - AVEC DOWNLOAD TEMPLATE) -->
     <div id="import-modal" class="fixed inset-0 bg-black/90 z-[99] hidden flex items-center justify-center backdrop-blur-sm">
         <div class="bento-card p-8 rounded-bento w-[600px] relative">
             <button onclick="toggleImportModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
-            <h3 class="text-xl font-bold text-white mb-2"><i class="fa-solid fa-table-columns text-cyan mr-2"></i>Import de Parc (V4)</h3>
-            <p class="text-xs text-gray-400 mb-6">Supporte Prix Détaillés.</p>
-            <div class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-cyan hover:bg-cyan/5 transition cursor-pointer mb-4">
-                <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 mb-2"></i>
-                <div class="text-sm font-bold text-white">Glisser fichier CSV</div>
+            
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h3 class="text-xl font-bold text-white"><i class="fa-solid fa-table-columns text-cyan mr-2"></i>Import de Parc (V5)</h3>
+                    <p class="text-xs text-gray-400">Supporte Prix 4 Postes & Noms de Sites.</p>
+                </div>
+                <!-- BOUTON DOWNLOAD TEMPLATE -->
+                <a href="/api/settings/template_csv" class="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded text-xs font-bold transition flex items-center gap-2">
+                    <i class="fa-solid fa-download"></i> Modèle .CSV
+                </a>
             </div>
-            <button class="w-full bg-cyan text-black font-bold py-3 rounded-lg mt-6" onclick="saveSite()">LANCER</button>
+
+            <div class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-cyan hover:bg-cyan/5 transition cursor-pointer mb-4 group">
+                <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 group-hover:text-cyan mb-2 transition"></i>
+                <div class="text-sm font-bold text-white">Glisser fichier CSV (Séparateur ;)</div>
+                <input type="file" id="csv-upload" class="hidden" accept=".csv">
+            </div>
+            
+            <button class="w-full bg-cyan text-black font-bold py-3 rounded-lg mt-6 hover:bg-cyan/90 transition shadow-lg shadow-cyan/20" onclick="saveSite()">LANCER</button>
         </div>
     </div>
 
-    <!-- SCRIPT CORRIGÉ V22.10 (NOM DU SITE + 4 POSTES) -->
+    <!-- SCRIPT CORRIGÉ V22.11 -->
     <script>
         function switchTab(id) {
             document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
@@ -415,10 +427,12 @@
                         const etab = data.results[0];
                         status.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>';
                         document.getElementById('company-name').value = etab.nom_complet;
-                        // Auto-fill site name if empty
+                        
+                        // AUTO-FILL SITE NAME (UX V22.11)
                         if(!document.getElementById('site-name-input').value) {
                              document.getElementById('site-name-input').value = etab.nom_complet;
                         }
+                        
                         if(etab.siege && etab.siege.adresse) document.getElementById('address-input').value = etab.siege.adresse;
                         else if (etab.adresse) document.getElementById('address-input').value = etab.adresse;
                         if(etab.activite_principale) document.getElementById('naf-input').value = etab.activite_principale;
@@ -475,7 +489,7 @@
             } catch(e) {}
         }
 
-        // --- 4. SAUVEGARDE CLIENT (CORRECTIF V22.10) ---
+        // --- 4. SAUVEGARDE CLIENT (CORRECTIF V22.11) ---
         async function saveSite() {
             const btn = document.activeElement;
             const original = btn.innerHTML;
@@ -484,7 +498,7 @@
             const rawId = document.getElementById('id-input').value;
             const cleanId = rawId ? rawId.replace(/\s/g, '') : "draft";
             const companyName = document.getElementById('company-name').value;
-            // PRIORITÉ AU NOM DU SITE, SINON RAISON SOCIALE
+            // PRIORITÉ AU NOM DU SITE
             const siteName = document.getElementById('site-name-input').value || companyName;
 
             const data = {
