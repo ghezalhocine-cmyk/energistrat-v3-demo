@@ -30,7 +30,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "35.0 (Context Aware)"
+        self.version = "35.3 (Mass Import V5)"
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
             "1013B": "Boucherie", "5610A": "Restauration Trad.", "5610C": "Fast Food",
@@ -54,6 +54,7 @@ class CortexEngine:
             return int(float(value))
         except: return 0
 
+    # --- ANALYSE COURBE DE CHARGE (SGE/ENEDIS) ---
     def analyze_file(self, file_content, filename, target_profile="demo", known_site_data=None):
         try:
             # 1. PARSING
@@ -240,7 +241,7 @@ class CortexEngine:
             return AI_MODEL.generate_content(prompt).text.replace('*','')
         except: return "IA Indisponible."
 
-    # AUDIT (Inchangé)
+    # --- AUDIT (Inchangé) ---
     def analyze_invoice_real(self, inv_b, ctr_b):
         txt = ""
         if PDF_AVAILABLE and inv_b:
@@ -260,6 +261,64 @@ class CortexEngine:
             {"point": "Contrat Associé", "a": "Présent" if ctr_b else "Manquant", "b": "-", "status": "OK" if ctr_b else "MANQUANT", "error": not ctr_b}
         ]
         return {"score": 100, "checks": checks}
+
+    # --- NOUVEAU : IMPORT DE MASSE CSV V5 ---
+    def parse_mass_import_v5(self, file_content):
+        """
+        Parse le CSV V5 (Template Officiel) pour création de JSONs clients.
+        Structure attendue : SIRET;RAISON_SOCIALE;NOM_SITE;...
+        """
+        try:
+            buffer = io.BytesIO(file_content)
+            # Tentative UTF-8 puis Latin-1
+            try:
+                df = pd.read_csv(buffer, sep=';', encoding='utf-8', dtype=str)
+            except:
+                buffer.seek(0)
+                df = pd.read_csv(buffer, sep=';', encoding='latin-1', dtype=str)
+            
+            sites = []
+            for _, row in df.iterrows():
+                # Nettoyage critique
+                siret = str(row.get('SIRET', '')).replace(' ', '').strip()
+                pdl = str(row.get('PDL', '')).replace(' ', '').strip()
+                
+                if len(siret) < 9: continue # Ligne vide ou invalide
+
+                # Mapping V22.11
+                site_name = row.get('NOM_SITE', row.get('RAISON_SOCIALE', '')).strip()
+                if not site_name: site_name = "Site Inconnu"
+
+                site = {
+                    "client_name": site_name, # Dashboard Title
+                    "identity": {
+                        "id": siret, # ID = SIRET
+                        "siret": siret,
+                        "name": row.get('RAISON_SOCIALE', '').strip(),
+                        "site_name": site_name,
+                        "lot_name": row.get('LOT', '').strip()
+                    },
+                    "location": { "address": row.get('ADRESSE', '').strip() },
+                    "contract": {
+                        "pdl": pdl,
+                        "power": self._safe_int(row.get('PUISSANCE', 0)),
+                        "segment": row.get('SEGMENT', '--').strip(),
+                        "provider": "Import CSV"
+                    },
+                    "pricing": {
+                        "fix": str(row.get('ABO_AN', '0')).replace(',', '.').strip(),
+                        "hph": str(row.get('PRIX_HPH', '0')).replace(',', '.').strip(),
+                        "hch": str(row.get('PRIX_HCH', '0')).replace(',', '.').strip(),
+                        "hpe": str(row.get('PRIX_HPE', '0')).replace(',', '.').strip(),
+                        "hce": str(row.get('PRIX_HCE', '0')).replace(',', '.').strip(),
+                        "tax": str(row.get('TAXES', '0')).replace(',', '.').strip()
+                    }
+                }
+                sites.append(site)
+            return sites
+        except Exception as e:
+            logger.error(f"Import CSV Error: {e}")
+            return []
 
     def run_chaos_monkey(self): return [{"test": "Maths", "status": "OK"}]
     def ask_agent(self, msg): return self._generate_insight({}, {"p_souscrite": 0})
