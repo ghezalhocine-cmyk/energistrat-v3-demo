@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V21.10 | Settings Data Fix</title>
+    <title>ENERGISTRAT V22.5 | Settings Ultimate</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -113,7 +113,7 @@
     <!-- CONTENT -->
     <main class="flex-1 overflow-y-auto p-10 relative bg-abysse">
         
-        <!-- TAB 1: CLIENTS & PARC -->
+        <!-- TAB 1: CLIENTS & PARC (EVOLUÉ AVEC PRIX) -->
         <div id="tab-clients" class="tab-content max-w-6xl mx-auto space-y-6">
             <header class="flex justify-between items-end">
                 <div><h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2><p class="text-gray-400 text-xs">Gestion Multi-Sites, Gaz/Élec et Lots.</p></div>
@@ -134,22 +134,10 @@
                     <div class="col-span-3">
                         <label id="lbl-id" class="text-[10px] text-gray-500 font-bold uppercase">SIRET *</label>
                         <div class="relative"><input type="text" id="id-input" placeholder="123..." class="w-full input-dark p-2 rounded text-xs font-mono" onblur="checkIdentity()"><div id="id-status" class="absolute right-2 top-2 text-[10px]"></div></div>
+                        <input type="hidden" id="naf-input">
                     </div>
-                    <div class="col-span-4">
-                        <label class="text-[10px] text-gray-500 font-bold uppercase">Raison Sociale</label>
-                        <input type="text" id="company-name" placeholder="Auto..." class="w-full input-dark p-2 rounded text-xs bg-white/5">
-                    </div>
-                    
-                    <!-- FIX: CHAMP NAF VISIBLE -->
-                    <div class="col-span-2">
-                        <label class="text-[10px] text-gray-500 font-bold uppercase">Code NAF</label>
-                        <input type="text" id="naf-input" placeholder="--" readonly class="w-full input-dark p-2 rounded text-xs font-mono bg-white/5 text-cyan">
-                    </div>
-
-                    <div class="col-span-3">
-                        <label class="text-[10px] text-gray-500 font-bold uppercase">Groupe / Réseau</label>
-                        <select class="w-full input-dark p-2 rounded text-xs"><option value="none">Aucun</option><option value="sde">Syndicat Énergie</option><option value="retail">Réseau Retail</option></select>
-                    </div>
+                    <div class="col-span-5"><label class="text-[10px] text-gray-500 font-bold uppercase">Raison Sociale</label><input type="text" id="company-name" placeholder="Auto..." class="w-full input-dark p-2 rounded text-xs bg-white/5"></div>
+                    <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Groupe / Réseau</label><select class="w-full input-dark p-2 rounded text-xs"><option value="none">Aucun</option><option value="sde">Syndicat Énergie</option><option value="retail">Réseau Retail</option></select></div>
                 </div>
             </div>
 
@@ -168,7 +156,7 @@
                 </div>
             </div>
 
-            <!-- 3. ÉNERGIE (MULTI-FLUIDES) -->
+            <!-- 3. ÉNERGIE & PRIX (NOUVEAU BLOC) -->
             <div class="bento-card rounded-bento p-6 border-l-4 border-yellow-500 transition-colors" id="card-energy">
                 <h3 class="text-sm font-bold text-white mb-4 flex items-center justify-between">
                     <div class="flex items-center gap-2"><span class="w-6 h-6 rounded bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-[10px]">3</span> CONTRAT & FLUIDE</div>
@@ -177,45 +165,38 @@
                         <button onclick="setEnergy('gaz')" id="btn-gaz" class="px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition">GAZ</button>
                     </div>
                 </h3>
-                <div class="grid grid-cols-12 gap-4">
+                
+                <!-- LIGNE 1 : TECHNIQUE -->
+                <div class="grid grid-cols-12 gap-4 mb-4">
                     <div class="col-span-3"><label id="lbl-ref" class="text-[10px] text-gray-500 font-bold uppercase">PDL / PRM (14)</label><input type="text" id="ref-input" placeholder="000..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
-                    <div class="col-span-2"><label id="lbl-puiss" class="text-[10px] text-gray-500 font-bold uppercase">Puissance (kVA)</label><input type="number" id="val-input" placeholder="Ex: 36" class="w-full input-dark p-2 rounded text-xs font-mono text-yellow-500 font-bold" oninput="inferContract()"></div>
-                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Segment / Tarif</label><input type="text" id="segment-display" readonly class="w-full input-dark p-2 rounded text-xs font-bold text-gray-400 bg-white/5" value="--"></div>
+                    <div class="col-span-2"><label id="lbl-puiss" class="text-[10px] text-gray-500 font-bold uppercase">Puissance</label><input type="number" id="val-input" placeholder="kVA" class="w-full input-dark p-2 rounded text-xs font-mono text-yellow-500 font-bold" oninput="inferContract()"></div>
+                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Segment</label><input type="text" id="segment-display" readonly class="w-full input-dark p-2 rounded text-xs font-bold text-gray-400 bg-white/5" value="--"></div>
                     <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Fournisseur</label><select class="w-full input-dark p-2 rounded text-xs"><option>EDF</option><option>Engie</option><option>TotalEnergies</option><option>Eni</option><option>Vattenfall</option></select></div>
                     <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Fin Contrat</label><input type="date" class="w-full input-dark p-2 rounded text-xs text-gray-400"></div>
                 </div>
+
+                <!-- LIGNE 2 : STRUCTURE TARIFAIRE (NOUVEAU) -->
+                <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                    <div class="text-[10px] font-bold text-gray-400 uppercase mb-3 flex justify-between">
+                        <span>Structure Tarifaire (€ HT)</span>
+                        <span class="text-cyan cursor-pointer hover:underline" onclick="showToast('Tarif dupliqué')"><i class="fa-solid fa-copy mr-1"></i>Dupliquer</span>
+                    </div>
+                    <div class="grid grid-cols-5 gap-4">
+                        <div><label class="text-[9px] text-gray-500 uppercase">Abonnement /an</label><input type="number" id="price-fix" placeholder="0.00" class="w-full input-dark p-2 rounded text-xs text-right text-yellow-500"></div>
+                        <div><label class="text-[9px] text-gray-500 uppercase">Prix P (HPH)</label><input type="number" id="price-p" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right"></div>
+                        <div><label class="text-[9px] text-gray-500 uppercase">Prix HP (HCH)</label><input type="number" id="price-hp" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right"></div>
+                        <div><label class="text-[9px] text-gray-500 uppercase">Prix HC (HCE)</label><input type="number" id="price-hc" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right"></div>
+                        <div><label id="lbl-tax" class="text-[9px] text-gray-500 uppercase">CSPE / TICGN</label><input type="number" id="price-tax" placeholder="22.5" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- NEW: TAB SUPPORT (TICKETING RÉEL) -->
-        <div id="tab-support" class="tab-content max-w-5xl mx-auto space-y-6 hidden">
-            <header class="flex justify-between items-end">
-                <div><h2 class="text-2xl font-bold text-white mb-1">Centre d'Assistance</h2><p class="text-gray-400 text-xs">Un problème ? Ouvrez un ticket directement vers nos équipes Ops.</p></div>
-                <button onclick="openTicketModal()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20"><i class="fa-solid fa-plus mr-2"></i>Nouveau Ticket</button>
-            </header>
-
-            <div class="bento-card rounded-bento p-0 overflow-hidden">
-                <table class="w-full ticket-table">
-                    <thead class="bg-white/5"><tr><th>ID</th><th>Sujet</th><th>Date</th><th>Statut</th></tr></thead>
-                    <tbody id="ticket-list" class="divide-y divide-white/5">
-                        <!-- REMPLI PAR JS -->
-                    </tbody>
-                </table>
-                <div id="loading-tickets" class="p-4 text-center text-gray-500 text-xs hidden">Chargement...</div>
-            </div>
-        </div>
-
-        <!-- TAB 2: GENERAL (RESTAURÉ) -->
-        <div id="tab-general" class="tab-content max-w-3xl mx-auto space-y-8 hidden">
-            <header><h2 class="text-2xl font-bold text-white mb-1">Mon Profil</h2></header>
-            <div class="bento-card rounded-bento p-8 flex items-center gap-6">
-                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-cyan to-blue-600 p-[2px]">
-                    <img src="https://ui-avatars.com/api/?name=Admin+V3&background=050505&color=fff" class="w-full h-full rounded-full object-cover">
-                </div>
-                <div>
-                    <button class="bg-white text-abysse px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan transition">Changer l'avatar</button>
-                    <p class="text-[10px] text-gray-500 mt-2">JPG, PNG ou GIF. Max 2MB.</p>
-                </div>
+        <!-- AUTRES ONGLETS (COMPLETS) -->
+        <div id="tab-general" class="tab-content hidden">
+            <div class="bento-card rounded-bento p-8 flex items-center gap-6 mb-6">
+                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-cyan to-blue-600 p-[2px]"><img src="https://ui-avatars.com/api/?name=Admin+V3&background=050505&color=fff" class="w-full h-full rounded-full object-cover"></div>
+                <div><button class="bg-white text-abysse px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan transition">Changer l'avatar</button></div>
             </div>
             <div class="bento-card rounded-bento p-8 space-y-6">
                 <div class="grid grid-cols-2 gap-6">
@@ -227,10 +208,22 @@
             </div>
         </div>
 
-        <!-- TAB 3: SECURITY (RESTAURÉ) -->
-        <div id="tab-security" class="tab-content max-w-3xl mx-auto space-y-8 hidden">
-            <header><h2 class="text-2xl font-bold text-white mb-1">Sécurité</h2></header>
-            <div class="bento-card rounded-bento p-8 border-l-4 border-green-500 flex justify-between items-center">
+        <div id="tab-support" class="tab-content hidden">
+            <header class="flex justify-between items-end mb-6">
+                <div><h2 class="text-2xl font-bold text-white mb-1">Centre d'Assistance</h2><p class="text-gray-400 text-xs">Un problème ? Ouvrez un ticket directement vers nos équipes Ops.</p></div>
+                <button onclick="openTicketModal()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20"><i class="fa-solid fa-plus mr-2"></i>Nouveau Ticket</button>
+            </header>
+            <div class="bento-card rounded-bento p-0 overflow-hidden">
+                <table class="w-full ticket-table">
+                    <thead class="bg-white/5"><tr><th>ID</th><th>Sujet</th><th>Date</th><th>Statut</th></tr></thead>
+                    <tbody id="ticket-list" class="divide-y divide-white/5"></tbody>
+                </table>
+                <div id="loading-tickets" class="p-4 text-center text-gray-500 text-xs hidden">Chargement...</div>
+            </div>
+        </div>
+
+        <div id="tab-security" class="tab-content hidden">
+            <div class="bento-card rounded-bento p-8 border-l-4 border-green-500 flex justify-between items-center mb-6">
                 <div><h3 class="font-bold text-white text-lg">Authentification 2FA</h3><p class="text-xs text-gray-400">Actif via Google Authenticator.</p></div>
                 <div class="text-green-500 font-bold text-xl"><i class="fa-solid fa-check-circle"></i></div>
             </div>
@@ -242,9 +235,7 @@
             </div>
         </div>
 
-        <!-- TAB 4: BILLING (RESTAURÉ) -->
-        <div id="tab-billing" class="tab-content max-w-3xl mx-auto space-y-8 hidden">
-            <header><h2 class="text-2xl font-bold text-white mb-1">Abonnement & Facturation</h2></header>
+        <div id="tab-billing" class="tab-content hidden">
             <div class="bento-card rounded-bento p-8 flex justify-between items-center bg-gradient-to-r from-card to-purple-900/20 mb-6">
                 <div><h3 class="font-bold text-white mb-1">Plan Entreprise (Annuel)</h3><p class="text-xs text-gray-400">Renouvellement le 01/01/2027</p></div>
                 <span class="bg-purple-500/20 text-purple-400 px-3 py-1 rounded-full text-xs font-bold border border-purple-500/30">ACTIF</span>
@@ -259,9 +250,7 @@
             </div>
         </div>
 
-        <!-- TAB 5: API (RESTAURÉ) -->
-        <div id="tab-api" class="tab-content max-w-3xl mx-auto space-y-8 hidden">
-            <header><h2 class="text-2xl font-bold text-white mb-1">Clés API</h2></header>
+        <div id="tab-api" class="tab-content hidden">
             <div class="bento-card rounded-bento p-8 bg-gradient-to-br from-card to-purple-900/20 border-purple-500/30">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="font-bold text-white">Clé Production</h3>
@@ -277,7 +266,7 @@
 
     </main>
 
-    <!-- MODAL TICKET -->
+    <!-- MODALS -->
     <div id="ticket-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
         <div class="bento-card p-6 w-96 rounded-xl border border-white/10">
             <h3 class="font-bold text-lg mb-4">Nouveau Ticket</h3>
@@ -290,7 +279,6 @@
         </div>
     </div>
 
-    <!-- IMPORT MODAL -->
     <div id="import-modal" class="fixed inset-0 bg-black/90 z-[99] hidden flex items-center justify-center backdrop-blur-sm">
         <div class="bento-card p-8 rounded-bento w-[600px] relative">
             <button onclick="toggleImportModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
@@ -310,82 +298,41 @@
             document.getElementById('tab-' + id).classList.remove('hidden');
             document.querySelectorAll('.nav-item').forEach(e => { e.classList.remove('active', 'text-white'); e.classList.add('text-gray-400'); });
             document.getElementById('nav-' + id).classList.add('active', 'text-white');
-            
             if(id === 'support') loadTickets();
         }
         function toggleImportModal() { document.getElementById('import-modal').classList.toggle('hidden'); }
+        function openTicketModal() { document.getElementById('ticket-modal').classList.remove('hidden'); }
 
         // --- TICKETING REAL ---
-        function openTicketModal() {
-            document.getElementById('ticket-modal').classList.remove('hidden');
-        }
-
         async function submitTicket() {
             const subject = document.getElementById('tk-subject').value;
             const msg = document.getElementById('tk-msg').value;
             if(!subject) return alert("Sujet requis");
-
             const btn = document.querySelector('#ticket-modal button:last-child');
-            const original = btn.innerText;
             btn.innerText = "...";
-
             try {
-                const res = await fetch('/api/support/ticket', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ subject: subject, message: msg, user: "Admin" })
-                });
-                const data = await res.json();
-                
-                if(data.success) {
-                    document.getElementById('ticket-modal').classList.add('hidden');
-                    document.getElementById('tk-subject').value = '';
-                    document.getElementById('tk-msg').value = '';
-                    showToast("Ticket créé : " + data.ticket.id);
-                    loadTickets();
-                }
+                const res = await fetch('/api/support/ticket', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ subject: subject, message: msg, user: "Admin" }) });
+                if((await res.json()).success) { document.getElementById('ticket-modal').classList.add('hidden'); showToast("Ticket créé !"); loadTickets(); }
             } catch(e) { alert("Erreur réseau"); }
-            btn.innerText = original;
+            btn.innerText = "Envoyer";
         }
-
         async function loadTickets() {
-            const list = document.getElementById('ticket-list');
-            list.innerHTML = '';
-            document.getElementById('loading-tickets').style.display = 'block';
-
+            const list = document.getElementById('ticket-list'); list.innerHTML = ''; document.getElementById('loading-tickets').style.display = 'block';
             try {
-                const res = await fetch('/api/support/tickets');
-                const data = await res.json();
-                document.getElementById('loading-tickets').style.display = 'none';
-
-                if(data.tickets && data.tickets.length > 0) {
-                    data.tickets.forEach(t => {
-                        const statusColor = t.status === 'OPEN' ? 'text-green-400' : 'text-gray-500';
-                        list.innerHTML += `
-                        <tr class="ticket-row hover:bg-white/5">
-                            <td class="font-mono text-gray-400">${t.id}</td>
-                            <td class="font-bold text-white">${t.subject}</td>
-                            <td class="text-gray-400">${t.created_at}</td>
-                            <td class="font-bold ${statusColor}">${t.status}</td>
-                        </tr>`;
-                    });
-                } else {
-                    list.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">Aucun ticket.</td></tr>';
-                }
-            } catch(e) { document.getElementById('loading-tickets').innerText = "Erreur chargement"; }
+                const res = await fetch('/api/support/tickets'); const data = await res.json(); document.getElementById('loading-tickets').style.display = 'none';
+                if(data.tickets) data.tickets.forEach(t => { list.innerHTML += `<tr class="ticket-row hover:bg-white/5"><td class="font-mono text-gray-400">${t.id}</td><td class="font-bold text-white">${t.subject}</td><td class="text-gray-400">${t.created_at}</td><td class="font-bold ${t.status==='OPEN'?'text-green-400':'text-gray-500'}">${t.status}</td></tr>`; });
+            } catch(e) {}
         }
 
-        // --- IDENTITY & ADDRESS (API GOUV ACTIVE) ---
+        // --- IDENTITY & ADDRESS ---
         function updateFormType() {
             const type = document.querySelector('input[name="entity_type"]:checked').value;
             if(type === 'company') { document.getElementById('lbl-id').innerText = "SIRET"; document.getElementById('id-input').placeholder = "123..."; } 
             else { document.getElementById('lbl-id').innerText = "RNC"; document.getElementById('id-input').placeholder = "AA123..."; }
         }
-
         async function checkIdentity() {
             const val = document.getElementById('id-input').value.replace(/\s/g, '');
             const status = document.getElementById('id-status');
-            
             if(val.length >= 9) {
                 status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i>';
                 try {
@@ -395,24 +342,13 @@
                         const etab = data.results[0];
                         status.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>';
                         document.getElementById('company-name').value = etab.nom_complet;
-                        
-                        // FIX: RECUPERATION ADRESSE
-                        if(etab.siege && etab.siege.adresse) {
-                            document.getElementById('address-input').value = etab.siege.adresse;
-                        } else if (etab.adresse) {
-                            document.getElementById('address-input').value = etab.adresse;
-                        }
-
-                        // FIX: CAPTURE DU NAF DANS LE CHAMP CACHÉ
-                        if(etab.activite_principale) {
-                            document.getElementById('naf-input').value = etab.activite_principale;
-                        }
-                    } else { status.innerHTML = '<i class="fa-solid fa-xmark text-red-500"></i>'; }
+                        if(etab.siege && etab.siege.adresse) document.getElementById('address-input').value = etab.siege.adresse;
+                        else if (etab.adresse) document.getElementById('address-input').value = etab.adresse;
+                        if(etab.activite_principale) document.getElementById('naf-input').value = etab.activite_principale;
+                    } else status.innerHTML = '<i class="fa-solid fa-xmark text-red-500"></i>';
                 } catch(e) { status.innerHTML = '?'; }
             }
         }
-        
-        // --- ADDRESS AUTOCOMPLETE (BAN) ---
         let timeout = null;
         async function searchAddress() {
             const query = document.getElementById('address-input').value;
@@ -424,7 +360,7 @@
                     const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`);
                     const data = await res.json();
                     list.innerHTML = '';
-                    if(data.features && data.features.length > 0) {
+                    if(data.features) {
                         list.classList.remove('hidden');
                         data.features.forEach(item => {
                             const div = document.createElement('div');
@@ -439,7 +375,7 @@
         }
         document.addEventListener('click', function(e) { if (!document.getElementById('address-input').contains(e.target)) document.getElementById('address-suggestions').classList.add('hidden'); });
 
-        // --- SAVE CLIENT ---
+        // --- SAVE CLIENT (AVEC PRIX) ---
         async function saveSite() {
             const btn = document.activeElement;
             const original = btn.innerHTML;
@@ -450,15 +386,20 @@
                     id: document.getElementById('id-input').value || "draft",
                     siret: document.getElementById('id-input').value,
                     name: document.getElementById('company-name').value,
-                    naf: document.getElementById('naf-input').value // ENVOI DU NAF
+                    naf: document.getElementById('naf-input').value
                 },
-                location: {
-                    address: document.getElementById('address-input').value
-                },
+                location: { address: document.getElementById('address-input').value },
                 contract: {
                     pdl: document.getElementById('ref-input').value,
                     power: document.getElementById('val-input').value,
                     segment: document.getElementById('segment-display').value
+                },
+                pricing: {
+                    fix: document.getElementById('price-fix').value,
+                    hph: document.getElementById('price-p').value,
+                    hch: document.getElementById('price-hp').value,
+                    hce: document.getElementById('price-hc').value,
+                    tax: document.getElementById('price-tax').value
                 }
             };
             
@@ -466,35 +407,31 @@
                 const res = await fetch('/api/settings/save_client', {
                     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
                 });
-                if((await res.json()).success) showToast("Sauvegardé sur le serveur !");
+                if((await res.json()).success) showToast("Sauvegardé avec Prix !");
             } catch(e) { alert("Erreur réseau"); }
-
             btn.innerHTML = original;
         }
 
-        // --- UTILS ---
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`;
-            t.className = "show";
-            setTimeout(() => t.className = "", 3000);
-        }
-
-        // --- ENERGY SWITCHER & SMART INFERENCE ---
+        function showToast(msg) { const t = document.getElementById('toast'); t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`; t.className = "show"; setTimeout(() => t.className = "", 3000); }
+        
         let currentEnergy = 'elec';
         function setEnergy(type) {
             currentEnergy = type;
             const btnElec = document.getElementById('btn-elec'); const btnGaz = document.getElementById('btn-gaz');
             const lblRef = document.getElementById('lbl-ref'); const lblPuiss = document.getElementById('lbl-puiss');
+            const lblTax = document.getElementById('lbl-tax');
             const card = document.getElementById('card-energy');
+
             if(type === 'elec') {
                 btnElec.className = "px-3 py-1 text-[10px] font-bold rounded bg-cyan text-black transition shadow-lg";
                 btnGaz.className = "px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
-                lblRef.innerText = "PDL / PRM (14)"; lblPuiss.innerText = "Puissance (kVA)"; card.style.borderColor = "#00E5FF";
+                lblRef.innerText = "PDL / PRM (14)"; lblPuiss.innerText = "Puissance (kVA)"; lblTax.innerText = "CSPE / TCFE";
+                card.style.borderColor = "#00E5FF";
             } else {
                 btnGaz.className = "px-3 py-1 text-[10px] font-bold rounded bg-gas text-white transition shadow-lg";
                 btnElec.className = "px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
-                lblRef.innerText = "PCE (14)"; lblPuiss.innerText = "CAR (MWh/an)"; card.style.borderColor = "#EF4444";
+                lblRef.innerText = "PCE (14)"; lblPuiss.innerText = "CAR (MWh/an)"; lblTax.innerText = "TICGN / CTA";
+                card.style.borderColor = "#EF4444";
             }
             document.getElementById('val-input').value = ''; document.getElementById('segment-display').value = '--';
         }
