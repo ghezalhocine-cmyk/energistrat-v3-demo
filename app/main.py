@@ -1,6 +1,11 @@
 import os
 import re
-from fastapi import FastAPI, Request, UploadFile, File, Form, Header
+import json
+import glob
+from datetime import datetime
+from typing import Optional, List
+from pydantic import BaseModel
+from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -19,6 +24,24 @@ templates = Jinja2Templates(directory="app/templates")
 @app.get("/health")
 async def health_check(): return {"status": "ONLINE", "cortex": cortex.version, "storage": storage.version}
 
+# --- MODELES DE DONNEES (NOUVEAU : PROPAGATION TARIFAIRE V35.1) ---
+class PropagationFilters(BaseModel):
+    segment: str
+    lot_name: str
+
+class PricingData(BaseModel):
+    fix: Optional[str] = "0.00"
+    hph: Optional[str] = "0.00"
+    hch: Optional[str] = "0.00"
+    hce: Optional[str] = "0.00"
+    tax: Optional[str] = "0.00"
+
+class PropagationRequest(BaseModel):
+    source_client_id: str
+    target_date: str
+    filters: PropagationFilters
+    pricing_data: PricingData
+
 # --- API OPS (ADMIN & ANALYSE - SMART SCAN V19.2) ---
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), site_name: str = Form("Site_1"), x_admin_token: str = Header(None)):
@@ -26,11 +49,10 @@ async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), 
     try:
         content = await file.read()
         
-        # 1. SCAN DU PDL (AMÉLIORÉ : NOM DE FICHIER D'ABORD)
+        # 1. SCAN DU PDL (LOGIQUE EXISTANTE PRÉSERVÉE)
         detected_pdl = None
         
         # A. On cherche D'ABORD dans le nom du fichier (Ex: ..._30000930316907.csv)
-        # C'est la ligne critique qui manquait
         filename_match = re.search(r'(\d{14})', file.filename)
         if filename_match:
             detected_pdl = filename_match.group(1)
@@ -97,16 +119,113 @@ async def get_tickets():
     tickets = storage.list_tickets()
     return JSONResponse({"tickets": tickets})
 
-# --- API SETTINGS ---
+# --- API SETTINGS (ERP MASTER) ---
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
     try:
         data = await request.json()
-        # On utilise le SIRET/RNC comme ID
+        # On utilise le SIRET/RNC comme ID (Logique existante préservée)
         client_id = data.get("identity", {}).get("id") or "draft_client"
         res = storage.save_client_settings(client_id, data)
         return JSONResponse(res)
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
+
+# --- NOUVEAU : ENDPOINT DE PROPAGATION ---
+@app.post("/api/settings/propagate_tariff")
+async def propagate_tariff(payload: PropagationRequest):
+    """
+    Moteur de Propagation Tarifaire Intelligent V35.1.
+    Règle : On ne propage que au sein de la même entité (SIREN) et sur le même profil technique (Segment + Lot).
+    Feature : Historisation automatique des anciens prix.
+    """
+    DATA_DIR = "/app/data"
+    updated_count = 0
+    errors = []
+
+    # 1. CHARGEMENT SOURCE (Pour vérifier le SIREN)
+    source_path = os.path.join(DATA_DIR, f"{payload.source_client_id}.json")
+    if not os.path.exists(source_path):
+        # Fallback : Si l'ID est un SIRET complet, on cherche le fichier correspondant
+        found = glob.glob(os.path.join(DATA_DIR, f"*{payload.source_client_id}*.json"))
+        if found:
+            source_path = found[0]
+        else:
+            raise HTTPException(status_code=404, detail="Site source introuvable")
+
+    try:
+        with open(source_path, 'r') as f:
+            source_data = json.load(f)
+            # Sécurité : On définit le périmètre de propagation (Les 9 premiers chiffres = SIREN)
+            scope_siren = source_data.get('identity', {}).get('siret', '')[:9] 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lecture source: {str(e)}")
+
+    if not scope_siren or len(scope_siren) < 9:
+        raise HTTPException(status_code=400, detail="Impossible de définir le périmètre (SIREN source invalide)")
+
+    # 2. SCAN DU PARC (Smart Scan)
+    all_files = glob.glob(os.path.join(DATA_DIR, "*.json"))
+    
+    for file_path in all_files:
+        try:
+            if file_path == source_path: continue
+
+            with open(file_path, 'r') as f:
+                client = json.load(f)
+
+            # --- FILTRES DE SÉCURITÉ ---
+            
+            # A. Filtre PÉRIMÈTRE (Même Entreprise/Groupe)
+            client_siret = client.get('identity', {}).get('siret', '')
+            if not client_siret.startswith(scope_siren): continue 
+
+            # B. Filtre TECHNIQUE (Même Segment : C5, C4...)
+            client_segment = client.get('contract', {}).get('segment', '--')
+            if client_segment != payload.filters.segment: continue
+
+            # C. Filtre MÉTIER (Même Lot : "Lot 1", "Ecoles"...)
+            # Gestion safe si le champ n'existe pas encore
+            client_lot = client.get('identity', {}).get('lot_name', '')
+            if client_lot != payload.filters.lot_name: continue
+
+            # --- APPLICATION & HISTORISATION ---
+
+            # 1. Historiser
+            if 'tariff_history' not in client: client['tariff_history'] = []
+            
+            current_pricing = client.get('pricing', {})
+            if current_pricing and (current_pricing.get('hph') or current_pricing.get('fix')):
+                history_entry = {
+                    "archived_at": datetime.now().isoformat(),
+                    "end_date": payload.target_date,
+                    "pricing": current_pricing,
+                    "provider": client.get('contract', {}).get('provider', 'Unknown')
+                }
+                client['tariff_history'].append(history_entry)
+
+            # 2. Mettre à jour
+            client['pricing'] = payload.pricing_data.dict()
+            client['last_update'] = datetime.now().isoformat()
+            client['sync_status'] = "PROPAGATED"
+
+            # 3. Sauvegarder
+            with open(file_path, 'w') as f:
+                json.dump(client, f, indent=4)
+            
+            updated_count += 1
+
+        except Exception as e:
+            print(f"[ERROR] Failed to propagate to {file_path}: {e}")
+            errors.append(str(e))
+            continue
+
+    return {
+        "success": True,
+        "source_siren": scope_siren,
+        "scanned": len(all_files),
+        "updated_count": updated_count,
+        "errors": errors
+    }
 
 @app.post("/api/partner/save_config")
 async def api_save_partner(request: Request):
