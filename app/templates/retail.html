@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V11.0 | Retail Market Edition</title>
+    <title>ENERGISTRAT V12.0 | Retail Full Suite</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -20,38 +20,30 @@
     <style>
         body { background-color: #050505; color: #E2E8F0; font-family: 'Inter', sans-serif; }
         .bento-card { background: #0F172A; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1rem; position: relative; overflow: hidden; }
-        
-        /* Table styles */
         tr.site-row:hover td { background-color: rgba(168, 85, 247, 0.1); cursor: pointer; color: white; }
         
-        /* Jauge Optimisation */
+        /* Jauges */
         .gauge-container { background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden; position: relative; }
         .gauge-fill { height: 100%; transition: width 1s ease-out; }
         
-        /* Action Bar Animation */
+        /* Action Bar */
         #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
         #action-bar.visible { transform: translateY(0); }
         
-        /* Coach Animation */
+        /* Animations */
         .coach-bubble { animation: float 6s ease-in-out infinite; }
         @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } }
-
-        /* Market Pulse */
-        .market-pulse { animation: pulse-border 2s infinite; }
-        @keyframes pulse-border { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden">
 
     <!-- SIDEBAR -->
     <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col flex-shrink-0 z-50">
-        <!-- Logo -->
         <div class="h-16 flex items-center px-6 border-b border-white/5">
             <div class="w-8 h-8 rounded bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20">E</div>
             <span class="ml-3 font-bold tracking-wide text-white">RETAIL<span class="text-primary">.OS</span></span>
         </div>
         
-        <!-- Filtres Parc -->
         <div class="p-4 space-y-4">
             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider">Filtres Énergie</div>
             <div class="flex bg-white/5 p-1 rounded-lg">
@@ -66,23 +58,12 @@
             </select>
         </div>
 
-        <!-- Navigation -->
         <nav class="flex-1 px-3 space-y-1 overflow-y-auto">
             <button onclick="showFleetView()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/5 text-white font-medium border-l-2 border-primary hover:bg-white/10 transition">
                 <i class="fa-solid fa-earth-europe w-5 text-center"></i> Vue Parc Global
             </button>
         </nav>
 
-        <!-- Simulateur Rapide -->
-        <div class="p-4 border-t border-white/5 bg-gradient-to-t from-primary/10 to-transparent">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-bold text-primary uppercase"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Simulateur -10%</span>
-            </div>
-            <div class="text-xs text-gray-400 mb-1">Gain immédiat estimé :</div>
-            <div class="text-lg font-bold text-success font-mono" id="sim-gain-sidebar">-- €</div>
-        </div>
-
-        <!-- Footer Admin -->
         <div class="p-4 border-t border-white/5 bg-black/20">
             <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
                 <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs text-white font-bold group-hover:bg-primary transition">AD</div>
@@ -91,7 +72,7 @@
         </div>
     </aside>
 
-    <!-- MAIN CONTENT -->
+    <!-- MAIN -->
     <main class="flex-1 flex flex-col min-w-0 bg-abysse relative">
         
         <!-- HEADER -->
@@ -100,7 +81,6 @@
                 <h1 class="text-xl font-bold text-white" id="main-title">Vision Consolidée</h1>
                 <p class="text-xs text-gray-400" id="main-subtitle">Données Live • Cortex V38 Active</p>
             </div>
-            <!-- KPI HEADER -->
             <div class="flex gap-6 text-right" id="header-kpis">
                 <div>
                     <div class="text-[10px] text-gray-500 uppercase font-bold">Sites Connectés</div>
@@ -113,27 +93,24 @@
             </div>
         </header>
 
-        <!-- CONTENU DYNAMIQUE -->
+        <!-- CONTENT AREA -->
         <div class="flex-1 overflow-y-auto p-8 pb-32" id="content-area">
             
             <!-- VUE 1 : FLEET (TABLEAU + CHARTS) -->
             <div id="view-fleet" class="space-y-6">
-                
                 <!-- ANALYTICS ROW -->
                 <div class="grid grid-cols-3 gap-6 h-64">
-                    <!-- Mix Energétique -->
                     <div class="bento-card p-6 flex flex-col">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Mix Énergétique (Budget)</h3>
                         <div class="flex-1 relative"><canvas id="mixChart"></canvas></div>
                     </div>
-                    <!-- Top Consommateurs -->
                     <div class="bento-card p-6 col-span-2 flex flex-col">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Top 5 Sites (Budget)</h3>
                         <div class="flex-1 relative"><canvas id="topChart"></canvas></div>
                     </div>
                 </div>
 
-                <!-- ROI CARDS -->
+                <!-- ROI CARDS (VIRTUAL METERING) -->
                 <div class="grid grid-cols-4 gap-6">
                     <div class="bento-card p-5 border-l-4 border-warning">
                         <div class="text-gray-400 text-xs font-bold uppercase">Gaspillage (Ghost)</div>
@@ -151,7 +128,7 @@
                         <div class="text-[10px] text-gray-500">MWh Annuels</div>
                     </div>
                     <div class="bento-card p-5 bg-white/5">
-                        <div class="text-gray-400 text-xs font-bold uppercase">Atterrissage</div>
+                        <div class="text-gray-400 text-xs font-bold uppercase">Atterrissage Parc</div>
                         <div class="text-2xl font-bold text-success mt-1" id="landing-trend">OK</div>
                         <div class="text-[10px] text-gray-500">Prévisions fin d'année</div>
                     </div>
@@ -183,7 +160,7 @@
                 </div>
             </div>
 
-            <!-- VUE 2 : DÉTAIL SITE (PEDAGOGIC + MARKET WATCH) -->
+            <!-- VUE 2 : DÉTAIL SITE (FULL OPTION V12) -->
             <div id="view-detail" class="hidden space-y-6">
                 <button onclick="showFleetView()" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4">
                     <i class="fa-solid fa-arrow-left"></i> RETOUR LISTE
@@ -201,9 +178,7 @@
                     </div>
                     <!-- CORTEX COACH -->
                     <div class="flex items-center gap-4 bg-white/5 border border-white/10 px-6 py-4 rounded-2xl coach-bubble max-w-md">
-                        <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary text-2xl flex-shrink-0">
-                            <i class="fa-solid fa-robot"></i>
-                        </div>
+                        <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary text-2xl flex-shrink-0"><i class="fa-solid fa-robot"></i></div>
                         <div>
                             <div class="text-[10px] text-primary font-bold uppercase tracking-wider mb-1">Analyse Cortex</div>
                             <div class="text-sm text-white font-medium leading-tight" id="cortex-msg">--</div>
@@ -214,13 +189,11 @@
                 <!-- GRILLE DÉTAIL -->
                 <div class="grid grid-cols-3 gap-6">
                     
-                    <!-- OPTIMISATION PUISSANCE -->
+                    <!-- 1. OPTIMISATION PUISSANCE -->
                     <div class="bento-card col-span-2 p-8 flex flex-col justify-center">
                         <div class="flex justify-between items-end mb-6">
                             <div>
-                                <h3 class="text-white font-bold text-lg flex items-center gap-2">
-                                    <i class="fa-solid fa-gauge-high text-primary"></i> Optimisation Contrat
-                                </h3>
+                                <h3 class="text-white font-bold text-lg flex items-center gap-2"><i class="fa-solid fa-gauge-high text-primary"></i> Optimisation Contrat</h3>
                                 <p class="text-xs text-gray-400 mt-1">Analyse de la puissance souscrite vs atteinte</p>
                             </div>
                             <div class="text-right">
@@ -228,50 +201,76 @@
                                 <div class="text-2xl font-bold text-success" id="detail-gain">-- €</div>
                             </div>
                         </div>
-                        <!-- Jauge -->
                         <div class="relative pt-6 pb-2">
                             <div class="flex justify-between text-xs font-mono text-gray-500 mb-2">
                                 <span>0</span>
                                 <span class="text-white font-bold" id="detail-reached">Max: --</span>
                                 <span class="text-primary font-bold" id="detail-sub">Souscrit: --</span>
                             </div>
-                            <div class="bg-white/10 h-4 rounded-full overflow-hidden">
+                            <div class="gauge-container h-4 bg-white/10 rounded-full">
                                 <div id="detail-gauge" class="h-full rounded-full transition-all duration-1000" style="width: 0%"></div>
                             </div>
                             <div class="mt-4 text-sm text-gray-300 italic" id="detail-advice">--</div>
                         </div>
                     </div>
 
-                    <!-- PRIX & MARKET WATCH (EVOLUTION V11) -->
+                    <!-- 2. PRIX & MARKET WATCH -->
                     <div class="bento-card col-span-1 p-6 flex flex-col bg-white/5 border-l-4 border-white/10" id="market-card">
-                        
-                        <!-- Header Card -->
                         <div class="flex justify-between items-start mb-4">
                             <h3 class="font-bold text-white text-sm">Contrat & Marché</h3>
                             <span id="market-badge" class="text-[9px] font-bold px-2 py-1 rounded bg-gray-700 text-gray-300">NEUTRE</span>
                         </div>
-
-                        <!-- Market Insight -->
                         <div class="mb-4 p-3 rounded-lg bg-black/20 border border-white/5">
                              <div class="text-[10px] text-gray-400 uppercase font-bold mb-1">Stratégie Achat</div>
                              <div class="text-xs text-white leading-tight font-medium" id="market-advice">Analyse en cours...</div>
                         </div>
-
-                        <!-- Pricing List -->
-                        <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="detail-pricing">
-                            <!-- JS Inject -->
-                        </div>
-                        
+                        <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="detail-pricing"></div>
                         <div class="mt-auto pt-4 border-t border-white/10 text-center">
                             <span class="text-xs text-gray-500" id="detail-provider">--</span>
                         </div>
                     </div>
+
+                    <!-- 3. NOUVEAU : BUDGET LANDING (V12) -->
+                    <div class="bento-card col-span-2 p-6">
+                        <h3 class="text-white font-bold text-sm mb-4"><i class="fa-solid fa-plane-arrival mr-2 text-primary"></i>Atterrissage Budgétaire (Projection)</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-400">Temps écoulé (Année)</span>
+                                    <span class="text-white font-mono" id="time-progress-txt">--%</span>
+                                </div>
+                                <div class="gauge-container h-2 bg-white/10 rounded-full"><div id="time-progress-bar" class="h-full bg-gray-500 rounded-full" style="width: 0%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-400">Budget Consommé</span>
+                                    <span class="text-white font-bold font-mono" id="budget-progress-txt">--%</span>
+                                </div>
+                                <div class="gauge-container h-2 bg-white/10 rounded-full"><div id="budget-progress-bar" class="h-full bg-primary rounded-full" style="width: 0%"></div></div>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-3 italic text-right" id="landing-msg">Analyse en cours...</p>
+                    </div>
+
+                    <!-- 4. NOUVEAU : DÉCRET TERTIAIRE (V12) -->
+                    <div class="bento-card col-span-1 p-6 flex flex-col items-center justify-center bg-gradient-to-br from-green-900/20 to-transparent border border-green-500/20">
+                        <h3 class="text-green-400 text-xs font-bold uppercase mb-2">Décret Tertiaire 2030</h3>
+                        <div class="relative w-24 h-24 flex items-center justify-center">
+                            <svg class="w-full h-full transform -rotate-90">
+                                <circle cx="48" cy="48" r="40" stroke="rgba(255,255,255,0.1)" stroke-width="8" fill="none"></circle>
+                                <circle id="tertiaire-circle" cx="48" cy="48" r="40" stroke="#10B981" stroke-width="8" fill="none" stroke-dasharray="251" stroke-dashoffset="251"></circle>
+                            </svg>
+                            <div class="absolute text-xl font-bold text-white">-12%</div>
+                        </div>
+                        <div class="text-[10px] text-center text-gray-400 mt-2">Objectif : -40%</div>
+                    </div>
+
                 </div>
             </div>
 
         </div>
 
-        <!-- ACTION BAR (TENDER) -->
+        <!-- ACTION BAR -->
         <div id="action-bar" class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-50 transform translate-y-32 transition-transform duration-300">
             <div class="font-bold"><span id="selected-count" class="text-primary">0</span> sites sélectionnés</div>
             <div class="h-6 w-px bg-gray-200"></div>
@@ -298,7 +297,6 @@
             try {
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
-                
                 if(data.fleet) {
                     FLEET_DATA = data.fleet;
                     initFilters();
@@ -355,7 +353,6 @@
                 const isSelected = SELECTED_IDS.has(site.id);
                 const row = document.createElement('tr');
                 row.className = "site-row border-b border-white/5";
-                
                 const detailAction = `onclick="loadDetail('${site.id}')"`;
 
                 row.innerHTML = `
@@ -367,16 +364,12 @@
                     <td class="px-4 py-3 text-gray-400" ${detailAction}>${site.city}</td>
                     <td class="px-4 py-3" ${detailAction}><span class="bg-white/5 px-2 py-1 rounded text-[10px]">${site.lot}</span></td>
                     <td class="px-4 py-3 text-center" ${detailAction}>
-                        <span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-cyan bg-cyan/10'} px-2 py-1 rounded">
-                            ${isGaz ? 'GAZ' : 'ELEC'}
-                        </span>
+                        <span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-cyan bg-cyan/10'} px-2 py-1 rounded">${isGaz ? 'GAZ' : 'ELEC'}</span>
                     </td>
                     <td class="px-4 py-3 text-right font-mono text-gray-300" ${detailAction}>
                         ${site.power} <span class="text-[10px] text-gray-600">${isGaz ? 'MWh' : 'kVA'}</span>
                     </td>
-                    <td class="px-4 py-3 text-right font-bold text-white" ${detailAction}>
-                        ${formatCurrency(site.budget)}
-                    </td>
+                    <td class="px-4 py-3 text-right font-bold text-white" ${detailAction}>${formatCurrency(site.budget)}</td>
                     <td class="px-4 py-3" ${detailAction}>
                         <div class="flex items-center gap-2">
                             <div class="w-2 h-2 rounded-full ${site.alert_contract ? 'bg-red-500 animate-pulse' : 'bg-success'}"></div>
@@ -396,50 +389,38 @@
                 totalGhost += s.ghost_savings;
                 if(s.alert_contract) alertCount++;
             });
-            
             document.getElementById('global-budget').innerText = formatCurrency(totalBudget);
             document.getElementById('global-ghost').innerText = formatCurrency(totalGhost);
             document.getElementById('alert-count').innerText = alertCount + " alertes";
         }
 
-        // --- 3. CHARTS ---
         function updateCharts(data) {
             let budgetElec = 0, budgetGaz = 0;
             data.forEach(s => { if(s.energy === 'gaz') budgetGaz += s.budget; else budgetElec += s.budget; });
-            
             const ctxMix = document.getElementById('mixChart').getContext('2d');
             if(mixChartInstance) mixChartInstance.destroy();
             mixChartInstance = new Chart(ctxMix, {
                 type: 'doughnut',
-                data: {
-                    labels: ['Élec', 'Gaz'],
-                    datasets: [{ data: [budgetElec, budgetGaz], backgroundColor: ['#00E5FF', '#EF4444'], borderWidth: 0 }]
-                },
+                data: { labels: ['Élec', 'Gaz'], datasets: [{ data: [budgetElec, budgetGaz], backgroundColor: ['#00E5FF', '#EF4444'], borderWidth: 0 }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 10 } } } } }
             });
-
             const top5 = [...data].sort((a, b) => b.budget - a.budget).slice(0, 5);
             const ctxTop = document.getElementById('topChart').getContext('2d');
             if(topChartInstance) topChartInstance.destroy();
             topChartInstance = new Chart(ctxTop, {
                 type: 'bar',
-                data: {
-                    labels: top5.map(s => s.name.substring(0, 10) + '...'),
-                    datasets: [{ label: 'Budget', data: top5.map(s => s.budget), backgroundColor: '#A855F7', borderRadius: 4 }]
-                },
+                data: { labels: top5.map(s => s.name.substring(0, 10) + '...'), datasets: [{ label: 'Budget', data: top5.map(s => s.budget), backgroundColor: '#A855F7', borderRadius: 4 }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94A3B8', font: { size: 9 } }, grid: { display: false } }, y: { display: false } } }
             });
         }
 
-        // --- 4. VUE DÉTAIL (AVEC MARKET WATCH) ---
+        // --- 4. VUE DÉTAIL (FULL OPTION V12) ---
         async function loadDetail(id) {
             try {
                 const res = await fetch(`/api/dashboard/data/${id}`);
                 const data = await res.json();
                 if(data.error) return alert("Site introuvable");
-                
                 renderDetailView(data);
-                
                 document.getElementById('view-fleet').classList.add('hidden');
                 document.getElementById('view-detail').classList.remove('hidden');
                 document.getElementById('main-title').innerText = "Détail Site";
@@ -451,15 +432,15 @@
             const isGaz = data.energy_type === 'gaz';
             document.getElementById('detail-title').innerText = data.identity.site_name || data.identity.name;
             document.getElementById('detail-address').innerText = data.location.address || "Adresse non renseignée";
-            
             const badge = document.getElementById('detail-badge');
             badge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
             badge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${isGaz ? 'bg-gas/10 text-gas' : 'bg-cyan/10 text-cyan'}`;
 
+            // Coach
             const coach = data.cortex_insight;
             document.getElementById('cortex-msg').innerHTML = `<span class="${coach.color === 'green' ? 'text-success' : 'text-warning'} font-bold">${coach.message}</span><br>${coach.conseil}`;
 
-            // OPTIMISATION
+            // Optimisation
             const pSub = parseFloat(data.contract.power);
             const pReach = pSub * (isGaz ? 0.9 : 0.7); 
             document.getElementById('detail-sub').innerText = `Souscrit: ${pSub} ${isGaz ? 'MWh' : 'kVA'}`;
@@ -472,33 +453,30 @@
             document.getElementById('detail-gain').innerText = gain > 0 ? `+ ${gain} €/an` : "OPTIMISÉ";
             document.getElementById('detail-advice').innerText = gain > 0 ? "Conseil: Baissez votre puissance souscrite." : "Votre contrat est bien calibré.";
 
-            // MARKET WATCH (NOUVEAU V11)
+            // Market Watch
             const market = data.market_analysis;
             const marketBadge = document.getElementById('market-badge');
             const marketAdvice = document.getElementById('market-advice');
             const marketCard = document.getElementById('market-card');
-
             if(market) {
                 marketBadge.innerText = market.status;
                 marketAdvice.innerText = market.action;
-                
-                if(market.color === 'green') { // Opportunité
+                if(market.color === 'green') {
                     marketBadge.className = "text-[9px] font-bold px-2 py-1 rounded bg-green-500 text-black animate-pulse";
                     marketCard.className = "bento-card col-span-1 p-6 flex flex-col bg-white/5 border-l-4 border-green-500";
-                } else if(market.color === 'blue') { // Protection
+                } else if(market.color === 'blue') {
                     marketBadge.className = "text-[9px] font-bold px-2 py-1 rounded bg-blue-500 text-white";
                     marketCard.className = "bento-card col-span-1 p-6 flex flex-col bg-white/5 border-l-4 border-blue-500";
-                } else { // Neutre
+                } else {
                     marketBadge.className = "text-[9px] font-bold px-2 py-1 rounded bg-gray-600 text-gray-300";
                     marketCard.className = "bento-card col-span-1 p-6 flex flex-col bg-white/5 border-l-4 border-gray-600";
                 }
             }
 
-            // PRICING
+            // Pricing
             const list = document.getElementById('detail-pricing');
             list.innerHTML = '';
             document.getElementById('detail-provider').innerText = "Fournisseur: " + (data.contract.provider || "Non renseigné");
-
             if (isGaz) {
                 addPriceLine(list, "Abo", data.pricing.fix + " €", "text-yellow-500");
                 addPriceLine(list, "Molécule", data.pricing.hph + " €", "text-gas font-bold");
@@ -508,6 +486,32 @@
                 addPriceLine(list, "HPE", data.pricing.hpe, "text-cyan");
                 addPriceLine(list, "HCE", data.pricing.hce, "text-cyan");
             }
+
+            // LANDING & TERTIAIRE (V12 NOUVEAUTÉS)
+            const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+            const timeProgress = (dayOfYear / 365) * 100;
+            // Simulation budget consommé (proche du temps si normal, > si alerte)
+            const budgetProgress = timeProgress * 1.05; 
+            
+            document.getElementById('time-progress-txt').innerText = Math.round(timeProgress) + "%";
+            document.getElementById('time-progress-bar').style.width = timeProgress + "%";
+            
+            document.getElementById('budget-progress-txt').innerText = Math.round(budgetProgress) + "%";
+            document.getElementById('budget-progress-bar').style.width = Math.min(budgetProgress, 100) + "%";
+            
+            if(budgetProgress > timeProgress + 5) {
+                document.getElementById('budget-progress-bar').className = "h-full bg-red-500 rounded-full";
+                document.getElementById('landing-msg').innerText = "Attention : Sur-consommation détectée.";
+                document.getElementById('landing-msg').className = "text-[10px] text-red-400 mt-3 italic text-right";
+            } else {
+                document.getElementById('budget-progress-bar').className = "h-full bg-primary rounded-full";
+                document.getElementById('landing-msg').innerText = "Trajectoire budgétaire maîtrisée.";
+                document.getElementById('landing-msg').className = "text-[10px] text-success mt-3 italic text-right";
+            }
+
+            // Tertiaire (Simulation -12%)
+            const offset = 251 - (12 / 100 * 251); // 251 = circonférence
+            document.getElementById('tertiaire-circle').style.strokeDashoffset = offset;
         }
 
         function showFleetView() {
@@ -517,26 +521,20 @@
             document.getElementById('header-kpis').classList.remove('hidden');
         }
 
-        // --- ACTION BAR ---
         function toggleSelection(id) {
-            if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id);
-            else SELECTED_IDS.add(id);
+            if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id);
             updateActionBar();
         }
-
         function selectAll() {
-            if(SELECTED_IDS.size === FLEET_DATA.length) SELECTED_IDS.clear();
-            else FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id));
+            if(SELECTED_IDS.size === FLEET_DATA.length) SELECTED_IDS.clear(); else FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id));
             renderTable(FLEET_DATA);
             updateActionBar();
         }
-
         function updateActionBar() {
             const count = SELECTED_IDS.size;
             document.getElementById('selected-count').innerText = count;
             const bar = document.getElementById('action-bar');
-            if(count > 0) bar.classList.add('visible');
-            else bar.classList.remove('visible');
+            if(count > 0) bar.classList.add('visible'); else bar.classList.remove('visible');
             bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)';
         }
 
@@ -545,23 +543,16 @@
             const btn = document.querySelector('#action-bar button');
             const original = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
-
             try {
                 const res = await fetch('/api/ops/generate_tender', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ site_ids: Array.from(SELECTED_IDS) })
                 });
-                
                 if(res.ok) {
                     const blob = await res.blob();
                     const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `AO_Energistrat_${SELECTED_IDS.size}_sites.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
+                    const a = document.createElement('a'); a.href = url; a.download = `AO_Energistrat_${SELECTED_IDS.size}_sites.csv`;
+                    document.body.appendChild(a); a.click(); a.remove();
                 } else { alert("Erreur génération"); }
             } catch(e) { console.error(e); alert("Erreur réseau"); }
             btn.innerHTML = original;
