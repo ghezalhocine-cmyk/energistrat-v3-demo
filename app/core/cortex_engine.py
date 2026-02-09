@@ -7,13 +7,14 @@ import logging
 import csv
 from datetime import datetime
 
-# CONFIG
+# CONFIGURATION IA & LOGGING
 VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_V37")
+logger = logging.getLogger("CORTEX_V38_FULL")
 
+# CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
     import pdfplumber
     PDF_AVAILABLE = True
@@ -31,7 +32,8 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "37.0 (Full Integral)"
+        self.version = "38.1 (Market Watch & Full Integrity)"
+        # Base de connaissance Métier (NAF)
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
             "1013B": "Boucherie", "5610A": "Restauration Trad.", "5610C": "Fast Food",
@@ -47,12 +49,13 @@ class CortexEngine:
             "5510Z": "Hôtellerie", "6832A": "Administration Immeubles", "6832B": "Supports Immobiliers"
         }
 
+    # --- HELPERS DE NETTOYAGE ---
     def _safe_int(self, value):
         try:
             if value is None: return 0
             if isinstance(value, (float, np.floating)):
                 if np.isnan(value) or np.isinf(value): return 0
-            return int(float(str(value).replace(',', '.').replace(' ', '')))
+            return int(float(str(value).replace(',', '.').replace(' ', '').replace('\xa0', '')))
         except: return 0
 
     def _safe_float(self, value):
@@ -60,15 +63,53 @@ class CortexEngine:
             if value is None: return 0.0
             if isinstance(value, (float, np.floating)):
                 if np.isnan(value) or np.isinf(value): return 0.0
-            return float(str(value).replace(',', '.').replace(' ', ''))
+            return float(str(value).replace(',', '.').replace(' ', '').replace('\xa0', ''))
         except: return 0.0
 
     # =========================================================
-    # MODULE 1 : GENERATEUR APPEL D'OFFRES (TENDER - V37)
+    # MODULE 1 : MARKET WATCH (NOUVEAU V38)
+    # =========================================================
+    def analyze_market_position(self, client_price, market_price, energy_type):
+        """
+        Compare le prix client vs marché et génère un conseil stratégique.
+        """
+        if client_price <= 0: 
+            return {"status": "UNKNOWN", "message": "Prix contrat manquant", "color": "gray", "action": "Renseignez vos prix."}
+        
+        delta = client_price - market_price
+        pct = (delta / client_price) * 100
+        
+        if delta > 10: # Le client est cher
+            return {
+                "status": "OPPORTUNITÉ",
+                "color": "green",
+                "title": "Baisse de Marché Détectée",
+                "message": f"Le marché ({market_price}€) est {abs(int(pct))}% moins cher que votre contrat.",
+                "action": "Conseil : Lancez un appel d'offres maintenant."
+            }
+        elif delta < -10: # Le client est bien
+            return {
+                "status": "PROTECTION",
+                "color": "blue",
+                "title": "Position Sécurisée",
+                "message": f"Votre prix ({client_price}€) bat le marché actuel ({market_price}€) de {abs(int(pct))}%.",
+                "action": "Conseil : Ne touchez à rien. Contrat performant."
+            }
+        else:
+            return {
+                "status": "NEUTRE",
+                "color": "gray",
+                "title": "Marché Stable",
+                "message": "Votre contrat est aligné avec les tendances actuelles.",
+                "action": "Conseil : Surveillance active maintenue."
+            }
+
+    # =========================================================
+    # MODULE 2 : TENDER GENERATOR (V37)
     # =========================================================
     def generate_tender_package(self, sites_data):
         """
-        Génère un CSV standardisé pour les fournisseurs à partir d'une liste de JSONs sites.
+        Génère un CSV standardisé pour les fournisseurs.
         """
         output = io.StringIO()
         writer = csv.writer(output, delimiter=';')
@@ -108,11 +149,11 @@ class CortexEngine:
         return output.getvalue()
 
     # =========================================================
-    # MODULE 2 : CALCULATEUR ROI & KPI (V37)
+    # MODULE 3 : CALCULATEUR ROI & KPI (V37)
     # =========================================================
     def enrich_fleet_kpis(self, site_data):
         """
-        Ajoute les KPIs avancés (Ghost Buster, Landing) aux données brutes du site.
+        Ajoute les KPIs avancés (Ghost Buster, Landing) aux données brutes.
         """
         contract = site_data.get('contract', {})
         pricing = site_data.get('pricing', {})
@@ -124,7 +165,7 @@ class CortexEngine:
         fix = self._safe_float(pricing.get('fix'))
         budget_annual = fix + (vol * price / 1000) if is_gaz else fix + (vol * price / 1000)
 
-        # 2. Ghost Buster (Gaspillage)
+        # 2. Ghost Buster (Gaspillage estimé à 15%)
         talon_ratio = 0.15 
         talon_cost = (vol * talon_ratio) * (price / 1000)
         
@@ -142,23 +183,27 @@ class CortexEngine:
         }
 
     # =========================================================
-    # MODULE 3 : IMPORT DE MASSE CSV V5 (V36)
+    # MODULE 4 : IMPORT DE MASSE CSV V5 (SMART SWITCH V36)
     # =========================================================
     def parse_mass_import_v5(self, file_content):
         try:
             buffer = io.BytesIO(file_content)
-            try: df = pd.read_csv(buffer, sep=';', encoding='utf-8', dtype=str)
-            except: 
+            try:
+                df = pd.read_csv(buffer, sep=';', encoding='utf-8', dtype=str)
+            except:
                 buffer.seek(0)
                 df = pd.read_csv(buffer, sep=';', encoding='latin-1', dtype=str)
             
             headers = [str(c).upper() for c in df.columns]
             is_gaz = "PCE" in headers
             sites = []
+            
             for _, row in df.iterrows():
                 siret = str(row.get('SIRET', '')).replace(' ', '').strip()
                 if len(siret) < 9: continue 
-                site_name = row.get('NOM_SITE', row.get('RAISON_SOCIALE', '')).strip() or "Site Inconnu"
+                
+                site_name = row.get('NOM_SITE', row.get('RAISON_SOCIALE', '')).strip()
+                if not site_name: site_name = "Site Inconnu"
                 
                 if is_gaz:
                     ref_id = str(row.get('PCE', '')).replace(' ', '').strip()
@@ -177,10 +222,28 @@ class CortexEngine:
 
                 site = {
                     "client_name": site_name, 
-                    "identity": { "id": siret, "siret": siret, "name": row.get('RAISON_SOCIALE', '').strip(), "site_name": site_name, "lot_name": row.get('LOT', '').strip() },
+                    "identity": {
+                        "id": siret,
+                        "siret": siret,
+                        "name": row.get('RAISON_SOCIALE', '').strip(),
+                        "site_name": site_name,
+                        "lot_name": row.get('LOT', '').strip()
+                    },
                     "location": { "address": row.get('ADRESSE', '').strip() },
-                    "contract": { "pdl": ref_id, "power": power, "segment": segment, "provider": "Import CSV" },
-                    "pricing": { "fix": str(row.get('ABO_AN', '0')).replace(',', '.').strip(), "hph": p_hph, "hch": p_hch, "hpe": p_hpe, "hce": p_hce, "tax": str(row.get('TAXES', '0')).replace(',', '.').strip() }
+                    "contract": {
+                        "pdl": ref_id,
+                        "power": power,
+                        "segment": segment,
+                        "provider": "Import CSV"
+                    },
+                    "pricing": {
+                        "fix": str(row.get('ABO_AN', '0')).replace(',', '.').strip(),
+                        "hph": p_hph,
+                        "hch": p_hch,
+                        "hpe": p_hpe,
+                        "hce": p_hce,
+                        "tax": str(row.get('TAXES', '0')).replace(',', '.').strip()
+                    }
                 }
                 sites.append(site)
             return sites
@@ -189,13 +252,15 @@ class CortexEngine:
             return []
 
     # =========================================================
-    # MODULE 4 : ANALYSE COURBE DE CHARGE (HISTORIQUE)
+    # MODULE 5 : ANALYSE COURBE DE CHARGE (HISTORIQUE V30)
     # =========================================================
     def analyze_file(self, file_content, filename, target_profile="demo", known_site_data=None):
         try:
+            # 1. Parsing
             df, time_step, meta_tech = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible ou vide"}
             
+            # 2. Contexte
             context = {
                 "pdl": known_site_data.get('pdl') if known_site_data else meta_tech.get('pdl'),
                 "p_souscrite": float(known_site_data.get('power', 0)) if known_site_data else 0,
@@ -215,12 +280,14 @@ class CortexEngine:
             cp_match = re.search(r'\b\d{5}\b', context['address'])
             zip_code = cp_match.group(0) if cp_match else "Inconnu"
 
+            # 3. Calculs
             base = self._module_socle(df, time_step)
             ref_pmax = context['p_souscrite'] if context['p_souscrite'] > 0 else base['p_max']
             finance = self._module_finance_4p(df, time_step, ref_pmax)
             solar = self._module_solar(df)
             waste = self._module_ghost(df, base['talon'])
             
+            # 4. Chart
             step = max(1, len(df)//2000)
             df_chart = df.iloc[::step].copy()
             chart_vals = df_chart['val'].fillna(0).tolist()
@@ -236,18 +303,24 @@ class CortexEngine:
             full_kpi = {
                 **base, **solar, **waste, **finance,
                 "profiling": {
-                    "type": target_profile, "pdl": context['pdl'], "contrat_actif": "OUI" if known_site_data else "NON (Découverte)",
-                    "metier": context['naf_label'], "geo": zip_code, "segment": context['segment']
+                    "type": target_profile, 
+                    "pdl": context['pdl'],
+                    "contrat_actif": "OUI" if known_site_data else "NON (Découverte)",
+                    "metier": context['naf_label'],
+                    "geo": zip_code,
+                    "segment": context['segment']
                 },
                 "meta": {"filename": filename, "points": len(df)}
             }
+            
             narrative = self._generate_insight(full_kpi, context)
             return {"success": True, "kpi": full_kpi, "chart": chart, "ai_insight": narrative}
+
         except Exception as e:
-            logger.exception("Crash Cortex V36")
+            logger.exception("Crash Cortex V38")
             return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
 
-    # --- SOUS-MODULES TECHNIQUES (PARSING & CALCULS) ---
+    # --- SOUS-MODULES TECHNIQUES (DÉCOMPRESSÉS) ---
     def _parse_data(self, content, filename):
         try:
             buffer = io.BytesIO(content)
@@ -349,7 +422,8 @@ class CortexEngine:
             return {"solar": {"status": "NON PERTINENT", "puissance_kwc": 0, "economie_annuelle_euro": 0}}
         except: return {"solar": {"status": "ERREUR", "puissance_kwc": 0, "economie_annuelle_euro": 0}}
 
-    def _module_ghost(self, df, t): return {"ghost_buster": {"cout_talon_annuel": self._safe_int(t * 8760 * 0.15)}}
+    def _module_ghost(self, df, t): 
+        return {"ghost_buster": {"cout_talon_annuel": self._safe_int(t * 8760 * 0.15)}}
 
     def _generate_insight(self, kpi, context):
         if not AI_AVAILABLE: return "IA Offline."
