@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V10.0 | Retail Command Center</title>
+    <title>ENERGISTRAT V11.0 | Retail Market Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -35,6 +35,10 @@
         /* Coach Animation */
         .coach-bubble { animation: float 6s ease-in-out infinite; }
         @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } }
+
+        /* Market Pulse */
+        .market-pulse { animation: pulse-border 2s infinite; }
+        @keyframes pulse-border { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden">
@@ -94,7 +98,7 @@
         <header class="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur sticky top-0 z-40">
             <div>
                 <h1 class="text-xl font-bold text-white" id="main-title">Vision Consolidée</h1>
-                <p class="text-xs text-gray-400" id="main-subtitle">Données Live • Cortex V37 Active</p>
+                <p class="text-xs text-gray-400" id="main-subtitle">Données Live • Cortex V38 Active</p>
             </div>
             <!-- KPI HEADER -->
             <div class="flex gap-6 text-right" id="header-kpis">
@@ -112,8 +116,23 @@
         <!-- CONTENU DYNAMIQUE -->
         <div class="flex-1 overflow-y-auto p-8 pb-32" id="content-area">
             
-            <!-- VUE 1 : FLEET (TABLEAU) -->
+            <!-- VUE 1 : FLEET (TABLEAU + CHARTS) -->
             <div id="view-fleet" class="space-y-6">
+                
+                <!-- ANALYTICS ROW -->
+                <div class="grid grid-cols-3 gap-6 h-64">
+                    <!-- Mix Energétique -->
+                    <div class="bento-card p-6 flex flex-col">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Mix Énergétique (Budget)</h3>
+                        <div class="flex-1 relative"><canvas id="mixChart"></canvas></div>
+                    </div>
+                    <!-- Top Consommateurs -->
+                    <div class="bento-card p-6 col-span-2 flex flex-col">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Top 5 Sites (Budget)</h3>
+                        <div class="flex-1 relative"><canvas id="topChart"></canvas></div>
+                    </div>
+                </div>
+
                 <!-- ROI CARDS -->
                 <div class="grid grid-cols-4 gap-6">
                     <div class="bento-card p-5 border-l-4 border-warning">
@@ -154,25 +173,23 @@
                                 <th class="px-4 py-3">Ville</th>
                                 <th class="px-4 py-3">Lot</th>
                                 <th class="px-4 py-3 text-center">Énergie</th>
+                                <th class="px-4 py-3 text-right">Volume</th>
                                 <th class="px-4 py-3 text-right">Budget Est.</th>
-                                <th class="px-4 py-3 text-right text-warning">Gaspillage</th>
-                                <th class="px-4 py-3 text-right">Atterrissage</th>
+                                <th class="px-4 py-3">État</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-white/5" id="fleet-table-body">
-                            <!-- JS INJECT -->
-                        </tbody>
+                        <tbody class="divide-y divide-white/5" id="fleet-table-body"></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- VUE 2 : DÉTAIL SITE (PEDAGOGIC) -->
+            <!-- VUE 2 : DÉTAIL SITE (PEDAGOGIC + MARKET WATCH) -->
             <div id="view-detail" class="hidden space-y-6">
                 <button onclick="showFleetView()" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4">
                     <i class="fa-solid fa-arrow-left"></i> RETOUR LISTE
                 </button>
 
-                <!-- HEADER DÉTAIL (COACH) -->
+                <!-- HEADER DÉTAIL -->
                 <div class="flex justify-between items-start">
                     <div>
                         <h2 class="text-3xl font-bold text-white" id="detail-title">--</h2>
@@ -195,7 +212,7 @@
                 </div>
 
                 <!-- GRILLE DÉTAIL -->
-                <div class="grid grid-cols-3 gap-6 h-96">
+                <div class="grid grid-cols-3 gap-6">
                     
                     <!-- OPTIMISATION PUISSANCE -->
                     <div class="bento-card col-span-2 p-8 flex flex-col justify-center">
@@ -218,19 +235,33 @@
                                 <span class="text-white font-bold" id="detail-reached">Max: --</span>
                                 <span class="text-primary font-bold" id="detail-sub">Souscrit: --</span>
                             </div>
-                            <div class="gauge-container h-4 bg-white/10 rounded-full">
+                            <div class="bg-white/10 h-4 rounded-full overflow-hidden">
                                 <div id="detail-gauge" class="h-full rounded-full transition-all duration-1000" style="width: 0%"></div>
                             </div>
                             <div class="mt-4 text-sm text-gray-300 italic" id="detail-advice">--</div>
                         </div>
                     </div>
 
-                    <!-- PRIX & CONTRAT -->
-                    <div class="bento-card col-span-1 p-6 flex flex-col bg-white/5">
-                        <h3 class="font-bold text-white mb-4">Structure Tarifaire</h3>
-                        <div class="flex-1 overflow-y-auto space-y-3" id="detail-pricing">
+                    <!-- PRIX & MARKET WATCH (EVOLUTION V11) -->
+                    <div class="bento-card col-span-1 p-6 flex flex-col bg-white/5 border-l-4 border-white/10" id="market-card">
+                        
+                        <!-- Header Card -->
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="font-bold text-white text-sm">Contrat & Marché</h3>
+                            <span id="market-badge" class="text-[9px] font-bold px-2 py-1 rounded bg-gray-700 text-gray-300">NEUTRE</span>
+                        </div>
+
+                        <!-- Market Insight -->
+                        <div class="mb-4 p-3 rounded-lg bg-black/20 border border-white/5">
+                             <div class="text-[10px] text-gray-400 uppercase font-bold mb-1">Stratégie Achat</div>
+                             <div class="text-xs text-white leading-tight font-medium" id="market-advice">Analyse en cours...</div>
+                        </div>
+
+                        <!-- Pricing List -->
+                        <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="detail-pricing">
                             <!-- JS Inject -->
                         </div>
+                        
                         <div class="mt-auto pt-4 border-t border-white/10 text-center">
                             <span class="text-xs text-gray-500" id="detail-provider">--</span>
                         </div>
@@ -259,8 +290,10 @@
         let FLEET_DATA = [];
         let SELECTED_IDS = new Set();
         let CURRENT_FILTER = 'all';
+        let mixChartInstance = null;
+        let topChartInstance = null;
 
-        // --- 1. CHARGEMENT PARC (API V37) ---
+        // --- 1. CHARGEMENT PARC ---
         async function loadFleet() {
             try {
                 const res = await fetch('/api/dashboard/fleet');
@@ -274,7 +307,7 @@
             } catch(e) { console.error("Erreur chargement parc", e); }
         }
 
-        // --- 2. FILTRES & RENDU TABLEAU ---
+        // --- 2. FILTRES & RENDU ---
         function initFilters() {
             const lots = [...new Set(FLEET_DATA.map(s => s.lot).filter(l => l))];
             const select = document.getElementById('lot-select');
@@ -310,6 +343,7 @@
             });
             renderTable(filtered);
             updateGlobalKPIs(filtered);
+            updateCharts(filtered);
         }
 
         function renderTable(data) {
@@ -322,7 +356,6 @@
                 const row = document.createElement('tr');
                 row.className = "site-row border-b border-white/5";
                 
-                // Click sur la ligne (sauf checkbox) -> Détail
                 const detailAction = `onclick="loadDetail('${site.id}')"`;
 
                 row.innerHTML = `
@@ -338,38 +371,67 @@
                             ${isGaz ? 'GAZ' : 'ELEC'}
                         </span>
                     </td>
-                    <td class="px-4 py-3 text-right font-mono" ${detailAction}>${formatCurrency(site.budget)}</td>
-                    <td class="px-4 py-3 text-right font-mono text-warning font-bold" ${detailAction}>
-                        ${site.ghost_savings > 10 ? formatCurrency(site.ghost_savings) : '-'}
+                    <td class="px-4 py-3 text-right font-mono text-gray-300" ${detailAction}>
+                        ${site.power} <span class="text-[10px] text-gray-600">${isGaz ? 'MWh' : 'kVA'}</span>
                     </td>
-                    <td class="px-4 py-3 text-right font-mono ${site.alert ? 'text-red-500' : 'text-success'}" ${detailAction}>
-                        ${formatCurrency(site.landing)}
+                    <td class="px-4 py-3 text-right font-bold text-white" ${detailAction}>
+                        ${formatCurrency(site.budget)}
+                    </td>
+                    <td class="px-4 py-3" ${detailAction}>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full ${site.alert_contract ? 'bg-red-500 animate-pulse' : 'bg-success'}"></div>
+                            <span class="text-xs text-gray-400">${site.alert_contract ? 'Action' : 'Actif'}</span>
+                        </div>
                     </td>
                 `;
                 tbody.appendChild(row);
             });
-            document.getElementById('count-display').innerText = data.length;
+            document.getElementById('site-count').innerText = data.length;
         }
 
         function updateGlobalKPIs(data) {
-            let totalBudget = 0, totalGhost = 0, volElec = 0, volGaz = 0;
+            let totalBudget = 0, totalGhost = 0, alertCount = 0;
             data.forEach(s => {
                 totalBudget += s.budget;
                 totalGhost += s.ghost_savings;
-                if(s.energy === 'gaz') volGaz += s.power; else volElec += s.power;
+                if(s.alert_contract) alertCount++;
             });
             
-            document.getElementById('budget-display').innerText = formatCurrency(totalBudget);
-            document.getElementById('total-ghost').innerText = formatCurrency(totalGhost);
-            document.getElementById('vol-elec').innerText = new Intl.NumberFormat('fr-FR').format(volElec);
-            document.getElementById('vol-gaz').innerText = new Intl.NumberFormat('fr-FR').format(volGaz);
-            
-            // Simulator update
-            const simGain = totalBudget * 0.10; // 10% simulation
-            document.getElementById('sim-gain-sidebar').innerText = "+ " + formatCurrency(simGain);
+            document.getElementById('global-budget').innerText = formatCurrency(totalBudget);
+            document.getElementById('global-ghost').innerText = formatCurrency(totalGhost);
+            document.getElementById('alert-count').innerText = alertCount + " alertes";
         }
 
-        // --- 3. VUE DÉTAIL (DRILL DOWN) ---
+        // --- 3. CHARTS ---
+        function updateCharts(data) {
+            let budgetElec = 0, budgetGaz = 0;
+            data.forEach(s => { if(s.energy === 'gaz') budgetGaz += s.budget; else budgetElec += s.budget; });
+            
+            const ctxMix = document.getElementById('mixChart').getContext('2d');
+            if(mixChartInstance) mixChartInstance.destroy();
+            mixChartInstance = new Chart(ctxMix, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Élec', 'Gaz'],
+                    datasets: [{ data: [budgetElec, budgetGaz], backgroundColor: ['#00E5FF', '#EF4444'], borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 10 } } } } }
+            });
+
+            const top5 = [...data].sort((a, b) => b.budget - a.budget).slice(0, 5);
+            const ctxTop = document.getElementById('topChart').getContext('2d');
+            if(topChartInstance) topChartInstance.destroy();
+            topChartInstance = new Chart(ctxTop, {
+                type: 'bar',
+                data: {
+                    labels: top5.map(s => s.name.substring(0, 10) + '...'),
+                    datasets: [{ label: 'Budget', data: top5.map(s => s.budget), backgroundColor: '#A855F7', borderRadius: 4 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94A3B8', font: { size: 9 } }, grid: { display: false } }, y: { display: false } } }
+            });
+        }
+
+        // --- 4. VUE DÉTAIL (AVEC MARKET WATCH) ---
         async function loadDetail(id) {
             try {
                 const res = await fetch(`/api/dashboard/data/${id}`);
@@ -378,48 +440,61 @@
                 
                 renderDetailView(data);
                 
-                // Switch View
                 document.getElementById('view-fleet').classList.add('hidden');
                 document.getElementById('view-detail').classList.remove('hidden');
                 document.getElementById('main-title').innerText = "Détail Site";
-                document.getElementById('header-kpis').classList.add('hidden'); // Hide global KPIs
+                document.getElementById('header-kpis').classList.add('hidden');
             } catch(e) { console.error(e); }
         }
 
         function renderDetailView(data) {
             const isGaz = data.energy_type === 'gaz';
-            
-            // Header
             document.getElementById('detail-title').innerText = data.identity.site_name || data.identity.name;
-            document.getElementById('detail-address').innerText = data.location.address;
+            document.getElementById('detail-address').innerText = data.location.address || "Adresse non renseignée";
             
             const badge = document.getElementById('detail-badge');
             badge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
             badge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${isGaz ? 'bg-gas/10 text-gas' : 'bg-cyan/10 text-cyan'}`;
 
-            // Coach
             const coach = data.cortex_insight;
             document.getElementById('cortex-msg').innerHTML = `<span class="${coach.color === 'green' ? 'text-success' : 'text-warning'} font-bold">${coach.message}</span><br>${coach.conseil}`;
 
-            // Optimisation Jauge
+            // OPTIMISATION
             const pSub = parseFloat(data.contract.power);
-            // Simulation d'une puissance atteinte (pour la démo, car pas d'historique réel importé ici)
-            const pReach = pSub * (isGaz ? 0.9 : 0.7); // 70% elec, 90% gaz
-            
+            const pReach = pSub * (isGaz ? 0.9 : 0.7); 
             document.getElementById('detail-sub').innerText = `Souscrit: ${pSub} ${isGaz ? 'MWh' : 'kVA'}`;
             document.getElementById('detail-reached').innerText = `Max: ${pReach}`;
-            
             const ratio = (pReach / pSub) * 100;
             const gauge = document.getElementById('detail-gauge');
             gauge.style.width = `${ratio}%`;
             gauge.className = `h-full rounded-full ${ratio > 95 ? 'bg-red-500' : (ratio < 60 ? 'bg-warning' : 'bg-success')}`;
-
-            // Gain Potentiel (Calcul simple)
             const gain = (!isGaz && ratio < 60) ? Math.floor((pSub - pReach*1.2) * 18) : 0;
             document.getElementById('detail-gain').innerText = gain > 0 ? `+ ${gain} €/an` : "OPTIMISÉ";
             document.getElementById('detail-advice').innerText = gain > 0 ? "Conseil: Baissez votre puissance souscrite." : "Votre contrat est bien calibré.";
 
-            // Pricing Grid
+            // MARKET WATCH (NOUVEAU V11)
+            const market = data.market_analysis;
+            const marketBadge = document.getElementById('market-badge');
+            const marketAdvice = document.getElementById('market-advice');
+            const marketCard = document.getElementById('market-card');
+
+            if(market) {
+                marketBadge.innerText = market.status;
+                marketAdvice.innerText = market.action;
+                
+                if(market.color === 'green') { // Opportunité
+                    marketBadge.className = "text-[9px] font-bold px-2 py-1 rounded bg-green-500 text-black animate-pulse";
+                    marketCard.className = "bento-card col-span-1 p-6 flex flex-col bg-white/5 border-l-4 border-green-500";
+                } else if(market.color === 'blue') { // Protection
+                    marketBadge.className = "text-[9px] font-bold px-2 py-1 rounded bg-blue-500 text-white";
+                    marketCard.className = "bento-card col-span-1 p-6 flex flex-col bg-white/5 border-l-4 border-blue-500";
+                } else { // Neutre
+                    marketBadge.className = "text-[9px] font-bold px-2 py-1 rounded bg-gray-600 text-gray-300";
+                    marketCard.className = "bento-card col-span-1 p-6 flex flex-col bg-white/5 border-l-4 border-gray-600";
+                }
+            }
+
+            // PRICING
             const list = document.getElementById('detail-pricing');
             list.innerHTML = '';
             document.getElementById('detail-provider').innerText = "Fournisseur: " + (data.contract.provider || "Non renseigné");
@@ -442,7 +517,7 @@
             document.getElementById('header-kpis').classList.remove('hidden');
         }
 
-        // --- ACTION BAR & TENDER ---
+        // --- ACTION BAR ---
         function toggleSelection(id) {
             if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id);
             else SELECTED_IDS.add(id);
@@ -460,10 +535,8 @@
             const count = SELECTED_IDS.size;
             document.getElementById('selected-count').innerText = count;
             const bar = document.getElementById('action-bar');
-            if(count > 0) bar.classList.add('visible'); // Use CSS transform
+            if(count > 0) bar.classList.add('visible');
             else bar.classList.remove('visible');
-            
-            // Fallback JS style if class not working
             bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)';
         }
 
@@ -494,11 +567,9 @@
             btn.innerHTML = original;
         }
 
-        // Helpers
         function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
         function addPriceLine(c, l, v, cl) { c.innerHTML += `<div class="flex justify-between text-xs border-b border-white/5 pb-2"><span class="text-gray-500">${l}</span><span class="font-mono ${cl}">${v}</span></div>`; }
 
-        // INIT
         document.addEventListener('DOMContentLoaded', loadFleet);
     </script>
 </body>
