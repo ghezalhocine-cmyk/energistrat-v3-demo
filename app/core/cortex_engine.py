@@ -4,6 +4,7 @@ import io
 import re
 import math
 import logging
+import csv
 from datetime import datetime
 
 # CONFIG
@@ -11,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_V36")
+logger = logging.getLogger("CORTEX_V37")
 
 try:
     import pdfplumber
@@ -30,7 +31,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "36.0 (Dual Flux Gaz/Elec)"
+        self.version = "37.0 (Full Integral)"
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
             "1013B": "Boucherie", "5610A": "Restauration Trad.", "5610C": "Fast Food",
@@ -51,17 +52,150 @@ class CortexEngine:
             if value is None: return 0
             if isinstance(value, (float, np.floating)):
                 if np.isnan(value) or np.isinf(value): return 0
-            return int(float(value))
+            return int(float(str(value).replace(',', '.').replace(' ', '')))
         except: return 0
 
-    # --- ANALYSE COURBE DE CHARGE (SGE/ENEDIS) ---
+    def _safe_float(self, value):
+        try:
+            if value is None: return 0.0
+            if isinstance(value, (float, np.floating)):
+                if np.isnan(value) or np.isinf(value): return 0.0
+            return float(str(value).replace(',', '.').replace(' ', ''))
+        except: return 0.0
+
+    # =========================================================
+    # MODULE 1 : GENERATEUR APPEL D'OFFRES (TENDER - V37)
+    # =========================================================
+    def generate_tender_package(self, sites_data):
+        """
+        Génère un CSV standardisé pour les fournisseurs à partir d'une liste de JSONs sites.
+        """
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=';')
+        
+        headers = ["REFERENCE_POINT (PDL/PCE)", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", "CODE_POSTAL", "VILLE", "CONSOMMATION_ANNUELLE (MWh)", "PUISSANCE_SOUSCRITE", "SEGMENT_TARIF", "DATE_DEBUT_SOUHAITEE"]
+        writer.writerow(headers)
+
+        for site in sites_data:
+            try:
+                identity = site.get('identity', {})
+                loc = site.get('location', {})
+                contract = site.get('contract', {})
+                
+                addr_full = loc.get('address', '')
+                cp_match = re.search(r'\b\d{5}\b', addr_full)
+                cp = cp_match.group(0) if cp_match else ""
+                ville = addr_full.split(cp)[-1].strip() if cp else ""
+                
+                row = [
+                    contract.get('pdl', ''),
+                    identity.get('name', ''),
+                    identity.get('site_name', ''),
+                    addr_full,
+                    cp,
+                    ville,
+                    contract.get('power', 0),
+                    contract.get('power', 0) if "T" not in contract.get('segment','') else 0,
+                    contract.get('segment', ''),
+                    "01/01/2026"
+                ]
+                writer.writerow(row)
+            except Exception as e:
+                logger.error(f"Erreur ligne tender: {e}")
+                continue
+                
+        output.seek(0)
+        return output.getvalue()
+
+    # =========================================================
+    # MODULE 2 : CALCULATEUR ROI & KPI (V37)
+    # =========================================================
+    def enrich_fleet_kpis(self, site_data):
+        """
+        Ajoute les KPIs avancés (Ghost Buster, Landing) aux données brutes du site.
+        """
+        contract = site_data.get('contract', {})
+        pricing = site_data.get('pricing', {})
+        
+        # 1. Budget Annuel Estimé
+        is_gaz = "T" in str(contract.get('segment', ''))
+        vol = self._safe_float(contract.get('power')) * (1 if is_gaz else 1500)
+        price = self._safe_float(pricing.get('hph')) + self._safe_float(pricing.get('tax'))
+        fix = self._safe_float(pricing.get('fix'))
+        budget_annual = fix + (vol * price / 1000) if is_gaz else fix + (vol * price / 1000)
+
+        # 2. Ghost Buster (Gaspillage)
+        talon_ratio = 0.15 
+        talon_cost = (vol * talon_ratio) * (price / 1000)
+        
+        # 3. Budget Landing (Atterrissage)
+        day_of_year = datetime.now().timetuple().tm_yday
+        progress_year = day_of_year / 365
+        consumed_pct = progress_year * (1.2 if is_gaz and progress_year < 0.3 else 1.0) 
+        landing_projection = budget_annual * (1 / (progress_year if progress_year > 0 else 1)) * consumed_pct
+
+        return {
+            "budget_annual": round(budget_annual, 2),
+            "ghost_savings": round(talon_cost, 2),
+            "landing_forecast": round(landing_projection, 2),
+            "is_alert_landing": landing_projection > (budget_annual * 1.1)
+        }
+
+    # =========================================================
+    # MODULE 3 : IMPORT DE MASSE CSV V5 (V36)
+    # =========================================================
+    def parse_mass_import_v5(self, file_content):
+        try:
+            buffer = io.BytesIO(file_content)
+            try: df = pd.read_csv(buffer, sep=';', encoding='utf-8', dtype=str)
+            except: 
+                buffer.seek(0)
+                df = pd.read_csv(buffer, sep=';', encoding='latin-1', dtype=str)
+            
+            headers = [str(c).upper() for c in df.columns]
+            is_gaz = "PCE" in headers
+            sites = []
+            for _, row in df.iterrows():
+                siret = str(row.get('SIRET', '')).replace(' ', '').strip()
+                if len(siret) < 9: continue 
+                site_name = row.get('NOM_SITE', row.get('RAISON_SOCIALE', '')).strip() or "Site Inconnu"
+                
+                if is_gaz:
+                    ref_id = str(row.get('PCE', '')).replace(' ', '').strip()
+                    power = self._safe_int(row.get('CAR_MWH', 0))
+                    segment = row.get('SEGMENT_GAZ', '--').strip()
+                    p_hph = str(row.get('PRIX_MWH', '0')).replace(',', '.').strip()
+                    p_hch, p_hpe, p_hce = "0", "0", "0"
+                else:
+                    ref_id = str(row.get('PDL', '')).replace(' ', '').strip()
+                    power = self._safe_int(row.get('PUISSANCE', 0))
+                    segment = row.get('SEGMENT', '--').strip()
+                    p_hph = str(row.get('PRIX_HPH', '0')).replace(',', '.').strip()
+                    p_hch = str(row.get('PRIX_HCH', '0')).replace(',', '.').strip()
+                    p_hpe = str(row.get('PRIX_HPE', '0')).replace(',', '.').strip()
+                    p_hce = str(row.get('PRIX_HCE', '0')).replace(',', '.').strip()
+
+                site = {
+                    "client_name": site_name, 
+                    "identity": { "id": siret, "siret": siret, "name": row.get('RAISON_SOCIALE', '').strip(), "site_name": site_name, "lot_name": row.get('LOT', '').strip() },
+                    "location": { "address": row.get('ADRESSE', '').strip() },
+                    "contract": { "pdl": ref_id, "power": power, "segment": segment, "provider": "Import CSV" },
+                    "pricing": { "fix": str(row.get('ABO_AN', '0')).replace(',', '.').strip(), "hph": p_hph, "hch": p_hch, "hpe": p_hpe, "hce": p_hce, "tax": str(row.get('TAXES', '0')).replace(',', '.').strip() }
+                }
+                sites.append(site)
+            return sites
+        except Exception as e:
+            logger.error(f"Import CSV Error: {e}")
+            return []
+
+    # =========================================================
+    # MODULE 4 : ANALYSE COURBE DE CHARGE (HISTORIQUE)
+    # =========================================================
     def analyze_file(self, file_content, filename, target_profile="demo", known_site_data=None):
         try:
-            # 1. PARSING
             df, time_step, meta_tech = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible ou vide"}
             
-            # 2. CONTEXTE
             context = {
                 "pdl": known_site_data.get('pdl') if known_site_data else meta_tech.get('pdl'),
                 "p_souscrite": float(known_site_data.get('power', 0)) if known_site_data else 0,
@@ -70,7 +204,6 @@ class CortexEngine:
                 "address": known_site_data.get('address', "") if known_site_data else ""
             }
 
-            # Enrichissement NAF
             if not known_site_data or not known_site_data.get('naf_label'):
                 naf_search = re.search(r'\b\d{2}\.?\d{2}[A-Z]?\b', filename)
                 if naf_search:
@@ -79,18 +212,15 @@ class CortexEngine:
             else:
                 context['naf_label'] = known_site_data.get('naf_label', 'Inconnu')
 
-            # Extraction CP pour Météo
             cp_match = re.search(r'\b\d{5}\b', context['address'])
             zip_code = cp_match.group(0) if cp_match else "Inconnu"
 
-            # 3. CALCULS
             base = self._module_socle(df, time_step)
             ref_pmax = context['p_souscrite'] if context['p_souscrite'] > 0 else base['p_max']
             finance = self._module_finance_4p(df, time_step, ref_pmax)
             solar = self._module_solar(df)
             waste = self._module_ghost(df, base['talon'])
             
-            # 4. CHART
             step = max(1, len(df)//2000)
             df_chart = df.iloc[::step].copy()
             chart_vals = df_chart['val'].fillna(0).tolist()
@@ -106,23 +236,18 @@ class CortexEngine:
             full_kpi = {
                 **base, **solar, **waste, **finance,
                 "profiling": {
-                    "type": target_profile, 
-                    "pdl": context['pdl'],
-                    "contrat_actif": "OUI" if known_site_data else "NON (Découverte)",
-                    "metier": context['naf_label'],
-                    "geo": zip_code,
-                    "segment": context['segment']
+                    "type": target_profile, "pdl": context['pdl'], "contrat_actif": "OUI" if known_site_data else "NON (Découverte)",
+                    "metier": context['naf_label'], "geo": zip_code, "segment": context['segment']
                 },
                 "meta": {"filename": filename, "points": len(df)}
             }
-            
             narrative = self._generate_insight(full_kpi, context)
             return {"success": True, "kpi": full_kpi, "chart": chart, "ai_insight": narrative}
-
         except Exception as e:
             logger.exception("Crash Cortex V36")
             return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
 
+    # --- SOUS-MODULES TECHNIQUES (PARSING & CALCULS) ---
     def _parse_data(self, content, filename):
         try:
             buffer = io.BytesIO(content)
@@ -261,86 +386,6 @@ class CortexEngine:
             {"point": "Contrat Associé", "a": "Présent" if ctr_b else "Manquant", "b": "-", "status": "OK" if ctr_b else "MANQUANT", "error": not ctr_b}
         ]
         return {"score": 100, "checks": checks}
-
-    # --- NOUVEAU : IMPORT DE MASSE (V36 SMART SWITCH) ---
-    def parse_mass_import_v5(self, file_content):
-        """
-        Parse le CSV V5 (Template Officiel) pour création de JSONs clients.
-        Détecte automatiquement si ÉLEC (PDL) ou GAZ (PCE).
-        """
-        try:
-            buffer = io.BytesIO(file_content)
-            # Tentative UTF-8 puis Latin-1
-            try:
-                df = pd.read_csv(buffer, sep=';', encoding='utf-8', dtype=str)
-            except:
-                buffer.seek(0)
-                df = pd.read_csv(buffer, sep=';', encoding='latin-1', dtype=str)
-            
-            # DÉTECTION DU FLUX (ELEC VS GAZ)
-            headers = [str(c).upper() for c in df.columns]
-            is_gaz = "PCE" in headers
-            
-            sites = []
-            for _, row in df.iterrows():
-                # Nettoyage critique
-                siret = str(row.get('SIRET', '')).replace(' ', '').strip()
-                if len(siret) < 9: continue 
-
-                # Mapping commun
-                site_name = row.get('NOM_SITE', row.get('RAISON_SOCIALE', '')).strip()
-                if not site_name: site_name = "Site Inconnu"
-                
-                # Mapping spécifique
-                if is_gaz:
-                    ref_id = str(row.get('PCE', '')).replace(' ', '').strip()
-                    power = self._safe_int(row.get('CAR_MWH', 0))
-                    segment = row.get('SEGMENT_GAZ', '--').strip()
-                    # Gaz = Prix Unique mappé dans HPH
-                    p_hph = str(row.get('PRIX_MWH', '0')).replace(',', '.').strip()
-                    p_hch = "0"
-                    p_hpe = "0"
-                    p_hce = "0"
-                else:
-                    ref_id = str(row.get('PDL', '')).replace(' ', '').strip()
-                    power = self._safe_int(row.get('PUISSANCE', 0))
-                    segment = row.get('SEGMENT', '--').strip()
-                    # Elec = 4 Postes
-                    p_hph = str(row.get('PRIX_HPH', '0')).replace(',', '.').strip()
-                    p_hch = str(row.get('PRIX_HCH', '0')).replace(',', '.').strip()
-                    p_hpe = str(row.get('PRIX_HPE', '0')).replace(',', '.').strip()
-                    p_hce = str(row.get('PRIX_HCE', '0')).replace(',', '.').strip()
-
-                site = {
-                    "client_name": site_name, 
-                    "identity": {
-                        "id": siret,
-                        "siret": siret,
-                        "name": row.get('RAISON_SOCIALE', '').strip(),
-                        "site_name": site_name,
-                        "lot_name": row.get('LOT', '').strip()
-                    },
-                    "location": { "address": row.get('ADRESSE', '').strip() },
-                    "contract": {
-                        "pdl": ref_id, # PDL ou PCE
-                        "power": power, # kVA ou CAR
-                        "segment": segment,
-                        "provider": "Import CSV"
-                    },
-                    "pricing": {
-                        "fix": str(row.get('ABO_AN', '0')).replace(',', '.').strip(),
-                        "hph": p_hph,
-                        "hch": p_hch,
-                        "hpe": p_hpe,
-                        "hce": p_hce,
-                        "tax": str(row.get('TAXES', '0')).replace(',', '.').strip()
-                    }
-                }
-                sites.append(site)
-            return sites
-        except Exception as e:
-            logger.error(f"Import CSV Error: {e}")
-            return []
 
     def run_chaos_monkey(self): return [{"test": "Maths", "status": "OK"}]
     def ask_agent(self, msg): return self._generate_insight({}, {"p_souscrite": 0})
