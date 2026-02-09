@@ -2,254 +2,325 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V6.2 | Retail Master Connected</title>
+    <title>ENERGISTRAT V7.0 | Retail Operations</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: { abysse: '#050505', card: '#0F172A', retail: '#A855F7', cyan: '#00E5FF', alert: '#EF4444', cold: '#38BDF8', gas: '#EF4444' },
-                    borderRadius: { 'bento': '2rem' },
-                    boxShadow: { 'neon': '0 0 20px rgba(168, 85, 247, 0.25)' }
+                    colors: { abysse: '#050505', card: '#0F172A', sidebar: '#020617', primary: '#A855F7', cyan: '#00E5FF', gas: '#EF4444', success: '#10B981' },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
                 }
             }
         }
     </script>
     <style>
-        body { background-color: #050505; color: white; }
-        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
-        .bento-card:hover { border-color: var(--border-color, rgba(168, 85, 247, 0.5)); transform: translateY(-2px); }
-        .nav-item.active { background: rgba(168, 85, 247, 0.1); border-left: 3px solid #A855F7; color: white; }
-        .page-content { display: none; } .page-content.active { display: grid; }
-        
-        /* Loader Security */
-        #lock-screen { position: fixed; inset: 0; background: #050505; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .loader { border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 3px solid #A855F7; width: 30px; height: 30px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body { background-color: #050505; color: #E2E8F0; }
+        .nav-item { transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: rgba(255, 255, 255, 0.03); color: white; }
+        .nav-item.active { background: rgba(168, 85, 247, 0.08); border-left-color: #A855F7; color: white; }
+        .bento-card { background: #0F172A; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1rem; }
+        .view-section { display: none; animation: fadeIn 0.3s ease-in-out; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        /* Scrollbar fine */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
-<body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
+<body class="flex h-screen w-screen overflow-hidden">
 
-    <!-- ECRAN DE SÉCURITÉ (PRÉSERVÉ) -->
-    <div id="lock-screen">
-        <div class="loader mb-4"></div>
-        <div class="text-xs font-mono text-retail animate-pulse">DÉCRYPTAGE VAULT...</div>
-    </div>
-
-    <!-- SIDEBAR -->
-    <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0">
-        <div class="p-6">
-            <div class="flex items-center gap-3 mb-8">
-                <div class="w-10 h-10 rounded-full border border-retail bg-retail/10 flex items-center justify-center text-retail font-bold shadow-neon">RT</div>
-                <div><h1 class="font-bold tracking-wider text-base">RETAIL<span class="text-retail">.OS</span></h1><p class="text-[10px] text-gray-500">Groupe & Franchises</p></div>
-            </div>
-            <nav class="space-y-2">
-                <button onclick="navTo('vision')" id="btn-vision" class="nav-item active w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide flex items-center gap-3 transition">
-                    <span>📊</span> Vision Groupe
-                </button>
-                <button onclick="navTo('league')" id="btn-league" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
-                    <span>🏆</span> Green League
-                </button>
-                <button onclick="navTo('froid')" id="btn-froid" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
-                    <span>❄️</span> Chaine Froid
-                </button>
-            </nav>
+    <!-- SIDEBAR PRO -->
+    <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col flex-shrink-0 z-50">
+        <!-- Logo Area -->
+        <div class="h-16 flex items-center px-6 border-b border-white/5">
+            <div class="w-8 h-8 rounded bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20">E</div>
+            <span class="ml-3 font-bold tracking-wide text-white">RETAIL<span class="text-primary">.OS</span></span>
         </div>
-        <div class="p-6 border-t border-white/5">
-            <a href="/nexus" class="block bg-white/5 border border-white/10 rounded-xl p-4 cursor-pointer group hover:bg-white/10 transition">
-                <div class="text-xs font-bold text-white mb-1"><i class="fa-solid fa-arrow-left mr-2"></i>Retour Nexus</div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 py-6 px-3 space-y-1">
+            <div class="text-[10px] uppercase text-gray-500 font-bold px-3 mb-2 tracking-wider">Pilotage</div>
+            <button onclick="switchView('vision')" id="nav-vision" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400">
+                <i class="fa-solid fa-chart-pie w-5 text-center"></i> Vision Globale
+            </button>
+            <button onclick="switchView('league')" id="nav-league" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400">
+                <i class="fa-solid fa-trophy w-5 text-center text-yellow-500"></i> Green League
+            </button>
+            <button onclick="switchView('froid')" id="nav-froid" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400">
+                <i class="fa-solid fa-snowflake w-5 text-center text-cyan"></i> Chaine Froid
+            </button>
+        </nav>
+
+        <!-- User / Settings Bottom -->
+        <div class="p-4 border-t border-white/5 bg-black/20">
+            <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
+                <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs text-white font-bold group-hover:bg-primary transition">AD</div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-xs font-bold text-white truncate">Admin Group</div>
+                    <div class="text-[10px] text-gray-500 truncate">Accès Paramètres</div>
+                </div>
+                <i class="fa-solid fa-gear text-gray-500 group-hover:text-white transition text-xs"></i>
             </a>
         </div>
     </aside>
 
-    <!-- MAIN -->
-    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col min-w-0 bg-abysse relative">
         
-        <!-- CORTEX SENTINEL -->
-        <div class="h-14 border-b border-white/5 flex items-center px-8 gap-4 bg-abysse/95 backdrop-blur z-20">
-            <div id="energy-badge" class="px-2 py-1 rounded bg-retail text-white text-[10px] font-black animate-pulse tracking-wider">ÉLEC</div>
-            <span class="text-xs text-retail font-mono flex-1" id="live-alert">Système connecté. Flux temps réel actif.</span>
-            <div class="text-xs font-mono text-gray-500" id="contract-ref">REF: --</div>
-        </div>
+        <!-- TOP BAR -->
+        <header class="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/80 backdrop-blur sticky top-0 z-40">
+            <div class="flex items-center gap-4">
+                <h2 id="site-title" class="text-lg font-bold text-white">Chargement...</h2>
+                <span id="energy-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/5 text-gray-500 border border-white/10">--</span>
+            </div>
+            <div class="flex items-center gap-6">
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] text-gray-500 uppercase font-bold" id="kpi-label">Puissance</span>
+                    <span class="text-sm font-mono font-bold text-primary" id="kpi-value">--</span>
+                </div>
+                <div class="h-8 w-px bg-white/10"></div>
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+                    <span class="text-xs font-medium text-gray-400">Live Stream</span>
+                </div>
+            </div>
+        </header>
 
-        <div class="p-8 overflow-y-auto h-full pb-20">
+        <!-- CONTENT AREA -->
+        <div class="flex-1 overflow-y-auto p-8">
             
-            <!-- HEADER (DYNAMIQUE V6.2) -->
-            <div class="flex justify-between items-end mb-6">
-                <div>
-                    <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Chargement...</h2>
-                    <p class="text-gray-400 text-xs mt-1" id="site-subtitle">Données certifiées Vault</p>
+            <!-- VUE 1 : VISION GLOBALE -->
+            <div id="view-vision" class="view-section active space-y-6">
+                <!-- KPI ROW -->
+                <div class="grid grid-cols-4 gap-6">
+                    <div class="bento-card p-5">
+                        <div class="text-gray-400 text-xs font-bold uppercase mb-2">Budget Estimé</div>
+                        <div class="text-2xl font-bold text-white mb-1" id="budget-total">-- €</div>
+                        <div class="text-[10px] text-gray-500">Annuel hors régul.</div>
+                    </div>
+                    <div class="bento-card p-5">
+                        <div class="text-gray-400 text-xs font-bold uppercase mb-2">Prix Moyen</div>
+                        <div class="text-2xl font-bold text-white mb-1" id="avg-price">--</div>
+                        <div class="text-[10px] text-gray-500">€ / MWh (Tout compris)</div>
+                    </div>
+                    <div class="bento-card p-5 border-l-2 border-primary">
+                        <div class="text-gray-400 text-xs font-bold uppercase mb-2">Contrat</div>
+                        <div class="text-lg font-bold text-white truncate" id="contract-provider">--</div>
+                        <div class="text-[10px] text-primary" id="contract-segment">--</div>
+                    </div>
+                    <div class="bento-card p-5 border-l-2 border-success">
+                        <div class="text-gray-400 text-xs font-bold uppercase mb-2">Empreinte CO2</div>
+                        <div class="text-2xl font-bold text-white mb-1">12.4 t</div>
+                        <div class="text-[10px] text-success">Objectif -10% atteint</div>
+                    </div>
                 </div>
-                <div class="flex gap-4">
-                    <div class="bg-card border border-white/10 px-4 py-2 rounded-full">
-                        <span class="text-xs font-bold text-gray-300 uppercase" id="kpi-label">Puissance</span>
-                        <span class="text-sm font-bold text-white ml-2" id="header-ratio">--</span>
+
+                <!-- MAIN CHART & PRICING -->
+                <div class="grid grid-cols-3 gap-6 h-96">
+                    <!-- Chart -->
+                    <div class="bento-card col-span-2 p-6 flex flex-col">
+                        <div class="flex justify-between mb-4">
+                            <h3 class="font-bold text-white">Consommation & Budget</h3>
+                            <div class="flex gap-2">
+                                <button class="px-2 py-1 rounded bg-white/10 text-[10px] text-white">Mois</button>
+                                <button class="px-2 py-1 rounded hover:bg-white/5 text-[10px] text-gray-400">Année</button>
+                            </div>
+                        </div>
+                        <div class="flex-1 relative w-full h-full">
+                            <canvas id="mainChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Pricing Structure (Smart Module) -->
+                    <div class="bento-card col-span-1 p-6 flex flex-col">
+                        <h3 class="font-bold text-white mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-tag text-gray-500 text-xs"></i> Structure Tarifaire
+                        </h3>
+                        <div class="flex-1 overflow-y-auto pr-2 space-y-3" id="pricing-grid">
+                            <!-- Injecté par JS -->
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-white/5 text-center">
+                            <span class="text-[10px] text-gray-500">Données issues de l'ERP Settings V22.14</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- VIEW 1: VISION GROUPE -->
-            <div id="view-vision" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
-                
-                <!-- GREEN LEAGUE (PRÉSERVÉ) -->
-                <div class="col-span-4 bg-gradient-to-b from-card to-abysse rounded-[2rem] p-0 bento-card border border-retail/20 overflow-hidden flex flex-col">
-                    <div class="p-6 pb-2 border-b border-white/5 flex justify-between items-center">
-                        <h3 class="font-bold text-lg text-white flex items-center gap-2">🏆 Green League</h3>
-                        <span class="text-[10px] bg-retail text-white px-2 py-1 rounded font-bold">TOP 3</span>
-                    </div>
-                    <div class="flex-1 p-6 space-y-4" id="league-container">
-                        <!-- Mock Data League -->
-                        <div class="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-white/10 relative overflow-hidden group hover:bg-white/10 transition">
-                            <div class="w-8 h-8 bg-yellow-500 text-black font-black flex items-center justify-center rounded-full shadow-lg">1</div>
-                            <div class="flex-1"><div class="text-sm font-bold text-white">Paris Nord</div><div class="text-[10px] text-gray-400">-12% vs N-1</div></div>
+            <!-- VUE 2 : GREEN LEAGUE -->
+            <div id="view-league" class="view-section hidden">
+                <div class="bento-card p-8">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 class="text-2xl font-bold text-white">Classement Performance</h2>
+                            <p class="text-sm text-gray-400">Comparatif des sites du groupe (kWh/m²)</p>
                         </div>
-                        <div class="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-white/10 relative overflow-hidden group hover:bg-white/10 transition">
-                            <div class="w-8 h-8 bg-gray-300 text-black font-black flex items-center justify-center rounded-full shadow-lg">2</div>
-                            <div class="flex-1"><div class="text-sm font-bold text-white">Lyon Part-Dieu</div><div class="text-[10px] text-gray-400">-8% vs N-1</div></div>
+                        <button class="bg-primary hover:bg-primary/80 text-white px-4 py-2 rounded-lg text-xs font-bold transition">Exporter PDF</button>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <!-- Mock Rows -->
+                        <div class="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
+                            <div class="w-8 h-8 rounded-full bg-yellow-500 text-black font-black flex items-center justify-center">1</div>
+                            <div class="flex-1 font-bold text-white">Paris Haussmann</div>
+                            <div class="text-right font-mono text-success">-12%</div>
+                        </div>
+                        <div class="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
+                            <div class="w-8 h-8 rounded-full bg-gray-400 text-black font-black flex items-center justify-center">2</div>
+                            <div class="flex-1 font-bold text-white">Lyon Part-Dieu</div>
+                            <div class="text-right font-mono text-success">-8%</div>
+                        </div>
+                        <div class="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
+                            <div class="w-8 h-8 rounded-full bg-orange-700 text-black font-black flex items-center justify-center">3</div>
+                            <div class="flex-1 font-bold text-white">Marseille Prado</div>
+                            <div class="text-right font-mono text-success">-5%</div>
                         </div>
                     </div>
                 </div>
-
-                <!-- CHART: BENCHMARK -->
-                <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card">
-                    <div class="flex justify-between mb-6">
-                        <h3 class="font-bold text-xl text-white">Benchmark Performance</h3>
-                        <div class="flex gap-4 text-xs">
-                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-retail"></span> Moyenne Réseau</span>
-                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400"></span> Ce Magasin</span>
-                        </div>
-                    </div>
-                    <div class="h-72 w-full"><canvas id="chartRetail"></canvas></div>
-                </div>
-
-                <!-- NOUVEAU : MODULE BUDGET & TARIF (V6.2 - ADAPTATIF) -->
-                <div class="col-span-12 bg-card rounded-[2rem] p-6 bento-card border-l-4 border-white/10" id="pricing-card">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-lg text-white">Structure Tarifaire 2026</h3>
-                        <span class="text-[10px] bg-white/10 px-2 py-1 rounded text-gray-400" id="pricing-mode">STANDARD</span>
-                    </div>
-                    <div class="grid grid-cols-5 gap-4" id="pricing-grid">
-                        <!-- Injecté par JS -->
-                    </div>
-                </div>
-
             </div>
+
+            <!-- VUE 3 : CHAINE FROID -->
+            <div id="view-froid" class="view-section hidden">
+                <div class="grid grid-cols-3 gap-6">
+                    <div class="bento-card p-6 border-l-4 border-cyan">
+                        <div class="text-xs font-bold text-gray-400 uppercase">Chambre Froide Neg</div>
+                        <div class="text-4xl font-bold text-white mt-2">-18.4°C</div>
+                        <div class="text-[10px] text-success mt-1"><i class="fa-solid fa-check mr-1"></i>Conforme</div>
+                    </div>
+                    <div class="bento-card p-6 border-l-4 border-cyan">
+                        <div class="text-xs font-bold text-gray-400 uppercase">Rayon Frais</div>
+                        <div class="text-4xl font-bold text-white mt-2">+3.2°C</div>
+                        <div class="text-[10px] text-success mt-1"><i class="fa-solid fa-check mr-1"></i>Conforme</div>
+                    </div>
+                    <div class="bento-card p-6 border-l-4 border-red-500 bg-red-500/5">
+                        <div class="text-xs font-bold text-red-400 uppercase">Réserve Positive</div>
+                        <div class="text-4xl font-bold text-white mt-2">+6.8°C</div>
+                        <div class="text-[10px] text-red-400 mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Seuil critique</div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 
     <script>
-        // NAVIGATION
-        function navTo(pageId) {
-            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
-            document.getElementById('btn-' + pageId).classList.add('active', 'text-white');
-            document.getElementById('btn-' + pageId).classList.remove('text-gray-400');
-            // Logique de changement de vue simplifiée pour la démo
+        // --- NAVIGATION SPA ---
+        function switchView(viewId) {
+            // Update Sidebar
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active', 'text-white'));
+            const btn = document.getElementById('nav-' + viewId);
+            if(btn) {
+                btn.classList.add('active', 'text-white');
+                btn.classList.remove('text-gray-400');
+            }
+            // Update Content
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById('view-' + viewId).classList.add('active');
         }
 
-        // CHART INIT
-        let retailChart = null;
-        function initChart() {
-            const ctx = document.getElementById('chartRetail').getContext('2d');
-            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(0, 'rgba(168, 85, 247, 0.2)');
-            gradient.addColorStop(1, 'rgba(0,0,0,0)');
-
-            retailChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin'],
-                    datasets: [
-                        { label: 'Moyenne', data: [65, 59, 80, 81, 56, 55], borderColor: '#A855F7', backgroundColor: gradient, borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0 },
-                        { label: 'Site', data: [28, 48, 40, 19, 86, 27], borderColor: '#00E5FF', borderDash: [5, 5], borderWidth: 2, tension: 0.4, pointRadius: 0 }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}}, scales:{ x:{grid:{display:false}, ticks:{color:'#64748B'}}, y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748B'}} } }
-            });
-        }
-
-        // --- INTELLIGENCE CORTEX (V6.2) ---
+        // --- INTELLIGENCE CORTEX ---
         async function loadData() {
-            // Simulation : On lit les données injectées par le Backend (Settings)
+            // Simulation des données injectées par Settings V22.14
             // Dans la vraie vie : fetch('/api/client/current')
             
-            // MOCK DATA (Pour simuler la connexion avec Settings)
-            // Ce bloc simule ce que le backend renvoie après une sauvegarde Settings V22.14
             const mockData = {
-                client_name: "HYPERMARCHÉ LYON SUD", // Vient de settings.json
-                energy: "gaz", // 'elec' ou 'gaz' (simulation)
-                contract: { pdl: "04500012345678", power: 1500, segment: "T2" },
+                client_name: "HYPERMARCHÉ LYON SUD",
+                energy: "gaz", // Testez 'elec' ou 'gaz' ici
+                contract: { pdl: "04500012345678", power: 1500, segment: "T2", provider: "TotalEnergies" },
                 pricing: { fix: 250, hph: 45.5, hch: 0, hpe: 0, hce: 0, tax: 8.44 }
             };
 
-            // NOTE : Pour la prod, remplacez mockData par un appel fetch réel.
-            // Pour l'instant, on utilise une logique de détection simple.
-            
-            updateDashboard(mockData);
-            
-            // Animation de déverrouillage
-            setTimeout(() => {
-                document.getElementById('lock-screen').style.opacity = '0';
-                setTimeout(() => document.getElementById('lock-screen').remove(), 500);
-            }, 800);
+            // Adapter si Elec pour le test
+            // const mockData = {
+            //     client_name: "SUPER U NANTES",
+            //     energy: "elec",
+            //     contract: { pdl: "30000012345678", power: 250, segment: "C4 (Jaune)", provider: "EDF" },
+            //     pricing: { fix: 120, hph: 150, hch: 100, hpe: 80, hce: 40, tax: 22.5 }
+            // };
+
+            renderDashboard(mockData);
         }
 
-        function updateDashboard(data) {
-            // 1. Identité
-            document.getElementById('page-title').innerText = data.client_name || "Site Inconnu";
-            document.getElementById('contract-ref').innerText = (data.energy === 'gaz' ? "PCE: " : "PDL: ") + data.contract.pdl;
-            document.getElementById('site-subtitle').innerText = `${data.contract.segment} • ${data.energy.toUpperCase()}`;
-
-            // 2. Gestion Gaz/Elec
-            const isGaz = data.energy === 'gaz';
-            const themeColor = isGaz ? '#EF4444' : '#A855F7'; // Rouge vs Violet
+        function renderDashboard(data) {
+            // 1. Header & Identity
+            document.getElementById('site-title').innerText = data.client_name;
             
-            // Badge & KPI
+            const isGaz = data.energy === 'gaz';
             const badge = document.getElementById('energy-badge');
             badge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
-            badge.className = `px-2 py-1 rounded text-white text-[10px] font-black animate-pulse tracking-wider ${isGaz ? 'bg-red-500' : 'bg-retail'}`;
-            
-            document.getElementById('kpi-label').innerText = isGaz ? 'CAR (MWh)' : 'PUISSANCE (kVA)';
-            document.getElementById('header-ratio').innerText = data.contract.power;
+            badge.className = `px-2 py-0.5 rounded text-[10px] font-bold border ${isGaz ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-cyan/10 text-cyan border-cyan/20'}`;
 
-            // 3. Grille Tarifaire Dynamique
+            document.getElementById('kpi-label').innerText = isGaz ? 'CAR (MWh)' : 'P. Souscrite';
+            document.getElementById('kpi-value').innerText = data.contract.power + (isGaz ? '' : ' kVA');
+            document.getElementById('kpi-value').className = `text-sm font-mono font-bold ${isGaz ? 'text-red-500' : 'text-cyan'}`;
+
+            document.getElementById('contract-provider').innerText = data.contract.provider;
+            document.getElementById('contract-segment').innerText = data.contract.segment;
+
+            // 2. Pricing Grid (Smart Switch)
             const grid = document.getElementById('pricing-grid');
-            grid.innerHTML = ''; // Reset
+            grid.innerHTML = '';
 
             if (isGaz) {
-                // Mode GAZ (3 Blocs)
-                document.getElementById('pricing-mode').innerText = "CONTRAT GAZ (INDEXÉ)";
-                document.getElementById('pricing-card').style.borderColor = "rgba(239, 68, 68, 0.3)"; // Red border
-                
-                addPriceBox(grid, "Abonnement", data.pricing.fix + " €", "text-yellow-500");
-                addPriceBox(grid, "Molécule", data.pricing.hph + " €/MWh", "text-red-500", true);
-                addPriceBox(grid, "Taxes (TICGN)", data.pricing.tax + " €/MWh", "text-gray-400");
-                
+                // Mode Gaz
+                addPriceRow(grid, "Abonnement", data.pricing.fix + " €", "text-yellow-500");
+                addPriceRow(grid, "Molécule", data.pricing.hph + " €/MWh", "text-red-500 font-bold");
+                addPriceRow(grid, "Taxes", data.pricing.tax + " €/MWh", "text-gray-400");
+                document.getElementById('avg-price').innerText = (parseFloat(data.pricing.hph) + parseFloat(data.pricing.tax)).toFixed(2);
             } else {
-                // Mode ELEC (4 Saisons)
-                document.getElementById('pricing-mode').innerText = "TURPE 4 POSTES";
-                document.getElementById('pricing-card').style.borderColor = "rgba(168, 85, 247, 0.3)"; // Purple border
-
-                addPriceBox(grid, "HPH (Hiver P)", data.pricing.hph, "text-white");
-                addPriceBox(grid, "HCH (Hiver C)", data.pricing.hch, "text-gray-400");
-                addPriceBox(grid, "HPE (Été P)", data.pricing.hpe, "text-cyan-400");
-                addPriceBox(grid, "HCE (Été C)", data.pricing.hce, "text-cyan-400");
-                addPriceBox(grid, "Taxes (CSPE)", data.pricing.tax, "text-gray-500");
+                // Mode Elec
+                addPriceRow(grid, "HPH (Hiver P)", data.pricing.hph, "text-white");
+                addPriceRow(grid, "HCH (Hiver C)", data.pricing.hch, "text-gray-400");
+                addPriceRow(grid, "HPE (Été P)", data.pricing.hpe, "text-cyan");
+                addPriceRow(grid, "HCE (Été C)", data.pricing.hce, "text-cyan");
+                addPriceRow(grid, "Taxes", data.pricing.tax, "text-gray-500");
+                document.getElementById('avg-price').innerText = "112.40"; // Calcul simulé
             }
+
+            // 3. Chart Init
+            initChart(isGaz);
         }
 
-        function addPriceBox(container, label, val, colorClass, highlight=false) {
+        function addPriceRow(container, label, val, classes) {
             const div = document.createElement('div');
-            div.className = `bg-abysse/50 rounded-xl p-4 flex flex-col justify-center items-center border ${highlight ? 'border-red-500/50 bg-red-500/5' : 'border-white/5'}`;
-            div.innerHTML = `<span class="text-[10px] text-gray-500 uppercase mb-1">${label}</span><span class="text-xl font-bold font-mono ${colorClass}">${val}</span>`;
+            div.className = "flex justify-between items-center p-2 rounded hover:bg-white/5 transition";
+            div.innerHTML = `<span class="text-xs text-gray-400">${label}</span><span class="text-sm font-mono ${classes}">${val}</span>`;
             container.appendChild(div);
         }
 
-        // INIT
+        function initChart(isGaz) {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            const color = isGaz ? '#EF4444' : '#A855F7';
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'],
+                    datasets: [{
+                        label: 'Consommation',
+                        data: [120, 110, 90, 80, 60, 50, 40, 45, 70, 90, 110, 130],
+                        backgroundColor: color,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#64748B', font: { size: 10 } } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Init
         document.addEventListener('DOMContentLoaded', () => {
-            initChart();
             loadData();
         });
     </script>
