@@ -48,7 +48,11 @@ class PropagationRequest(BaseModel):
 class TenderRequest(BaseModel):
     site_ids: List[str]
 
-# --- MARKET WATCH ENGINE ---
+class MarketUpdateModel(BaseModel):
+    elec: dict
+    gaz: dict
+
+# --- MARKET WATCH ENGINE (NOUVEAU V38) ---
 def get_market_ref():
     path = "/app/data/market_ref.json"
     if os.path.exists(path):
@@ -64,7 +68,17 @@ def get_market_ref():
 @app.get("/api/market/current")
 async def api_get_market(): return JSONResponse(get_market_ref())
 
-# --- API DASHBOARD / FLEET ---
+@app.post("/api/ops/market/update")
+async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header(None)):
+    if x_admin_token != "BOSS_V5": raise HTTPException(status_code=401, detail="Accès refusé")
+    try:
+        payload = data.dict()
+        payload["updated_at"] = datetime.now().isoformat()
+        with open("/app/data/market_ref.json", "w") as f: json.dump(payload, f, indent=4)
+        return JSONResponse({"success": True, "updated_at": payload["updated_at"]})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
+
+# --- API DASHBOARD / FLEET (BI & ANALYTICS V37) ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
     DATA_DIR = "/app/data"
@@ -173,19 +187,15 @@ async def api_chaos(x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
-# --- API TENDER (GENERATION APPEL D'OFFRE EXCEL) ---
+# --- API TENDER (GENERATION APPEL D'OFFRE EXCEL V39) ---
 @app.post("/api/ops/generate_tender")
 async def generate_tender(payload: TenderRequest):
-    """
-    Génère un fichier Excel (.xlsx) DCE complet pour les sites sélectionnés.
-    """
     selected_sites = []
     for site_id in payload.site_ids:
         data = storage.get_client_settings(site_id)
         if data: selected_sites.append(data)
     
-    if not selected_sites:
-        raise HTTPException(status_code=400, detail="Aucun site valide sélectionné")
+    if not selected_sites: raise HTTPException(status_code=400, detail="Aucun site valide sélectionné")
 
     # APPEL CORTEX V39 (EXCEL ENGINE)
     excel_content = cortex.generate_advanced_tender_excel(selected_sites)
