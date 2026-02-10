@@ -48,43 +48,25 @@ class PropagationRequest(BaseModel):
 class TenderRequest(BaseModel):
     site_ids: List[str]
 
-# --- MARKET WATCH ENGINE (NOUVEAU V38) ---
+# --- MARKET WATCH ENGINE ---
 def get_market_ref():
-    """
-    Charge les indices de marché de référence (Source Interne Sécurisée).
-    Si le fichier n'existe pas, retourne des valeurs par défaut réalistes (2026).
-    """
     path = "/app/data/market_ref.json"
     if os.path.exists(path):
         try:
             with open(path, 'r') as f: return json.load(f)
         except: pass
-    
-    # Valeurs par défaut (Sécurité)
     return {
         "updated_at": datetime.now().isoformat(),
-        "elec": {
-            "cal_n1": 82.50,  # €/MWh (Baseload 2027)
-            "cal_n2": 76.00,
-            "trend": "BAISSIER"
-        },
-        "gaz": {
-            "peg_n1": 39.40,  # €/MWh (PEG 2027)
-            "peg_n2": 36.10,
-            "trend": "STABLE"
-        }
+        "elec": { "cal_n1": 82.50, "cal_n2": 76.00, "trend": "BAISSIER" },
+        "gaz": { "peg_n1": 39.40, "peg_n2": 36.10, "trend": "STABLE" }
     }
 
 @app.get("/api/market/current")
-async def api_get_market():
-    return JSONResponse(get_market_ref())
+async def api_get_market(): return JSONResponse(get_market_ref())
 
-# --- API DASHBOARD / FLEET (BI & ANALYTICS) ---
+# --- API DASHBOARD / FLEET ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
-    """
-    Renvoie la liste consolidée du parc AVEC les calculs ROI (Ghost & Landing).
-    """
     DATA_DIR = "/app/data"
     fleet = []
     try:
@@ -92,14 +74,10 @@ async def get_fleet_data():
         for file_path in files:
             try:
                 with open(file_path, 'r') as f: data = json.load(f)
-                
-                # Enrichissement Cortex (Calculs ROI)
                 kpis = cortex.enrich_fleet_kpis(data)
-                
                 contract = data.get('contract', {})
                 identity = data.get('identity', {})
                 is_gaz = "T" in str(contract.get('segment', '')) or "gaz" in str(data.get('pricing', {}).get('hph', '')).lower()
-
                 fleet.append({
                     "id": identity.get('id'),
                     "name": identity.get('site_name') or identity.get('name') or "Site Inconnu",
@@ -120,61 +98,25 @@ async def get_fleet_data():
 
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str):
-    """
-    Données détaillées + ANALYSE DE MARCHÉ (Market Watch).
-    """
     client_data = storage.get_client_settings(client_id)
     if not client_data: return JSONResponse({"error": "Client introuvable"})
-    
     contract = client_data.get('contract', {})
     pricing = client_data.get('pricing', {})
-    is_gaz = "T" in str(contract.get('segment', '')) or "gaz" in str(pricing.get('hph', '')).lower()
+    is_gaz = "T" in str(contract.get('segment', ''))
     
-    # 1. Récupération Marché
     market = get_market_ref()
     market_price = market['gaz']['peg_n1'] if is_gaz else market['elec']['cal_n1']
-    
-    # 2. Récupération Prix Client (Nettoyage)
-    try:
-        client_price = float(str(pricing.get('hph', '0')).replace(',', '.').replace(' ', ''))
+    try: client_price = float(str(pricing.get('hph', '0')).replace(',', '.').replace(' ', ''))
     except: client_price = 0.0
-
-    # 3. Moteur de Conseil (Market Watch V1)
-    advice = {}
-    if client_price > 0:
-        delta = client_price - market_price
-        if delta > 10: # Le client paie beaucoup plus cher que le marché
-            advice = {
-                "status": "OPPORTUNITÉ",
-                "color": "green",
-                "title": "Baisse de Marché Détectée",
-                "message": f"Le marché ({market_price}€) est inférieur à votre contrat ({client_price}€).",
-                "action": "Conseil : Anticipez le renouvellement pour sécuriser ce gain."
-            }
-        elif delta < -10: # Le client paie moins cher (Bien joué)
-            advice = {
-                "status": "PROTECTION",
-                "color": "blue",
-                "title": "Position Sécurisée",
-                "message": f"Votre prix ({client_price}€) bat le marché actuel ({market_price}€).",
-                "action": "Conseil : Ne bougez pas. Votre contrat est un bouclier."
-            }
-        else: # Prix aligné
-            advice = {
-                "status": "NEUTRE",
-                "color": "gray",
-                "title": "Marché Stable",
-                "message": "Votre contrat est aligné avec les tendances actuelles.",
-                "action": "Conseil : Surveillance active maintenue."
-            }
-    else:
-        advice = {"status": "INFO", "color": "gray", "title": "Analyse Impossible", "message": "Prix contrat manquant.", "action": "Veuillez renseigner les prix."}
-
-    # 4. Insight Technique (Préservé)
+    
+    advice = cortex.analyze_market_position(client_price, market_price, "gaz" if is_gaz else "elec")
+    
     tech_insight = {
         "titre": "Analyse Chauffage" if is_gaz else "Surveillance Puissance",
         "message": "Consommation conforme aux prévisions." if is_gaz else f"Optimisation possible de l'abonnement.",
-        "status": "NORMAL"
+        "conseil": "Vérifiez les régulations horaires." if is_gaz else "Analysez les pics de charge.",
+        "status": "NORMAL",
+        "color": "green" if is_gaz else "yellow"
     }
     
     response = {
@@ -183,7 +125,7 @@ async def get_dashboard_data(client_id: str):
         "contract": contract,
         "pricing": client_data.get('pricing', {}),
         "cortex_insight": tech_insight,
-        "market_analysis": advice, # NOUVEAU
+        "market_analysis": advice,
         "energy_type": "gaz" if is_gaz else "elec"
     }
     return JSONResponse(response)
@@ -194,37 +136,21 @@ async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), 
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     try:
         content = await file.read()
-        
-        # 1. SCAN DU PDL
         detected_pdl = None
         filename_match = re.search(r'(\d{14})', file.filename)
-        if filename_match:
-            detected_pdl = filename_match.group(1)
-            print(f"[SCAN] PDL trouvé dans le nom de fichier : {detected_pdl}")
-        
+        if filename_match: detected_pdl = filename_match.group(1)
         if not detected_pdl:
             try:
                 content_str = content.decode('latin-1', errors='ignore')[:1000]
                 content_match = re.search(r'\b(\d{14})\b', content_str)
                 if content_match: detected_pdl = content_match.group(1)
             except: pass
-
-        # 2. RECONCILIATION
         site_data = None
-        if detected_pdl:
-            site_data = storage.find_site_by_pdl(detected_pdl)
-            if site_data:
-                print(f"[RECONCILIATION] SUCCÈS : {site_data.get('client_name')} lié au PDL {detected_pdl}")
-            else:
-                print(f"[RECONCILIATION] ÉCHEC : Le PDL {detected_pdl} est inconnu dans Settings.")
-
-        # 3. APPEL CORTEX
+        if detected_pdl: site_data = storage.find_site_by_pdl(detected_pdl)
         res = cortex.analyze_file(content, file.filename, target_profile=target, known_site_data=site_data)
-        
         if res.get("success"): 
             res["secure_link"] = f"/dashboard/{target}?site={site_name}"
             if site_data: res["reconciled"] = True
-            
         return JSONResponse(res)
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
@@ -247,11 +173,11 @@ async def api_chaos(x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
-# --- API TENDER (GENERATION APPEL D'OFFRE) ---
+# --- API TENDER (GENERATION APPEL D'OFFRE EXCEL) ---
 @app.post("/api/ops/generate_tender")
 async def generate_tender(payload: TenderRequest):
     """
-    Génère un fichier d'Appel d'Offres pour les sites sélectionnés.
+    Génère un fichier Excel (.xlsx) DCE complet pour les sites sélectionnés.
     """
     selected_sites = []
     for site_id in payload.site_ids:
@@ -261,12 +187,16 @@ async def generate_tender(payload: TenderRequest):
     if not selected_sites:
         raise HTTPException(status_code=400, detail="Aucun site valide sélectionné")
 
-    csv_content = cortex.generate_tender_package(selected_sites)
+    # APPEL CORTEX V39 (EXCEL ENGINE)
+    excel_content = cortex.generate_advanced_tender_excel(selected_sites)
     
+    timestamp = datetime.now().strftime("%Y%m%d")
+    filename = f"DCE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"
+
     return StreamingResponse(
-        iter([csv_content]), 
-        media_type="text/csv", 
-        headers={"Content-Disposition": f"attachment; filename=appel_offre_{len(selected_sites)}_sites.csv"}
+        io.BytesIO(excel_content), 
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 # --- API SETTINGS & IMPORT ---
@@ -302,15 +232,12 @@ async def propagate_tariff(payload: PropagationRequest):
         found = glob.glob(os.path.join(DATA_DIR, f"*{payload.source_client_id}*.json"))
         if found: source_path = found[0]
         else: raise HTTPException(status_code=404, detail="Site source introuvable")
-
     try:
         with open(source_path, 'r') as f:
             source_data = json.load(f)
             scope_siren = source_data.get('identity', {}).get('siret', '')[:9] 
     except Exception as e: raise HTTPException(status_code=500, detail=f"Erreur lecture source: {str(e)}")
-
     if not scope_siren or len(scope_siren) < 9: raise HTTPException(status_code=400, detail="Impossible de définir le périmètre (SIREN source invalide)")
-
     all_files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     for file_path in all_files:
         try:
@@ -322,29 +249,20 @@ async def propagate_tariff(payload: PropagationRequest):
             if client_segment != payload.filters.segment: continue
             client_lot = client.get('identity', {}).get('lot_name', '')
             if client_lot != payload.filters.lot_name: continue
-
             if 'tariff_history' not in client: client['tariff_history'] = []
             current_pricing = client.get('pricing', {})
             if current_pricing and (current_pricing.get('hph') or current_pricing.get('fix')):
-                history_entry = {
-                    "archived_at": datetime.now().isoformat(),
-                    "end_date": payload.target_date,
-                    "pricing": current_pricing,
-                    "provider": client.get('contract', {}).get('provider', 'Unknown')
-                }
+                history_entry = { "archived_at": datetime.now().isoformat(), "end_date": payload.target_date, "pricing": current_pricing, "provider": client.get('contract', {}).get('provider', 'Unknown') }
                 client['tariff_history'].append(history_entry)
-
             client['pricing'] = payload.pricing_data.dict()
             client['last_update'] = datetime.now().isoformat()
             client['sync_status'] = "PROPAGATED"
-
             with open(file_path, 'w') as f: json.dump(client, f, indent=4)
             updated_count += 1
         except Exception as e:
             print(f"[ERROR] Failed to propagate to {file_path}: {e}")
             errors.append(str(e))
             continue
-
     return {"success": True, "source_siren": scope_siren, "scanned": len(all_files), "updated_count": updated_count, "errors": errors}
 
 @app.post("/api/partner/save_config")
@@ -369,43 +287,26 @@ async def get_tickets():
     tickets = storage.list_tickets()
     return JSONResponse({"tickets": tickets})
 
-# --- GENERATEUR DE TEMPLATE CSV ELEC (V5) ---
+# --- TEMPLATES CSV ---
 @app.get("/api/settings/template_csv")
 async def get_import_template():
-    headers = [
-        "SIRET", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", 
-        "PDL", "PUISSANCE", "SEGMENT", "LOT",
-        "ABO_AN", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES"
-    ]
+    headers = [ "SIRET", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", "PDL", "PUISSANCE", "SEGMENT", "LOT", "ABO_AN", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES" ]
     stream = io.StringIO()
     writer = csv.writer(stream, delimiter=';')
     writer.writerow(headers)
-    writer.writerow([
-        "12345678900012", "Mon Entreprise", "Site Principal", "10 Rue de la Paix 75000 Paris",
-        "30000000000000", "36", "C5", "Lot 1",
-        "150.00", "0.15", "0.10", "0.08", "0.04", "22.5"
-    ])
+    writer.writerow([ "12345678900012", "Mon Entreprise", "Site Principal", "10 Rue de la Paix 75000 Paris", "30000000000000", "36", "C5", "Lot 1", "150.00", "0.15", "0.10", "0.08", "0.04", "22.5" ])
     stream.seek(0)
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=template_import_v5.csv"
     return response
 
-# --- GENERATEUR DE TEMPLATE CSV GAZ (V1) ---
 @app.get("/api/settings/template_csv_gaz")
 async def get_import_template_gaz():
-    headers = [
-        "SIRET", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", 
-        "PCE", "CAR_MWH", "SEGMENT_GAZ", "LOT",
-        "ABO_AN", "PRIX_MWH", "TAXES" 
-    ]
+    headers = [ "SIRET", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", "PCE", "CAR_MWH", "SEGMENT_GAZ", "LOT", "ABO_AN", "PRIX_MWH", "TAXES" ]
     stream = io.StringIO()
     writer = csv.writer(stream, delimiter=';')
     writer.writerow(headers)
-    writer.writerow([
-        "12345678900012", "Mon Entreprise", "Chaufferie Bât A", "10 Rue de la Paix",
-        "04500000000000", "150", "T2", "Lot Chauffage",
-        "250.00", "45.50", "8.44"
-    ])
+    writer.writerow([ "12345678900012", "Mon Entreprise", "Chaufferie Bât A", "10 Rue de la Paix", "04500000000000", "150", "T2", "Lot Chauffage", "250.00", "45.50", "8.44" ])
     stream.seek(0)
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=template_import_gaz_v1.csv"
