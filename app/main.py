@@ -52,7 +52,7 @@ class MarketUpdateModel(BaseModel):
     elec: dict
     gaz: dict
 
-# --- MARKET WATCH ENGINE (NOUVEAU V38) ---
+# --- MARKET WATCH ENGINE ---
 def get_market_ref():
     path = "/app/data/market_ref.json"
     if os.path.exists(path):
@@ -78,9 +78,13 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
         return JSONResponse({"success": True, "updated_at": payload["updated_at"]})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET (BI & ANALYTICS) ---
+# --- API DASHBOARD / FLEET (BI & ANALYTICS - CORRIGÉ V40.1) ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
+    """
+    Renvoie la liste consolidée du parc.
+    CORRECTIF V40.1 : Gestion robuste des IDs manquants pour éviter les erreurs Frontend.
+    """
     DATA_DIR = "/app/data"
     fleet = []
     try:
@@ -88,14 +92,24 @@ async def get_fleet_data():
         for file_path in files:
             try:
                 with open(file_path, 'r') as f: data = json.load(f)
+                
                 kpis = cortex.enrich_fleet_kpis(data)
                 contract = data.get('contract', {})
                 identity = data.get('identity', {})
+                
+                # CORRECTIF ID : Si l'ID est vide dans le JSON, on utilise le nom du fichier
+                file_id = os.path.basename(file_path).replace('.json', '')
+                real_id = identity.get('id') or file_id
+                
+                # Sécurisation Nom
+                real_name = identity.get('site_name') or identity.get('name') or data.get('client_name') or f"Site {real_id}"
+
                 is_gaz = "T" in str(contract.get('segment', '')) or "gaz" in str(data.get('pricing', {}).get('hph', '')).lower()
+                
                 fleet.append({
-                    "id": identity.get('id'),
-                    "name": identity.get('site_name') or identity.get('name') or "Site Inconnu",
-                    "city": data.get('location', {}).get('address', '').split(',')[-1].strip(),
+                    "id": real_id, # ID Garanti non-null
+                    "name": real_name,
+                    "city": data.get('location', {}).get('address', '').split(',')[-1].strip() or "-",
                     "energy": "gaz" if is_gaz else "elec",
                     "segment": contract.get('segment', '--'),
                     "lot": identity.get('lot_name', 'Hors Lot'),
@@ -195,11 +209,15 @@ async def generate_tender(payload: TenderRequest):
     """
     selected_sites = []
     for site_id in payload.site_ids:
+        # Robustesse : Ignore les IDs vides ou nuls
+        if not site_id: continue
+        
         data = storage.get_client_settings(site_id)
         if data: selected_sites.append(data)
     
     if not selected_sites:
-        raise HTTPException(status_code=400, detail="Aucun site valide sélectionné")
+        # Ne plante pas, renvoie une erreur propre
+        raise HTTPException(status_code=400, detail="Aucun site valide trouvé pour l'export.")
 
     # APPEL CORTEX V39 (EXCEL ENGINE)
     excel_content = cortex.generate_advanced_tender_excel(selected_sites)
@@ -222,7 +240,10 @@ async def api_import_csv(file: UploadFile = File(...)):
         if not sites: return JSONResponse({"success": False, "error": "Format incorrect"})
         saved = 0
         for s in sites:
-            storage.save_client_settings(s['identity']['id'], s)
+            # Sécurité ID
+            cid = s['identity'].get('id')
+            if not cid: continue 
+            storage.save_client_settings(cid, s)
             saved += 1
         return JSONResponse({"success": True, "imported": saved})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
