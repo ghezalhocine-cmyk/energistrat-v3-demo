@@ -78,7 +78,7 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
         return JSONResponse({"success": True, "updated_at": payload["updated_at"]})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET (BI & ANALYTICS V37) ---
+# --- API DASHBOARD / FLEET (BI & ANALYTICS) ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
     DATA_DIR = "/app/data"
@@ -187,15 +187,19 @@ async def api_chaos(x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
-# --- API TENDER (GENERATION APPEL D'OFFRE EXCEL V39) ---
+# --- API TENDER (GENERATION APPEL D'OFFRE EXCEL) ---
 @app.post("/api/ops/generate_tender")
 async def generate_tender(payload: TenderRequest):
+    """
+    Génère un fichier Excel (.xlsx) DCE complet pour les sites sélectionnés.
+    """
     selected_sites = []
     for site_id in payload.site_ids:
         data = storage.get_client_settings(site_id)
         if data: selected_sites.append(data)
     
-    if not selected_sites: raise HTTPException(status_code=400, detail="Aucun site valide sélectionné")
+    if not selected_sites:
+        raise HTTPException(status_code=400, detail="Aucun site valide sélectionné")
 
     # APPEL CORTEX V39 (EXCEL ENGINE)
     excel_content = cortex.generate_advanced_tender_excel(selected_sites)
