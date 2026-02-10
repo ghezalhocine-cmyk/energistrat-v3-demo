@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V13.1 | Retail Ultimate</title>
+    <title>ENERGISTRAT V13.2 | Retail Ultimate Fixed</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -527,7 +527,35 @@
         function toggleSelection(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
         function selectAll() { if(SELECTED_IDS.size === FLEET_DATA.length) SELECTED_IDS.clear(); else FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); renderTable(FLEET_DATA); updateActionBar(); }
         function updateActionBar() { const count = SELECTED_IDS.size; document.getElementById('selected-count').innerText = count; const bar = document.getElementById('action-bar'); if(count > 0) bar.classList.add('visible'); else bar.classList.remove('visible'); bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; }
-        async function generateTender() { if(SELECTED_IDS.size === 0) return; const btn = document.querySelector('#action-bar button'); const original = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ...'; try { const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: Array.from(SELECTED_IDS) }) }); if(res.ok) { const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `AO_Energistrat_${SELECTED_IDS.size}_sites.xlsx`; document.body.appendChild(a); a.click(); a.remove(); } else { alert("Erreur"); } } catch(e) { console.error(e); } btn.innerHTML = original; }
+        
+        // --- FIX V13.2 : GESTION ERREURS TENDER & EXTENSION XLSX ---
+        async function generateTender() {
+            if(SELECTED_IDS.size === 0) return alert("Veuillez sélectionner au moins un site.");
+            const btn = document.querySelector('#action-bar button');
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
+            try {
+                const res = await fetch('/api/ops/generate_tender', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ site_ids: Array.from(SELECTED_IDS) })
+                });
+                if(res.ok) {
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url;
+                    // FIX: Extension .xlsx
+                    a.download = `DCE_Energistrat_${SELECTED_IDS.size}_sites.xlsx`; 
+                    document.body.appendChild(a); a.click(); a.remove();
+                    selectAll(); // Reset
+                } else {
+                    // FIX: Affichage erreur serveur
+                    const err = await res.json();
+                    alert("Erreur Serveur : " + (err.detail || "Inconnue"));
+                }
+            } catch(e) { console.error(e); alert("Erreur réseau"); }
+            btn.innerHTML = original;
+        }
+
         function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
         function addPriceLine(c, l, v, cl) { c.innerHTML += `<div class="flex justify-between text-xs border-b border-white/5 pb-2"><span class="text-gray-500">${l}</span><span class="font-mono ${cl}">${v}</span></div>`; }
         document.addEventListener('DOMContentLoaded', loadFleet);
