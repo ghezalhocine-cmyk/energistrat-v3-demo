@@ -6,29 +6,37 @@ from pathlib import Path
 import logging
 
 # CONFIGURATION DU CHEMIN
-DATA_ROOT = Path("/app/data") if os.path.exists("/app/data") else Path("data")
+# Force le chemin absolu pour Cloud Run
+DATA_ROOT = Path("/app/data")
+if not DATA_ROOT.exists():
+    # Fallback local
+    DATA_ROOT = Path("data")
+    DATA_ROOT.mkdir(exist_ok=True)
+
 INDEX_FILE = DATA_ROOT / "master_index.json"
 VAULT_FILE = DATA_ROOT / "system" / "secure_vault.json"
 
-logger = logging.getLogger("STORAGE_ENGINE")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("STORAGE_ENGINE_V4")
 
 class StorageEngine:
     def __init__(self):
-        self.version = "3.6 (Full Context Extraction)"
+        self.version = "4.0 (Flat Storage for Fleet Dashboard)"
         self.index = {}
         self._ensure_structure()
         self.load_index()
 
     def _ensure_structure(self):
+        # On garde les dossiers annexes, mais les clients iront à la racine
         dirs = [
-            DATA_ROOT / "raw_uploads", DATA_ROOT / "raw_uploads" / "API",
-            DATA_ROOT / "orgs", DATA_ROOT / "clients", DATA_ROOT / "partners",
-            DATA_ROOT / "tickets", DATA_ROOT / "archives" / "INBOX", DATA_ROOT / "system"
+            DATA_ROOT / "partners",
+            DATA_ROOT / "tickets", 
+            DATA_ROOT / "system"
         ]
         for d in dirs: d.mkdir(parents=True, exist_ok=True)
 
         if not INDEX_FILE.exists():
-            initial = {"meta": {"version": "3.6", "created": datetime.datetime.now().isoformat()}, "organizations": {}, "sites": {}}
+            initial = {"meta": {"version": "4.0", "created": datetime.datetime.now().isoformat()}, "organizations": {}, "sites": {}}
             with open(INDEX_FILE, 'w', encoding='utf-8') as f: json.dump(initial, f, indent=2)
 
     def load_index(self):
@@ -45,18 +53,18 @@ class StorageEngine:
             os.replace(temp, INDEX_FILE)
         except Exception: pass
 
-    # --- RECONCILIATION ENGINE (EVOLUTION V3.6) ---
+    # --- RECONCILIATION ENGINE (MISE A JOUR V4.0 - FLAT SCAN) ---
     def find_site_by_pdl(self, pdl):
         """
-        Cherche un PDL et extrait TOUT le contexte (NAF, Puissance, Adresse).
+        Cherche un PDL dans la structure PLATE (/app/data/*.json).
         """
         if not pdl: return None
         
-        clients_dir = DATA_ROOT / "clients"
-        if not clients_dir.exists(): return None
-
-        # Scan des dossiers clients
-        for client_file in clients_dir.glob("*/settings.json"):
+        # Scan de tous les JSON à la racine
+        for client_file in DATA_ROOT.glob("*.json"):
+            # Ignore les fichiers système
+            if "master_index" in client_file.name or "market_ref" in client_file.name: continue
+            
             try:
                 with open(client_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
@@ -68,44 +76,71 @@ class StorageEngine:
                     # Comparaison
                     if str(pdl) in stored_pdl:
                         identity = data.get("identity", {})
-                        location = data.get("location", {}) # AJOUT V3.6
+                        location = data.get("location", {})
                         
                         return {
                             "pdl": pdl,
-                            "client_name": identity.get("name", "Client Inconnu"),
+                            "client_name": identity.get("site_name") or identity.get("name", "Client Inconnu"),
                             "power": contract.get("power", 0),
                             "segment": contract.get("segment", "Inconnu"),
                             "naf_label": identity.get("naf", "Métier Détecté"),
-                            # NOUVEAU : On passe l'adresse pour le calcul DJU
-                            "address": location.get("address", "")
+                            "address": location.get("address", ""),
+                            "reconciled": True
                         }
-            except Exception as e:
+            except Exception:
                 continue
         
         return None
 
-    # --- ERP CLIENTS ---
+    # --- ERP CLIENTS (MISE A JOUR V4.0 - FLAT WRITE) ---
     def save_client_settings(self, client_id, data):
+        """
+        Sauvegarde le client à la RACINE pour être visible par le Dashboard Fleet.
+        """
         try:
+            # Nettoyage ID
             cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
-            path = DATA_ROOT / "clients" / cid
-            path.mkdir(parents=True, exist_ok=True)
+            if not cid: cid = f"site_{uuid.uuid4().hex[:8]}"
+
+            # Chemin PLAT : /app/data/{id}.json
+            path = DATA_ROOT / f"{cid}.json"
+            
             data["_meta"] = {"updated_at": datetime.datetime.now().isoformat()}
-            with open(path / "settings.json", 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
-            self.index["organizations"][cid] = {"name": data.get("identity", {}).get("name"), "path": str(path)}
+            
+            with open(path, 'w', encoding='utf-8') as f: 
+                json.dump(data, f, indent=4, ensure_ascii=False)
+            
+            # Mise à jour index (optionnel mais propre)
+            self.index["sites"][cid] = {"name": data.get("identity", {}).get("site_name"), "path": str(path)}
             self.save_index()
-            return {"success": True}
-        except Exception as e: return {"success": False, "error": str(e)}
+            
+            return {"success": True, "id": cid, "path": str(path)}
+        except Exception as e: 
+            logger.error(f"Save Error: {e}")
+            return {"success": False, "error": str(e)}
 
-    def load_client_settings(self, client_id):
+    def get_client_settings(self, client_id):
+        """
+        Récupère un client depuis la racine.
+        Renommé de 'load_client_settings' pour compatibilité main.py V40.
+        """
         try:
             cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
-            path = DATA_ROOT / "clients" / cid / "settings.json"
-            if not path.exists(): return {"success": False, "error": "Inconnu"}
+            path = DATA_ROOT / f"{cid}.json"
+            
+            if not path.exists(): 
+                # Tentative de fallback (Ancienne structure dossier)
+                old_path = DATA_ROOT / "clients" / cid / "settings.json"
+                if old_path.exists():
+                    with open(old_path, 'r', encoding='utf-8') as f: return json.load(f)
+                return None
+            
             with open(path, 'r', encoding='utf-8') as f: return json.load(f)
-        except Exception as e: return {"success": False, "error": str(e)}
+        except Exception as e: 
+            logger.error(f"Load Error: {e}")
+            return None
 
-    # --- PARTNERS ---
+    # --- PARTNERS (INCHANGÉ) ---
     def save_partner_config(self, pid, data):
         try:
             clean = "".join(x for x in pid if x.isalnum() or x in "_-")
@@ -115,7 +150,7 @@ class StorageEngine:
             return {"success": True}
         except Exception as e: return {"success": False, "error": str(e)}
 
-    # --- TICKETING ---
+    # --- TICKETING (INCHANGÉ) ---
     def create_ticket(self, data):
         try:
             tid = f"TK-{uuid.uuid4().hex[:6].upper()}"
