@@ -135,8 +135,8 @@
                                 <th class="px-4 py-3">Ville</th>
                                 <th class="px-4 py-3">Lot</th>
                                 <th class="px-4 py-3 text-center">Énergie</th>
+                                <th class="px-4 py-3 text-right">Volume</th>
                                 <th class="px-4 py-3 text-right">Budget Est.</th>
-                                <th class="px-4 py-3 text-right text-warning">Gaspillage</th>
                                 <th class="px-4 py-3 text-right">Atterrissage</th>
                             </tr>
                         </thead>
@@ -185,7 +185,7 @@
                 </div>
             </div>
 
-            <!-- VUE 3 : DÉTAIL SITE (COACHING & TECHNIQUE) -->
+            <!-- VUE 3 : DÉTAIL SITE (ULTIMATE COCKPIT) -->
             <div id="view-detail" class="view-section hidden space-y-6">
                 <button onclick="switchView('fleet')" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4">
                     <i class="fa-solid fa-arrow-left"></i> RETOUR LISTE
@@ -209,15 +209,14 @@
                         <div>
                             <div class="text-[10px] text-primary font-bold uppercase tracking-wider mb-1">Analyse Cortex</div>
                             <div class="text-sm text-white font-medium leading-tight" id="cortex-msg">--</div>
-                            <div class="inline-block bg-primary/20 text-primary px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider mt-2" id="cortex-action">Action Requise</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- GRILLE DÉTAIL (3 COLONNES) -->
+                <!-- GRILLE DÉTAIL (3 COLONNES - EVOLUTION V13.1) -->
                 <div class="grid grid-cols-3 gap-6">
                     
-                    <!-- 1. OPTIMISATION PUISSANCE & CONTRAT -->
+                    <!-- COL 1 : TECHNIQUE (Optimisation) -->
                     <div class="bento-card col-span-1 p-6 flex flex-col justify-between">
                         <div>
                             <h3 class="text-white font-bold text-sm mb-4 flex items-center gap-2">
@@ -242,7 +241,7 @@
                         </div>
                     </div>
 
-                    <!-- 2. PRIX & MARKET WATCH -->
+                    <!-- COL 2 : STRATÉGIE (Market Watch + Prix) -->
                     <div class="bento-card col-span-1 p-6 flex flex-col bg-white/5 border-l-4 border-white/10" id="market-card">
                         <div class="flex justify-between items-start mb-4">
                             <h3 class="font-bold text-white text-sm">Contrat & Marché</h3>
@@ -258,7 +257,7 @@
                         </div>
                     </div>
 
-                    <!-- 3. ATTERRISSAGE & TERTIAIRE (RÉINTÉGRÉ V13.1) -->
+                    <!-- COL 3 : CONTROLE GESTION (Landing + Tertiaire) - NOUVEAU -->
                     <div class="bento-card col-span-1 p-6 flex flex-col justify-between">
                         <div>
                             <h3 class="text-white font-bold text-sm mb-4"><i class="fa-solid fa-plane-arrival mr-2 text-primary"></i>Budget Landing</h3>
@@ -276,7 +275,7 @@
                         </div>
                         
                         <div class="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-                            <span class="text-xs font-bold text-green-400">Obj. Tertiaire</span>
+                            <div class="text-xs font-bold text-green-400">Obj. Tertiaire</div>
                             <div class="flex items-center gap-2">
                                 <span class="text-xl font-bold text-white">-12%</span>
                                 <div class="w-8 h-8 rounded-full border-2 border-green-500 flex items-center justify-center text-[8px] text-green-500">2030</div>
@@ -528,7 +527,7 @@
         function toggleSelection(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
         function selectAll() { if(SELECTED_IDS.size === FLEET_DATA.length) SELECTED_IDS.clear(); else FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); renderTable(FLEET_DATA); updateActionBar(); }
         function updateActionBar() { const count = SELECTED_IDS.size; document.getElementById('selected-count').innerText = count; const bar = document.getElementById('action-bar'); if(count > 0) bar.classList.add('visible'); else bar.classList.remove('visible'); bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; }
-        async function generateTender() { if(SELECTED_IDS.size === 0) return; const btn = document.querySelector('#action-bar button'); const original = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ...'; try { const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: Array.from(SELECTED_IDS) }) }); if(res.ok) { const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `AO_Energistrat_${SELECTED_IDS.size}_sites.csv`; document.body.appendChild(a); a.click(); a.remove(); } else { alert("Erreur"); } } catch(e) { console.error(e); } btn.innerHTML = original; }
+        async function generateTender() { if(SELECTED_IDS.size === 0) return; const btn = document.querySelector('#action-bar button'); const original = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ...'; try { const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: Array.from(SELECTED_IDS) }) }); if(res.ok) { const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `AO_Energistrat_${SELECTED_IDS.size}_sites.xlsx`; document.body.appendChild(a); a.click(); a.remove(); } else { alert("Erreur"); } } catch(e) { console.error(e); } btn.innerHTML = original; }
         function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
         function addPriceLine(c, l, v, cl) { c.innerHTML += `<div class="flex justify-between text-xs border-b border-white/5 pb-2"><span class="text-gray-500">${l}</span><span class="font-mono ${cl}">${v}</span></div>`; }
         document.addEventListener('DOMContentLoaded', loadFleet);
