@@ -78,62 +78,86 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
         return JSONResponse({"success": True, "updated_at": payload["updated_at"]})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET (BI & ANALYTICS - CORRIGÉ V40.1) ---
+# --- API DASHBOARD / FLEET (BI & ANALYTICS - ROBUSTE V40.1) ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
     """
     Renvoie la liste consolidée du parc.
-    CORRECTIF V40.1 : Gestion robuste des IDs manquants pour éviter les erreurs Frontend.
+    CORRECTIF V40.1 : Gestion robuste des IDs manquants et nettoyage des nombres.
     """
     DATA_DIR = "/app/data"
     fleet = []
+    
+    # Helper interne pour nettoyer les nombres sales
+    def clean_num(val):
+        if not val: return 0.0
+        s = str(val).replace(' ', '').replace(',', '.').replace('€', '').replace('kVA', '').replace('MWh', '')
+        try: return float(s)
+        except: return 0.0
+
     try:
         files = glob.glob(os.path.join(DATA_DIR, "*.json"))
         for file_path in files:
             try:
                 with open(file_path, 'r') as f: data = json.load(f)
                 
+                # Enrichissement Cortex
                 kpis = cortex.enrich_fleet_kpis(data)
+                
                 contract = data.get('contract', {})
                 identity = data.get('identity', {})
+                pricing = data.get('pricing', {})
+                loc = data.get('location', {})
                 
-                # CORRECTIF ID : Si l'ID est vide dans le JSON, on utilise le nom du fichier
+                # CORRECTIF ID : Fallback sur le nom de fichier si ID manquant
                 file_id = os.path.basename(file_path).replace('.json', '')
                 real_id = identity.get('id') or file_id
                 
                 # Sécurisation Nom
                 real_name = identity.get('site_name') or identity.get('name') or data.get('client_name') or f"Site {real_id}"
 
-                is_gaz = "T" in str(contract.get('segment', '')) or "gaz" in str(data.get('pricing', {}).get('hph', '')).lower()
+                # Détection Energie
+                is_gaz = "T" in str(contract.get('segment', '')) or "gaz" in str(pricing.get('hph', '')).lower()
                 
+                # Sécurisation Puissance
+                power = clean_num(contract.get('power', 0))
+
                 fleet.append({
                     "id": real_id, # ID Garanti non-null
                     "name": real_name,
-                    "city": data.get('location', {}).get('address', '').split(',')[-1].strip() or "-",
+                    "city": loc.get('address', '').split(',')[-1].strip() or "-",
                     "energy": "gaz" if is_gaz else "elec",
                     "segment": contract.get('segment', '--'),
                     "lot": identity.get('lot_name', 'Hors Lot'),
-                    "power": contract.get('power', 0),
+                    "power": power,
                     "budget": kpis['budget_annual'],
                     "ghost_savings": kpis['ghost_savings'],
                     "landing": kpis['landing_forecast'],
                     "alert": kpis['is_alert_landing'],
                     "provider": contract.get('provider', 'Inconnu')
                 })
-            except: continue
+            except Exception as e:
+                print(f"[WARN] Skipped file {file_path}: {e}")
+                continue
         return JSONResponse({"fleet": fleet, "count": len(fleet)})
     except Exception as e: return JSONResponse({"error": str(e)})
 
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str):
+    """
+    Données détaillées + ANALYSE DE MARCHÉ.
+    """
     client_data = storage.get_client_settings(client_id)
     if not client_data: return JSONResponse({"error": "Client introuvable"})
+    
     contract = client_data.get('contract', {})
     pricing = client_data.get('pricing', {})
     is_gaz = "T" in str(contract.get('segment', ''))
     
     market = get_market_ref()
     market_price = market['gaz']['peg_n1'] if is_gaz else market['elec']['cal_n1']
+    
+    # Nettoyage prix client pour comparaison
     try: client_price = float(str(pricing.get('hph', '0')).replace(',', '.').replace(' ', ''))
     except: client_price = 0.0
     
@@ -209,15 +233,14 @@ async def generate_tender(payload: TenderRequest):
     """
     selected_sites = []
     for site_id in payload.site_ids:
-        # Robustesse : Ignore les IDs vides ou nuls
+        # Robustesse : on ignore les IDs vides
         if not site_id: continue
         
         data = storage.get_client_settings(site_id)
         if data: selected_sites.append(data)
     
     if not selected_sites:
-        # Ne plante pas, renvoie une erreur propre
-        raise HTTPException(status_code=400, detail="Aucun site valide trouvé pour l'export.")
+        raise HTTPException(status_code=400, detail="Aucun site valide sélectionné pour l'export.")
 
     # APPEL CORTEX V39 (EXCEL ENGINE)
     excel_content = cortex.generate_advanced_tender_excel(selected_sites)
@@ -237,12 +260,12 @@ async def api_import_csv(file: UploadFile = File(...)):
     try:
         content = await file.read()
         sites = cortex.parse_mass_import_v5(content)
-        if not sites: return JSONResponse({"success": False, "error": "Format incorrect"})
+        if not sites: return JSONResponse({"success": False, "error": "Format incorrect ou fichier vide"})
         saved = 0
         for s in sites:
-            # Sécurité ID
+            # Sécurité ID : Utiliser le SIRET ou générer un ID si manquant
             cid = s['identity'].get('id')
-            if not cid: continue 
+            if not cid: continue
             storage.save_client_settings(cid, s)
             saved += 1
         return JSONResponse({"success": True, "imported": saved})
