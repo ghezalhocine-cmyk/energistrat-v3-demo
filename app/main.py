@@ -4,6 +4,7 @@ import json
 import glob
 import io
 import csv
+import traceback # AJOUT POUR DEBUG
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
@@ -52,7 +53,7 @@ class MarketUpdateModel(BaseModel):
     elec: dict
     gaz: dict
 
-# --- MARKET WATCH ENGINE ---
+# --- MARKET WATCH ---
 def get_market_ref():
     path = "/app/data/market_ref.json"
     if os.path.exists(path):
@@ -78,7 +79,7 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
         return JSONResponse({"success": True, "updated_at": payload["updated_at"]})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET (BI & ANALYTICS - ROBUSTE V40.1) ---
+# --- API DASHBOARD / FLEET (CORRECTIF V40.3 - FILTRAGE FANTOMES) ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
     DATA_DIR = "/app/data"
@@ -93,16 +94,23 @@ async def get_fleet_data():
     try:
         files = glob.glob(os.path.join(DATA_DIR, "*.json"))
         for file_path in files:
+            # FILTRE 1 : Ignorer les fichiers système ou temporaires
+            filename = os.path.basename(file_path)
+            if "master_index" in filename or "market_ref" in filename: continue
+
             try:
                 with open(file_path, 'r') as f: data = json.load(f)
                 
+                # FILTRE 2 : Ignorer les fichiers vides/corrompus
+                if not data or 'identity' not in data: continue
+
                 kpis = cortex.enrich_fleet_kpis(data)
                 contract = data.get('contract', {})
                 identity = data.get('identity', {})
                 pricing = data.get('pricing', {})
                 loc = data.get('location', {})
                 
-                file_id = os.path.basename(file_path).replace('.json', '')
+                file_id = filename.replace('.json', '')
                 real_id = identity.get('id') or file_id
                 real_name = identity.get('site_name') or identity.get('name') or data.get('client_name') or f"Site {real_id}"
 
@@ -123,12 +131,17 @@ async def get_fleet_data():
                     "alert": kpis['is_alert_landing'],
                     "provider": contract.get('provider', 'Inconnu')
                 })
-            except: continue
+            except Exception as e:
+                print(f"[WARN] Skipped file {file_path}: {e}")
+                continue
         return JSONResponse({"fleet": fleet, "count": len(fleet)})
     except Exception as e: return JSONResponse({"error": str(e)})
 
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str):
+    # Sécurité : Empêcher la lecture des fichiers système
+    if "master" in client_id or "market" in client_id: return JSONResponse({"error": "Accès interdit"})
+
     client_data = storage.get_client_settings(client_id)
     if not client_data: return JSONResponse({"error": "Client introuvable"})
     
@@ -138,7 +151,6 @@ async def get_dashboard_data(client_id: str):
     
     market = get_market_ref()
     market_price = market['gaz']['peg_n1'] if is_gaz else market['elec']['cal_n1']
-    
     try: client_price = float(str(pricing.get('hph', '0')).replace(',', '.').replace(' ', ''))
     except: client_price = 0.0
     
@@ -146,8 +158,8 @@ async def get_dashboard_data(client_id: str):
     
     tech_insight = {
         "titre": "Analyse Chauffage" if is_gaz else "Surveillance Puissance",
-        "message": "Consommation conforme aux prévisions." if is_gaz else f"Optimisation possible de l'abonnement.",
-        "conseil": "Vérifiez les régulations horaires." if is_gaz else "Analysez les pics de charge.",
+        "message": "Consommation conforme." if is_gaz else f"Optimisation possible.",
+        "conseil": "Vérifiez régulations." if is_gaz else "Analysez pics de charge.",
         "status": "NORMAL",
         "color": "green" if is_gaz else "yellow"
     }
@@ -163,7 +175,7 @@ async def get_dashboard_data(client_id: str):
     }
     return JSONResponse(response)
 
-# --- API OPS (ADMIN & ANALYSE) ---
+# --- API OPS ---
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), site_name: str = Form("Site_1"), x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
@@ -206,33 +218,49 @@ async def api_chaos(x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
-# --- API TENDER (GENERATION APPEL D'OFFRE EXCEL V40.2 FIX) ---
+# --- API TENDER (GENERATION EXCEL V40.3 - DEBUG) ---
 @app.post("/api/ops/generate_tender")
 async def generate_tender(payload: TenderRequest):
+    """
+    Génère le DCE Excel. Avec LOGS D'ERREUR PRÉCIS.
+    """
+    print(f"[TENDER] Reçu demande pour {len(payload.site_ids)} sites: {payload.site_ids}")
+    
     selected_sites = []
     for site_id in payload.site_ids:
         if not site_id: continue
+        # Ignore le site master_index s'il est sélectionné par erreur
+        if "master_index" in site_id: continue
+        
         data = storage.get_client_settings(site_id)
         if data: selected_sites.append(data)
     
     if not selected_sites:
-        raise HTTPException(status_code=400, detail="Aucun site valide sélectionné pour l'export.")
+        print("[TENDER] Aucun site valide trouvé après filtrage.")
+        raise HTTPException(status_code=400, detail="Aucun site valide sélectionné (ou site fantôme ignoré).")
 
-    # Appel Cortex (Excel Engine)
-    excel_content = cortex.generate_advanced_tender_excel(selected_sites)
-    
-    # CORRECTIF V40.2 : Vérification du contenu binaire
-    if not excel_content or len(excel_content) == 0:
-        raise HTTPException(status_code=500, detail="Erreur interne : La génération du fichier Excel a échoué (Contenu vide).")
-    
-    timestamp = datetime.now().strftime("%Y%m%d")
-    filename = f"DCE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"
+    try:
+        # APPEL CORTEX
+        excel_content = cortex.generate_advanced_tender_excel(selected_sites)
+        
+        if not excel_content or len(excel_content) == 0:
+            print("[TENDER] Cortex a renvoyé un contenu vide.")
+            raise HTTPException(status_code=500, detail="Erreur Interne : Génération Excel vide. Vérifiez 'openpyxl'.")
+        
+        timestamp = datetime.now().strftime("%Y%m%d")
+        filename = f"DCE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"
 
-    return StreamingResponse(
-        io.BytesIO(excel_content), 
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+        print(f"[TENDER] Succès. Taille fichier: {len(excel_content)} bytes.")
+        
+        return StreamingResponse(
+            io.BytesIO(excel_content), 
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        error_msg = f"Crash Moteur : {str(e)} | Trace: {traceback.format_exc()}"
+        print(f"[TENDER ERROR] {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 # --- API SETTINGS & IMPORT ---
 @app.post("/api/settings/import_csv")
