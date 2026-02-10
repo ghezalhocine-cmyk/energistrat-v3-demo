@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_V38_FULL")
+logger = logging.getLogger("CORTEX_V39")
 
 # CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
@@ -32,7 +32,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "38.1 (Market Watch & Full Integrity)"
+        self.version = "39.0 (Excel Tender Factory & Market Watch)"
         # Base de connaissance Métier (NAF)
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
@@ -67,7 +67,126 @@ class CortexEngine:
         except: return 0.0
 
     # =========================================================
-    # MODULE 1 : MARKET WATCH (NOUVEAU V38)
+    # MODULE 1 : TENDER FACTORY EXCEL (NOUVEAU V39)
+    # =========================================================
+    def generate_advanced_tender_excel(self, sites_data):
+        """
+        Routeur Intelligent : Détecte si le lot est Gaz ou Elec et génère le bon Excel.
+        """
+        if not sites_data: return b""
+        
+        # Détection de l'énergie dominante du lot
+        first_site = sites_data[0]
+        contract = first_site.get('contract', {})
+        segment = str(contract.get('segment', '')).upper()
+        is_gaz = "T" in segment or "GAZ" in segment
+        
+        if is_gaz:
+            return self._generate_gaz_tender(sites_data)
+        else:
+            return self._generate_elec_tender(sites_data)
+
+    def _generate_elec_tender(self, sites_data):
+        """
+        Génère le DCE Électricité (Inspiré BPU Fixe).
+        Onglets : DQE (Sites), BPU (Prix).
+        """
+        output = io.BytesIO()
+        
+        # 1. DQE - DÉTAIL DES SITES
+        rows = []
+        for s in sites_data:
+            c = s.get('contract', {})
+            i = s.get('identity', {})
+            p = s.get('pricing', {})
+            
+            # Répartition théorique si pas de courbe (Profilage)
+            vol_total = self._safe_float(c.get('power')) * 1500 # Est.
+            
+            rows.append({
+                "PDL": c.get('pdl', ''),
+                "Nom Site": i.get('site_name', ''),
+                "Adresse": s.get('location', {}).get('address', ''),
+                "Segment (FTA)": c.get('segment', 'C5'),
+                "Puissance (kVA)": c.get('power', 0),
+                "Vol. Annuel (kWh)": vol_total,
+                "HPH (kWh)": vol_total * 0.40, # Est. 40%
+                "HCH (kWh)": vol_total * 0.25,
+                "HPE (kWh)": vol_total * 0.20,
+                "HCE (kWh)": vol_total * 0.15
+            })
+        
+        df_dqe = pd.DataFrame(rows)
+
+        # 2. BPU - BORDEREAU DE PRIX (MASQUE VIDE)
+        bpu_data = [
+            {"Lot": "Lot 1", "Poste": "Fourniture Élec (Base)", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
+            {"Lot": "Lot 1", "Poste": "Fourniture Élec (HPH)", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
+            {"Lot": "Lot 1", "Poste": "Fourniture Élec (HCH)", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
+            {"Lot": "Lot 1", "Poste": "Fourniture Élec (HPE)", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
+            {"Lot": "Lot 1", "Poste": "Fourniture Élec (HCE)", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
+            {"Lot": "Lot 1", "Poste": "Abonnement Gestion", "Unité": "€/an/site", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
+            {"Lot": "Lot 1", "Poste": "CEE", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""}
+        ]
+        df_bpu = pd.DataFrame(bpu_data)
+
+        # Écriture Excel
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
+            df_bpu.to_excel(writer, sheet_name='2-BPU_Reponse', index=False)
+            
+            # Mise en forme basique
+            ws = writer.sheets['2-BPU_Reponse']
+            ws.column_dimensions['B'].width = 30 # Largeur col Poste
+            
+        output.seek(0)
+        return output.getvalue()
+
+    def _generate_gaz_tender(self, sites_data):
+        """
+        Génère le DCE Gaz (Inspiré BPU Gaz).
+        """
+        output = io.BytesIO()
+        
+        # 1. DQE
+        rows = []
+        for s in sites_data:
+            c = s.get('contract', {})
+            i = s.get('identity', {})
+            car = self._safe_float(c.get('power', 0))
+            
+            segment = "T1"
+            if car > 6: segment = "T2"
+            if car > 300: segment = "T3"
+            if car > 5000: segment = "T4"
+
+            rows.append({
+                "PCE": c.get('pdl', ''), # PDL stocke le PCE en mode gaz
+                "Nom Site": i.get('site_name', ''),
+                "Adresse": s.get('location', {}).get('address', ''),
+                "CAR (MWh)": car,
+                "Profil": segment,
+                "CJA (MWh/j)": round(car/300, 3) # Est.
+            })
+        df_dqe = pd.DataFrame(rows)
+
+        # 2. BPU
+        bpu_data = [
+            {"Poste": "Abonnement", "Unité": "€/an", "T1": "", "T2": "", "T3": "", "T4": ""},
+            {"Poste": "Prix Molécule Fixe", "Unité": "€/MWh", "T1": "", "T2": "", "T3": "", "T4": ""},
+            {"Poste": "CEE", "Unité": "€/MWh", "T1": "", "T2": "", "T3": "", "T4": ""}
+        ]
+        df_bpu = pd.DataFrame(bpu_data)
+
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
+            df_bpu.to_excel(writer, sheet_name='2-BPU_Reponse', index=False)
+
+        output.seek(0)
+        return output.getvalue()
+
+    # =========================================================
+    # MODULE 2 : MARKET WATCH (V38)
     # =========================================================
     def analyze_market_position(self, client_price, market_price, energy_type):
         """
@@ -103,48 +222,17 @@ class CortexEngine:
                 "message": "Votre contrat est aligné avec les tendances actuelles.",
                 "action": "Conseil : Surveillance active maintenue."
             }
-
-    # =========================================================
-    # MODULE 2 : TENDER GENERATOR (V37)
-    # =========================================================
+    
+    # --- LEGACY TENDER (CSV PLAT) ---
     def generate_tender_package(self, sites_data):
-        """
-        Génère un CSV standardisé pour les fournisseurs.
-        """
+        # Cette fonction est conservée pour compatibilité mais remplacée par generate_advanced_tender_excel
         output = io.StringIO()
         writer = csv.writer(output, delimiter=';')
-        
-        headers = ["REFERENCE_POINT (PDL/PCE)", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", "CODE_POSTAL", "VILLE", "CONSOMMATION_ANNUELLE (MWh)", "PUISSANCE_SOUSCRITE", "SEGMENT_TARIF", "DATE_DEBUT_SOUHAITEE"]
-        writer.writerow(headers)
-
-        for site in sites_data:
-            try:
-                identity = site.get('identity', {})
-                loc = site.get('location', {})
-                contract = site.get('contract', {})
-                
-                addr_full = loc.get('address', '')
-                cp_match = re.search(r'\b\d{5}\b', addr_full)
-                cp = cp_match.group(0) if cp_match else ""
-                ville = addr_full.split(cp)[-1].strip() if cp else ""
-                
-                row = [
-                    contract.get('pdl', ''),
-                    identity.get('name', ''),
-                    identity.get('site_name', ''),
-                    addr_full,
-                    cp,
-                    ville,
-                    contract.get('power', 0),
-                    contract.get('power', 0) if "T" not in contract.get('segment','') else 0,
-                    contract.get('segment', ''),
-                    "01/01/2026"
-                ]
-                writer.writerow(row)
-            except Exception as e:
-                logger.error(f"Erreur ligne tender: {e}")
-                continue
-                
+        writer.writerow(["REF_ID", "NOM", "ADRESSE", "CONSO", "PUISSANCE", "SEGMENT"])
+        for s in sites_data:
+            c = s.get('contract', {})
+            i = s.get('identity', {})
+            writer.writerow([c.get('pdl'), i.get('name'), s.get('location',{}).get('address'), c.get('power'), c.get('power'), c.get('segment')])
         output.seek(0)
         return output.getvalue()
 
