@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_V39")
+logger = logging.getLogger("CORTEX_V39_2")
 
 # CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
@@ -32,7 +32,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "39.0 (Excel Tender Factory & Market Watch)"
+        self.version = "39.2 (Excel Tender Robust)"
         # Base de connaissance Métier (NAF)
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
@@ -53,91 +53,99 @@ class CortexEngine:
     def _safe_int(self, value):
         try:
             if value is None: return 0
-            if isinstance(value, (float, np.floating)):
-                if np.isnan(value) or np.isinf(value): return 0
-            return int(float(str(value).replace(',', '.').replace(' ', '').replace('\xa0', '')))
+            # Nettoyage agressif pour éviter les erreurs de conversion
+            val_str = str(value).replace(',', '.').replace(' ', '').replace('\xa0', '').replace('€', '').replace('kVA', '')
+            if not val_str or val_str.lower() == 'nan': return 0
+            return int(float(val_str))
         except: return 0
 
     def _safe_float(self, value):
         try:
             if value is None: return 0.0
-            if isinstance(value, (float, np.floating)):
-                if np.isnan(value) or np.isinf(value): return 0.0
-            return float(str(value).replace(',', '.').replace(' ', '').replace('\xa0', ''))
+            val_str = str(value).replace(',', '.').replace(' ', '').replace('\xa0', '').replace('€', '').replace('kVA', '')
+            if not val_str or val_str.lower() == 'nan': return 0.0
+            return float(val_str)
         except: return 0.0
 
     # =========================================================
-    # MODULE 1 : TENDER FACTORY EXCEL (NOUVEAU V39)
+    # MODULE 1 : TENDER FACTORY EXCEL (CORRIGÉ V39.2)
     # =========================================================
     def generate_advanced_tender_excel(self, sites_data):
         """
         Routeur Intelligent : Détecte si le lot est Gaz ou Elec et génère le bon Excel.
+        Sécurisé contre les données vides.
         """
         if not sites_data: return b""
         
-        # Détection de l'énergie dominante du lot
-        first_site = sites_data[0]
-        contract = first_site.get('contract', {})
-        segment = str(contract.get('segment', '')).upper()
-        is_gaz = "T" in segment or "GAZ" in segment
-        
-        if is_gaz:
-            return self._generate_gaz_tender(sites_data)
-        else:
-            return self._generate_elec_tender(sites_data)
+        try:
+            # Détection de l'énergie dominante du lot
+            first_site = sites_data[0]
+            contract = first_site.get('contract', {}) or {}
+            segment = str(contract.get('segment', '')).upper()
+            is_gaz = "T" in segment or "GAZ" in segment
+            
+            if is_gaz:
+                return self._generate_gaz_tender(sites_data)
+            else:
+                return self._generate_elec_tender(sites_data)
+        except Exception as e:
+            logger.error(f"Erreur Fatale Excel Generator: {e}")
+            return b""
 
     def _generate_elec_tender(self, sites_data):
         """
         Génère le DCE Électricité (Inspiré BPU Fixe).
-        Onglets : DQE (Sites), BPU (Prix).
         """
         output = io.BytesIO()
-        
-        # 1. DQE - DÉTAIL DES SITES
         rows = []
+        
         for s in sites_data:
-            c = s.get('contract', {})
-            i = s.get('identity', {})
-            p = s.get('pricing', {})
-            
-            # Répartition théorique si pas de courbe (Profilage)
-            vol_total = self._safe_float(c.get('power')) * 1500 # Est.
-            
-            rows.append({
-                "PDL": c.get('pdl', ''),
-                "Nom Site": i.get('site_name', ''),
-                "Adresse": s.get('location', {}).get('address', ''),
-                "Segment (FTA)": c.get('segment', 'C5'),
-                "Puissance (kVA)": c.get('power', 0),
-                "Vol. Annuel (kWh)": vol_total,
-                "HPH (kWh)": vol_total * 0.40, # Est. 40%
-                "HCH (kWh)": vol_total * 0.25,
-                "HPE (kWh)": vol_total * 0.20,
-                "HCE (kWh)": vol_total * 0.15
-            })
+            try:
+                c = s.get('contract', {}) or {}
+                i = s.get('identity', {}) or {}
+                loc = s.get('location', {}) or {}
+                
+                # Sécurité sur le calcul de volume
+                power = self._safe_float(c.get('power', 0))
+                vol_total = power * 1500 # Estimation standard
+                
+                rows.append({
+                    "PDL": str(c.get('pdl', 'Inconnu')),
+                    "Nom Site": str(i.get('site_name') or i.get('name') or 'Site Inconnu'),
+                    "Adresse": str(loc.get('address', '')),
+                    "Segment (FTA)": str(c.get('segment', 'C5')),
+                    "Puissance (kVA)": power,
+                    "Vol. Annuel (kWh)": vol_total,
+                    "HPH (kWh)": vol_total * 0.40, 
+                    "HCH (kWh)": vol_total * 0.25,
+                    "HPE (kWh)": vol_total * 0.20,
+                    "HCE (kWh)": vol_total * 0.15
+                })
+            except Exception as e:
+                logger.warning(f"Skipping Elec site due to error: {e}")
+                continue
         
         df_dqe = pd.DataFrame(rows)
 
-        # 2. BPU - BORDEREAU DE PRIX (MASQUE VIDE)
+        # Masque BPU Vide
         bpu_data = [
-            {"Lot": "Lot 1", "Poste": "Fourniture Élec (Base)", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
-            {"Lot": "Lot 1", "Poste": "Fourniture Élec (HPH)", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
-            {"Lot": "Lot 1", "Poste": "Fourniture Élec (HCH)", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
-            {"Lot": "Lot 1", "Poste": "Fourniture Élec (HPE)", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
-            {"Lot": "Lot 1", "Poste": "Fourniture Élec (HCE)", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
-            {"Lot": "Lot 1", "Poste": "Abonnement Gestion", "Unité": "€/an/site", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""},
-            {"Lot": "Lot 1", "Poste": "CEE", "Unité": "€/MWh", "C5 (Bleu)": "", "C4 (Jaune)": "", "C3/C2 (Vert)": ""}
+            {"Lot": "Lot 1", "Poste": "Fourniture Élec (Base)", "Unité": "€/MWh", "C5": "", "C4": ""},
+            {"Lot": "Lot 1", "Poste": "Abonnement", "Unité": "€/an", "C5": "", "C4": ""}
         ]
         df_bpu = pd.DataFrame(bpu_data)
 
-        # Écriture Excel
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
-            df_bpu.to_excel(writer, sheet_name='2-BPU_Reponse', index=False)
-            
-            # Mise en forme basique
-            ws = writer.sheets['2-BPU_Reponse']
-            ws.column_dimensions['B'].width = 30 # Largeur col Poste
+        try:
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
+                df_bpu.to_excel(writer, sheet_name='2-BPU_Reponse', index=False)
+                
+                # Auto-adjust width (basic)
+                for sheet in writer.sheets.values():
+                    for col in sheet.columns:
+                        sheet.column_dimensions[col[0].column_letter].width = 20
+        except Exception as e:
+            logger.error(f"Excel Write Error: {e}")
+            return b""
             
         output.seek(0)
         return output.getvalue()
@@ -147,40 +155,41 @@ class CortexEngine:
         Génère le DCE Gaz (Inspiré BPU Gaz).
         """
         output = io.BytesIO()
-        
-        # 1. DQE
         rows = []
+        
         for s in sites_data:
-            c = s.get('contract', {})
-            i = s.get('identity', {})
-            car = self._safe_float(c.get('power', 0))
-            
-            segment = "T1"
-            if car > 6: segment = "T2"
-            if car > 300: segment = "T3"
-            if car > 5000: segment = "T4"
+            try:
+                c = s.get('contract', {}) or {}
+                i = s.get('identity', {}) or {}
+                loc = s.get('location', {}) or {}
+                
+                car = self._safe_float(c.get('power', 0))
+                segment = "T1"
+                if car > 6: segment = "T2"
+                if car > 300: segment = "T3"
 
-            rows.append({
-                "PCE": c.get('pdl', ''), # PDL stocke le PCE en mode gaz
-                "Nom Site": i.get('site_name', ''),
-                "Adresse": s.get('location', {}).get('address', ''),
-                "CAR (MWh)": car,
-                "Profil": segment,
-                "CJA (MWh/j)": round(car/300, 3) # Est.
-            })
+                rows.append({
+                    "PCE": str(c.get('pdl', 'Inconnu')), # PDL stocke le PCE
+                    "Nom Site": str(i.get('site_name') or i.get('name') or 'Site Inconnu'),
+                    "Adresse": str(loc.get('address', '')),
+                    "CAR (MWh)": car,
+                    "Profil": segment,
+                    "CJA (MWh/j)": round(car/300, 3) if car > 0 else 0
+                })
+            except Exception as e:
+                logger.warning(f"Skipping Gaz site due to error: {e}")
+                continue
+
         df_dqe = pd.DataFrame(rows)
+        df_bpu = pd.DataFrame([{"Poste": "Prix Molécule", "Unité": "€/MWh"}, {"Poste": "Abonnement", "Unité": "€/an"}])
 
-        # 2. BPU
-        bpu_data = [
-            {"Poste": "Abonnement", "Unité": "€/an", "T1": "", "T2": "", "T3": "", "T4": ""},
-            {"Poste": "Prix Molécule Fixe", "Unité": "€/MWh", "T1": "", "T2": "", "T3": "", "T4": ""},
-            {"Poste": "CEE", "Unité": "€/MWh", "T1": "", "T2": "", "T3": "", "T4": ""}
-        ]
-        df_bpu = pd.DataFrame(bpu_data)
-
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
-            df_bpu.to_excel(writer, sheet_name='2-BPU_Reponse', index=False)
+        try:
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
+                df_bpu.to_excel(writer, sheet_name='2-BPU_Reponse', index=False)
+        except Exception as e:
+            logger.error(f"Excel Write Error: {e}")
+            return b""
 
         output.seek(0)
         return output.getvalue()
@@ -222,19 +231,6 @@ class CortexEngine:
                 "message": "Votre contrat est aligné avec les tendances actuelles.",
                 "action": "Conseil : Surveillance active maintenue."
             }
-    
-    # --- LEGACY TENDER (CSV PLAT) ---
-    def generate_tender_package(self, sites_data):
-        # Cette fonction est conservée pour compatibilité mais remplacée par generate_advanced_tender_excel
-        output = io.StringIO()
-        writer = csv.writer(output, delimiter=';')
-        writer.writerow(["REF_ID", "NOM", "ADRESSE", "CONSO", "PUISSANCE", "SEGMENT"])
-        for s in sites_data:
-            c = s.get('contract', {})
-            i = s.get('identity', {})
-            writer.writerow([c.get('pdl'), i.get('name'), s.get('location',{}).get('address'), c.get('power'), c.get('power'), c.get('segment')])
-        output.seek(0)
-        return output.getvalue()
 
     # =========================================================
     # MODULE 3 : CALCULATEUR ROI & KPI (V37)
@@ -243,8 +239,8 @@ class CortexEngine:
         """
         Ajoute les KPIs avancés (Ghost Buster, Landing) aux données brutes.
         """
-        contract = site_data.get('contract', {})
-        pricing = site_data.get('pricing', {})
+        contract = site_data.get('contract', {}) or {}
+        pricing = site_data.get('pricing', {}) or {}
         
         # 1. Budget Annuel Estimé
         is_gaz = "T" in str(contract.get('segment', ''))
@@ -287,53 +283,57 @@ class CortexEngine:
             sites = []
             
             for _, row in df.iterrows():
-                siret = str(row.get('SIRET', '')).replace(' ', '').strip()
-                if len(siret) < 9: continue 
-                
-                site_name = row.get('NOM_SITE', row.get('RAISON_SOCIALE', '')).strip()
-                if not site_name: site_name = "Site Inconnu"
-                
-                if is_gaz:
-                    ref_id = str(row.get('PCE', '')).replace(' ', '').strip()
-                    power = self._safe_int(row.get('CAR_MWH', 0))
-                    segment = row.get('SEGMENT_GAZ', '--').strip()
-                    p_hph = str(row.get('PRIX_MWH', '0')).replace(',', '.').strip()
-                    p_hch, p_hpe, p_hce = "0", "0", "0"
-                else:
-                    ref_id = str(row.get('PDL', '')).replace(' ', '').strip()
-                    power = self._safe_int(row.get('PUISSANCE', 0))
-                    segment = row.get('SEGMENT', '--').strip()
-                    p_hph = str(row.get('PRIX_HPH', '0')).replace(',', '.').strip()
-                    p_hch = str(row.get('PRIX_HCH', '0')).replace(',', '.').strip()
-                    p_hpe = str(row.get('PRIX_HPE', '0')).replace(',', '.').strip()
-                    p_hce = str(row.get('PRIX_HCE', '0')).replace(',', '.').strip()
+                try:
+                    siret = str(row.get('SIRET', '')).replace(' ', '').strip()
+                    if len(siret) < 9: continue 
+                    
+                    site_name = row.get('NOM_SITE', row.get('RAISON_SOCIALE', '')).strip()
+                    if not site_name: site_name = "Site Inconnu"
+                    
+                    if is_gaz:
+                        ref_id = str(row.get('PCE', '')).replace(' ', '').strip()
+                        power = self._safe_int(row.get('CAR_MWH', 0))
+                        segment = row.get('SEGMENT_GAZ', '--').strip()
+                        p_hph = str(row.get('PRIX_MWH', '0')).replace(',', '.').strip()
+                        p_hch, p_hpe, p_hce = "0", "0", "0"
+                    else:
+                        ref_id = str(row.get('PDL', '')).replace(' ', '').strip()
+                        power = self._safe_int(row.get('PUISSANCE', 0))
+                        segment = row.get('SEGMENT', '--').strip()
+                        p_hph = str(row.get('PRIX_HPH', '0')).replace(',', '.').strip()
+                        p_hch = str(row.get('PRIX_HCH', '0')).replace(',', '.').strip()
+                        p_hpe = str(row.get('PRIX_HPE', '0')).replace(',', '.').strip()
+                        p_hce = str(row.get('PRIX_HCE', '0')).replace(',', '.').strip()
 
-                site = {
-                    "client_name": site_name, 
-                    "identity": {
-                        "id": siret,
-                        "siret": siret,
-                        "name": row.get('RAISON_SOCIALE', '').strip(),
-                        "site_name": site_name,
-                        "lot_name": row.get('LOT', '').strip()
-                    },
-                    "location": { "address": row.get('ADRESSE', '').strip() },
-                    "contract": {
-                        "pdl": ref_id,
-                        "power": power,
-                        "segment": segment,
-                        "provider": "Import CSV"
-                    },
-                    "pricing": {
-                        "fix": str(row.get('ABO_AN', '0')).replace(',', '.').strip(),
-                        "hph": p_hph,
-                        "hch": p_hch,
-                        "hpe": p_hpe,
-                        "hce": p_hce,
-                        "tax": str(row.get('TAXES', '0')).replace(',', '.').strip()
+                    site = {
+                        "client_name": site_name, 
+                        "identity": {
+                            "id": siret,
+                            "siret": siret,
+                            "name": row.get('RAISON_SOCIALE', '').strip(),
+                            "site_name": site_name,
+                            "lot_name": row.get('LOT', '').strip()
+                        },
+                        "location": { "address": row.get('ADRESSE', '').strip() },
+                        "contract": {
+                            "pdl": ref_id,
+                            "power": power,
+                            "segment": segment,
+                            "provider": "Import CSV"
+                        },
+                        "pricing": {
+                            "fix": str(row.get('ABO_AN', '0')).replace(',', '.').strip(),
+                            "hph": p_hph,
+                            "hch": p_hch,
+                            "hpe": p_hpe,
+                            "hce": p_hce,
+                            "tax": str(row.get('TAXES', '0')).replace(',', '.').strip()
+                        }
                     }
-                }
-                sites.append(site)
+                    sites.append(site)
+                except Exception as e:
+                    logger.warning(f"Error skipping row in import: {e}")
+                    continue
             return sites
         except Exception as e:
             logger.error(f"Import CSV Error: {e}")
@@ -551,5 +551,9 @@ class CortexEngine:
 
     def run_chaos_monkey(self): return [{"test": "Maths", "status": "OK"}]
     def ask_agent(self, msg): return self._generate_insight({}, {"p_souscrite": 0})
+
+    # --- LEGACY TENDER (CSV PLAT - POUR RETROCOMPATIBILITÉ) ---
+    def generate_tender_package(self, sites_data):
+        return b"" # On utilise désormais generate_advanced_tender_excel
 
 cortex = CortexEngine()
