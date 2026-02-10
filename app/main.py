@@ -4,7 +4,7 @@ import json
 import glob
 import io
 import csv
-import traceback # AJOUT POUR DEBUG
+import traceback
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
@@ -53,7 +53,7 @@ class MarketUpdateModel(BaseModel):
     elec: dict
     gaz: dict
 
-# --- MARKET WATCH ---
+# --- MARKET WATCH ENGINE ---
 def get_market_ref():
     path = "/app/data/market_ref.json"
     if os.path.exists(path):
@@ -79,7 +79,7 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
         return JSONResponse({"success": True, "updated_at": payload["updated_at"]})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET (CORRECTIF V40.3 - FILTRAGE FANTOMES) ---
+# --- API DASHBOARD / FLEET (CORRECTIF V40.4) ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
     DATA_DIR = "/app/data"
@@ -94,23 +94,19 @@ async def get_fleet_data():
     try:
         files = glob.glob(os.path.join(DATA_DIR, "*.json"))
         for file_path in files:
-            # FILTRE 1 : Ignorer les fichiers système ou temporaires
-            filename = os.path.basename(file_path)
-            if "master_index" in filename or "market_ref" in filename: continue
+            # SÉCURITÉ : Ignorer les fichiers système (cause du bug)
+            if "master_index" in file_path or "market_ref" in file_path: continue
 
             try:
                 with open(file_path, 'r') as f: data = json.load(f)
                 
-                # FILTRE 2 : Ignorer les fichiers vides/corrompus
-                if not data or 'identity' not in data: continue
-
                 kpis = cortex.enrich_fleet_kpis(data)
                 contract = data.get('contract', {})
                 identity = data.get('identity', {})
                 pricing = data.get('pricing', {})
                 loc = data.get('location', {})
                 
-                file_id = filename.replace('.json', '')
+                file_id = os.path.basename(file_path).replace('.json', '')
                 real_id = identity.get('id') or file_id
                 real_name = identity.get('site_name') or identity.get('name') or data.get('client_name') or f"Site {real_id}"
 
@@ -139,9 +135,8 @@ async def get_fleet_data():
 
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str):
-    # Sécurité : Empêcher la lecture des fichiers système
     if "master" in client_id or "market" in client_id: return JSONResponse({"error": "Accès interdit"})
-
+    
     client_data = storage.get_client_settings(client_id)
     if not client_data: return JSONResponse({"error": "Client introuvable"})
     
@@ -218,49 +213,39 @@ async def api_chaos(x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
-# --- API TENDER (GENERATION EXCEL V40.3 - DEBUG) ---
+# --- API TENDER (CORRECTIF V40.4 - SÉCURISÉ) ---
 @app.post("/api/ops/generate_tender")
 async def generate_tender(payload: TenderRequest):
-    """
-    Génère le DCE Excel. Avec LOGS D'ERREUR PRÉCIS.
-    """
-    print(f"[TENDER] Reçu demande pour {len(payload.site_ids)} sites: {payload.site_ids}")
-    
     selected_sites = []
+    
     for site_id in payload.site_ids:
         if not site_id: continue
-        # Ignore le site master_index s'il est sélectionné par erreur
-        if "master_index" in site_id: continue
-        
+        # SÉCURITÉ : On ignore les fichiers système pour éviter le crash Excel
+        if "master_index" in site_id or "market_ref" in site_id: continue
+            
         data = storage.get_client_settings(site_id)
         if data: selected_sites.append(data)
     
     if not selected_sites:
-        print("[TENDER] Aucun site valide trouvé après filtrage.")
-        raise HTTPException(status_code=400, detail="Aucun site valide sélectionné (ou site fantôme ignoré).")
+        raise HTTPException(status_code=400, detail="Aucun site valide sélectionné (Fichiers système ignorés).")
 
     try:
-        # APPEL CORTEX
         excel_content = cortex.generate_advanced_tender_excel(selected_sites)
         
         if not excel_content or len(excel_content) == 0:
-            print("[TENDER] Cortex a renvoyé un contenu vide.")
-            raise HTTPException(status_code=500, detail="Erreur Interne : Génération Excel vide. Vérifiez 'openpyxl'.")
+            raise HTTPException(status_code=500, detail="Erreur Interne : Génération Excel vide.")
         
         timestamp = datetime.now().strftime("%Y%m%d")
         filename = f"DCE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"
 
-        print(f"[TENDER] Succès. Taille fichier: {len(excel_content)} bytes.")
-        
         return StreamingResponse(
             io.BytesIO(excel_content), 
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
     except Exception as e:
-        error_msg = f"Crash Moteur : {str(e)} | Trace: {traceback.format_exc()}"
-        print(f"[TENDER ERROR] {error_msg}")
-        raise HTTPException(status_code=500, detail=error_msg)
+        print(f"[CRASH TENDER] {e}")
+        raise HTTPException(status_code=500, detail=f"Crash Serveur : {str(e)}")
 
 # --- API SETTINGS & IMPORT ---
 @app.post("/api/settings/import_csv")
