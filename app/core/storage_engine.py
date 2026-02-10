@@ -17,11 +17,11 @@ INDEX_FILE = DATA_ROOT / "master_index.json"
 VAULT_FILE = DATA_ROOT / "system" / "secure_vault.json"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("STORAGE_ENGINE_V4")
+logger = logging.getLogger("STORAGE_ENGINE_V4_1")
 
 class StorageEngine:
     def __init__(self):
-        self.version = "4.0 (Flat Storage for Fleet Dashboard)"
+        self.version = "4.1 (Flat Storage & CRUD)"
         self.index = {}
         self._ensure_structure()
         self.load_index()
@@ -36,7 +36,7 @@ class StorageEngine:
         for d in dirs: d.mkdir(parents=True, exist_ok=True)
 
         if not INDEX_FILE.exists():
-            initial = {"meta": {"version": "4.0", "created": datetime.datetime.now().isoformat()}, "organizations": {}, "sites": {}}
+            initial = {"meta": {"version": "4.1", "created": datetime.datetime.now().isoformat()}, "organizations": {}, "sites": {}}
             with open(INDEX_FILE, 'w', encoding='utf-8') as f: json.dump(initial, f, indent=2)
 
     def load_index(self):
@@ -53,7 +53,7 @@ class StorageEngine:
             os.replace(temp, INDEX_FILE)
         except Exception: pass
 
-    # --- RECONCILIATION ENGINE (MISE A JOUR V4.0 - FLAT SCAN) ---
+    # --- RECONCILIATION ENGINE (FLAT SCAN) ---
     def find_site_by_pdl(self, pdl):
         """
         Cherche un PDL dans la structure PLATE (/app/data/*.json).
@@ -92,10 +92,11 @@ class StorageEngine:
         
         return None
 
-    # --- ERP CLIENTS (MISE A JOUR V4.0 - FLAT WRITE) ---
+    # --- ERP CLIENTS (WRITE & READ) ---
     def save_client_settings(self, client_id, data):
         """
-        Sauvegarde le client à la RACINE pour être visible par le Dashboard Fleet.
+        Sauvegarde le client à la RACINE.
+        V4.1 : Force la cohérence du Nom du Site.
         """
         try:
             # Nettoyage ID
@@ -105,15 +106,21 @@ class StorageEngine:
             # Chemin PLAT : /app/data/{id}.json
             path = DATA_ROOT / f"{cid}.json"
             
+            # Enrichissement Meta
             data["_meta"] = {"updated_at": datetime.datetime.now().isoformat()}
             
+            # Sécurité V4.1 : Si client_name manque à la racine, on le prend dans identity
+            if "client_name" not in data:
+                data["client_name"] = data.get("identity", {}).get("site_name") or data.get("identity", {}).get("name") or cid
+
             with open(path, 'w', encoding='utf-8') as f: 
                 json.dump(data, f, indent=4, ensure_ascii=False)
             
-            # Mise à jour index (optionnel mais propre)
-            self.index["sites"][cid] = {"name": data.get("identity", {}).get("site_name"), "path": str(path)}
+            # Mise à jour index
+            self.index["sites"][cid] = {"name": data.get("client_name"), "path": str(path)}
             self.save_index()
             
+            logger.info(f"Site sauvegardé : {cid}")
             return {"success": True, "id": cid, "path": str(path)}
         except Exception as e: 
             logger.error(f"Save Error: {e}")
@@ -122,14 +129,13 @@ class StorageEngine:
     def get_client_settings(self, client_id):
         """
         Récupère un client depuis la racine.
-        Renommé de 'load_client_settings' pour compatibilité main.py V40.
         """
         try:
             cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
             path = DATA_ROOT / f"{cid}.json"
             
             if not path.exists(): 
-                # Tentative de fallback (Ancienne structure dossier)
+                # Tentative de fallback (Ancienne structure dossier - Retrocompatibilité)
                 old_path = DATA_ROOT / "clients" / cid / "settings.json"
                 if old_path.exists():
                     with open(old_path, 'r', encoding='utf-8') as f: return json.load(f)
@@ -139,6 +145,27 @@ class StorageEngine:
         except Exception as e: 
             logger.error(f"Load Error: {e}")
             return None
+
+    # --- ADMINISTRATION (NOUVEAU V4.1) ---
+    def delete_client(self, client_id):
+        """
+        Supprime proprement un fichier client et son entrée dans l'index.
+        Utile pour nettoyer les "Sites Inconnus".
+        """
+        try:
+            cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
+            path = DATA_ROOT / f"{cid}.json"
+            
+            if path.exists():
+                os.remove(path)
+                if cid in self.index["sites"]:
+                    del self.index["sites"][cid]
+                    self.save_index()
+                logger.info(f"Site supprimé : {cid}")
+                return {"success": True}
+            return {"success": False, "error": "Not found"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     # --- PARTNERS (INCHANGÉ) ---
     def save_partner_config(self, pid, data):
