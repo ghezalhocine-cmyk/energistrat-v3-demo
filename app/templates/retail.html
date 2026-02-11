@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V13.5 | Retail Ultimate Strict</title>
+    <title>ENERGISTRAT V14.1 | Retail Ultimate Restored</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -20,26 +20,13 @@
     <style>
         body { background-color: #050505; color: #E2E8F0; font-family: 'Inter', sans-serif; }
         .bento-card { background: #0F172A; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1rem; position: relative; overflow: hidden; }
-        .nav-item { transition: all 0.2s; border-left: 3px solid transparent; cursor: pointer; }
-        .nav-item:hover { background: rgba(255, 255, 255, 0.03); color: white; }
-        .nav-item.active { background: rgba(168, 85, 247, 0.08); border-left-color: #A855F7; color: white; }
-        .view-section { display: none; animation: fadeIn 0.3s ease-in-out; }
-        .view-section.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        
-        /* Jauges */
+        tr.site-row:hover td { background-color: rgba(168, 85, 247, 0.1); cursor: pointer; color: white; }
         .gauge-container { background: rgba(255,255,255,0.1); height: 6px; border-radius: 4px; overflow: hidden; position: relative; }
         .gauge-fill { height: 100%; transition: width 1s ease-out; }
-        
-        /* Action Bar */
         #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
         #action-bar.visible { transform: translateY(0); }
-        
-        /* Animations */
         .coach-avatar { animation: pulse-glow 3s infinite; }
         @keyframes pulse-glow { 0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(168, 85, 247, 0); } 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); } }
-        .market-pulse { animation: pulse-border 2s infinite; }
-        @keyframes pulse-border { 0% { border-color: rgba(16, 185, 129, 0.2); } 50% { border-color: rgba(16, 185, 129, 0.8); } 100% { border-color: rgba(16, 185, 129, 0.2); } }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden">
@@ -53,10 +40,10 @@
         
         <div class="p-4 space-y-4">
             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider">Navigation</div>
-            <div onclick="switchView('fleet')" id="nav-fleet" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400">
+            <div onclick="switchView('fleet')" id="nav-fleet" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 cursor-pointer hover:bg-white/5 transition">
                 <i class="fa-solid fa-earth-europe w-5 text-center"></i> Vision Parc
             </div>
-            <div onclick="switchView('league')" id="nav-league" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400">
+            <div onclick="switchView('league')" id="nav-league" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 cursor-pointer hover:bg-white/5 transition">
                 <i class="fa-solid fa-trophy w-5 text-center text-yellow-500"></i> Green League
             </div>
         </div>
@@ -110,7 +97,7 @@
                 <!-- ANALYTICS ROW -->
                 <div class="grid grid-cols-3 gap-6 h-64">
                     <div class="bento-card p-6 flex flex-col">
-                        <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Mix Énergétique</h3>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Mix Énergétique (Budget)</h3>
                         <div class="flex-1 relative"><canvas id="mixChart"></canvas></div>
                     </div>
                     <div class="bento-card p-6 col-span-2 flex flex-col">
@@ -151,7 +138,6 @@
                     <h2 class="text-3xl font-black text-white italic tracking-tight">CHAMPIONNAT <span class="text-success">EFFICACITÉ</span></h2>
                     <p class="text-gray-400 text-sm">Classement basé sur le taux de gaspillage (Ghost / Budget)</p>
                 </div>
-
                 <div class="grid grid-cols-3 gap-6 mb-8">
                     <!-- PODIUM -->
                     <div class="bento-card p-6 border-t-4 border-silver transform translate-y-4">
@@ -176,16 +162,13 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="bento-card p-6">
                     <h3 class="font-bold text-white mb-4">Le Reste du Classement</h3>
-                    <div class="space-y-2" id="league-list">
-                        <!-- Injecté par JS -->
-                    </div>
+                    <div class="space-y-2" id="league-list"></div>
                 </div>
             </div>
 
-            <!-- VUE 3 : DÉTAIL SITE (ULTIMATE COCKPIT) -->
+            <!-- VUE 3 : DÉTAIL SITE -->
             <div id="view-detail" class="view-section hidden space-y-6">
                 <button onclick="switchView('fleet')" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4">
                     <i class="fa-solid fa-arrow-left"></i> RETOUR LISTE
@@ -201,11 +184,8 @@
                             <span id="detail-badge" class="px-2 py-0.5 rounded text-[10px] font-bold">--</span>
                         </div>
                     </div>
-                    <!-- CORTEX COACH -->
                     <div class="flex items-center gap-4 bg-white/5 border border-white/10 px-6 py-4 rounded-2xl coach-bubble max-w-md">
-                        <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary text-2xl flex-shrink-0">
-                            <i class="fa-solid fa-robot"></i>
-                        </div>
+                        <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary text-2xl flex-shrink-0"><i class="fa-solid fa-robot"></i></div>
                         <div>
                             <div class="text-[10px] text-primary font-bold uppercase tracking-wider mb-1">Analyse Cortex</div>
                             <div class="text-sm text-white font-medium leading-tight" id="cortex-msg">--</div>
@@ -215,33 +195,23 @@
 
                 <!-- GRILLE DÉTAIL (3 COLONNES) -->
                 <div class="grid grid-cols-3 gap-6">
-                    
-                    <!-- COL 1 : TECHNIQUE (Optimisation) -->
+                    <!-- OPTIMISATION -->
                     <div class="bento-card col-span-1 p-6 flex flex-col justify-between">
                         <div>
-                            <h3 class="text-white font-bold text-sm mb-4 flex items-center gap-2">
-                                <i class="fa-solid fa-gauge-high text-primary"></i> Optimisation Puissance
-                            </h3>
+                            <h3 class="text-white font-bold text-sm mb-4 flex items-center gap-2"><i class="fa-solid fa-gauge-high text-primary"></i> Optimisation Puissance</h3>
                             <div class="relative pt-2 pb-2">
                                 <div class="flex justify-between text-xs font-mono text-gray-500 mb-2">
                                     <span class="text-white font-bold" id="detail-reached">Max: --</span>
                                     <span class="text-primary font-bold" id="detail-sub">Souscrit: --</span>
                                 </div>
-                                <div class="gauge-container h-3 bg-white/10 rounded-full">
-                                    <div id="detail-gauge" class="h-full rounded-full transition-all duration-1000" style="width: 0%"></div>
-                                </div>
+                                <div class="gauge-container h-3 bg-white/10 rounded-full"><div id="detail-gauge" class="h-full rounded-full transition-all duration-1000" style="width: 0%"></div></div>
                             </div>
                         </div>
-                        <div class="mt-4 pt-4 border-t border-white/5">
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs text-gray-500">Gain Potentiel</span>
-                                <span class="text-xl font-bold text-success" id="detail-gain">-- €</span>
-                            </div>
-                            <div class="text-[10px] text-gray-400 mt-1 italic" id="detail-advice">--</div>
-                        </div>
+                        <div class="mt-4 pt-4 border-t border-white/5 flex justify-between items-center"><span class="text-xs text-gray-500">Gain Potentiel</span><span class="text-xl font-bold text-success" id="detail-gain">-- €</span></div>
+                        <div class="text-[10px] text-gray-400 mt-1 italic" id="detail-advice">--</div>
                     </div>
 
-                    <!-- COL 2 : STRATÉGIE (Market Watch + Prix) -->
+                    <!-- MARKET -->
                     <div class="bento-card col-span-1 p-6 flex flex-col bg-white/5 border-l-4 border-white/10" id="market-card">
                         <div class="flex justify-between items-start mb-4">
                             <h3 class="font-bold text-white text-sm">Contrat & Marché</h3>
@@ -257,7 +227,7 @@
                         </div>
                     </div>
 
-                    <!-- COL 3 : CONTROLE GESTION (Landing + Tertiaire) -->
+                    <!-- LANDING -->
                     <div class="bento-card col-span-1 p-6 flex flex-col justify-between">
                         <div>
                             <h3 class="text-white font-bold text-sm mb-4"><i class="fa-solid fa-plane-arrival mr-2 text-primary"></i>Budget Landing</h3>
@@ -273,19 +243,13 @@
                             </div>
                             <p class="text-[10px] text-gray-400 mt-2 italic text-right" id="landing-msg">--</p>
                         </div>
-                        
                         <div class="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
                             <div class="text-xs font-bold text-green-400">Obj. Tertiaire</div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-xl font-bold text-white">-12%</span>
-                                <div class="w-8 h-8 rounded-full border-2 border-green-500 flex items-center justify-center text-[8px] text-green-500">2030</div>
-                            </div>
+                            <div class="flex items-center gap-2"><span class="text-xl font-bold text-white">-12%</span><div class="w-8 h-8 rounded-full border-2 border-green-500 flex items-center justify-center text-[8px] text-green-500">2030</div></div>
                         </div>
                     </div>
-
                 </div>
             </div>
-
         </div>
 
         <!-- ACTION BAR -->
@@ -307,34 +271,17 @@
         let mixChartInstance = null;
         let topChartInstance = null;
 
-        // --- NAVIGATION ---
+        function safeSetText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
+        
+        // --- NAVIGATION (RESTAURÉE) ---
         function switchView(viewName) {
-            document.querySelectorAll('.nav-item').forEach(el => {
-                el.classList.remove('active', 'text-white');
-                el.classList.add('text-gray-400');
-            });
+            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
             const btn = document.getElementById('nav-' + viewName);
-            if(btn) {
-                btn.classList.add('active', 'text-white');
-                btn.classList.remove('text-gray-400');
-            }
-
+            if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-            
-            if(viewName === 'detail') {
-                document.getElementById('view-detail').classList.add('active');
-                document.getElementById('main-title').innerText = "Détail & Conseil";
-                document.getElementById('header-kpis').classList.add('hidden');
-            } else if (viewName === 'league') {
-                document.getElementById('view-league').classList.add('active');
-                document.getElementById('main-title').innerText = "Green League";
-                document.getElementById('header-kpis').classList.add('hidden');
-                calculateLeague(); 
-            } else {
-                document.getElementById('view-fleet').classList.add('active');
-                document.getElementById('main-title').innerText = "Vision Consolidée";
-                document.getElementById('header-kpis').classList.remove('hidden');
-            }
+            if(viewName === 'detail') { document.getElementById('view-detail').classList.add('active'); safeSetText('main-title', "Détail & Conseil"); document.getElementById('header-kpis').classList.add('hidden'); }
+            else if (viewName === 'league') { document.getElementById('view-league').classList.add('active'); safeSetText('main-title', "Green League"); document.getElementById('header-kpis').classList.add('hidden'); calculateLeague(); }
+            else { document.getElementById('view-fleet').classList.add('active'); safeSetText('main-title', "Vision Consolidée"); document.getElementById('header-kpis').classList.remove('hidden'); }
         }
 
         // --- 1. CHARGEMENT ---
@@ -347,34 +294,39 @@
                     initFilters();
                     applyFilters();
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) { console.error("Erreur chargement parc", e); }
         }
 
-        // --- 2. LOGIQUE GAMING ---
+        // --- 2. LOGIQUE GAMING (RESTAURÉE) ---
         function calculateLeague() {
             const ranked = [...FLEET_DATA].sort((a, b) => {
-                const ratioA = a.budget > 0 ? (a.ghost_savings / a.budget) : 0;
-                const ratioB = b.budget > 0 ? (b.ghost_savings / b.budget) : 0;
+                const ratioA = parseFloat(a.budget) > 0 ? (parseFloat(a.ghost_savings) / parseFloat(a.budget)) : 0;
+                const ratioB = parseFloat(b.budget) > 0 ? (parseFloat(b.ghost_savings) / parseFloat(b.budget)) : 0;
                 return ratioA - ratioB; 
             });
             if(ranked[0]) updatePodium('1', ranked[0]);
             if(ranked[1]) updatePodium('2', ranked[1]);
             if(ranked[2]) updatePodium('3', ranked[2]);
-
             const list = document.getElementById('league-list');
-            list.innerHTML = '';
-            ranked.slice(3).forEach((site, index) => {
-                const ratio = site.budget > 0 ? Math.round((site.ghost_savings / site.budget) * 100) : 0;
-                list.innerHTML += `<div class="flex items-center gap-4 p-3 bg-white/5 rounded-lg border border-white/5"><div class="w-6 h-6 rounded-full bg-gray-700 text-xs font-bold flex items-center justify-center">${index + 4}</div><div class="flex-1 font-bold text-sm text-white">${site.name}</div><div class="text-right font-mono text-xs ${ratio > 10 ? 'text-red-400' : 'text-gray-400'}">${ratio}% Gaspillage</div></div>`;
-            });
+            if(list) {
+                list.innerHTML = '';
+                ranked.slice(3).forEach((site, index) => {
+                    const budget = parseFloat(site.budget) || 0;
+                    const ghost = parseFloat(site.ghost_savings) || 0;
+                    const ratio = budget > 0 ? Math.round((ghost / budget) * 100) : 0;
+                    list.innerHTML += `<div class="flex items-center gap-4 p-3 bg-white/5 rounded-lg border border-white/5"><div class="w-6 h-6 rounded-full bg-gray-700 text-xs font-bold flex items-center justify-center">${index + 4}</div><div class="flex-1 font-bold text-sm text-white">${site.name}</div><div class="text-right font-mono text-xs ${ratio > 10 ? 'text-red-400' : 'text-gray-400'}">${ratio}% Gaspillage</div></div>`;
+                });
+            }
         }
         function updatePodium(rank, site) {
-            document.getElementById(`podium-${rank}-name`).innerText = site.name;
-            const ratio = site.budget > 0 ? Math.round((site.ghost_savings / site.budget) * 100) : 0;
-            document.getElementById(`podium-${rank}-score`).innerText = `${ratio}% Gaspillage`;
+            safeSetText(`podium-${rank}-name`, site.name);
+            const budget = parseFloat(site.budget) || 0;
+            const ghost = parseFloat(site.ghost_savings) || 0;
+            const ratio = budget > 0 ? Math.round((ghost / budget) * 100) : 0;
+            safeSetText(`podium-${rank}-score`, `${ratio}% Gaspillage`);
         }
 
-        // --- 3. LOGIQUE DETAIL ---
+        // --- 3. LOGIQUE DETAIL (RESTAURÉE) ---
         async function loadDetail(id) {
             try {
                 const res = await fetch(`/api/dashboard/data/${id}`);
@@ -387,72 +339,87 @@
 
         function renderDetail(data) {
             const isGaz = data.energy_type === 'gaz';
-            document.getElementById('detail-title').innerText = data.identity.site_name || "Site";
-            document.getElementById('detail-address').innerText = data.location.address;
+            safeSetText('detail-title', data.identity.site_name || "Site");
+            safeSetText('detail-address', data.location.address);
             
             const badge = document.getElementById('detail-badge');
-            badge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
-            badge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${isGaz ? 'bg-gas/10 text-gas' : 'bg-cyan/10 text-cyan'}`;
-
-            // Coach
-            const coach = data.cortex_insight;
-            document.getElementById('cortex-msg').innerText = coach.message + " " + coach.conseil;
-            document.getElementById('cortex-action').innerText = coach.status;
-            document.getElementById('cortex-action').className = `inline-block px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider mt-2 ${coach.color === 'green' ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'}`;
-
-            // Market Watch
-            const market = data.market_analysis;
-            if(market) {
-                document.getElementById('market-badge').innerText = market.status;
-                document.getElementById('market-advice').innerText = market.message + " " + market.action;
-                const color = market.color === 'green' ? '#10B981' : (market.color === 'blue' ? '#3B82F6' : '#4B5563');
-                document.getElementById('market-card').style.borderColor = color;
-                document.getElementById('market-badge').style.backgroundColor = color;
+            if(badge) {
+                badge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
+                badge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${isGaz ? 'bg-gas/10 text-gas' : 'bg-cyan/10 text-cyan'}`;
             }
 
-            // Pricing
+            const coach = data.cortex_insight;
+            const msgEl = document.getElementById('cortex-msg');
+            if(msgEl) msgEl.innerText = coach.message + " " + coach.conseil;
+            
+            const actionEl = document.getElementById('cortex-action');
+            if(actionEl) {
+                actionEl.innerText = coach.status;
+                actionEl.className = `inline-block px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider mt-2 ${coach.color === 'green' ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'}`;
+            }
+
+            const market = data.market_analysis;
+            if(market) {
+                safeSetText('market-badge', market.status);
+                safeSetText('market-advice', market.message + " " + market.action);
+                const color = market.color === 'green' ? '#10B981' : (market.color === 'blue' ? '#3B82F6' : '#4B5563');
+                const mCard = document.getElementById('market-card');
+                if(mCard) mCard.style.borderColor = color;
+                const mBadge = document.getElementById('market-badge');
+                if(mBadge) mBadge.style.backgroundColor = color;
+            }
+
             const list = document.getElementById('detail-pricing');
-            list.innerHTML = '';
-            document.getElementById('detail-provider').innerText = "Fournisseur: " + (data.contract.provider || "Non renseigné");
-            if (isGaz) {
-                addPriceLine(list, "Abo", data.pricing.fix + " €", "text-yellow-500");
-                addPriceLine(list, "Molécule", data.pricing.hph + " €", "text-gas font-bold");
-            } else {
-                addPriceLine(list, "HPH", data.pricing.hph, "text-white");
-                addPriceLine(list, "HCH", data.pricing.hch, "text-gray-400");
-                addPriceLine(list, "HPE", data.pricing.hpe, "text-cyan");
-                addPriceLine(list, "HCE", data.pricing.hce, "text-cyan");
+            if(list) {
+                list.innerHTML = '';
+                safeSetText('detail-provider', "Fournisseur: " + (data.contract.provider || "Non renseigné"));
+                if (isGaz) {
+                    addPriceLine(list, "Abo", data.pricing.fix + " €", "text-yellow-500");
+                    addPriceLine(list, "Molécule", data.pricing.hph + " €", "text-gas font-bold");
+                } else {
+                    addPriceLine(list, "HPH", data.pricing.hph, "text-white");
+                    addPriceLine(list, "HCH", data.pricing.hch, "text-gray-400");
+                    addPriceLine(list, "HPE", data.pricing.hpe, "text-cyan");
+                    addPriceLine(list, "HCE", data.pricing.hce, "text-cyan");
+                }
             }
 
             // Optimisation
-            const pSub = parseFloat(data.contract.power);
+            const pSub = parseFloat(data.contract.power) || 0;
             const pReach = pSub * (isGaz ? 0.9 : 0.7); 
-            document.getElementById('detail-sub').innerText = `Souscrit: ${pSub} ${isGaz ? 'MWh' : 'kVA'}`;
-            document.getElementById('detail-reached').innerText = `Max: ${pReach}`;
-            const ratio = (pReach / pSub) * 100;
+            safeSetText('detail-sub', `Souscrit: ${pSub} ${isGaz ? 'MWh' : 'kVA'}`);
+            safeSetText('detail-reached', `Max: ${pReach}`);
+            const ratio = pSub > 0 ? (pReach / pSub) * 100 : 0;
             const gauge = document.getElementById('detail-gauge');
-            gauge.style.width = `${ratio}%`;
-            gauge.className = `h-full rounded-full ${ratio > 95 ? 'bg-red-500' : (ratio < 60 ? 'bg-warning' : 'bg-success')}`;
+            if(gauge) {
+                gauge.style.width = `${ratio}%`;
+                gauge.className = `h-full rounded-full ${ratio > 95 ? 'bg-red-500' : (ratio < 60 ? 'bg-warning' : 'bg-success')}`;
+            }
             const gain = (!isGaz && ratio < 60) ? Math.floor((pSub - pReach*1.2) * 18) : 0;
-            document.getElementById('detail-gain').innerText = gain > 0 ? `+ ${gain} €/an` : "OPTIMISÉ";
-            document.getElementById('detail-advice').innerText = gain > 0 ? "Conseil: Baissez votre puissance souscrite." : "Votre contrat est bien calibré.";
+            safeSetText('detail-gain', gain > 0 ? `+ ${gain} €/an` : "OPTIMISÉ");
+            safeSetText('detail-advice', gain > 0 ? "Conseil: Baissez votre puissance souscrite." : "Votre contrat est bien calibré.";
 
             // Landing (V13.1 Update)
             const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
             const timeProgress = (dayOfYear / 365) * 100;
-            const budgetProgress = timeProgress * 1.05; // Sim
-            document.getElementById('time-progress-txt').innerText = Math.round(timeProgress) + "%";
-            document.getElementById('time-progress-bar').style.width = timeProgress + "%";
-            document.getElementById('budget-progress-txt').innerText = Math.round(budgetProgress) + "%";
-            document.getElementById('budget-progress-bar').style.width = Math.min(budgetProgress, 100) + "%";
-            if(budgetProgress > timeProgress + 5) {
-                document.getElementById('budget-progress-bar').className = "gauge-fill bg-red-500 rounded-full";
-                document.getElementById('landing-msg').innerText = "Attention : Sur-consommation détectée.";
-                document.getElementById('landing-msg').className = "text-[10px] text-red-400 mt-2 italic text-right";
-            } else {
-                document.getElementById('budget-progress-bar').className = "gauge-fill bg-primary rounded-full";
-                document.getElementById('landing-msg').innerText = "Trajectoire budgétaire maîtrisée.";
-                document.getElementById('landing-msg').className = "text-[10px] text-success mt-2 italic text-right";
+            const budgetProgress = timeProgress * 1.05; 
+            safeSetText('time-progress-txt', Math.round(timeProgress) + "%");
+            const timeBar = document.getElementById('time-progress-bar');
+            if(timeBar) timeBar.style.width = timeProgress + "%";
+            
+            safeSetText('budget-progress-txt', Math.round(budgetProgress) + "%");
+            const budBar = document.getElementById('budget-progress-bar');
+            const landMsg = document.getElementById('landing-msg');
+            
+            if(budBar) {
+                budBar.style.width = Math.min(budgetProgress, 100) + "%";
+                if(budgetProgress > timeProgress + 5) {
+                    budBar.className = "gauge-fill bg-red-500 rounded-full";
+                    if(landMsg) { landMsg.innerText = "Attention : Sur-consommation détectée."; landMsg.className = "text-[10px] text-red-400 mt-2 italic text-right"; }
+                } else {
+                    budBar.className = "gauge-fill bg-primary rounded-full";
+                    if(landMsg) { landMsg.innerText = "Trajectoire budgétaire maîtrisée."; landMsg.className = "text-[10px] text-success mt-2 italic text-right"; }
+                }
             }
         }
 
@@ -460,15 +427,19 @@
         function initFilters() {
             const lots = [...new Set(FLEET_DATA.map(s => s.lot).filter(l => l))];
             const select = document.getElementById('lot-select');
-            select.innerHTML = '<option value="all">Tous les Lots</option>';
-            lots.forEach(lot => select.innerHTML += `<option value="${lot}">${lot}</option>`);
+            if(select) {
+                select.innerHTML = '<option value="all">Tous les Lots</option>';
+                lots.forEach(lot => select.innerHTML += `<option value="${lot}">${lot}</option>`);
+            }
         }
         function filterEnergy(type) {
             CURRENT_FILTER = type;
             ['all', 'elec', 'gaz'].forEach(t => {
                 const btn = document.getElementById('btn-' + t);
-                btn.className = (t === type) ? "flex-1 py-1 text-[10px] font-bold rounded bg-primary text-white transition shadow-lg" : "flex-1 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
-                if(t === type && t === 'gaz') btn.classList.replace('bg-primary', 'bg-gas');
+                if(btn) {
+                    btn.className = (t === type) ? "flex-1 py-1 text-[10px] font-bold rounded bg-primary text-white transition shadow-lg" : "flex-1 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
+                    if(t === type && t === 'gaz') btn.classList.replace('bg-primary', 'bg-gas');
+                }
             });
             applyFilters();
         }
@@ -485,6 +456,7 @@
         }
         function renderTable(data) {
             const tbody = document.getElementById('fleet-table-body');
+            if(!tbody) return;
             tbody.innerHTML = '';
             data.forEach(site => {
                 const isGaz = site.energy === 'gaz';
@@ -492,6 +464,12 @@
                 const row = document.createElement('tr');
                 row.className = "site-row border-b border-white/5";
                 const detailAction = `onclick="loadDetail('${site.id}')"`;
+                
+                // SECURITE BUDGET NULL
+                const safeBudget = parseFloat(site.budget) || 0;
+                const safeLanding = parseFloat(site.landing) || 0;
+                const safeGhost = parseFloat(site.ghost_savings) || 0;
+
                 row.innerHTML = `
                     <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
                         <input type="checkbox" class="accent-primary w-4 h-4 cursor-pointer" onchange="toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}>
@@ -501,39 +479,57 @@
                     <td class="px-4 py-3" ${detailAction}><span class="bg-white/5 px-2 py-1 rounded text-[10px]">${site.lot}</span></td>
                     <td class="px-4 py-3 text-center" ${detailAction}><span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-cyan bg-cyan/10'} px-2 py-1 rounded">${isGaz ? 'GAZ' : 'ELEC'}</span></td>
                     <td class="px-4 py-3 text-right font-mono text-gray-300" ${detailAction}>${site.power} <span class="text-[10px] text-gray-600">${isGaz ? 'MWh' : 'kVA'}</span></td>
-                    <td class="px-4 py-3 text-right font-bold text-white" ${detailAction}>${formatCurrency(site.budget)}</td>
-                    <td class="px-4 py-3 text-right font-mono ${site.alert ? 'text-red-500' : 'text-success'}" ${detailAction}>${formatCurrency(site.landing)}</td>
+                    <td class="px-4 py-3 text-right font-bold text-white" ${detailAction}>${formatCurrency(safeBudget)}</td>
+                    <td class="px-4 py-3 text-right font-mono text-warning font-bold" ${detailAction}>${safeGhost > 10 ? formatCurrency(safeGhost) : '-'}</td>
+                    <td class="px-4 py-3 text-right font-mono ${site.alert ? 'text-red-500' : 'text-success'}" ${detailAction}>${formatCurrency(safeLanding)}</td>
                 `;
                 tbody.appendChild(row);
             });
-            document.getElementById('site-count').innerText = data.length;
+            safeSetText('site-count', data.length);
         }
         function updateGlobalKPIs(data) {
             let totalBudget = 0;
-            data.forEach(s => totalBudget += s.budget);
-            document.getElementById('budget-display').innerText = formatCurrency(totalBudget);
+            data.forEach(s => totalBudget += (parseFloat(s.budget) || 0));
+            safeSetText('budget-display', formatCurrency(totalBudget));
         }
         function updateCharts(data) {
             let budgetElec = 0, budgetGaz = 0;
-            data.forEach(s => { if(s.energy === 'gaz') budgetGaz += s.budget; else budgetElec += s.budget; });
-            const ctxMix = document.getElementById('mixChart').getContext('2d');
-            if(mixChartInstance) mixChartInstance.destroy();
-            mixChartInstance = new Chart(ctxMix, { type: 'doughnut', data: { labels: ['Élec', 'Gaz'], datasets: [{ data: [budgetElec, budgetGaz], backgroundColor: ['#00E5FF', '#EF4444'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 10 } } } } } });
-            const top5 = [...data].sort((a, b) => b.budget - a.budget).slice(0, 5);
-            const ctxTop = document.getElementById('topChart').getContext('2d');
-            if(topChartInstance) topChartInstance.destroy();
-            topChartInstance = new Chart(ctxTop, { type: 'bar', data: { labels: top5.map(s => s.name.substring(0, 10) + '...'), datasets: [{ label: 'Budget', data: top5.map(s => s.budget), backgroundColor: '#A855F7', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94A3B8', font: { size: 9 } }, grid: { display: false } }, y: { display: false } } } });
+            data.forEach(s => { 
+                const b = parseFloat(s.budget) || 0;
+                if(s.energy === 'gaz') budgetGaz += b; else budgetElec += b; 
+            });
+            
+            const ctxMix = document.getElementById('mixChart');
+            if(ctxMix) {
+                if(mixChartInstance) mixChartInstance.destroy();
+                mixChartInstance = new Chart(ctxMix.getContext('2d'), { type: 'doughnut', data: { labels: ['Élec', 'Gaz'], datasets: [{ data: [budgetElec, budgetGaz], backgroundColor: ['#00E5FF', '#EF4444'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 10 } } } } } });
+            }
+            
+            const top5 = [...data].sort((a, b) => (parseFloat(b.budget)||0) - (parseFloat(a.budget)||0)).slice(0, 5);
+            const ctxTop = document.getElementById('topChart');
+            if(ctxTop) {
+                if(topChartInstance) topChartInstance.destroy();
+                topChartInstance = new Chart(ctxTop.getContext('2d'), { type: 'bar', data: { labels: top5.map(s => s.name.substring(0, 10) + '...'), datasets: [{ label: 'Budget', data: top5.map(s => parseFloat(s.budget)||0), backgroundColor: '#A855F7', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94A3B8', font: { size: 9 } }, grid: { display: false } }, y: { display: false } } } });
+            }
         }
         function toggleSelection(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
         function selectAll() { if(SELECTED_IDS.size === FLEET_DATA.length) SELECTED_IDS.clear(); else FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); renderTable(FLEET_DATA); updateActionBar(); }
-        function updateActionBar() { const count = SELECTED_IDS.size; document.getElementById('selected-count').innerText = count; const bar = document.getElementById('action-bar'); if(count > 0) bar.classList.add('visible'); else bar.classList.remove('visible'); bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; }
+        function updateActionBar() { 
+            const count = SELECTED_IDS.size; 
+            safeSetText('selected-count', count);
+            const bar = document.getElementById('action-bar'); 
+            if(bar) {
+                if(count > 0) bar.classList.add('visible'); else bar.classList.remove('visible'); 
+                bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; 
+            }
+        }
         
-        // --- CORRECTIF V13.5 (STRICT FIX) ---
+        // --- CORRECTIF V14.1 : DOWNLOAD SANS CRASH + FONCTIONS RESTAURÉES ---
         async function generateTender() {
             if(SELECTED_IDS.size === 0) return alert("Veuillez sélectionner au moins un site.");
             const btn = document.querySelector('#action-bar button');
             const original = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ...';
 
             try {
                 const res = await fetch('/api/ops/generate_tender', {
@@ -544,35 +540,31 @@
 
                 if(res.ok) {
                     const blob = await res.blob();
-                    if (blob.size === 0) throw new Error("Le fichier reçu est vide.");
-                    
+                    if (blob.size === 0) throw new Error("Fichier vide.");
                     const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
+                    const a = document.createElement('a'); a.href = url;
                     const date = new Date().toISOString().slice(0,10);
                     a.download = `DCE_Energistrat_${SELECTED_IDS.size}sites_${date}.xlsx`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
+                    document.body.appendChild(a); a.click(); a.remove();
                     
+                    // Reset Safe
                     btn.innerHTML = '<i class="fa-solid fa-check"></i> Téléchargé';
-                    setTimeout(() => btn.innerHTML = original, 2000);
-                    selectAll(); 
+                    setTimeout(() => { 
+                        if(document.contains(btn)) btn.innerHTML = original; 
+                        SELECTED_IDS.clear();
+                        renderTable(FLEET_DATA);
+                        updateActionBar();
+                    }, 2000);
                 } else {
-                    let errorMsg = "Erreur inconnue";
-                    try {
-                        const errorJson = await res.json();
-                        errorMsg = errorJson.detail || JSON.stringify(errorJson);
-                    } catch(jsonError) {
-                        errorMsg = await res.text(); 
-                    }
-                    alert("ÉCHEC SERVEUR (" + res.status + ") : " + errorMsg.substring(0, 300));
+                    let msg = "Erreur serveur";
+                    try { msg = (await res.json()).detail; } catch(e) {}
+                    alert(msg);
+                    btn.innerHTML = original;
                 }
             } catch(e) { 
                 console.error(e); 
-                alert("ERREUR RÉSEAU : " + e.message); 
+                if(btn) btn.innerHTML = original;
             }
-            if(!btn.innerHTML.includes("Téléchargé")) btn.innerHTML = original;
         }
 
         function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
