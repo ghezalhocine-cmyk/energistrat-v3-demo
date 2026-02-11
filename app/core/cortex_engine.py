@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V42_2")
+logger = logging.getLogger("CORTEX_MASTER_V43_DIAMOND")
 
 # CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
@@ -32,8 +32,8 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "42.2 (Integral + Fix ID Unique)"
-        # Base de connaissance Métier (NAF)
+        self.version = "43.0 (Diamond: Intelligence Active)"
+        # Base de connaissance Métier (NAF) - Inchangée
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
             "1013B": "Boucherie", "5610A": "Restauration Trad.", "5610C": "Fast Food",
@@ -49,7 +49,7 @@ class CortexEngine:
             "5510Z": "Hôtellerie", "6832A": "Administration Immeubles", "6832B": "Supports Immobiliers"
         }
 
-    # --- HELPERS DE NETTOYAGE ---
+    # --- HELPERS DE NETTOYAGE (STABLES) ---
     def _safe_int(self, value):
         try:
             if value is None: return 0
@@ -67,25 +67,17 @@ class CortexEngine:
         except: return 0.0
 
     # =========================================================
-    # MODULE 1 : TENDER FACTORY EXCEL (V39)
+    # MODULE 1 : TENDER FACTORY EXCEL (STABLE V39)
     # =========================================================
     def generate_advanced_tender_excel(self, sites_data):
-        """
-        Génère le DCE Excel complet (.xlsx).
-        """
         if not sites_data: return b""
-        
         try:
-            # Détection de l'énergie dominante du lot
             first_site = sites_data[0]
             contract = first_site.get('contract', {}) or {}
             segment = str(contract.get('segment', '')).upper()
             is_gaz = "T" in segment or "GAZ" in segment
-            
-            if is_gaz:
-                return self._generate_gaz_tender(sites_data)
-            else:
-                return self._generate_elec_tender(sites_data)
+            if is_gaz: return self._generate_gaz_tender(sites_data)
+            else: return self._generate_elec_tender(sites_data)
         except Exception as e:
             logger.error(f"Erreur Fatale Excel Generator: {e}")
             return b""
@@ -99,8 +91,7 @@ class CortexEngine:
                 i = s.get('identity', {}) or {}
                 loc = s.get('location', {}) or {}
                 power = self._safe_float(c.get('power', 0))
-                vol_total = power * 1500 # Estimation standard si pas de courbe
-                
+                vol_total = power * 1500 
                 rows.append({
                     "PDL": str(c.get('pdl', 'Inconnu')),
                     "Nom Site": str(i.get('site_name') or i.get('name') or 'Site Inconnu'),
@@ -118,13 +109,11 @@ class CortexEngine:
         df_dqe = pd.DataFrame(rows)
         bpu_data = [{"Lot": "Lot 1", "Poste": "Fourniture Élec (Base)", "Unité": "€/MWh", "C5": "", "C4": ""}]
         df_bpu = pd.DataFrame(bpu_data)
-
         try:
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
                 df_bpu.to_excel(writer, sheet_name='2-BPU_Reponse', index=False)
         except: return b""
-            
         output.seek(0)
         return output.getvalue()
 
@@ -137,7 +126,6 @@ class CortexEngine:
                 i = s.get('identity', {}) or {}
                 loc = s.get('location', {}) or {}
                 car = self._safe_float(c.get('power', 0))
-                
                 rows.append({
                     "PCE": str(c.get('pdl', 'Inconnu')),
                     "Nom Site": str(i.get('site_name') or i.get('name') or 'Site Inconnu'),
@@ -147,27 +135,23 @@ class CortexEngine:
                     "CJA (MWh/j)": round(car/300, 3) if car > 0 else 0
                 })
             except: continue
-
         df_dqe = pd.DataFrame(rows)
         df_bpu = pd.DataFrame([{"Poste": "Prix Molécule", "Unité": "€/MWh"}, {"Poste": "Abonnement", "Unité": "€/an"}])
-
         try:
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
                 df_bpu.to_excel(writer, sheet_name='2-BPU_Reponse', index=False)
         except: return b""
-
         output.seek(0)
         return output.getvalue()
 
     # =========================================================
-    # MODULE 2 : MARKET WATCH (V38)
+    # MODULE 2 : MARKET WATCH (STABLE V38)
     # =========================================================
     def analyze_market_position(self, client_price, market_price, energy_type):
         if client_price <= 0: return {"status": "UNKNOWN", "message": "Prix contrat manquant", "color": "gray", "action": "Renseignez vos prix."}
         delta = client_price - market_price
         pct = (delta / client_price) * 100
-        
         if delta > 10: 
             return {"status": "OPPORTUNITÉ", "color": "green", "message": f"Marché {abs(int(pct))}% moins cher.", "action": "Anticipez !"}
         elif delta < -10: 
@@ -176,7 +160,7 @@ class CortexEngine:
             return {"status": "NEUTRE", "color": "gray", "message": "Prix aligné marché.", "action": "Surveillance."}
 
     # =========================================================
-    # MODULE 3 : ROI & KPI (V37)
+    # MODULE 3 : ROI & KPI (STABLE V37)
     # =========================================================
     def enrich_fleet_kpis(self, site_data):
         contract = site_data.get('contract', {}) or {}
@@ -186,10 +170,8 @@ class CortexEngine:
         price = self._safe_float(pricing.get('hph')) + self._safe_float(pricing.get('tax'))
         fix = self._safe_float(pricing.get('fix'))
         budget = fix + (vol * price / 1000)
-        
         day = datetime.now().timetuple().tm_yday
         landing = budget * (1 / (day/365 if day>0 else 1)) * (day/365)
-        
         return {
             "budget_annual": round(budget, 2),
             "ghost_savings": round(budget * 0.15, 2),
@@ -198,7 +180,7 @@ class CortexEngine:
         }
 
     # =========================================================
-    # MODULE 4 : IMPORT MASSE V5 (CORRECTIF ID UNIQUE V42.1)
+    # MODULE 4 : IMPORT MASSE V5.1 (AMÉLIORÉ POUR SGE)
     # =========================================================
     def parse_mass_import_v5(self, file_content):
         try:
@@ -224,6 +206,10 @@ class CortexEngine:
                     col_adresse = next((c for c in df.columns if "ADRESSE" in c), None)
                     site_name = str(row[col_nom]).strip() if col_nom else "Site Inconnu"
                     
+                    # Détection SGE (Puissance Atteinte / Max)
+                    col_pmax = next((c for c in df.columns if "ATTEINTE" in str(c).upper() or "MAX" in str(c).upper() or "POINTE" in str(c).upper()), None)
+                    p_atteinte = self._safe_float(row.get(col_pmax, 0)) if col_pmax else 0.0
+
                     if is_gaz:
                         col_pce = next((c for c in df.columns if "PCE" in c), None)
                         col_car = next((c for c in df.columns if "CAR" in c), None)
@@ -249,14 +235,12 @@ class CortexEngine:
                         p_hpe = str(row.get('PRIX_HPE', '0')).replace(',', '.')
                         p_hce = str(row.get('PRIX_HCE', '0')).replace(',', '.')
 
-                    # --- CORRECTIF ID UNIQUE (V42.1) ---
-                    # On utilise ref_id (PDL/PCE) comme clé, pas le SIRET
                     unique_id = ref_id if ref_id != "Inconnu" else f"{siret}_{site_name}"
                     
                     site = {
                         "client_name": site_name, 
                         "identity": {
-                            "id": unique_id, # <--- ID UNIQUE BASÉ SUR PDL/PCE
+                            "id": unique_id,
                             "siret": siret,
                             "name": site_name,
                             "site_name": site_name,
@@ -265,7 +249,8 @@ class CortexEngine:
                         "location": { "address": str(row.get(col_adresse, '')).strip() },
                         "contract": {
                             "pdl": ref_id,
-                            "power": power,
+                            "power": power, # Puissance SOUSCRITE
+                            "p_max": p_atteinte, # Puissance ATTEINTE (SGE)
                             "segment": segment,
                             "provider": "Import CSV"
                         },
@@ -288,15 +273,13 @@ class CortexEngine:
             return []
 
     # =========================================================
-    # MODULE 5 : ANALYSE COURBE DE CHARGE (HISTORIQUE COMPLET)
+    # MODULE 5 : ANALYSE COURBE DE CHARGE (STABLE)
     # =========================================================
     def analyze_file(self, file_content, filename, target_profile="demo", known_site_data=None):
         try:
-            # 1. Parsing
             df, time_step, meta_tech = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible ou vide"}
             
-            # 2. Contexte
             context = {
                 "pdl": known_site_data.get('pdl') if known_site_data else meta_tech.get('pdl'),
                 "p_souscrite": float(known_site_data.get('power', 0)) if known_site_data else 0,
@@ -316,14 +299,12 @@ class CortexEngine:
             cp_match = re.search(r'\b\d{5}\b', context['address'])
             zip_code = cp_match.group(0) if cp_match else "Inconnu"
 
-            # 3. Calculs
             base = self._module_socle(df, time_step)
             ref_pmax = context['p_souscrite'] if context['p_souscrite'] > 0 else base['p_max']
             finance = self._module_finance_4p(df, time_step, ref_pmax)
             solar = self._module_solar(df)
             waste = self._module_ghost(df, base['talon'])
             
-            # 4. Chart
             step = max(1, len(df)//2000)
             df_chart = df.iloc[::step].copy()
             chart_vals = df_chart['val'].fillna(0).tolist()
@@ -353,49 +334,147 @@ class CortexEngine:
             return {"success": True, "kpi": full_kpi, "chart": chart, "ai_insight": narrative}
 
         except Exception as e:
-            logger.exception("Crash Cortex V42")
+            logger.exception("Crash Cortex V43")
             return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
 
-    # --- SOUS-MODULES TECHNIQUES (DÉCOMPRESSÉS) ---
+    # =========================================================
+    # MODULE 6 : DIAMOND INTELLIGENCE (NOUVEAU)
+    # =========================================================
+    def analyze_portfolio(self, sites_data):
+        """
+        Analyse croisée du portefeuille pour générer la Green League et les conseils Cortex.
+        Utilise les données SGE (P_MAX) si disponibles.
+        """
+        if not sites_data: return {"error": "Aucune donnée"}
+
+        total_conso = 0.0
+        total_budget = 0.0
+        sites_analysis = []
+        cortex_insights = []
+        
+        MARKET_REF_PRICE = 90.0
+        POWER_OPTIM_THRESHOLD = 0.70
+
+        for site in sites_data:
+            contract = site.get('contract', {}) or {}
+            pricing = site.get('pricing', {}) or {}
+            ident = site.get('identity', {}) or {}
+
+            # Reconstruction des métriques
+            p_sous = self._safe_float(contract.get('power', 0))
+            p_att = self._safe_float(contract.get('p_max', 0)) # Vient de l'import SGE/CSV
+            
+            # Estimation Conso/Budget si non explicite
+            vol = p_sous * 1500 # Fallback
+            # Si on a des données financières calculées par enrich_fleet_kpis
+            # On pourrait les utiliser ici, mais restons sur la donnée brute pour l'instant
+            
+            price_hph = self._safe_float(pricing.get('hph', 0))
+            budget_est = vol * (price_hph + 50) / 1000 # Estimation grossière budget
+            
+            # Si des KPIs existent déjà (calculés par enrich_fleet_kpis)
+            if 'kpis' in site:
+                budget_est = site['kpis'].get('budget_annual', budget_est)
+            
+            pmc = (budget_est / vol * 1000) if vol > 0 else 0
+            
+            # Calcul Ratio Puissance (Si données SGE présentes)
+            ratio_p = (p_att / p_sous) if p_sous > 0 else 1.0
+            
+            site_flags = []
+            
+            # Règle 1 : Optimisation Puissance (Basée sur SGE)
+            if p_sous > 36 and p_att > 0 and ratio_p < POWER_OPTIM_THRESHOLD:
+                economy_pot = (p_sous - p_att) * 12 * 10
+                msg = f"📉 <b>{ident.get('site_name')}</b> : Sur-dimensionné ({int(ratio_p*100)}% utilisé). Gain ~{int(economy_pot)}€/an."
+                cortex_insights.append({"type": "optimization", "msg": msg, "priority": 2})
+                site_flags.append("TURPE_OPTIM")
+            
+            # Règle 2 : Alerte Prix
+            if pmc > (MARKET_REF_PRICE * 1.3):
+                msg = f"💰 <b>{ident.get('site_name')}</b> : Prix élevé ({int(pmc)}€/MWh)."
+                cortex_insights.append({"type": "alert", "msg": msg, "priority": 1})
+                site_flags.append("HIGH_PRICE")
+
+            total_conso += vol
+            total_budget += budget_est
+            
+            sites_analysis.append({
+                "nom_site": ident.get('site_name', 'Inconnu'),
+                "ville": site.get('location', {}).get('address', ''),
+                "pmc": pmc,
+                "consommation": vol,
+                "depense": budget_est,
+                "flags": site_flags
+            })
+
+        # TRI GREEN LEAGUE (Top 3 Economes)
+        active_sites = [s for s in sites_analysis if s['consommation'] > 0]
+        sorted_sites = sorted(active_sites, key=lambda x: x['pmc'])
+        
+        # TRI CANCRES (Top 3 Chers)
+        flop_3 = sorted(sorted_sites, key=lambda x: x['pmc'], reverse=True)[:3] if len(sorted_sites) > 3 else []
+
+        global_pmc = (total_budget / total_conso * 1000) if total_conso > 0 else 0
+        
+        main_cortex = f"Parc analysé : {int(global_pmc)}€/MWh moyen."
+        if global_pmc > MARKET_REF_PRICE:
+            main_cortex += f" Au-dessus de la cible ({MARKET_REF_PRICE}€)."
+        else:
+            main_cortex += " Performance alignée marché."
+
+        return {
+            "kpis": {
+                "total_conso": total_conso,
+                "total_budget": total_budget,
+                "global_pmc": global_pmc,
+                "nb_sites": len(sites_data)
+            },
+            "green_league": {
+                "gold": sorted_sites[0] if len(sorted_sites) > 0 else None,
+                "silver": sorted_sites[1] if len(sorted_sites) > 1 else None,
+                "bronze": sorted_sites[2] if len(sorted_sites) > 2 else None,
+                "cancres": flop_3
+            },
+            "cortex": {
+                "main_message": main_cortex,
+                "insights": sorted(cortex_insights, key=lambda x: x['priority'])
+            },
+            "raw_data": sites_analysis
+        }
+
+    # --- SOUS-MODULES TECHNIQUES (INCHANGÉS) ---
     def _parse_data(self, content, filename):
         try:
             buffer = io.BytesIO(content)
             content_str = content.decode('latin-1', errors='ignore')
             pdl_match = re.search(r'\b(\d{14})\b', content_str)
             pdl = pdl_match.group(1) if pdl_match else None
-            
             try: df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip', low_memory=False)
             except: 
                 buffer.seek(0)
                 df = pd.read_csv(buffer, sep=None, engine='python', encoding='latin-1')
-
             df.columns = [str(c).lower().strip().replace('é','e').replace('è','e') for c in df.columns]
             c_date = next((c for c in df.columns if 'horodate' in c or 'date' in c), None)
             c_val = next((c for c in df.columns if 'valeur' in c or 'puiss' in c or 'conso' in c), None)
             c_unit = next((c for c in df.columns if 'unit' in c), None)
-            
             if not c_date or not c_val: return None, 0, {}
-
             if df[c_val].dtype == object:
                 df['val'] = pd.to_numeric(df[c_val].astype(str).str.replace(',', '.').str.replace(r'\s+', '', regex=True), errors='coerce')
             else:
                 df['val'] = pd.to_numeric(df[c_val], errors='coerce')
             df['val'] = df['val'].fillna(0)
-
             df['date'] = pd.to_datetime(df[c_date], format='%d/%m/%Y %H:%M', errors='coerce')
             if df['date'].isna().mean() > 0.5: df['date'] = pd.to_datetime(df[c_date], dayfirst=True, errors='coerce')
             df = df.dropna(subset=['date']).sort_values('date')
-
             is_watts = False
             if c_unit and 'W' in str(df[c_unit].iloc[0]).upper() and 'KW' not in str(df[c_unit].iloc[0]).upper(): is_watts = True
             if df['val'].mean() > 800: is_watts = True
             if is_watts: df['val'] = df['val'] / 1000.0
-
             time_step = 0.1666
             if len(df) > 1:
                 delta = (df.iloc[1]['date'] - df.iloc[0]['date']).total_seconds()
                 if delta > 0: time_step = delta / 3600.0
-
             df['date_str'] = df['date'].dt.strftime('%Y-%m-%d %H:%M')
             return df[['date', 'val', 'date_str']], time_step, {"pdl": pdl}
         except: return None, 0, {}
@@ -406,12 +485,10 @@ class CortexEngine:
         mask_nuit = (df['date'].dt.hour < 6)
         nuit = df.loc[mask_nuit, 'val']
         talon = nuit.quantile(0.05) if not nuit.empty else 0
-        
         mask_winter = df['date'].dt.month.isin([11, 12, 1, 2, 3])
         conso_hiver = df.loc[mask_winter, 'val'].sum()
         conso_ete = df.loc[~mask_winter, 'val'].sum()
         thermo = round(conso_hiver / conso_ete, 1) if conso_ete > 0 else 0
-        
         return {
             "conso_totale": self._safe_int(val.sum() * ts),
             "p_max": round(float(p_max), 2),
@@ -426,14 +503,11 @@ class CortexEngine:
         df['h'] = df['date'].dt.hour
         mask_w = df['m'].isin([11, 12, 1, 2, 3])
         mask_hp = (df['h'] >= 6) & (df['h'] < 22)
-        
         v_hph = df.loc[mask_w & mask_hp, 'val'].sum() * ts
         v_hch = df.loc[mask_w & ~mask_hp, 'val'].sum() * ts
         v_hpe = df.loc[~mask_w & mask_hp, 'val'].sum() * ts
         v_hce = df.loc[~mask_w & ~mask_hp, 'val'].sum() * ts
-        
         cost = (v_hph*0.22) + (v_hch*0.14) + (v_hpe*0.14) + (v_hce*0.09) + (ref_pmax*18)
-        
         return {
             "finance": {
                 "budget_total": self._safe_int(cost),
@@ -484,12 +558,10 @@ class CortexEngine:
                 with pdfplumber.open(io.BytesIO(inv_b)) as pdf:
                     for p in pdf.pages: txt += p.extract_text() + "\n"
             except: pass
-        
         m_sous = re.search(r"(?:souscrite|ps|p\.souscrite).*?(\d+[.,]?\d*)", txt, re.I)
         m_max = re.search(r"(?:atteinte|max|pointe).*?(\d+[.,]?\d*)", txt, re.I)
         p_sous = float(m_sous.group(1).replace(',', '.')) if m_sous else 0
         p_att = float(m_max.group(1).replace(',', '.')) if m_max else 0
-        
         checks = [
             {"point": "Puissance Souscrite", "a": f"{p_sous} kVA", "b": "Seuil", "status": "INFO", "error": False},
             {"point": "Puissance Atteinte", "a": f"{p_att} kVA", "b": "Relevé", "status": "ALERTE" if p_att > p_sous else "OK", "error": p_att > p_sous},
