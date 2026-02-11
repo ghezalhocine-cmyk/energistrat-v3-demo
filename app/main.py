@@ -74,7 +74,7 @@ class MarketUpdateModel(BaseModel):
     elec: dict
     gaz: dict
 
-# --- MARKET WATCH ENGINE (NOUVEAU) ---
+# --- MARKET WATCH ENGINE (EVOLUTION DIAMOND : HISTORY) ---
 def get_market_ref():
     path = f"{DATA_DIR}/market_ref.json"
     if os.path.exists(path):
@@ -94,13 +94,45 @@ async def api_get_market(): return JSONResponse(get_market_ref())
 async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": raise HTTPException(status_code=401, detail="Accès refusé")
     try:
-        payload = data.dict()
-        payload["updated_at"] = datetime.now().isoformat()
-        with open(f"{DATA_DIR}/market_ref.json", "w") as f: json.dump(payload, f, indent=4)
-        return JSONResponse({"success": True, "updated_at": payload["updated_at"]})
+        # 1. Préparation de la nouvelle donnée
+        new_payload = data.dict()
+        new_payload["updated_at"] = datetime.now().isoformat()
+        
+        ref_path = f"{DATA_DIR}/market_ref.json"
+        hist_path = f"{DATA_DIR}/market_history.json"
+        
+        # 2. Logique d'Historisation (Avant écrasement)
+        if os.path.exists(ref_path):
+            try:
+                # On lit la version actuelle (qui va devenir "l'ancienne")
+                with open(ref_path, 'r') as f: old_data = json.load(f)
+                
+                # On charge l'historique existant ou on le crée
+                history = []
+                if os.path.exists(hist_path):
+                    try:
+                        with open(hist_path, 'r') as f: history = json.load(f)
+                    except: history = [] 
+                
+                # On ajoute l'ancienne version à l'historique
+                history.append(old_data)
+                
+                # Rotation : On ne garde que les 104 dernières semaines (2 ans) pour ne pas saturer
+                if len(history) > 104: history = history[-104:]
+                
+                # Sauvegarde de l'historique
+                with open(hist_path, 'w') as f: json.dump(history, f, indent=4)
+                
+            except Exception as e:
+                print(f"[WARNING] Market History Failed: {str(e)}")
+
+        # 3. Mise à jour du Référentiel LIVE (Cortex V43 lit ce fichier)
+        with open(ref_path, "w") as f: json.dump(new_payload, f, indent=4)
+        
+        return JSONResponse({"success": True, "updated_at": new_payload["updated_at"], "history_archived": True})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET (BI & ANALYTICS - EVOLUTION CORTEX V43) ---
+# --- API DASHBOARD / FLEET (BI & ANALYTICS - CORTEX V43 CONNECTED) ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
     raw_sites = []
@@ -108,32 +140,28 @@ async def get_fleet_data():
     
     # 1. Chargement des données brutes
     for p in files:
-        if "master_index" in p or "market_ref" in p: continue
+        if "master_index" in p or "market_ref" in p or "market_history" in p: continue
         try:
             with open(p, 'r') as f: data = json.load(f)
             if not data or 'identity' not in data: continue
             
-            # On enrichit avec les KPIs basiques pour que Cortex ait de la matière
+            # Enrichissement KPI basique
             try: kpis = cortex.enrich_fleet_kpis(data)
             except: kpis = {"budget_annual": 0, "ghost_savings": 0, "landing_forecast": 0, "is_alert_landing": False}
-            data['kpis'] = kpis # Injection pour Cortex
+            data['kpis'] = kpis 
             
             raw_sites.append(data)
         except: continue
     
     # 2. Appel du Cerveau (Intelligence Collective)
-    # C'est ici que la Green League et les Conseils sont générés
     analysis_result = cortex.analyze_portfolio(raw_sites)
     
-    # 3. Formatage pour le Frontend (Rétro-compatibilité + Nouveautés)
+    # 3. Formatage pour le Frontend
     fleet_list = []
     for s in raw_sites:
         c, i, pr = s.get('contract',{}), s.get('identity',{}), s.get('pricing',{})
         kpis = s.get('kpis', {})
         is_gaz = "T" in str(c.get('segment','')) or "gaz" in str(pr.get('hph','')).lower()
-        
-        # Récupération des flags calculés par Cortex (s'ils existent dans raw_data retourné)
-        # Pour faire simple, on refait un mapping léger ou on utilise les données brutes
         
         fleet_list.append({
             "id": i.get('id', 'unknown'),
@@ -150,13 +178,12 @@ async def get_fleet_data():
             "provider": c.get('provider','Inconnu')
         })
 
-    # La réponse contient maintenant tout : la liste classique ET l'intelligence
     return JSONResponse({
         "fleet": fleet_list, 
         "count": len(fleet_list),
-        "green_league": analysis_result.get('green_league'), # LE PODIUM
-        "cortex": analysis_result.get('cortex'),             # LE CONSEIL
-        "global_kpis": analysis_result.get('kpis')           # LES TOTAUX
+        "green_league": analysis_result.get('green_league'),
+        "cortex": analysis_result.get('cortex'),
+        "global_kpis": analysis_result.get('kpis')
     })
 
 @app.get("/api/dashboard/data/{client_id}")
