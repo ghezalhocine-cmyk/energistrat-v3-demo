@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V13.2 | Retail Ultimate Fixed</title>
+    <title>ENERGISTRAT V13.3 | Retail Ultimate Debug</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -213,7 +213,7 @@
                     </div>
                 </div>
 
-                <!-- GRILLE DÉTAIL (3 COLONNES - EVOLUTION V13.1) -->
+                <!-- GRILLE DÉTAIL (3 COLONNES) -->
                 <div class="grid grid-cols-3 gap-6">
                     
                     <!-- COL 1 : TECHNIQUE (Optimisation) -->
@@ -257,7 +257,7 @@
                         </div>
                     </div>
 
-                    <!-- COL 3 : CONTROLE GESTION (Landing + Tertiaire) - NOUVEAU -->
+                    <!-- COL 3 : CONTROLE GESTION (Landing + Tertiaire) -->
                     <div class="bento-card col-span-1 p-6 flex flex-col justify-between">
                         <div>
                             <h3 class="text-white font-bold text-sm mb-4"><i class="fa-solid fa-plane-arrival mr-2 text-primary"></i>Budget Landing</h3>
@@ -528,7 +528,7 @@
         function selectAll() { if(SELECTED_IDS.size === FLEET_DATA.length) SELECTED_IDS.clear(); else FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); renderTable(FLEET_DATA); updateActionBar(); }
         function updateActionBar() { const count = SELECTED_IDS.size; document.getElementById('selected-count').innerText = count; const bar = document.getElementById('action-bar'); if(count > 0) bar.classList.add('visible'); else bar.classList.remove('visible'); bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; }
         
-        // --- FIX V13.2 : GESTION ERREURS TENDER & EXTENSION XLSX ---
+        // --- CORRECTIF V13.3 : GESTION ERREURS TENDER ---
         async function generateTender() {
             if(SELECTED_IDS.size === 0) return alert("Veuillez sélectionner au moins un site.");
             const btn = document.querySelector('#action-bar button');
@@ -536,24 +536,29 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
             try {
                 const res = await fetch('/api/ops/generate_tender', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ site_ids: Array.from(SELECTED_IDS) })
                 });
                 if(res.ok) {
                     const blob = await res.blob();
+                    if (blob.size === 0) throw new Error("Le fichier reçu est vide.");
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a'); a.href = url;
-                    // FIX: Extension .xlsx
-                    a.download = `DCE_Energistrat_${SELECTED_IDS.size}_sites.xlsx`; 
+                    const date = new Date().toISOString().slice(0,10);
+                    a.download = `DCE_Energistrat_${SELECTED_IDS.size}sites_${date}.xlsx`;
                     document.body.appendChild(a); a.click(); a.remove();
-                    selectAll(); // Reset
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Téléchargé';
+                    setTimeout(() => btn.innerHTML = original, 2000);
+                    selectAll(); 
                 } else {
-                    // FIX: Affichage erreur serveur
-                    const err = await res.json();
-                    alert("Erreur Serveur : " + (err.detail || "Inconnue"));
+                    let errorMsg = "Erreur inconnue";
+                    try { const errorJson = await res.json(); errorMsg = errorJson.detail || JSON.stringify(errorJson); } 
+                    catch(jsonError) { errorMsg = await res.text(); }
+                    alert("ÉCHEC SERVEUR (" + res.status + ") : " + errorMsg.substring(0, 300));
                 }
-            } catch(e) { console.error(e); alert("Erreur réseau"); }
-            btn.innerHTML = original;
+            } catch(e) { console.error(e); alert("ÉCHEC CLIENT : " + e.message); }
+            if(!btn.innerHTML.includes("Téléchargé")) btn.innerHTML = original;
         }
 
         function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
