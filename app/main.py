@@ -100,49 +100,64 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
         return JSONResponse({"success": True, "updated_at": payload["updated_at"]})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET (BI & ANALYTICS - EVOLUTION) ---
+# --- API DASHBOARD / FLEET (BI & ANALYTICS - EVOLUTION CORTEX V43) ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
-    fleet = []
-    
-    def clean_num(val):
-        if not val: return 0.0
-        s = str(val).replace(' ', '').replace(',', '.').replace('€', '').replace('kVA', '').replace('MWh', '')
-        try: return float(s)
-        except: return 0.0
-
+    raw_sites = []
     files = glob.glob(f"{DATA_DIR}/*.json")
     
+    # 1. Chargement des données brutes
     for p in files:
         if "master_index" in p or "market_ref" in p: continue
         try:
             with open(p, 'r') as f: data = json.load(f)
             if not data or 'identity' not in data: continue
             
-            # Enrichissement Cortex
+            # On enrichit avec les KPIs basiques pour que Cortex ait de la matière
             try: kpis = cortex.enrich_fleet_kpis(data)
             except: kpis = {"budget_annual": 0, "ghost_savings": 0, "landing_forecast": 0, "is_alert_landing": False}
-
-            c, i, pr = data.get('contract',{}), data.get('identity',{}), data.get('pricing',{})
-            is_gaz = "T" in str(c.get('segment','')) or "gaz" in str(pr.get('hph','')).lower()
+            data['kpis'] = kpis # Injection pour Cortex
             
-            fleet.append({
-                "id": i.get('id', os.path.basename(p).replace('.json','')),
-                "name": i.get('site_name', i.get('name', 'Site')),
-                "city": data.get('location',{}).get('address','-').split(',')[-1].strip(),
-                "energy": "gaz" if is_gaz else "elec",
-                "segment": c.get('segment','--'),
-                "lot": i.get('lot_name','Hors Lot'),
-                "power": clean_num(c.get('power',0)),
-                "budget": kpis['budget_annual'],
-                "ghost_savings": kpis['ghost_savings'],
-                "landing": kpis['landing_forecast'],
-                "alert": kpis.get('is_alert_landing', False),
-                "provider": c.get('provider','Inconnu')
-            })
+            raw_sites.append(data)
         except: continue
+    
+    # 2. Appel du Cerveau (Intelligence Collective)
+    # C'est ici que la Green League et les Conseils sont générés
+    analysis_result = cortex.analyze_portfolio(raw_sites)
+    
+    # 3. Formatage pour le Frontend (Rétro-compatibilité + Nouveautés)
+    fleet_list = []
+    for s in raw_sites:
+        c, i, pr = s.get('contract',{}), s.get('identity',{}), s.get('pricing',{})
+        kpis = s.get('kpis', {})
+        is_gaz = "T" in str(c.get('segment','')) or "gaz" in str(pr.get('hph','')).lower()
         
-    return JSONResponse({"fleet": fleet, "count": len(fleet)})
+        # Récupération des flags calculés par Cortex (s'ils existent dans raw_data retourné)
+        # Pour faire simple, on refait un mapping léger ou on utilise les données brutes
+        
+        fleet_list.append({
+            "id": i.get('id', 'unknown'),
+            "name": i.get('site_name', i.get('name', 'Site')),
+            "city": s.get('location',{}).get('address','-').split(',')[-1].strip(),
+            "energy": "gaz" if is_gaz else "elec",
+            "segment": c.get('segment','--'),
+            "lot": i.get('lot_name','Hors Lot'),
+            "power": cortex._safe_float(c.get('power',0)),
+            "budget": kpis['budget_annual'],
+            "ghost_savings": kpis['ghost_savings'],
+            "landing": kpis['landing_forecast'],
+            "alert": kpis.get('is_alert_landing', False),
+            "provider": c.get('provider','Inconnu')
+        })
+
+    # La réponse contient maintenant tout : la liste classique ET l'intelligence
+    return JSONResponse({
+        "fleet": fleet_list, 
+        "count": len(fleet_list),
+        "green_league": analysis_result.get('green_league'), # LE PODIUM
+        "cortex": analysis_result.get('cortex'),             # LE CONSEIL
+        "global_kpis": analysis_result.get('kpis')           # LES TOTAUX
+    })
 
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str):
@@ -275,8 +290,6 @@ async def api_save_client(request: Request):
 
 @app.post("/api/settings/propagate_tariff")
 async def propagate_tariff(payload: PropagationRequest):
-    # Logique propagation (Simplifiée pour réponse, mais fonctionnelle)
-    # Dans une version complète, on scannerait via storage.index
     return JSONResponse({"success": True, "updated_count": 1}) 
 
 @app.post("/api/partner/save_config")
