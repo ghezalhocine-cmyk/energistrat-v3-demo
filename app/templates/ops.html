@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V17.3 | Ops Connected</title>
+    <title>ENERGISTRAT V17.4 | Ops Diamond</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -21,6 +21,7 @@
 
         .nav-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #64748B; cursor: pointer; margin-bottom: 1rem; border-radius: 12px; transition: 0.2s; }
         .nav-icon.active { background: rgba(0, 229, 255, 0.1); color: #00E5FF; box-shadow: 0 0 15px rgba(0, 229, 255, 0.2); }
+        .nav-icon:hover { color: #00E5FF; background: rgba(255,255,255,0.05); }
 
         .input-dark { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 8px; font-size: 0.75rem; }
         .chart-btn { padding: 4px 12px; font-size: 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; background: transparent; color: #94a3b8; }
@@ -45,10 +46,15 @@
     <!-- SIDEBAR -->
     <aside class="bg-[#000f1f] border-r border-white/5 flex flex-col items-center py-6 z-50">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center font-bold mb-8 text-xs shadow-lg shadow-cyan-500/20">V3</div>
-        <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active"><i class="fa-solid fa-chart-line text-lg"></i></div>
-        <div onclick="navTo('finlab')" id="nav-finlab" class="nav-icon"><i class="fa-solid fa-coins text-lg"></i></div>
-        <div onclick="navTo('auditlab')" id="nav-auditlab" class="nav-icon"><i class="fa-solid fa-file-contract text-lg"></i></div>
-        <div onclick="navTo('scenarios')" id="nav-scenarios" class="nav-icon text-red-500"><i class="fa-solid fa-bug text-lg"></i></div>
+        
+        <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active" title="Data Lab"><i class="fa-solid fa-chart-line text-lg"></i></div>
+        <div onclick="navTo('finlab')" id="nav-finlab" class="nav-icon" title="Finance Lab"><i class="fa-solid fa-coins text-lg"></i></div>
+        <div onclick="navTo('auditlab')" id="nav-auditlab" class="nav-icon" title="Audit Lab"><i class="fa-solid fa-file-contract text-lg"></i></div>
+        
+        <!-- DIAMOND UPDATE : MARKET WATCH BUTTON -->
+        <a href="/ops_market" target="_blank" class="nav-icon text-yellow-500" title="Market Watch"><i class="fa-solid fa-globe text-lg"></i></a>
+        
+        <div onclick="navTo('scenarios')" id="nav-scenarios" class="nav-icon text-red-500 mt-auto" title="Chaos Monkey"><i class="fa-solid fa-bug text-lg"></i></div>
     </aside>
 
     <!-- MAIN -->
@@ -56,7 +62,7 @@
         <header class="h-14 border-b border-white/5 flex items-center justify-between px-8 shrink-0 bg-[#000f1f]/50 backdrop-blur">
             <div class="flex items-center gap-3">
                 <span class="text-cyan-400 font-bold tracking-wider text-sm">ENERGISTRAT</span>
-                <span class="px-2 py-0.5 rounded-full bg-white/5 text-[10px] text-gray-400 border border-white/10">OPS V17.3</span>
+                <span class="px-2 py-0.5 rounded-full bg-white/5 text-[10px] text-gray-400 border border-white/10">OPS V17.4</span>
             </div>
             <div class="text-[10px] text-gray-500 font-mono flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> CORTEX READY</div>
         </header>
@@ -87,7 +93,6 @@
                 </label>
                 <input type="file" id="real-upload" class="hidden" onchange="handleFileSelect(this.files[0])">
                 
-                <!-- BOUTON DE BASCULE VERS CLIENT (NOUVEAU) -->
                 <a id="view-client-btn" href="#" target="_blank" class="hidden w-full py-2 bg-white/10 text-white text-center rounded text-xs font-bold hover:bg-white/20 border border-white/20 mt-2">
                     <i class="fa-solid fa-external-link-alt mr-2"></i>Voir Vue Client
                 </a>
@@ -240,13 +245,11 @@
                 const data = await res.json();
                 
                 if(data.success) {
-                    // --- PONT DE DONNEES VERS DASHBOARD CLIENT ---
                     localStorage.setItem('last_cortex_result', JSON.stringify(data));
                     
                     const btn = document.getElementById('view-client-btn');
                     btn.href = `/dashboard/${target}`;
                     btn.classList.remove('hidden');
-                    // ---------------------------------------------
 
                     if(data.chart) {
                         store.labels = data.chart.labels; store.values = data.chart.values;
@@ -261,7 +264,6 @@
                         
                         if(data.kpi.profiling) {
                             document.getElementById('meta-geo').innerText = "CP: " + (data.kpi.profiling.geo || "Inconnu");
-                            // Affichage intelligent du NAF ou Métier
                             const nafDisplay = (data.kpi.profiling.metier && data.kpi.profiling.metier !== "Inconnu") 
                                 ? data.kpi.profiling.metier 
                                 : (data.kpi.profiling.naf_label || data.kpi.profiling.naf_code || "Inconnu");
