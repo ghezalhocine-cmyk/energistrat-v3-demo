@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V42")
+logger = logging.getLogger("CORTEX_MASTER_V42_2")
 
 # CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
@@ -32,7 +32,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "42.0 (Maximalist Integral)"
+        self.version = "42.2 (Integral + Fix ID Unique)"
         # Base de connaissance Métier (NAF)
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
@@ -198,7 +198,7 @@ class CortexEngine:
         }
 
     # =========================================================
-    # MODULE 4 : IMPORT MASSE V5 (V40)
+    # MODULE 4 : IMPORT MASSE V5 (CORRECTIF ID UNIQUE V42.1)
     # =========================================================
     def parse_mass_import_v5(self, file_content):
         try:
@@ -222,7 +222,7 @@ class CortexEngine:
                     col_nom = next((c for c in df.columns if "NOM" in c), None)
                     col_lot = next((c for c in df.columns if "LOT" in c), None)
                     col_adresse = next((c for c in df.columns if "ADRESSE" in c), None)
-                    site_name = str(row[col_nom]).strip() if col_nom and pd.notna(row[col_nom]) else "Site Inconnu"
+                    site_name = str(row[col_nom]).strip() if col_nom else "Site Inconnu"
                     
                     if is_gaz:
                         col_pce = next((c for c in df.columns if "PCE" in c), None)
@@ -244,21 +244,19 @@ class CortexEngine:
                         power = self._safe_int(row.get(col_puis, 0))
                         segment = str(row.get(col_seg, 'C5'))
                         
-                        # Prix 4 Postes
-                        col_hph = next((c for c in df.columns if "HPH" in c), None)
-                        col_hch = next((c for c in df.columns if "HCH" in c), None)
-                        col_hpe = next((c for c in df.columns if "HPE" in c), None)
-                        col_hce = next((c for c in df.columns if "HCE" in c), None)
-                        
-                        p_hph = str(row.get(col_hph, '0')).replace(',', '.')
-                        p_hch = str(row.get(col_hch, '0')).replace(',', '.')
-                        p_hpe = str(row.get(col_hpe, '0')).replace(',', '.')
-                        p_hce = str(row.get(col_hce, '0')).replace(',', '.')
+                        p_hph = str(row.get('PRIX_HPH', '0')).replace(',', '.')
+                        p_hch = str(row.get('PRIX_HCH', '0')).replace(',', '.')
+                        p_hpe = str(row.get('PRIX_HPE', '0')).replace(',', '.')
+                        p_hce = str(row.get('PRIX_HCE', '0')).replace(',', '.')
 
+                    # --- CORRECTIF ID UNIQUE (V42.1) ---
+                    # On utilise ref_id (PDL/PCE) comme clé, pas le SIRET
+                    unique_id = ref_id if ref_id != "Inconnu" else f"{siret}_{site_name}"
+                    
                     site = {
                         "client_name": site_name, 
                         "identity": {
-                            "id": siret,
+                            "id": unique_id, # <--- ID UNIQUE BASÉ SUR PDL/PCE
                             "siret": siret,
                             "name": site_name,
                             "site_name": site_name,
@@ -272,12 +270,12 @@ class CortexEngine:
                             "provider": "Import CSV"
                         },
                         "pricing": {
-                            "fix": "0",
+                            "fix": str(row.get('ABO_AN', '0')).replace(',', '.').strip(),
                             "hph": p_hph,
                             "hch": p_hch,
                             "hpe": p_hpe,
                             "hce": p_hce,
-                            "tax": "0"
+                            "tax": str(row.get('TAXES', '0')).replace(',', '.').strip()
                         }
                     }
                     sites.append(site)
@@ -290,7 +288,7 @@ class CortexEngine:
             return []
 
     # =========================================================
-    # MODULE 5 : ANALYSE COURBE DE CHARGE (HISTORIQUE V30)
+    # MODULE 5 : ANALYSE COURBE DE CHARGE (HISTORIQUE COMPLET)
     # =========================================================
     def analyze_file(self, file_content, filename, target_profile="demo", known_site_data=None):
         try:
@@ -355,7 +353,7 @@ class CortexEngine:
             return {"success": True, "kpi": full_kpi, "chart": chart, "ai_insight": narrative}
 
         except Exception as e:
-            logger.exception("Crash Cortex V38")
+            logger.exception("Crash Cortex V42")
             return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
 
     # --- SOUS-MODULES TECHNIQUES (DÉCOMPRESSÉS) ---
@@ -502,16 +500,11 @@ class CortexEngine:
     def run_chaos_monkey(self): return [{"test": "Maths", "status": "OK"}]
     def ask_agent(self, msg): return self._generate_insight({}, {"p_souscrite": 0})
     
-    # --- RESTAURATION DE LA FONCTION LEGACY (CSV) ---
+    # --- LEGACY CSV (POUR COMPATIBILITÉ TOTALE) ---
     def generate_tender_package(self, sites_data):
-        """
-        Génère un CSV standardisé (Format V1 - Legacy).
-        Restauré pour compatibilité totale.
-        """
         output = io.StringIO()
         writer = csv.writer(output, delimiter=';')
-        headers = ["REF_ID", "NOM", "ADRESSE", "CONSO", "PUISSANCE", "SEGMENT"]
-        writer.writerow(headers)
+        writer.writerow(["REF_ID", "NOM", "ADRESSE", "CONSO", "PUISSANCE", "SEGMENT"])
         for s in sites_data:
             try:
                 c = s.get('contract', {})
