@@ -132,7 +132,7 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
         return JSONResponse({"success": True, "updated_at": new_payload["updated_at"], "history_archived": True})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET (BI & ANALYTICS - CORTEX V43 CONNECTED) ---
+# --- API DASHBOARD / FLEET (BI & ANALYTICS - CORTEX V44 CONNECTED) ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
     raw_sites = []
@@ -145,9 +145,9 @@ async def get_fleet_data():
             with open(p, 'r') as f: data = json.load(f)
             if not data or 'identity' not in data: continue
             
-            # Enrichissement KPI basique
+            # Enrichissement KPI basique (Cortex V44)
             try: kpis = cortex.enrich_fleet_kpis(data)
-            except: kpis = {"budget_annual": 0, "ghost_savings": 0, "landing_forecast": 0, "is_alert_landing": False}
+            except: kpis = {"budget_annual": 0, "ghost_savings": 0, "landing_forecast": 0, "is_alert_landing": False, "volume_mwh": 0}
             data['kpis'] = kpis 
             
             raw_sites.append(data)
@@ -160,13 +160,18 @@ async def get_fleet_data():
     fleet_list = []
     for s in raw_sites:
         c, i, pr = s.get('contract',{}), s.get('identity',{}), s.get('pricing',{})
+        loc = s.get('location', {})
         kpis = s.get('kpis', {})
         is_gaz = "T" in str(c.get('segment','')) or "gaz" in str(pr.get('hph','')).lower()
         
         fleet_list.append({
             "id": i.get('id', 'unknown'),
             "name": i.get('site_name', i.get('name', 'Site')),
-            "city": s.get('location',{}).get('address','-').split(',')[-1].strip(),
+            # MAPPING NOUVEAUX CHAMPS (UNIVERSAL)
+            "city": loc.get('city', loc.get('address','-').split(',')[-1].strip()),
+            "zip": loc.get('zip_code', ''),
+            "volume": kpis.get('volume_mwh', 0), # MWh
+            
             "energy": "gaz" if is_gaz else "elec",
             "segment": c.get('segment','--'),
             "lot": i.get('lot_name','Hors Lot'),
@@ -201,6 +206,7 @@ async def get_dashboard_data(client_id: str):
         market_price = market['gaz']['peg_n1'] if is_gaz else market['elec']['cal_n1']
         client_price = float(str(pricing.get('hph', '0')).replace(',', '.').replace(' ', ''))
         
+        # Appel Cortex V44 (Fix Unit)
         data["market_analysis"] = cortex.analyze_market_position(client_price, market_price, "gaz" if is_gaz else "elec")
     except:
         data["market_analysis"] = {"status": "NEUTRE", "action": "-", "color": "gray"}
@@ -344,14 +350,24 @@ async def get_tickets():
 # --- TEMPLATES CSV ---
 @app.get("/api/settings/template_csv")
 async def get_import_template():
-    # Template Elec V5
-    headers = [ "SIRET", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", "PDL", "PUISSANCE", "SEGMENT", "LOT", "ABO_AN", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES" ]
+    # Template Elec V5.2 (Universal Structure) - MISE A JOUR V40.8
+    headers = [ 
+        "SIRET", "RAISON_SOCIALE", "NOM_SITE", 
+        "ADRESSE_SITE", "CODE_POSTAL", "VILLE", "ADRESSE_FACTURATION", 
+        "PDL", "PUISSANCE", "SEGMENT", "LOT", 
+        "ABO_AN", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES" 
+    ]
     stream = io.StringIO()
     writer = csv.writer(stream, delimiter=';')
     writer.writerow(headers)
-    writer.writerow([ "12345678900012", "Mon Entreprise", "Site Principal", "10 Rue de la Paix 75000 Paris", "30000000000000", "36", "C5", "Lot 1", "150.00", "0.15", "0.10", "0.08", "0.04", "22.5" ])
+    writer.writerow([ 
+        "12345678900012", "Mon Entreprise HQ", "Magasin Lyon", 
+        "12 Rue de la République", "69002", "Lyon", "10 Rue du Siège Paris", 
+        "30000000000000", "36", "C5", "Lot 1", 
+        "150.00", "0.15", "0.10", "0.08", "0.04", "22.5" 
+    ])
     stream.seek(0)
-    return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=template_import_v5.csv"})
+    return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=template_import_v5_universal.csv"})
 
 @app.get("/api/settings/template_csv_gaz")
 async def get_import_template_gaz():
