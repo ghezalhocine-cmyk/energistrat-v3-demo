@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V13.7 | Retail Diamond Patch</title>
+    <title>ENERGISTRAT V13.8 | Retail Fixed</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -197,7 +197,6 @@
 
     <script>
         let FLEET_DATA = [];
-        // DIAMOND UPDATE : VARIABLES GLOBALES POUR L'INTELLIGENCE
         let LEAGUE_DATA = null;
         let GLOBAL_CORTEX = null;
         
@@ -208,23 +207,44 @@
 
         function safeSetText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
         
+        // --- CORRECTIF V13.8 : GESTION ROBUSTE DES VUES (TAILWIND HIDDEN) ---
         function switchView(viewName) {
+            // 1. Mise à jour des boutons de navigation (Visuel)
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
-            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             
+            // 2. MASQUAGE TOTAL (Force Tailwind 'hidden')
+            // On s'assure que TOUTES les vues sont cachées d'abord
+            const views = ['view-fleet', 'view-league', 'view-detail'];
+            views.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) {
+                    el.classList.add('hidden'); // Tailwind hide
+                    el.classList.remove('active');
+                }
+            });
+
+            // 3. AFFICHAGE CIBLÉ
+            let targetId = 'view-fleet'; // Par défaut
+            if (viewName === 'league') targetId = 'view-league';
+            if (viewName === 'detail') targetId = 'view-detail';
+
+            const targetEl = document.getElementById(targetId);
+            if(targetEl) {
+                targetEl.classList.remove('hidden'); // Tailwind show
+                targetEl.classList.add('active');
+            }
+
+            // 4. LOGIQUE HEADER (Titres & KPIs)
             if(viewName === 'detail') {
-                document.getElementById('view-detail').classList.add('active');
                 safeSetText('main-title', "Détail & Conseil");
                 document.getElementById('header-kpis').classList.add('hidden');
             } else if (viewName === 'league') {
-                document.getElementById('view-league').classList.add('active');
                 safeSetText('main-title', "Green League");
                 document.getElementById('header-kpis').classList.add('hidden');
                 calculateLeague(); 
             } else {
-                document.getElementById('view-fleet').classList.add('active');
                 safeSetText('main-title', "Vision Consolidée");
                 document.getElementById('header-kpis').classList.remove('hidden');
             }
@@ -235,16 +255,14 @@
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
                 
-                // DIAMOND UPDATE : CAPTURE DES NOUVELLES DONNÉES SANS CASSER L'ANCIEN
                 if(data.fleet) {
                     FLEET_DATA = data.fleet;
-                    LEAGUE_DATA = data.green_league; // Nouveau
-                    GLOBAL_CORTEX = data.cortex;     // Nouveau
+                    LEAGUE_DATA = data.green_league;
+                    GLOBAL_CORTEX = data.cortex;
                     
                     initFilters();
                     applyFilters();
 
-                    // DIAMOND UPDATE : HEADER CORTEX
                     if (GLOBAL_CORTEX && GLOBAL_CORTEX.main_message) {
                         const sub = document.getElementById('main-subtitle');
                         if(sub) sub.innerHTML = `<span class="text-primary font-bold">CORTEX V43 :</span> ${GLOBAL_CORTEX.main_message}`;
@@ -254,14 +272,11 @@
         }
 
         function calculateLeague() {
-            // DIAMOND UPDATE : LOGIQUE HYBRIDE (BACKEND PRIORITAIRE)
             if (LEAGUE_DATA && LEAGUE_DATA.gold) {
-                // Si le backend a travaillé, on affiche sa vérité (PMC)
                 updatePodium('1', LEAGUE_DATA.gold, true);
                 if(LEAGUE_DATA.silver) updatePodium('2', LEAGUE_DATA.silver, true);
                 if(LEAGUE_DATA.bronze) updatePodium('3', LEAGUE_DATA.bronze, true);
                 
-                // Affichage des Cancres (Si fournis par le backend)
                 const list = document.getElementById('league-list');
                 if(list && LEAGUE_DATA.cancres) {
                     list.innerHTML = '';
@@ -269,10 +284,9 @@
                         list.innerHTML += `<div class="flex items-center gap-4 p-3 bg-white/5 rounded-lg border border-white/5"><div class="w-6 h-6 rounded-full bg-red-900 text-red-200 text-xs font-bold flex items-center justify-center">!</div><div class="flex-1 font-bold text-sm text-white">${site.nom_site}</div><div class="text-right font-mono text-xs text-red-400">${Math.round(site.pmc)} €/MWh</div></div>`;
                     });
                 }
-                return; // On s'arrête là, pas besoin du calcul local
+                return;
             }
 
-            // FALLBACK : LOGIQUE LOCALE (ANCIENNE MÉTHODE DE SECOURS)
             const ranked = [...FLEET_DATA].sort((a, b) => {
                 const ratioA = a.budget > 0 ? (a.ghost_savings / a.budget) : 0;
                 const ratioB = b.budget > 0 ? (b.ghost_savings / b.budget) : 0;
@@ -282,7 +296,6 @@
             if(ranked[1]) updatePodium('2', ranked[1], false);
             if(ranked[2]) updatePodium('3', ranked[2], false);
             
-            // Liste fallback (Top gaspillage)
             const list = document.getElementById('league-list');
             if(list) {
                 list.innerHTML = '';
@@ -293,17 +306,14 @@
             }
         }
 
-        // DIAMOND UPDATE : ADAPTATION DE L'AFFICHAGE PODIUM
         function updatePodium(rank, site, isBackendMode) {
             const name = isBackendMode ? site.nom_site : site.name;
             safeSetText(`podium-${rank}-name`, name);
             
             let scoreTxt = "";
             if (isBackendMode) {
-                // Mode Backend : On affiche le PMC
                 scoreTxt = Math.round(site.pmc) + " €/MWh";
             } else {
-                // Mode Local : On affiche le % Gaspillage
                 const ratio = site.budget > 0 ? Math.round((site.ghost_savings / site.budget) * 100) : 0;
                 scoreTxt = ratio + "% Gaspillage";
             }
@@ -367,7 +377,6 @@
                 }
             }
 
-            // Optimisation
             const pSub = parseFloat(data.contract.power);
             const pReach = pSub * (isGaz ? 0.9 : 0.7); 
             safeSetText('detail-sub', `Souscrit: ${pSub} ${isGaz ? 'MWh' : 'kVA'}`);
@@ -382,7 +391,6 @@
             safeSetText('detail-gain', gain > 0 ? `+ ${gain} €/an` : "OPTIMISÉ");
             safeSetText('detail-advice', gain > 0 ? "Conseil: Baissez votre puissance souscrite." : "Votre contrat est bien calibré.");
 
-            // Landing
             const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
             const timeProgress = (dayOfYear / 365) * 100;
             const budgetProgress = timeProgress * 1.05; 
@@ -500,7 +508,6 @@
             }
         }
 
-        // --- CORRECTIF V13.6 : SÉCURITÉ TOTALE TENDER ---
         async function generateTender() {
             if(SELECTED_IDS.size === 0) return alert("Veuillez sélectionner au moins un site.");
             const btn = document.querySelector('#action-bar button');
@@ -527,7 +534,6 @@
                     a.click();
                     a.remove();
                     
-                    // Reset UI sans erreur
                     try { selectAll(); } catch(e) {}
                 } else {
                     let msg = "Erreur serveur";
