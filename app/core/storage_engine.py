@@ -4,9 +4,9 @@ import datetime
 import uuid
 from pathlib import Path
 import logging
+import shutil
 
 # CONFIGURATION DU CHEMIN (EVOLUTION V4.3 : CHEMIN ABSOLU ROBUSTE)
-# On force le chemin absolu pour Cloud Run pour éviter le Split Brain
 DATA_ROOT = Path("/app/data")
 
 # Initialisation Sécurisée du Root
@@ -14,7 +14,6 @@ try:
     if not DATA_ROOT.exists():
         DATA_ROOT.mkdir(parents=True, exist_ok=True)
 except Exception as e:
-    # Fallback local (Windows/Dev) si permission refusée sur /app
     print(f"[STORAGE] Attention : Fallback local suite erreur {e}")
     DATA_ROOT = Path("data")
     DATA_ROOT.mkdir(exist_ok=True)
@@ -23,11 +22,11 @@ INDEX_FILE = DATA_ROOT / "master_index.json"
 VAULT_FILE = DATA_ROOT / "system" / "secure_vault.json"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("STORAGE_ENGINE_V4_3")
+logger = logging.getLogger("STORAGE_ENGINE_V4_4_RGPD")
 
 class StorageEngine:
     def __init__(self):
-        self.version = "4.3 (Flat Storage + Legacy Support)"
+        self.version = "4.4 (RGPD Vault + Mandats)"
         self.index = {}
         self._ensure_structure()
         self.load_index()
@@ -38,18 +37,19 @@ class StorageEngine:
             DATA_ROOT / "raw_uploads", 
             DATA_ROOT / "raw_uploads" / "API",
             DATA_ROOT / "orgs", 
-            DATA_ROOT / "clients", # Conservé pour compatibilité
+            DATA_ROOT / "clients", 
             DATA_ROOT / "partners",
             DATA_ROOT / "tickets", 
             DATA_ROOT / "archives" / "INBOX", 
-            DATA_ROOT / "system"
+            DATA_ROOT / "system",
+            DATA_ROOT / "mandats" # NOUVEAU : Coffre-fort PDF
         ]
         for d in dirs: 
             d.mkdir(parents=True, exist_ok=True)
 
         if not INDEX_FILE.exists():
             initial = {
-                "meta": {"version": "4.3", "created": datetime.datetime.now().isoformat()}, 
+                "meta": {"version": "4.4", "created": datetime.datetime.now().isoformat()}, 
                 "organizations": {}, 
                 "sites": {}
             }
@@ -74,32 +74,19 @@ class StorageEngine:
             os.replace(temp, INDEX_FILE)
         except Exception: pass
 
-    # --- RECONCILIATION ENGINE (EVOLUTION : SCAN PLAT) ---
+    # --- RECONCILIATION ENGINE (SCAN PLAT) ---
     def find_site_by_pdl(self, pdl):
-        """
-        Cherche un PDL dans la structure PLATE (/app/data/*.json).
-        """
         if not pdl: return None
-        
-        # Scan de tous les JSON à la racine (Nouveau standard)
         for client_file in DATA_ROOT.glob("*.json"):
-            # Ignore les fichiers système
-            if "master_index" in client_file.name or "market_ref" in client_file.name: 
-                continue
-            
+            if "master_index" in client_file.name or "market_ref" in client_file.name: continue
             try:
                 with open(client_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    
-                    # Lecture structurée
                     contract = data.get("contract", {})
                     stored_pdl = str(contract.get("pdl", "")).strip()
-                    
-                    # Comparaison
                     if str(pdl) in stored_pdl:
                         identity = data.get("identity", {})
                         location = data.get("location", {})
-                        
                         return {
                             "pdl": pdl,
                             "client_name": identity.get("site_name") or identity.get("name", "Client Inconnu"),
@@ -109,34 +96,33 @@ class StorageEngine:
                             "address": location.get("address", ""),
                             "reconciled": True
                         }
-            except Exception:
-                continue
-        
+            except Exception: continue
         return None
 
-    # --- ERP CLIENTS (EVOLUTION : ECRITURE PLATE) ---
+    # --- ERP CLIENTS (ECRITURE PLATE) ---
     def save_client_settings(self, client_id, data):
-        """
-        Sauvegarde le client à la RACINE pour être visible par le Dashboard Fleet.
-        """
         try:
-            # Nettoyage ID
             cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
             if not cid: cid = f"site_{uuid.uuid4().hex[:8]}"
-
-            # EVOLUTION : Chemin PLAT (/app/data/{id}.json) au lieu de dossier imbriqué
             path = DATA_ROOT / f"{cid}.json"
             
+            # Préservation des données RGPD existantes si non fournies
+            if path.exists():
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        existing = json.load(f)
+                        if "rgpd" in existing and "rgpd" not in data:
+                            data["rgpd"] = existing["rgpd"]
+                except: pass
+
             data["_meta"] = {"updated_at": datetime.datetime.now().isoformat()}
             
-            # Sécurité V4.1 : Si client_name manque à la racine, on le prend dans identity
             if "client_name" not in data:
                 data["client_name"] = data.get("identity", {}).get("site_name") or data.get("identity", {}).get("name") or cid
 
             with open(path, 'w', encoding='utf-8') as f: 
                 json.dump(data, f, indent=4, ensure_ascii=False)
             
-            # Mise à jour index
             self.index["sites"][cid] = {"name": data.get("client_name"), "path": str(path)}
             self.save_index()
             
@@ -147,47 +133,75 @@ class StorageEngine:
             return {"success": False, "error": str(e)}
 
     def get_client_settings(self, client_id):
-        """
-        Récupère un client depuis la racine.
-        Renommé de 'load_client_settings' pour compatibilité main.py V40.
-        """
         try:
             cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
             path = DATA_ROOT / f"{cid}.json"
-            
             if not path.exists(): 
-                # TENTATIVE DE FALLBACK (Ancienne structure dossier - Retrocompatibilité)
                 old_path = DATA_ROOT / "clients" / cid / "settings.json"
                 if old_path.exists():
                     with open(old_path, 'r', encoding='utf-8') as f: return json.load(f)
                 return None
-            
             with open(path, 'r', encoding='utf-8') as f: return json.load(f)
         except Exception as e: 
             logger.error(f"Load Error: {e}")
             return None
 
-    # --- ADMINISTRATION (NOUVEAU V4.1) ---
-    def delete_client(self, client_id):
+    # --- MODULE RGPD & MANDATS (NOUVEAU V4.4) ---
+    def save_mandate_file(self, client_id, file_content, filename):
         """
-        Supprime proprement un fichier client et son entrée dans l'index.
+        Stocke le PDF signé dans un coffre sécurisé.
         """
         try:
             cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
-            path = DATA_ROOT / f"{cid}.json"
+            vault_dir = DATA_ROOT / "mandats" / cid
+            vault_dir.mkdir(parents=True, exist_ok=True)
             
+            clean_name = f"MANDAT_{datetime.datetime.now().strftime('%Y%m%d')}_{filename}"
+            file_path = vault_dir / clean_name
+            
+            with open(file_path, "wb") as f:
+                f.write(file_content)
+                
+            return {"success": True, "path": str(file_path), "filename": clean_name}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def update_consent(self, client_id, consent_data):
+        """
+        Met à jour uniquement le bloc RGPD d'un client.
+        """
+        client = self.get_client_settings(client_id)
+        if not client: return {"success": False, "error": "Client not found"}
+        
+        client["rgpd"] = {
+            "consent_grd": consent_data.get("consent_grd", False),
+            "consent_date": datetime.datetime.now().isoformat(),
+            "mandate_file": consent_data.get("mandate_file", None),
+            "dpo_contact": consent_data.get("dpo_contact", "")
+        }
+        return self.save_client_settings(client_id, client)
+
+    # --- ADMINISTRATION ---
+    def delete_client(self, client_id):
+        try:
+            cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
+            path = DATA_ROOT / f"{cid}.json"
             if path.exists():
                 os.remove(path)
                 if cid in self.index["sites"]:
                     del self.index["sites"][cid]
                     self.save_index()
+                # Nettoyage Mandats
+                mandat_dir = DATA_ROOT / "mandats" / cid
+                if mandat_dir.exists(): shutil.rmtree(mandat_dir)
+                
                 logger.info(f"Site supprimé : {cid}")
                 return {"success": True}
             return {"success": False, "error": "Not found"}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    # --- PARTNERS (INCHANGÉ) ---
+    # --- PARTNERS & TICKETING (INCHANGÉS) ---
     def save_partner_config(self, pid, data):
         try:
             clean = "".join(x for x in pid if x.isalnum() or x in "_-")
@@ -197,7 +211,6 @@ class StorageEngine:
             return {"success": True}
         except Exception as e: return {"success": False, "error": str(e)}
 
-    # --- TICKETING (INCHANGÉ) ---
     def create_ticket(self, data):
         try:
             tid = f"TK-{uuid.uuid4().hex[:6].upper()}"
