@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V14.1 | Retail Cockpit</title>
+    <title>ENERGISTRAT V15.0 | Retail Business</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -27,6 +27,9 @@
         #action-bar.visible { transform: translateY(0); }
         .input-edit { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 6px; width: 100%; font-size: 12px; }
         .input-edit:focus { border-color: #00E5FF; outline: none; }
+        
+        /* Custom Scrollbar for Filters */
+        select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden">
@@ -90,37 +93,42 @@
                 <div class="grid grid-cols-4 gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
                     <div>
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Fournisseur</label>
-                        <select id="filter-provider" onchange="applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan"><option value="all">Tous</option></select>
+                        <select id="filter-provider" onchange="applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan cursor-pointer hover:bg-white/5 transition"><option value="all">Tous</option></select>
                     </div>
                     <div>
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Ville</label>
-                        <select id="filter-city" onchange="applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan"><option value="all">Toutes</option></select>
+                        <select id="filter-city" onchange="applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan cursor-pointer hover:bg-white/5 transition"><option value="all">Toutes</option></select>
                     </div>
                     <div>
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Segment</label>
-                        <select id="filter-segment" onchange="applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan"><option value="all">Tous</option></select>
+                        <select id="filter-segment" onchange="applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan cursor-pointer hover:bg-white/5 transition"><option value="all">Tous</option></select>
                     </div>
                     <div>
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Lot</label>
-                        <select id="filter-lot" onchange="applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan"><option value="all">Tous</option></select>
+                        <select id="filter-lot" onchange="applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan cursor-pointer hover:bg-white/5 transition"><option value="all">Tous</option></select>
                     </div>
                 </div>
 
+                <!-- GRAPHIQUES (4 COLONNES) -->
                 <div class="grid grid-cols-4 gap-6 h-64">
+                    <!-- Mix -->
                     <div class="bento-card p-6 flex flex-col col-span-1">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Mix Énergétique</h3>
                         <div class="flex-1 relative"><canvas id="mixChart"></canvas></div>
                     </div>
+                    <!-- Parts de Marché (Camembert) -->
                     <div class="bento-card p-6 flex flex-col col-span-1">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Parts de Marché</h3>
                         <div class="flex-1 relative"><canvas id="supplierChart"></canvas></div>
                     </div>
+                    <!-- Top 5 -->
                     <div class="bento-card p-6 col-span-2 flex flex-col">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Top 5 Budgets</h3>
                         <div class="flex-1 relative"><canvas id="topChart"></canvas></div>
                     </div>
                 </div>
 
+                <!-- TABLEAU -->
                 <div class="bento-card overflow-hidden">
                     <div class="px-6 py-4 border-b border-white/5 flex justify-between items-center">
                         <h3 class="font-bold text-white">Détail du Parc</h3>
@@ -177,8 +185,8 @@
                     <div>
                         <div class="flex items-center gap-3">
                             <h2 class="text-3xl font-bold text-white" id="detail-title">--</h2>
-                            <!-- BOUTON EDITER (SPRINT B) -->
-                            <button onclick="openEditModal()" class="text-gray-500 hover:text-cyan transition"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <!-- BOUTON EDITER -->
+                            <button onclick="openEditModal()" class="text-gray-500 hover:text-cyan transition" title="Modifier le site"><i class="fa-solid fa-pen-to-square"></i></button>
                         </div>
                         <div class="flex items-center gap-2 mt-2 text-sm text-gray-400"><span id="detail-address">--</span><span id="detail-badge" class="px-2 py-0.5 rounded text-[10px] font-bold">--</span></div>
                     </div>
@@ -220,9 +228,9 @@
 
     </main>
 
-    <!-- MODAL EDITION (SPRINT B) -->
+    <!-- MODAL EDITION -->
     <div id="edit-modal" class="fixed inset-0 bg-black/90 z-[99] hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bento-card p-8 rounded-2xl w-[500px] relative border border-cyan/30">
+        <div class="bento-card p-8 rounded-2xl w-[500px] relative border border-cyan/30 shadow-[0_0_50px_rgba(0,229,255,0.1)]">
             <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-cyan"></i> Édition Rapide</h3>
             
             <div class="space-y-4">
@@ -230,24 +238,24 @@
                 <div><label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site</label><input type="text" id="edit-name" class="input-edit"></div>
                 <div class="grid grid-cols-2 gap-4">
                     <div><label class="text-[10px] text-gray-500 uppercase font-bold">Fournisseur</label><input type="text" id="edit-provider" class="input-edit"></div>
-                    <div><label class="text-[10px] text-gray-500 uppercase font-bold">Puissance</label><input type="number" id="edit-power" class="input-edit"></div>
+                    <div><label class="text-[10px] text-gray-500 uppercase font-bold">Puissance (kVA/kW)</label><input type="number" id="edit-power" class="input-edit"></div>
                 </div>
-                <div><label class="text-[10px] text-gray-500 uppercase font-bold">Prix (€/MWh ou €/kWh)</label><input type="number" id="edit-price" class="input-edit" step="0.0001"></div>
+                <div><label class="text-[10px] text-gray-500 uppercase font-bold">Prix Molécule (€/MWh)</label><input type="number" id="edit-price" class="input-edit" step="0.01"></div>
             </div>
 
             <div class="flex justify-end gap-3 mt-8">
-                <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white">ANNULER</button>
-                <button onclick="saveSiteChanges()" class="bg-cyan text-black px-6 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90">ENREGISTRER</button>
+                <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button>
+                <button onclick="saveSiteChanges()" class="bg-cyan text-black px-6 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg">ENREGISTRER</button>
             </div>
         </div>
     </div>
 
     <script>
         let FLEET_DATA = [];
-        let FILTER_META = {}; // Données pour les listes déroulantes
+        let FILTER_META = {};
         let LEAGUE_DATA = null;
         let GLOBAL_CORTEX = null;
-        let CURRENT_DETAIL_SITE = null; // Pour l'édition
+        let CURRENT_DETAIL_SITE = null;
         
         let SELECTED_IDS = new Set();
         let CURRENT_FILTER_ENERGY = 'all';
@@ -296,7 +304,7 @@
                     GLOBAL_CORTEX = data.cortex;
                     FILTER_META = data.filters_meta || {};
                     
-                    initFilters(); // Remplissage des listes déroulantes
+                    initFilters();
                     applyFilters();
 
                     if (GLOBAL_CORTEX && GLOBAL_CORTEX.main_message) {
@@ -307,7 +315,7 @@
             } catch(e) { console.error(e); }
         }
 
-        // --- SPRINT B : FILTRES INTELLIGENTS ---
+        // --- FILTRES ---
         function initFilters() {
             const populate = (id, list) => {
                 const sel = document.getElementById(id);
@@ -356,7 +364,7 @@
             updateCharts(filtered);
         }
 
-        // --- SPRINT B : MODE ÉDITION ---
+        // --- MODE EDITION ---
         function openEditModal() {
             if(!CURRENT_DETAIL_SITE) return;
             document.getElementById('edit-id').value = CURRENT_DETAIL_SITE.identity.id;
@@ -370,10 +378,8 @@
 
         async function saveSiteChanges() {
             const id = document.getElementById('edit-id').value;
-            // On récupère l'objet complet d'origine pour ne pas écraser le reste
             const original = CURRENT_DETAIL_SITE; 
             
-            // Mise à jour des champs
             original.identity.site_name = document.getElementById('edit-name').value;
             original.contract.provider = document.getElementById('edit-provider').value;
             original.contract.power = document.getElementById('edit-power').value;
@@ -388,13 +394,22 @@
                 if((await res.json()).success) {
                     document.getElementById('edit-modal').classList.add('hidden');
                     alert("Modifications enregistrées !");
-                    loadFleet(); // Refresh global
-                    loadDetail(id); // Refresh vue détail
+                    loadFleet();
+                    loadDetail(id);
                 } else { alert("Erreur sauvegarde"); }
             } catch(e) { alert("Erreur réseau"); }
         }
 
-        // --- FONCTIONS EXISTANTES (INCHANGÉES) ---
+        // --- TABLEAU AVEC BADGES FOURNISSEURS ---
+        function getProviderBadge(name) {
+            const n = (name || "").toUpperCase();
+            if(n.includes("EDF")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white border border-blue-400">EDF</span>`;
+            if(n.includes("TOTAL")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white border border-red-400">TOTAL</span>`;
+            if(n.includes("ENGIE")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan/20 text-cyan border border-cyan/30">ENGIE</span>`;
+            if(n.includes("ENI")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-500/20 text-yellow-500 border border-yellow-500/30">ENI</span>`;
+            return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-300">${name}</span>`;
+        }
+
         function renderTable(data) {
             const tbody = document.getElementById('fleet-table-body');
             if(!tbody) return;
@@ -418,7 +433,7 @@
                     <td class="px-4 py-3 font-bold text-white" ${detailAction}>${site.name}</td>
                     <td class="px-4 py-3 text-gray-400 font-mono text-xs" ${detailAction}>${zip}</td>
                     <td class="px-4 py-3 text-gray-300" ${detailAction}>${city}</td>
-                    <td class="px-4 py-3" ${detailAction}><span class="bg-white/5 px-2 py-1 rounded text-[10px]">${site.lot}</span></td>
+                    <td class="px-4 py-3" ${detailAction}>${getProviderBadge(prov)}</td>
                     <td class="px-4 py-3 text-center" ${detailAction}><span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-cyan bg-cyan/10'} px-2 py-1 rounded">${isGaz ? 'GAZ' : 'ELEC'}</span></td>
                     <td class="px-4 py-3 text-right font-mono text-gray-300" ${detailAction}>${Math.round(conso)} <span class="text-[10px] text-gray-600">MWh</span></td>
                     <td class="px-4 py-3 text-right font-bold text-white" ${detailAction}>${formatCurrency(site.budget)}</td>
@@ -512,7 +527,6 @@
         }
 
         function calculateLeague() {
-            // ... (Code league inchangé)
             if (LEAGUE_DATA && LEAGUE_DATA.gold) {
                 updatePodium('1', LEAGUE_DATA.gold, true);
                 if(LEAGUE_DATA.silver) updatePodium('2', LEAGUE_DATA.silver, true);
@@ -526,7 +540,6 @@
                 }
                 return;
             }
-            // Fallback local
             const ranked = [...FLEET_DATA].sort((a, b) => {
                 const ratioA = a.budget > 0 ? (a.ghost_savings / a.budget) : 0;
                 const ratioB = b.budget > 0 ? (b.ghost_savings / b.budget) : 0;
@@ -535,6 +548,15 @@
             if(ranked[0]) updatePodium('1', ranked[0], false);
             if(ranked[1]) updatePodium('2', ranked[1], false);
             if(ranked[2]) updatePodium('3', ranked[2], false);
+            
+            const list = document.getElementById('league-list');
+            if(list) {
+                list.innerHTML = '';
+                ranked.slice(3).forEach((site, index) => {
+                    const ratio = site.budget > 0 ? Math.round((site.ghost_savings / site.budget) * 100) : 0;
+                    list.innerHTML += `<div class="flex items-center gap-4 p-3 bg-white/5 rounded-lg border border-white/5"><div class="w-6 h-6 rounded-full bg-gray-700 text-xs font-bold flex items-center justify-center">${index + 4}</div><div class="flex-1 font-bold text-sm text-white">${site.name}</div><div class="text-right font-mono text-xs ${ratio > 10 ? 'text-red-400' : 'text-gray-400'}">${ratio}% Gaspillage</div></div>`;
+                });
+            }
         }
 
         function updatePodium(rank, site, isBackendMode) {
@@ -555,14 +577,13 @@
                 const data = await res.json();
                 if(data.error) return;
                 
-                CURRENT_DETAIL_SITE = data; // STOCKAGE POUR EDITION
+                CURRENT_DETAIL_SITE = data; 
                 renderDetail(data);
                 switchView('detail');
             } catch(e) { console.error(e); }
         }
 
         function renderDetail(data) {
-            // ... (Code renderDetail inchangé)
             const isGaz = data.energy_type === 'gaz';
             safeSetText('detail-title', data.identity.site_name || "Site");
             safeSetText('detail-address', data.location.address);
