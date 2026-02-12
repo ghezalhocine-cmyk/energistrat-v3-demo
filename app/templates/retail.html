@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V15.0 | Retail Business</title>
+    <title>ENERGISTRAT V15.1 | Retail Hotfix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -28,8 +28,15 @@
         .input-edit { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 6px; width: 100%; font-size: 12px; }
         .input-edit:focus { border-color: #00E5FF; outline: none; }
         
-        /* Custom Scrollbar for Filters */
-        select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; }
+        /* FIX V15.1 : Lisibilité des Selects */
+        select { 
+            -webkit-appearance: none; appearance: none; 
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
+            background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; 
+            background-color: #0F172A; /* Fond sombre forcé */
+            color: white; /* Texte blanc forcé */
+        }
+        option { background-color: #0F172A; color: white; padding: 5px; } /* Options lisibles */
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden">
@@ -89,7 +96,7 @@
             <!-- VUE 1 : FLEET -->
             <div id="view-fleet" class="view-section active space-y-6">
                 
-                <!-- BARRE DE FILTRES INTELLIGENTE (SPRINT B) -->
+                <!-- BARRE DE FILTRES INTELLIGENTE -->
                 <div class="grid grid-cols-4 gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
                     <div>
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Fournisseur</label>
@@ -109,19 +116,16 @@
                     </div>
                 </div>
 
-                <!-- GRAPHIQUES (4 COLONNES) -->
+                <!-- GRAPHIQUES -->
                 <div class="grid grid-cols-4 gap-6 h-64">
-                    <!-- Mix -->
                     <div class="bento-card p-6 flex flex-col col-span-1">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Mix Énergétique</h3>
                         <div class="flex-1 relative"><canvas id="mixChart"></canvas></div>
                     </div>
-                    <!-- Parts de Marché (Camembert) -->
                     <div class="bento-card p-6 flex flex-col col-span-1">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Parts de Marché</h3>
                         <div class="flex-1 relative"><canvas id="supplierChart"></canvas></div>
                     </div>
-                    <!-- Top 5 -->
                     <div class="bento-card p-6 col-span-2 flex flex-col">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Top 5 Budgets</h3>
                         <div class="flex-1 relative"><canvas id="topChart"></canvas></div>
@@ -178,14 +182,14 @@
                 </div>
             </div>
 
-            <!-- VUE 3 : DÉTAIL & MODIFICATION -->
+            <!-- VUE 3 : DÉTAIL & MODIFICATION (V15.1 - FICHE TECHNIQUE COMPLETE) -->
             <div id="view-detail" class="view-section hidden space-y-6">
                 <button onclick="switchView('fleet')" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4"><i class="fa-solid fa-arrow-left"></i> RETOUR LISTE</button>
+                
                 <div class="flex justify-between items-start">
                     <div>
                         <div class="flex items-center gap-3">
                             <h2 class="text-3xl font-bold text-white" id="detail-title">--</h2>
-                            <!-- BOUTON EDITER -->
                             <button onclick="openEditModal()" class="text-gray-500 hover:text-cyan transition" title="Modifier le site"><i class="fa-solid fa-pen-to-square"></i></button>
                         </div>
                         <div class="flex items-center gap-2 mt-2 text-sm text-gray-400"><span id="detail-address">--</span><span id="detail-badge" class="px-2 py-0.5 rounded text-[10px] font-bold">--</span></div>
@@ -195,6 +199,15 @@
                         <div><div class="text-[10px] text-primary font-bold uppercase tracking-wider mb-1">Analyse Cortex</div><div class="text-sm text-white font-medium leading-tight" id="cortex-msg">--</div></div>
                     </div>
                 </div>
+
+                <!-- NOUVEAU BLOC : FICHE DQE COMPLETE -->
+                <div class="bento-card p-6 border-l-4 border-cyan/50">
+                    <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-file-contract text-cyan"></i> DONNÉES CONTRACTUELLES & TECHNIQUES</h3>
+                    <div class="grid grid-cols-4 gap-6 text-xs" id="dqe-grid">
+                        <!-- Rempli par JS -->
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-3 gap-6">
                     <div class="bento-card col-span-1 p-6 flex flex-col justify-between">
                         <h3 class="text-white font-bold text-sm mb-4">Optimisation</h3>
@@ -232,7 +245,6 @@
     <div id="edit-modal" class="fixed inset-0 bg-black/90 z-[99] hidden flex items-center justify-center backdrop-blur-sm">
         <div class="bento-card p-8 rounded-2xl w-[500px] relative border border-cyan/30 shadow-[0_0_50px_rgba(0,229,255,0.1)]">
             <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-cyan"></i> Édition Rapide</h3>
-            
             <div class="space-y-4">
                 <input type="hidden" id="edit-id">
                 <div><label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site</label><input type="text" id="edit-name" class="input-edit"></div>
@@ -242,7 +254,6 @@
                 </div>
                 <div><label class="text-[10px] text-gray-500 uppercase font-bold">Prix Molécule (€/MWh)</label><input type="number" id="edit-price" class="input-edit" step="0.01"></div>
             </div>
-
             <div class="flex justify-end gap-3 mt-8">
                 <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button>
                 <button onclick="saveSiteChanges()" class="bg-cyan text-black px-6 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg">ENREGISTRER</button>
@@ -315,7 +326,6 @@
             } catch(e) { console.error(e); }
         }
 
-        // --- FILTRES ---
         function initFilters() {
             const populate = (id, list) => {
                 const sel = document.getElementById(id);
@@ -364,7 +374,6 @@
             updateCharts(filtered);
         }
 
-        // --- MODE EDITION ---
         function openEditModal() {
             if(!CURRENT_DETAIL_SITE) return;
             document.getElementById('edit-id').value = CURRENT_DETAIL_SITE.identity.id;
@@ -372,41 +381,28 @@
             document.getElementById('edit-provider').value = CURRENT_DETAIL_SITE.contract.provider || "";
             document.getElementById('edit-power').value = CURRENT_DETAIL_SITE.contract.power || 0;
             document.getElementById('edit-price').value = CURRENT_DETAIL_SITE.pricing.hph || 0;
-            
             document.getElementById('edit-modal').classList.remove('hidden');
         }
 
         async function saveSiteChanges() {
             const id = document.getElementById('edit-id').value;
             const original = CURRENT_DETAIL_SITE; 
-            
             original.identity.site_name = document.getElementById('edit-name').value;
             original.contract.provider = document.getElementById('edit-provider').value;
             original.contract.power = document.getElementById('edit-power').value;
             original.pricing.hph = document.getElementById('edit-price').value;
-
             try {
-                const res = await fetch('/api/settings/save_client', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(original)
-                });
-                if((await res.json()).success) {
-                    document.getElementById('edit-modal').classList.add('hidden');
-                    alert("Modifications enregistrées !");
-                    loadFleet();
-                    loadDetail(id);
-                } else { alert("Erreur sauvegarde"); }
+                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
+                if((await res.json()).success) { document.getElementById('edit-modal').classList.add('hidden'); alert("Enregistré !"); loadFleet(); loadDetail(id); } 
+                else { alert("Erreur"); }
             } catch(e) { alert("Erreur réseau"); }
         }
 
-        // --- TABLEAU AVEC BADGES FOURNISSEURS ---
         function getProviderBadge(name) {
             const n = (name || "").toUpperCase();
             if(n.includes("EDF")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white border border-blue-400">EDF</span>`;
             if(n.includes("TOTAL")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white border border-red-400">TOTAL</span>`;
             if(n.includes("ENGIE")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan/20 text-cyan border border-cyan/30">ENGIE</span>`;
-            if(n.includes("ENI")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-500/20 text-yellow-500 border border-yellow-500/30">ENI</span>`;
             return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-300">${name}</span>`;
         }
 
@@ -460,10 +456,7 @@
             }
 
             const suppliers = {};
-            data.forEach(s => {
-                const p = s.provider || 'Inconnu';
-                suppliers[p] = (suppliers[p] || 0) + s.budget;
-            });
+            data.forEach(s => { const p = s.provider || 'Inconnu'; suppliers[p] = (suppliers[p] || 0) + s.budget; });
             const sortedSuppliers = Object.entries(suppliers).sort((a, b) => b[1] - a[1]);
             const labelsSup = sortedSuppliers.map(x => x[0]);
             const dataSup = sortedSuppliers.map(x => x[1]);
@@ -471,18 +464,7 @@
             const ctxSup = document.getElementById('supplierChart');
             if(ctxSup) {
                 if(supplierChartInstance) supplierChartInstance.destroy();
-                supplierChartInstance = new Chart(ctxSup.getContext('2d'), { 
-                    type: 'doughnut', 
-                    data: { 
-                        labels: labelsSup, 
-                        datasets: [{ 
-                            data: dataSup, 
-                            backgroundColor: ['#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#A855F7', '#64748B'], 
-                            borderWidth: 0 
-                        }] 
-                    }, 
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 9 }, boxWidth: 8 } } } } 
-                });
+                supplierChartInstance = new Chart(ctxSup.getContext('2d'), { type: 'doughnut', data: { labels: labelsSup, datasets: [{ data: dataSup, backgroundColor: ['#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#A855F7', '#64748B'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 9 }, boxWidth: 8 } } } } });
             }
 
             const top5 = [...data].sort((a, b) => b.budget - a.budget).slice(0, 5);
@@ -499,10 +481,7 @@
             const count = SELECTED_IDS.size; 
             safeSetText('selected-count', count);
             const bar = document.getElementById('action-bar'); 
-            if(bar) {
-                if(count > 0) bar.classList.add('visible'); else bar.classList.remove('visible'); 
-                bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; 
-            }
+            if(bar) { if(count > 0) bar.classList.add('visible'); else bar.classList.remove('visible'); bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; }
         }
 
         async function generateTender() {
@@ -548,7 +527,6 @@
             if(ranked[0]) updatePodium('1', ranked[0], false);
             if(ranked[1]) updatePodium('2', ranked[1], false);
             if(ranked[2]) updatePodium('3', ranked[2], false);
-            
             const list = document.getElementById('league-list');
             if(list) {
                 list.innerHTML = '';
@@ -564,10 +542,7 @@
             safeSetText(`podium-${rank}-name`, name);
             let scoreTxt = "";
             if (isBackendMode) { scoreTxt = Math.round(site.pmc) + " €/MWh"; } 
-            else {
-                const ratio = site.budget > 0 ? Math.round((site.ghost_savings / site.budget) * 100) : 0;
-                scoreTxt = ratio + "% Gaspillage";
-            }
+            else { const ratio = site.budget > 0 ? Math.round((site.ghost_savings / site.budget) * 100) : 0; scoreTxt = ratio + "% Gaspillage"; }
             safeSetText(`podium-${rank}-score`, scoreTxt);
         }
 
@@ -576,25 +551,61 @@
                 const res = await fetch(`/api/dashboard/data/${id}`);
                 const data = await res.json();
                 if(data.error) return;
-                
                 CURRENT_DETAIL_SITE = data; 
                 renderDetail(data);
                 switchView('detail');
             } catch(e) { console.error(e); }
         }
 
+        // --- V15.1 : FONCTION RENDER DÉTAILLÉE ---
         function renderDetail(data) {
             const isGaz = data.energy_type === 'gaz';
             safeSetText('detail-title', data.identity.site_name || "Site");
             safeSetText('detail-address', data.location.address);
+            
             const badge = document.getElementById('detail-badge');
             if(badge) {
                 badge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
                 badge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${isGaz ? 'bg-gas/10 text-gas' : 'bg-cyan/10 text-cyan'}`;
             }
+
+            // BLOC FICHE TECHNIQUE (NOUVEAU)
+            const dqeGrid = document.getElementById('dqe-grid');
+            if(dqeGrid) {
+                const c = data.contract || {};
+                const t = data.technical || {};
+                const p = c.power_details || {};
+                
+                const safeVal = (v, unit) => v ? `${v} ${unit}` : '-';
+                
+                let html = `
+                    <div><span class="text-gray-500 block mb-1">PDL / PCE</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div>
+                    <div><span class="text-gray-500 block mb-1">Segment</span><span class="text-white font-bold">${c.segment || '-'}</span></div>
+                    <div><span class="text-gray-500 block mb-1">Début Contrat</span><span class="text-white">${c.start_date || '-'}</span></div>
+                    <div><span class="text-gray-500 block mb-1">Fin Contrat</span><span class="text-white">${c.end_date || '-'}</span></div>
+                    
+                    <div><span class="text-gray-500 block mb-1">FTA</span><span class="text-white">${c.fta || '-'}</span></div>
+                    <div><span class="text-gray-500 block mb-1">PS Max</span><span class="text-white font-bold text-yellow-500">${safeVal(c.power, isGaz?'MWh':'kVA')}</span></div>
+                    <div><span class="text-gray-500 block mb-1">Pointe Max</span><span class="text-white font-mono">${safeVal(c.p_max, 'kW')}</span></div>
+                    <div><span class="text-gray-500 block mb-1">GRD</span><span class="text-white">${c.grd || 'Enedis'}</span></div>
+                `;
+                
+                if(!isGaz) {
+                    html += `
+                        <div class="col-span-4 h-px bg-white/5 my-2"></div>
+                        <div><span class="text-gray-500 block mb-1">PS HPH</span><span class="text-white font-mono">${safeVal(p.hph, 'kVA')}</span></div>
+                        <div><span class="text-gray-500 block mb-1">PS HCH</span><span class="text-white font-mono">${safeVal(p.hch, 'kVA')}</span></div>
+                        <div><span class="text-gray-500 block mb-1">PS HPE</span><span class="text-white font-mono">${safeVal(p.hpe, 'kVA')}</span></div>
+                        <div><span class="text-gray-500 block mb-1">PS HCE</span><span class="text-white font-mono">${safeVal(p.hce, 'kVA')}</span></div>
+                    `;
+                }
+                dqeGrid.innerHTML = html;
+            }
+
             const coach = data.cortex_insight;
             const msgEl = document.getElementById('cortex-msg');
             if(msgEl) msgEl.innerText = coach.message + " " + coach.conseil;
+
             const market = data.market_analysis;
             if(market) {
                 safeSetText('market-badge', market.status);
@@ -605,6 +616,7 @@
                 const mBadge = document.getElementById('market-badge');
                 if(mBadge) mBadge.style.backgroundColor = color;
             }
+
             const list = document.getElementById('detail-pricing');
             if(list) {
                 list.innerHTML = '';
@@ -619,6 +631,7 @@
                     addPriceLine(list, "HCE", data.pricing.hce, "text-cyan");
                 }
             }
+
             const pSub = parseFloat(data.contract.power);
             const pReach = pSub * (isGaz ? 0.9 : 0.7); 
             safeSetText('detail-sub', `Souscrit: ${pSub} ${isGaz ? 'MWh' : 'kVA'}`);
@@ -632,6 +645,7 @@
             const gain = (!isGaz && ratio < 60) ? Math.floor((pSub - pReach*1.2) * 18) : 0;
             safeSetText('detail-gain', gain > 0 ? `+ ${gain} €/an` : "OPTIMISÉ");
             safeSetText('detail-advice', gain > 0 ? "Conseil: Baissez votre puissance souscrite." : "Votre contrat est bien calibré.");
+
             const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
             const timeProgress = (dayOfYear / 365) * 100;
             const budgetProgress = timeProgress * 1.05; 
