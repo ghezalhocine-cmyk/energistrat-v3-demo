@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V45_1_FULL")
+logger = logging.getLogger("CORTEX_MASTER_V46_FULL_INTEGRAL")
 
 # CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
@@ -32,8 +32,8 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "45.1 (Full Integral: Import Fix + BI)"
-        # Base de connaissance Métier (NAF) - Inchangée
+        self.version = "46.0 (Full Integral: DQE + Import Expert + BI)"
+        # Base de connaissance Métier (NAF)
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
             "1013B": "Boucherie", "5610A": "Restauration Trad.", "5610C": "Fast Food",
@@ -49,7 +49,7 @@ class CortexEngine:
             "5510Z": "Hôtellerie", "6832A": "Administration Immeubles", "6832B": "Supports Immobiliers"
         }
 
-    # --- HELPERS DE NETTOYAGE (STABLES) ---
+    # --- HELPERS DE NETTOYAGE ---
     def _safe_int(self, value):
         try:
             if value is None: return 0
@@ -66,7 +66,6 @@ class CortexEngine:
             return float(val_str)
         except: return 0.0
 
-    # --- HELPER SPRINT B : NORMALISATION FOURNISSEUR ---
     def _normalize_supplier(self, raw_name):
         if not raw_name: return "Inconnu"
         n = str(raw_name).upper().strip()
@@ -78,20 +77,18 @@ class CortexEngine:
         if "IBERDROLA" in n: return "Iberdrola"
         if "AXPO" in n: return "Axpo"
         if "ALPIQ" in n: return "Alpiq"
-        # Si c'est "Import CSV", on le garde tel quel pour inciter à la modif
         if "IMPORT" in n: return "Import CSV"
         return n.title() 
 
     # =========================================================
-    # MODULE 1 : TENDER FACTORY EXCEL (V44 - Universal)
+    # MODULE 1 : TENDER FACTORY EXCEL (V46 - DQE EXPORT)
     # =========================================================
     def generate_advanced_tender_excel(self, sites_data):
         if not sites_data: return b""
         try:
             first_site = sites_data[0]
             contract = first_site.get('contract', {}) or {}
-            segment = str(contract.get('segment', '')).upper()
-            is_gaz = "T" in segment or "GAZ" in segment
+            is_gaz = "T" in str(contract.get('segment', '')).upper() or "GAZ" in str(contract.get('segment', '')).upper()
             if is_gaz: return self._generate_gaz_tender(sites_data)
             else: return self._generate_elec_tender(sites_data)
         except Exception as e:
@@ -103,34 +100,57 @@ class CortexEngine:
         rows = []
         for s in sites_data:
             try:
-                c = s.get('contract', {}) or {}
-                i = s.get('identity', {}) or {}
-                loc = s.get('location', {}) or {}
+                c = s.get('contract', {})
+                i = s.get('identity', {})
+                loc = s.get('location', {})
+                tech = s.get('technical', {})
+                conso_det = s.get('consumption_details', {})
+                power_det = c.get('power_details', {})
+                
                 power = self._safe_float(c.get('power', 0))
-                vol_total = power * 1500 
+                
                 rows.append({
-                    "PDL": str(c.get('pdl', 'Inconnu')),
-                    "Nom Site": str(i.get('site_name') or i.get('name') or 'Site Inconnu'),
-                    "Adresse": str(loc.get('address', '')),
-                    "CP": str(loc.get('zip_code', '')),
-                    "Ville": str(loc.get('city', '')),
-                    "Segment (FTA)": str(c.get('segment', 'C5')),
-                    "Puissance (kVA)": power,
-                    "Vol. Annuel (kWh)": vol_total,
-                    "HPH (kWh)": vol_total * 0.40, 
-                    "HCH (kWh)": vol_total * 0.25,
-                    "HPE (kWh)": vol_total * 0.20,
-                    "HCE (kWh)": vol_total * 0.15
+                    "Entité": s.get('client_name', ''),
+                    "Nom du site": i.get('site_name', ''),
+                    "Adresse": loc.get('address', ''),
+                    "CP": loc.get('zip_code', ''),
+                    "Commune": loc.get('city', ''),
+                    "SIRET Site": i.get('siret_site', ''),
+                    "NAF": i.get('naf', ''),
+                    "CEE": tech.get('cee_eligible', 'NON'),
+                    "GO %": tech.get('go_percentage', '0'),
+                    "Compteur Prod.": tech.get('producer_meter', 'Non'),
+                    "PRM": c.get('pdl', ''),
+                    "Segment": c.get('segment', ''),
+                    "FTA": c.get('fta', ''),
+                    "GRD": c.get('grd', ''),
+                    "Typologie": tech.get('typology', ''),
+                    
+                    # Puissances
+                    "PS Max (kVA)": power,
+                    "Pointe (kW)": c.get('p_max', 0),
+                    "PS HPH": power_det.get('hph', 0),
+                    "PS HCH": power_det.get('hch', 0),
+                    "PS HPE": power_det.get('hpe', 0),
+                    "PS HCE": power_det.get('hce', 0),
+                    
+                    # Consommations
+                    "Conso HPH": conso_det.get('hph', 0),
+                    "Conso HCH": conso_det.get('hch', 0),
+                    "Conso HPE": conso_det.get('hpe', 0),
+                    "Conso HCE": conso_det.get('hce', 0),
+                    "Vol. Annuel": s.get('kpis', {}).get('volume_mwh', 0) * 1000,
+                    
+                    "Commentaires": s.get('meta', {}).get('comments', ''),
+                    "Date début": c.get('start_date', ''),
+                    "Date fin": c.get('end_date', '')
                 })
             except: continue
         
         df_dqe = pd.DataFrame(rows)
-        bpu_data = [{"Lot": "Lot 1", "Poste": "Fourniture Élec (Base)", "Unité": "€/MWh", "C5": "", "C4": ""}]
-        df_bpu = pd.DataFrame(bpu_data)
         try:
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
-                df_bpu.to_excel(writer, sheet_name='2-BPU_Reponse', index=False)
         except: return b""
         output.seek(0)
         return output.getvalue()
@@ -140,42 +160,38 @@ class CortexEngine:
         rows = []
         for s in sites_data:
             try:
-                c = s.get('contract', {}) or {}
-                i = s.get('identity', {}) or {}
-                loc = s.get('location', {}) or {}
+                c = s.get('contract', {})
+                i = s.get('identity', {})
+                loc = s.get('location', {})
                 car = self._safe_float(c.get('power', 0))
                 rows.append({
-                    "PCE": str(c.get('pdl', 'Inconnu')),
-                    "Nom Site": str(i.get('site_name') or i.get('name') or 'Site Inconnu'),
-                    "Adresse": str(loc.get('address', '')),
-                    "CP": str(loc.get('zip_code', '')),
-                    "Ville": str(loc.get('city', '')),
+                    "PCE": c.get('pdl', ''),
+                    "Nom Site": i.get('site_name', ''),
+                    "Adresse": loc.get('address', ''),
+                    "CP": loc.get('zip_code', ''),
+                    "Ville": loc.get('city', ''),
                     "CAR (MWh)": car,
-                    "Profil": "T1" if car < 300 else "T2",
-                    "CJA (MWh/j)": round(car/300, 3) if car > 0 else 0
+                    "Profil": c.get('segment', 'T1'),
+                    "Fournisseur": c.get('provider', '')
                 })
             except: continue
         df_dqe = pd.DataFrame(rows)
-        df_bpu = pd.DataFrame([{"Poste": "Prix Molécule", "Unité": "€/MWh"}, {"Poste": "Abonnement", "Unité": "€/an"}])
         try:
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
-                df_bpu.to_excel(writer, sheet_name='2-BPU_Reponse', index=False)
         except: return b""
         output.seek(0)
         return output.getvalue()
 
     # =========================================================
-    # MODULE 2 : MARKET WATCH (V44.1 - TRVE Logic)
+    # MODULE 2 : MARKET WATCH (V44.1)
     # =========================================================
     def analyze_market_position(self, client_price, market_price, energy_type, segment="C5"):
-        if client_price <= 0: return {"status": "UNKNOWN", "message": "Prix contrat manquant", "color": "gray", "action": "Renseignez vos prix."}
+        if client_price <= 0: return {"status": "UNKNOWN", "message": "Prix manquant", "color": "gray", "action": "Renseigner"}
         
-        # 1. Normalisation Unité
         adjusted_client_price = client_price
         if client_price < 2.0: adjusted_client_price = client_price * 1000
             
-        # 2. Référence (TRVE vs EEX)
         TRVE_ELEC_C5 = 230.0 
         TRVE_GAZ_T1 = 110.0
         
@@ -192,35 +208,18 @@ class CortexEngine:
                 reference_price = TRVE_GAZ_T1
                 ref_label = "Prix Repère"
 
-        # 3. Calcul
         delta = adjusted_client_price - reference_price
         pct = (delta / reference_price) * 100
         
-        # 4. Message Hybride
         if delta > 15: 
-            return {
-                "status": "ALERTE PRIX", 
-                "color": "red", 
-                "message": f"Prix excessif (+{int(pct)}% vs {ref_label}).", 
-                "action": f"Payé {int(adjusted_client_price)}€ vs {int(reference_price)}€ cible."
-            }
+            return {"status": "ALERTE PRIX", "color": "red", "message": f"Prix excessif (+{int(pct)}% vs {ref_label}).", "action": f"Payé {int(adjusted_client_price)}€ vs {int(reference_price)}€ cible."}
         elif delta < -5: 
-            return {
-                "status": "PERFORMANCE", 
-                "color": "green", 
-                "message": f"Vous battez le {ref_label} de {abs(int(pct))}%.", 
-                "action": f"Prix {int(adjusted_client_price)}€/MWh (Top)."
-            }
+            return {"status": "PERFORMANCE", "color": "green", "message": f"Vous battez le {ref_label} de {abs(int(pct))}%.", "action": f"Prix {int(adjusted_client_price)}€/MWh (Top)."}
         else: 
-            return {
-                "status": "ALIGNE", 
-                "color": "blue", 
-                "message": f"Prix cohérent avec le {ref_label}.", 
-                "action": "Pas d'action requise."
-            }
+            return {"status": "ALIGNE", "color": "blue", "message": f"Prix cohérent avec le {ref_label}.", "action": "Pas d'action requise."}
 
     # =========================================================
-    # MODULE 3 : ROI & KPI (V44 - Volume Fix)
+    # MODULE 3 : ROI & KPI (V44)
     # =========================================================
     def enrich_fleet_kpis(self, site_data):
         contract = site_data.get('contract', {}) or {}
@@ -228,10 +227,8 @@ class CortexEngine:
         is_gaz = "T" in str(contract.get('segment', ''))
         
         p_sous = self._safe_float(contract.get('power'))
-        if is_gaz:
-            vol_mwh = p_sous 
-        else:
-            vol_mwh = (p_sous * 1500) / 1000 
+        if is_gaz: vol_mwh = p_sous 
+        else: vol_mwh = (p_sous * 1500) / 1000 
             
         price = self._safe_float(pricing.get('hph')) + self._safe_float(pricing.get('tax'))
         fix = self._safe_float(pricing.get('fix'))
@@ -240,7 +237,6 @@ class CortexEngine:
         if price < 2.0: calc_price = price * 1000
             
         budget = fix + (vol_mwh * calc_price)
-        
         day = datetime.now().timetuple().tm_yday
         landing = budget * (1 / (day/365 if day>0 else 1)) * (day/365)
         
@@ -253,7 +249,7 @@ class CortexEngine:
         }
 
     # =========================================================
-    # MODULE 4 : IMPORT MASSE V5.3 (PROVIDER FIX)
+    # MODULE 4 : IMPORT MASSE V6.0 (DQE MAPPING EXPERT)
     # =========================================================
     def parse_mass_import_v5(self, file_content):
         try:
@@ -269,90 +265,99 @@ class CortexEngine:
             
             for _, row in df.iterrows():
                 try:
-                    siret_col = next((c for c in df.columns if "SIRET" in c), None)
-                    if not siret_col: continue
-                    siret = str(row[siret_col]).replace(' ', '').strip()
-                    if len(siret) < 9: continue 
+                    # MAPPING DQE
+                    col_entite = next((c for c in df.columns if "ENTIT" in str(c).upper()), None)
+                    col_nom = next((c for c in df.columns if "NOM" in str(c).upper()), None)
+                    col_adresse = next((c for c in df.columns if "ADRESSE" in str(c).upper()), None)
+                    col_cp = next((c for c in df.columns if "CP" == str(c).upper() or "CODE" in str(c).upper()), None)
+                    col_ville = next((c for c in df.columns if "COMMUNE" in str(c).upper() or "VILLE" in str(c).upper()), None)
+                    col_siret_site = next((c for c in df.columns if "SIRET" in str(c).upper()), None)
+                    col_naf = next((c for c in df.columns if "NAF" in str(c).upper()), None)
                     
-                    # --- CHAMPS D'ADRESSE (UNIVERSAL) ---
-                    col_nom = next((c for c in df.columns if "NOM" in c), None)
-                    col_lot = next((c for c in df.columns if "LOT" in c), None)
+                    col_cee = next((c for c in df.columns if "CEE" in str(c).upper()), None)
+                    col_go = next((c for c in df.columns if "GO" in str(c).upper()), None)
+                    col_prod = next((c for c in df.columns if "PRODUCTEUR" in str(c).upper()), None)
+                    col_pdl = next((c for c in df.columns if "PDL" in str(c).upper() or "PRM" in str(c).upper()), None)
+                    col_segment = next((c for c in df.columns if "SEGMENT" in str(c).upper()), None)
+                    col_fta = next((c for c in df.columns if "FTA" in str(c).upper()), None)
+                    col_grd = next((c for c in df.columns if "GRD" in str(c).upper()), None)
+                    col_typo = next((c for c in df.columns if "TYPOLOGIE" in str(c).upper()), None)
                     
-                    col_adresse_factu = next((c for c in df.columns if "ADRESSE_FACTURATION" in str(c).upper()), None)
-                    if not col_adresse_factu: col_adresse_factu = next((c for c in df.columns if "ADRESSE" in str(c).upper()), None)
+                    col_ps = next((c for c in df.columns if "PUISSANCE_SOUSCRITE_MAX" in str(c).upper()), None)
+                    if not col_ps: col_ps = next((c for c in df.columns if "PUISSANCE" in str(c).upper()), None)
+                    col_pmax = next((c for c in df.columns if "POINTE" in str(c).upper() or "MAX" in str(c).upper()), None)
                     
-                    col_adresse_site = next((c for c in df.columns if "ADRESSE_SITE" in str(c).upper()), None)
-                    col_cp = next((c for c in df.columns if "CODE_POSTAL" in str(c).upper() or "CP" == str(c).upper()), None)
-                    col_ville = next((c for c in df.columns if "VILLE" in str(c).upper()), None)
+                    col_ps_hph = next((c for c in df.columns if "PS_HPH" in str(c).upper()), None)
+                    col_ps_hch = next((c for c in df.columns if "PS_HCH" in str(c).upper()), None)
+                    col_ps_hpe = next((c for c in df.columns if "PS_HPE" in str(c).upper()), None)
+                    col_ps_hce = next((c for c in df.columns if "PS_HCE" in str(c).upper()), None)
                     
-                    site_name = str(row[col_nom]).strip() if col_nom else "Site Inconnu"
-                    
-                    addr_site = str(row.get(col_adresse_site, row.get(col_adresse_factu, ''))).strip()
-                    cp_site = str(row.get(col_cp, '')).strip()
-                    ville_site = str(row.get(col_ville, '')).strip()
-                    
-                    col_pmax = next((c for c in df.columns if "ATTEINTE" in str(c).upper() or "MAX" in str(c).upper() or "POINTE" in str(c).upper()), None)
-                    p_atteinte = self._safe_float(row.get(col_pmax, 0)) if col_pmax else 0.0
+                    col_conso_hph = next((c for c in df.columns if "CONSO_HPH" in str(c).upper() or "HPH" in str(c).upper()), None)
+                    col_conso_hch = next((c for c in df.columns if "CONSO_HCH" in str(c).upper() or "HCH" in str(c).upper()), None)
+                    col_conso_hpe = next((c for c in df.columns if "CONSO_HPE" in str(c).upper() or "HPE" in str(c).upper()), None)
+                    col_conso_hce = next((c for c in df.columns if "CONSO_HCE" in str(c).upper() or "HCE" in str(c).upper()), None)
 
-                    # --- CORRECTION SPRINT B : DÉTECTION FOURNISSEUR ---
-                    col_provider = next((c for c in df.columns if "FOURNISSEUR" in str(c).upper() or "PROVIDER" in str(c).upper()), None)
-                    raw_provider = str(row.get(col_provider, 'Import CSV')) if col_provider else "Import CSV"
+                    col_start = next((c for c in df.columns if "DEBUT" in str(c).upper()), None)
+                    col_end = next((c for c in df.columns if "FIN" in str(c).upper()), None)
+                    col_prov = next((c for c in df.columns if "FOURNISSEUR" in str(c).upper()), None)
+                    col_prix = next((c for c in df.columns if "PRIX" in str(c).upper() or "MOLECULE" in str(c).upper()), None)
+                    col_abo = next((c for c in df.columns if "ABO" in str(c).upper()), None)
 
-                    if is_gaz:
-                        col_pce = next((c for c in df.columns if "PCE" in c), None)
-                        col_car = next((c for c in df.columns if "CAR" in c), None)
-                        col_seg = next((c for c in df.columns if "SEGMENT" in c), None)
-                        col_prix = next((c for c in df.columns if "PRIX" in c and "MWH" in c), None)
-                        
-                        ref_id = str(row[col_pce]).replace(' ', '') if col_pce else "Inconnu"
-                        power = self._safe_int(row.get(col_car, 0))
-                        segment = str(row.get(col_seg, 'T1'))
-                        p_hph = str(row.get(col_prix, '0')).replace(',', '.')
-                        p_hch, p_hpe, p_hce = "0", "0", "0"
-                    else:
-                        col_pdl = next((c for c in df.columns if "PDL" in c), None)
-                        col_puis = next((c for c in df.columns if "PUISSANCE" in c), None)
-                        col_seg = next((c for c in df.columns if "SEGMENT" in c), None)
-                        
-                        ref_id = str(row[col_pdl]).replace(' ', '') if col_pdl else "Inconnu"
-                        power = self._safe_int(row.get(col_puis, 0))
-                        segment = str(row.get(col_seg, 'C5'))
-                        
-                        p_hph = str(row.get('PRIX_HPH', '0')).replace(',', '.')
-                        p_hch = str(row.get('PRIX_HCH', '0')).replace(',', '.')
-                        p_hpe = str(row.get('PRIX_HPE', '0')).replace(',', '.')
-                        p_hce = str(row.get('PRIX_HCE', '0')).replace(',', '.')
+                    pdl = str(row.get(col_pdl, '')).strip()
+                    if len(pdl) < 5: continue 
 
-                    unique_id = ref_id if ref_id != "Inconnu" else f"{siret}_{site_name}"
+                    unique_id = pdl
                     
                     site = {
-                        "client_name": site_name, 
+                        "client_name": str(row.get(col_entite, 'Inconnu')),
                         "identity": {
                             "id": unique_id,
-                            "siret": siret,
-                            "name": site_name,
-                            "site_name": site_name,
-                            "lot_name": str(row.get(col_lot, '')).strip()
+                            "name": str(row.get(col_entite, 'Inconnu')),
+                            "site_name": str(row.get(col_nom, 'Site Inconnu')),
+                            "siret_site": str(row.get(col_siret_site, '')),
+                            "naf": str(row.get(col_naf, ''))
                         },
                         "location": { 
-                            "address": addr_site,
-                            "zip_code": cp_site,
-                            "city": ville_site
+                            "address": str(row.get(col_adresse, '')),
+                            "zip_code": str(row.get(col_cp, '')),
+                            "city": str(row.get(col_ville, ''))
                         },
                         "contract": {
-                            "pdl": ref_id,
-                            "power": power, 
-                            "p_max": p_atteinte, 
-                            "segment": segment,
-                            "provider": raw_provider # CORRIGÉ
+                            "pdl": pdl,
+                            "power": self._safe_float(row.get(col_ps, 0)),
+                            "p_max": self._safe_float(row.get(col_pmax, 0)),
+                            "segment": str(row.get(col_segment, 'C5')),
+                            "fta": str(row.get(col_fta, '')),
+                            "grd": str(row.get(col_grd, '')),
+                            "provider": str(row.get(col_prov, 'Import CSV')),
+                            "start_date": str(row.get(col_start, '')),
+                            "end_date": str(row.get(col_end, '')),
+                            "power_details": {
+                                "hph": self._safe_float(row.get(col_ps_hph, 0)),
+                                "hch": self._safe_float(row.get(col_ps_hch, 0)),
+                                "hpe": self._safe_float(row.get(col_ps_hpe, 0)),
+                                "hce": self._safe_float(row.get(col_ps_hce, 0))
+                            }
+                        },
+                        "consumption_details": {
+                            "hph": self._safe_float(row.get(col_conso_hph, 0)),
+                            "hch": self._safe_float(row.get(col_conso_hch, 0)),
+                            "hpe": self._safe_float(row.get(col_conso_hpe, 0)),
+                            "hce": self._safe_float(row.get(col_conso_hce, 0))
+                        },
+                        "technical": {
+                            "cee_eligible": str(row.get(col_cee, 'NON')),
+                            "go_percentage": str(row.get(col_go, '0')),
+                            "producer_meter": str(row.get(col_prod, 'Non')),
+                            "typology": str(row.get(col_typo, ''))
                         },
                         "pricing": {
-                            "fix": str(row.get('ABO_AN', '0')).replace(',', '.').strip(),
-                            "hph": p_hph,
-                            "hch": p_hch,
-                            "hpe": p_hpe,
-                            "hce": p_hce,
-                            "tax": str(row.get('TAXES', '0')).replace(',', '.').strip()
+                            "fix": str(row.get(col_abo, '0')),
+                            "hph": str(row.get(col_prix, '0')),
+                            "hch": "0", "hpe": "0", "hce": "0", "tax": "0"
+                        },
+                        "meta": {
+                            "comments": str(row.get("Commentaires", ""))
                         }
                     }
                     sites.append(site)
@@ -365,13 +370,15 @@ class CortexEngine:
             return []
 
     # =========================================================
-    # MODULE 5 : ANALYSE COURBE DE CHARGE (STABLE)
+    # MODULE 5 : ANALYSE COURBE DE CHARGE (HISTORIQUE COMPLET)
     # =========================================================
     def analyze_file(self, file_content, filename, target_profile="demo", known_site_data=None):
         try:
+            # 1. Parsing
             df, time_step, meta_tech = self._parse_data(file_content, filename)
             if df is None or df.empty: return {"success": False, "error": "Fichier illisible ou vide"}
             
+            # 2. Contexte
             context = {
                 "pdl": known_site_data.get('pdl') if known_site_data else meta_tech.get('pdl'),
                 "p_souscrite": float(known_site_data.get('power', 0)) if known_site_data else 0,
@@ -391,12 +398,14 @@ class CortexEngine:
             cp_match = re.search(r'\b\d{5}\b', context['address'])
             zip_code = cp_match.group(0) if cp_match else "Inconnu"
 
+            # 3. Calculs
             base = self._module_socle(df, time_step)
             ref_pmax = context['p_souscrite'] if context['p_souscrite'] > 0 else base['p_max']
             finance = self._module_finance_4p(df, time_step, ref_pmax)
             solar = self._module_solar(df)
             waste = self._module_ghost(df, base['talon'])
             
+            # 4. Chart
             step = max(1, len(df)//2000)
             df_chart = df.iloc[::step].copy()
             chart_vals = df_chart['val'].fillna(0).tolist()
@@ -426,7 +435,7 @@ class CortexEngine:
             return {"success": True, "kpi": full_kpi, "chart": chart, "ai_insight": narrative}
 
         except Exception as e:
-            logger.exception("Crash Cortex V43")
+            logger.exception("Crash Cortex V46")
             return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
 
     # =========================================================
@@ -439,9 +448,7 @@ class CortexEngine:
         total_budget = 0.0
         sites_analysis = []
         cortex_insights = []
-        
-        # SPRINT B : AGREGATION FOURNISSEURS
-        suppliers_stats = {} # { "EDF": 45000, "TOTAL": 12000 }
+        suppliers_stats = {} 
         
         MARKET_REF_PRICE = 90.0
         POWER_OPTIM_THRESHOLD = 0.70
@@ -469,11 +476,8 @@ class CortexEngine:
             
             pmc = (budget_est / vol) if vol > 0 else 0
             
-            # SPRINT B : Normalisation
             raw_provider = contract.get('provider', 'Inconnu')
             clean_provider = self._normalize_supplier(raw_provider)
-            
-            # Agregation Budget
             if clean_provider not in suppliers_stats: suppliers_stats[clean_provider] = 0
             suppliers_stats[clean_provider] += budget_est
             
@@ -489,7 +493,7 @@ class CortexEngine:
             
             if pmc > (MARKET_REF_PRICE * 1.3):
                 surcout = (pmc - MARKET_REF_PRICE) * vol
-                msg = f"💰 <b>{ident.get('site_name')}</b> : Payé {int(pmc)}€/MWh (Cible {int(MARKET_REF_PRICE)}€). Enjeu : <b>{int(surcout)} €/an</b>."
+                msg = f"💰 <b>{ident.get('site_name')}</b> : Payé {int(pmc)}€/MWh. Enjeu : <b>{int(surcout)} €/an</b>."
                 cortex_insights.append({"type": "alert", "msg": msg, "priority": 1})
                 site_flags.append("HIGH_PRICE")
 
@@ -499,7 +503,7 @@ class CortexEngine:
             sites_analysis.append({
                 "nom_site": ident.get('site_name', 'Inconnu'),
                 "ville": loc.get('city', loc.get('address', '')),
-                "fournisseur": clean_provider, # Nouveau champ pour filtres
+                "fournisseur": clean_provider,
                 "pmc": pmc,
                 "consommation": vol,
                 "depense": budget_est,
@@ -516,7 +520,7 @@ class CortexEngine:
         if global_pmc > MARKET_REF_PRICE:
             main_cortex += f" Potentiel global : {int(total_budget - (total_conso * MARKET_REF_PRICE))} € d'économies."
         else:
-            main_cortex += " Performance alignée marché."
+            main_cortex += " Performance achat validée."
 
         return {
             "kpis": {
@@ -525,7 +529,7 @@ class CortexEngine:
                 "global_pmc": global_pmc,
                 "nb_sites": len(sites_data)
             },
-            "market_share": { # SPRINT B : DATA POUR CAMEMBERT
+            "market_share": { 
                 "labels": list(suppliers_stats.keys()),
                 "values": list(suppliers_stats.values())
             },
@@ -541,113 +545,6 @@ class CortexEngine:
             },
             "raw_data": sites_analysis
         }
-
-    # --- SOUS-MODULES TECHNIQUES (INCHANGÉS) ---
-    def _parse_data(self, content, filename):
-        try:
-            buffer = io.BytesIO(content)
-            content_str = content.decode('latin-1', errors='ignore')
-            pdl_match = re.search(r'\b(\d{14})\b', content_str)
-            pdl = pdl_match.group(1) if pdl_match else None
-            try: df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip', low_memory=False)
-            except: 
-                buffer.seek(0)
-                df = pd.read_csv(buffer, sep=None, engine='python', encoding='latin-1')
-            df.columns = [str(c).lower().strip().replace('é','e').replace('è','e') for c in df.columns]
-            c_date = next((c for c in df.columns if 'horodate' in c or 'date' in c), None)
-            c_val = next((c for c in df.columns if 'valeur' in c or 'puiss' in c or 'conso' in c), None)
-            c_unit = next((c for c in df.columns if 'unit' in c), None)
-            if not c_date or not c_val: return None, 0, {}
-            if df[c_val].dtype == object:
-                df['val'] = pd.to_numeric(df[c_val].astype(str).str.replace(',', '.').str.replace(r'\s+', '', regex=True), errors='coerce')
-            else:
-                df['val'] = pd.to_numeric(df[c_val], errors='coerce')
-            df['val'] = df['val'].fillna(0)
-            df['date'] = pd.to_datetime(df[c_date], format='%d/%m/%Y %H:%M', errors='coerce')
-            if df['date'].isna().mean() > 0.5: df['date'] = pd.to_datetime(df[c_date], dayfirst=True, errors='coerce')
-            df = df.dropna(subset=['date']).sort_values('date')
-            is_watts = False
-            if c_unit and 'W' in str(df[c_unit].iloc[0]).upper() and 'KW' not in str(df[c_unit].iloc[0]).upper(): is_watts = True
-            if df['val'].mean() > 800: is_watts = True
-            if is_watts: df['val'] = df['val'] / 1000.0
-            time_step = 0.1666
-            if len(df) > 1:
-                delta = (df.iloc[1]['date'] - df.iloc[0]['date']).total_seconds()
-                if delta > 0: time_step = delta / 3600.0
-            df['date_str'] = df['date'].dt.strftime('%Y-%m-%d %H:%M')
-            return df[['date', 'val', 'date_str']], time_step, {"pdl": pdl}
-        except: return None, 0, {}
-
-    def _module_socle(self, df, ts):
-        val = df['val']
-        p_max = val.max()
-        mask_nuit = (df['date'].dt.hour < 6)
-        nuit = df.loc[mask_nuit, 'val']
-        talon = nuit.quantile(0.05) if not nuit.empty else 0
-        mask_winter = df['date'].dt.month.isin([11, 12, 1, 2, 3])
-        conso_hiver = df.loc[mask_winter, 'val'].sum()
-        conso_ete = df.loc[~mask_winter, 'val'].sum()
-        thermo = round(conso_hiver / conso_ete, 1) if conso_ete > 0 else 0
-        return {
-            "conso_totale": self._safe_int(val.sum() * ts),
-            "p_max": round(float(p_max), 2),
-            "talon": round(float(talon), 2),
-            "thermo_score": thermo,
-            "inactivity_ratio": 0
-        }
-
-    def _module_finance_4p(self, original_df, ts, ref_pmax):
-        df = original_df.copy()
-        df['m'] = df['date'].dt.month
-        df['h'] = df['date'].dt.hour
-        mask_w = df['m'].isin([11, 12, 1, 2, 3])
-        mask_hp = (df['h'] >= 6) & (df['h'] < 22)
-        v_hph = df.loc[mask_w & mask_hp, 'val'].sum() * ts
-        v_hch = df.loc[mask_w & ~mask_hp, 'val'].sum() * ts
-        v_hpe = df.loc[~mask_w & mask_hp, 'val'].sum() * ts
-        v_hce = df.loc[~mask_w & ~mask_hp, 'val'].sum() * ts
-        cost = (v_hph*0.22) + (v_hch*0.14) + (v_hpe*0.14) + (v_hce*0.09) + (ref_pmax*18)
-        return {
-            "finance": {
-                "budget_total": self._safe_int(cost),
-                "detail_4p": {
-                    "HPH": {"vol": self._safe_int(v_hph), "cout": self._safe_int(v_hph*0.22)},
-                    "HCH": {"vol": self._safe_int(v_hch), "cout": self._safe_int(v_hch*0.14)},
-                    "HPE": {"vol": self._safe_int(v_hpe), "cout": self._safe_int(v_hpe*0.14)},
-                    "HCE": {"vol": self._safe_int(v_hce), "cout": self._safe_int(v_hce*0.09)}
-                }
-            }
-        }
-
-    def _module_solar(self, df):
-        try:
-            mask = (df['date'].dt.month.isin([6,7,8])) & (df['date'].dt.hour.between(11, 15))
-            subset = df.loc[mask, 'val']
-            if subset.empty: return {"solar": {"status": "DONNÉES INSUFFISANTES", "puissance_kwc": 0, "economie_annuelle_euro": 0}}
-            avg = subset.mean()
-            if avg > 8:
-                kwc = avg * 0.7
-                return {"solar": {"status": "OPPORTUNITÉ DÉTECTÉE", "puissance_kwc": round(kwc, 1), "economie_annuelle_euro": self._safe_int(kwc*1100*0.18)}}
-            return {"solar": {"status": "NON PERTINENT", "puissance_kwc": 0, "economie_annuelle_euro": 0}}
-        except: return {"solar": {"status": "ERREUR", "puissance_kwc": 0, "economie_annuelle_euro": 0}}
-
-    def _module_ghost(self, df, t): 
-        return {"ghost_buster": {"cout_talon_annuel": self._safe_int(t * 8760 * 0.15)}}
-
-    def _generate_insight(self, kpi, context):
-        if not AI_AVAILABLE: return "IA Offline."
-        try:
-            prompt = f"""
-            Analyse pour {kpi['profiling']['metier']}.
-            PDL: {kpi['profiling']['pdl']}.
-            Ville (CP): {kpi['profiling']['geo']}.
-            Contrat: {kpi['profiling']['contrat_actif']}.
-            Puissance Souscrite: {context['p_souscrite']} kVA vs Atteinte: {kpi['p_max']} kVA.
-            Thermo-Score: {kpi['thermo_score']}.
-            3 conseils experts brefs.
-            """
-            return AI_MODEL.generate_content(prompt).text.replace('*','')
-        except: return "IA Indisponible."
 
     # --- AUDIT (Inchangé) ---
     def analyze_invoice_real(self, inv_b, ctr_b):
