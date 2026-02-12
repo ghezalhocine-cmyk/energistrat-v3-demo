@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V45_BUSINESS")
+logger = logging.getLogger("CORTEX_MASTER_V45_1_FULL")
 
 # CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
@@ -32,7 +32,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "45.0 (Business Intelligence: Suppliers & Filters)"
+        self.version = "45.1 (Full Integral: Import Fix + BI)"
         # Base de connaissance Métier (NAF) - Inchangée
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
@@ -66,7 +66,7 @@ class CortexEngine:
             return float(val_str)
         except: return 0.0
 
-    # --- NOUVEAU HELPER SPRINT B : NORMALISATION FOURNISSEUR ---
+    # --- HELPER SPRINT B : NORMALISATION FOURNISSEUR ---
     def _normalize_supplier(self, raw_name):
         if not raw_name: return "Inconnu"
         n = str(raw_name).upper().strip()
@@ -78,7 +78,9 @@ class CortexEngine:
         if "IBERDROLA" in n: return "Iberdrola"
         if "AXPO" in n: return "Axpo"
         if "ALPIQ" in n: return "Alpiq"
-        return n.title() # Cas par défaut : Première lettre majuscule
+        # Si c'est "Import CSV", on le garde tel quel pour inciter à la modif
+        if "IMPORT" in n: return "Import CSV"
+        return n.title() 
 
     # =========================================================
     # MODULE 1 : TENDER FACTORY EXCEL (V44 - Universal)
@@ -251,7 +253,7 @@ class CortexEngine:
         }
 
     # =========================================================
-    # MODULE 4 : IMPORT MASSE V5.2 (Universal)
+    # MODULE 4 : IMPORT MASSE V5.3 (PROVIDER FIX)
     # =========================================================
     def parse_mass_import_v5(self, file_content):
         try:
@@ -272,6 +274,7 @@ class CortexEngine:
                     siret = str(row[siret_col]).replace(' ', '').strip()
                     if len(siret) < 9: continue 
                     
+                    # --- CHAMPS D'ADRESSE (UNIVERSAL) ---
                     col_nom = next((c for c in df.columns if "NOM" in c), None)
                     col_lot = next((c for c in df.columns if "LOT" in c), None)
                     
@@ -290,6 +293,10 @@ class CortexEngine:
                     
                     col_pmax = next((c for c in df.columns if "ATTEINTE" in str(c).upper() or "MAX" in str(c).upper() or "POINTE" in str(c).upper()), None)
                     p_atteinte = self._safe_float(row.get(col_pmax, 0)) if col_pmax else 0.0
+
+                    # --- CORRECTION SPRINT B : DÉTECTION FOURNISSEUR ---
+                    col_provider = next((c for c in df.columns if "FOURNISSEUR" in str(c).upper() or "PROVIDER" in str(c).upper()), None)
+                    raw_provider = str(row.get(col_provider, 'Import CSV')) if col_provider else "Import CSV"
 
                     if is_gaz:
                         col_pce = next((c for c in df.columns if "PCE" in c), None)
@@ -337,7 +344,7 @@ class CortexEngine:
                             "power": power, 
                             "p_max": p_atteinte, 
                             "segment": segment,
-                            "provider": "Import CSV"
+                            "provider": raw_provider # CORRIGÉ
                         },
                         "pricing": {
                             "fix": str(row.get('ABO_AN', '0')).replace(',', '.').strip(),
@@ -358,7 +365,7 @@ class CortexEngine:
             return []
 
     # =========================================================
-    # MODULE 5 (Inchangé)
+    # MODULE 5 : ANALYSE COURBE DE CHARGE (STABLE)
     # =========================================================
     def analyze_file(self, file_content, filename, target_profile="demo", known_site_data=None):
         try:
@@ -509,7 +516,7 @@ class CortexEngine:
         if global_pmc > MARKET_REF_PRICE:
             main_cortex += f" Potentiel global : {int(total_budget - (total_conso * MARKET_REF_PRICE))} € d'économies."
         else:
-            main_cortex += " Performance achat validée."
+            main_cortex += " Performance alignée marché."
 
         return {
             "kpis": {
