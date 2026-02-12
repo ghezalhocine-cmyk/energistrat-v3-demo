@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V44_UNIVERSAL")
+logger = logging.getLogger("CORTEX_MASTER_V45_BUSINESS")
 
 # CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
@@ -32,7 +32,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "44.0 (Universal Structure + Unit Fix)"
+        self.version = "45.0 (Business Intelligence: Suppliers & Filters)"
         # Base de connaissance Métier (NAF) - Inchangée
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
@@ -66,8 +66,22 @@ class CortexEngine:
             return float(val_str)
         except: return 0.0
 
+    # --- NOUVEAU HELPER SPRINT B : NORMALISATION FOURNISSEUR ---
+    def _normalize_supplier(self, raw_name):
+        if not raw_name: return "Inconnu"
+        n = str(raw_name).upper().strip()
+        if "EDF" in n: return "EDF"
+        if "TOTAL" in n: return "TotalEnergies"
+        if "ENGIE" in n: return "Engie"
+        if "ENI" in n: return "Eni"
+        if "VATTENFALL" in n: return "Vattenfall"
+        if "IBERDROLA" in n: return "Iberdrola"
+        if "AXPO" in n: return "Axpo"
+        if "ALPIQ" in n: return "Alpiq"
+        return n.title() # Cas par défaut : Première lettre majuscule
+
     # =========================================================
-    # MODULE 1 : TENDER FACTORY EXCEL (V44 - Updated for Universal)
+    # MODULE 1 : TENDER FACTORY EXCEL (V44 - Universal)
     # =========================================================
     def generate_advanced_tender_excel(self, sites_data):
         if not sites_data: return b""
@@ -96,8 +110,8 @@ class CortexEngine:
                     "PDL": str(c.get('pdl', 'Inconnu')),
                     "Nom Site": str(i.get('site_name') or i.get('name') or 'Site Inconnu'),
                     "Adresse": str(loc.get('address', '')),
-                    "CP": str(loc.get('zip_code', '')), # Nouveau V44
-                    "Ville": str(loc.get('city', '')),  # Nouveau V44
+                    "CP": str(loc.get('zip_code', '')),
+                    "Ville": str(loc.get('city', '')),
                     "Segment (FTA)": str(c.get('segment', 'C5')),
                     "Puissance (kVA)": power,
                     "Vol. Annuel (kWh)": vol_total,
@@ -132,8 +146,8 @@ class CortexEngine:
                     "PCE": str(c.get('pdl', 'Inconnu')),
                     "Nom Site": str(i.get('site_name') or i.get('name') or 'Site Inconnu'),
                     "Adresse": str(loc.get('address', '')),
-                    "CP": str(loc.get('zip_code', '')), # Nouveau V44
-                    "Ville": str(loc.get('city', '')),  # Nouveau V44
+                    "CP": str(loc.get('zip_code', '')),
+                    "Ville": str(loc.get('city', '')),
                     "CAR (MWh)": car,
                     "Profil": "T1" if car < 300 else "T2",
                     "CJA (MWh/j)": round(car/300, 3) if car > 0 else 0
@@ -150,28 +164,58 @@ class CortexEngine:
         return output.getvalue()
 
     # =========================================================
-    # MODULE 2 : MARKET WATCH (V44 - Unit Fix)
+    # MODULE 2 : MARKET WATCH (V44.1 - TRVE Logic)
     # =========================================================
-    def analyze_market_position(self, client_price, market_price, energy_type):
+    def analyze_market_position(self, client_price, market_price, energy_type, segment="C5"):
         if client_price <= 0: return {"status": "UNKNOWN", "message": "Prix contrat manquant", "color": "gray", "action": "Renseignez vos prix."}
         
-        # --- CORRECTIF DIAMOND : DÉTECTION UNITÉ ---
-        # Si le prix client est < 2.0 (ex: 0.19), c'est du €/kWh.
-        # Le marché est en €/MWh (ex: 80.0). Il faut multiplier client par 1000.
+        # 1. Normalisation Unité
         adjusted_client_price = client_price
-        
-        if client_price < 2.0:
-            adjusted_client_price = client_price * 1000
+        if client_price < 2.0: adjusted_client_price = client_price * 1000
             
-        delta = adjusted_client_price - market_price
-        pct = (delta / adjusted_client_price) * 100
+        # 2. Référence (TRVE vs EEX)
+        TRVE_ELEC_C5 = 230.0 
+        TRVE_GAZ_T1 = 110.0
         
+        reference_price = market_price
+        ref_label = "marché"
+        
+        is_small_site = str(segment).upper() in ["C5", "C4", "T1", "T2"]
+        
+        if is_small_site:
+            if energy_type == "elec":
+                reference_price = TRVE_ELEC_C5
+                ref_label = "TRVE"
+            else:
+                reference_price = TRVE_GAZ_T1
+                ref_label = "Prix Repère"
+
+        # 3. Calcul
+        delta = adjusted_client_price - reference_price
+        pct = (delta / reference_price) * 100
+        
+        # 4. Message Hybride
         if delta > 15: 
-            return {"status": "ALERTE", "color": "red", "message": f"Prix {int(adjusted_client_price)}€/MWh vs {int(market_price)}€ marché.", "action": "Renégociez !"}
+            return {
+                "status": "ALERTE PRIX", 
+                "color": "red", 
+                "message": f"Prix excessif (+{int(pct)}% vs {ref_label}).", 
+                "action": f"Payé {int(adjusted_client_price)}€ vs {int(reference_price)}€ cible."
+            }
         elif delta < -5: 
-            return {"status": "PROTECTION", "color": "green", "message": f"Vous battez le marché de {abs(int(pct))}%.", "action": "Ne bougez pas."}
+            return {
+                "status": "PERFORMANCE", 
+                "color": "green", 
+                "message": f"Vous battez le {ref_label} de {abs(int(pct))}%.", 
+                "action": f"Prix {int(adjusted_client_price)}€/MWh (Top)."
+            }
         else: 
-            return {"status": "NEUTRE", "color": "blue", "message": "Prix aligné marché.", "action": "Surveillance."}
+            return {
+                "status": "ALIGNE", 
+                "color": "blue", 
+                "message": f"Prix cohérent avec le {ref_label}.", 
+                "action": "Pas d'action requise."
+            }
 
     # =========================================================
     # MODULE 3 : ROI & KPI (V44 - Volume Fix)
@@ -181,17 +225,15 @@ class CortexEngine:
         pricing = site_data.get('pricing', {}) or {}
         is_gaz = "T" in str(contract.get('segment', ''))
         
-        # Calcul Volume Annuel (MWh)
         p_sous = self._safe_float(contract.get('power'))
         if is_gaz:
-            vol_mwh = p_sous # En gaz, power = CAR (MWh)
+            vol_mwh = p_sous 
         else:
-            vol_mwh = (p_sous * 1500) / 1000 # Estim standard elec (MWh)
+            vol_mwh = (p_sous * 1500) / 1000 
             
         price = self._safe_float(pricing.get('hph')) + self._safe_float(pricing.get('tax'))
         fix = self._safe_float(pricing.get('fix'))
         
-        # Si prix unitaire < 2, c'est du kWh, sinon MWh pour le calcul budget
         calc_price = price
         if price < 2.0: calc_price = price * 1000
             
@@ -202,14 +244,14 @@ class CortexEngine:
         
         return {
             "budget_annual": round(budget, 2),
-            "volume_mwh": round(vol_mwh, 1), # Nouveau champ explicite pour l'affichage
+            "volume_mwh": round(vol_mwh, 1),
             "ghost_savings": round(budget * 0.15, 2),
             "landing_forecast": round(landing, 2),
             "is_alert_landing": False
         }
 
     # =========================================================
-    # MODULE 4 : IMPORT MASSE V5.2 (UNIVERSAL STRUCTURE)
+    # MODULE 4 : IMPORT MASSE V5.2 (Universal)
     # =========================================================
     def parse_mass_import_v5(self, file_content):
         try:
@@ -230,27 +272,22 @@ class CortexEngine:
                     siret = str(row[siret_col]).replace(' ', '').strip()
                     if len(siret) < 9: continue 
                     
-                    # --- NOUVEAUX CHAMPS D'ADRESSE (UNIVERSAL) ---
                     col_nom = next((c for c in df.columns if "NOM" in c), None)
                     col_lot = next((c for c in df.columns if "LOT" in c), None)
                     
-                    # Adresse Facturation (Liée au SIRET)
                     col_adresse_factu = next((c for c in df.columns if "ADRESSE_FACTURATION" in str(c).upper()), None)
                     if not col_adresse_factu: col_adresse_factu = next((c for c in df.columns if "ADRESSE" in str(c).upper()), None)
                     
-                    # Adresse Site (Liée au PDL) - Priorité
                     col_adresse_site = next((c for c in df.columns if "ADRESSE_SITE" in str(c).upper()), None)
                     col_cp = next((c for c in df.columns if "CODE_POSTAL" in str(c).upper() or "CP" == str(c).upper()), None)
                     col_ville = next((c for c in df.columns if "VILLE" in str(c).upper()), None)
                     
                     site_name = str(row[col_nom]).strip() if col_nom else "Site Inconnu"
                     
-                    # Construction Location
                     addr_site = str(row.get(col_adresse_site, row.get(col_adresse_factu, ''))).strip()
                     cp_site = str(row.get(col_cp, '')).strip()
                     ville_site = str(row.get(col_ville, '')).strip()
                     
-                    # SGE Detection
                     col_pmax = next((c for c in df.columns if "ATTEINTE" in str(c).upper() or "MAX" in str(c).upper() or "POINTE" in str(c).upper()), None)
                     p_atteinte = self._safe_float(row.get(col_pmax, 0)) if col_pmax else 0.0
 
@@ -292,8 +329,8 @@ class CortexEngine:
                         },
                         "location": { 
                             "address": addr_site,
-                            "zip_code": cp_site, # Nouveau
-                            "city": ville_site   # Nouveau
+                            "zip_code": cp_site,
+                            "city": ville_site
                         },
                         "contract": {
                             "pdl": ref_id,
@@ -321,7 +358,7 @@ class CortexEngine:
             return []
 
     # =========================================================
-    # MODULE 5 : ANALYSE COURBE DE CHARGE (STABLE)
+    # MODULE 5 (Inchangé)
     # =========================================================
     def analyze_file(self, file_content, filename, target_profile="demo", known_site_data=None):
         try:
@@ -386,7 +423,7 @@ class CortexEngine:
             return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
 
     # =========================================================
-    # MODULE 6 : DIAMOND INTELLIGENCE (V44 - Financial Proof)
+    # MODULE 6 : DIAMOND INTELLIGENCE (V45 - Market Share)
     # =========================================================
     def analyze_portfolio(self, sites_data):
         if not sites_data: return {"error": "Aucune donnée"}
@@ -395,6 +432,9 @@ class CortexEngine:
         total_budget = 0.0
         sites_analysis = []
         cortex_insights = []
+        
+        # SPRINT B : AGREGATION FOURNISSEURS
+        suppliers_stats = {} # { "EDF": 45000, "TOTAL": 12000 }
         
         MARKET_REF_PRICE = 90.0
         POWER_OPTIM_THRESHOLD = 0.70
@@ -405,38 +445,41 @@ class CortexEngine:
             ident = site.get('identity', {}) or {}
             loc = site.get('location', {}) or {}
 
-            # Reconstruction des métriques
             p_sous = self._safe_float(contract.get('power', 0))
             p_att = self._safe_float(contract.get('p_max', 0)) 
             
-            # Utilisation du Volume MWh pré-calculé si dispo (V44)
             if 'kpis' in site and 'volume_mwh' in site['kpis']:
                 vol = site['kpis']['volume_mwh']
             else:
-                vol = p_sous * 1.5 # Fallback
+                vol = p_sous * 1.5 
             
-            # Utilisation Budget pré-calculé
             if 'kpis' in site:
                 budget_est = site['kpis'].get('budget_annual', 0)
             else:
                 price_hph = self._safe_float(pricing.get('hph', 0))
-                if price_hph < 2.0: price_hph *= 1000 # Correctif Unité à la volée
+                if price_hph < 2.0: price_hph *= 1000 
                 budget_est = vol * price_hph
             
             pmc = (budget_est / vol) if vol > 0 else 0
             
+            # SPRINT B : Normalisation
+            raw_provider = contract.get('provider', 'Inconnu')
+            clean_provider = self._normalize_supplier(raw_provider)
+            
+            # Agregation Budget
+            if clean_provider not in suppliers_stats: suppliers_stats[clean_provider] = 0
+            suppliers_stats[clean_provider] += budget_est
+            
             ratio_p = (p_att / p_sous) if p_sous > 0 else 1.0
             site_flags = []
             
-            # Règle 1 : Optimisation Puissance (Preuve par l'argent)
             if p_sous > 36 and p_att > 0 and ratio_p < POWER_OPTIM_THRESHOLD:
                 diff_kva = p_sous - p_att
-                economy_pot = diff_kva * 15 # ~15€/kVA/an en moyenne TURPE
+                economy_pot = diff_kva * 15 
                 msg = f"📉 <b>{ident.get('site_name')}</b> : {int(diff_kva)} kVA inutilisés. Gain potentiel : <b>{int(economy_pot)} €/an</b>."
                 cortex_insights.append({"type": "optimization", "msg": msg, "priority": 2})
                 site_flags.append("TURPE_OPTIM")
             
-            # Règle 2 : Alerte Prix (Preuve par l'argent)
             if pmc > (MARKET_REF_PRICE * 1.3):
                 surcout = (pmc - MARKET_REF_PRICE) * vol
                 msg = f"💰 <b>{ident.get('site_name')}</b> : Payé {int(pmc)}€/MWh (Cible {int(MARKET_REF_PRICE)}€). Enjeu : <b>{int(surcout)} €/an</b>."
@@ -448,7 +491,8 @@ class CortexEngine:
             
             sites_analysis.append({
                 "nom_site": ident.get('site_name', 'Inconnu'),
-                "ville": loc.get('city', loc.get('address', '')), # Priorité Ville
+                "ville": loc.get('city', loc.get('address', '')),
+                "fournisseur": clean_provider, # Nouveau champ pour filtres
                 "pmc": pmc,
                 "consommation": vol,
                 "depense": budget_est,
@@ -461,11 +505,11 @@ class CortexEngine:
 
         global_pmc = (total_budget / total_conso) if total_conso > 0 else 0
         
-        main_cortex = f"Parc analysé : {int(global_pmc)}€/MWh moyen."
+        main_cortex = f"Parc à {int(global_pmc)}€/MWh."
         if global_pmc > MARKET_REF_PRICE:
-            main_cortex += f" Au-dessus de la cible ({MARKET_REF_PRICE}€)."
+            main_cortex += f" Potentiel global : {int(total_budget - (total_conso * MARKET_REF_PRICE))} € d'économies."
         else:
-            main_cortex += " Performance alignée marché."
+            main_cortex += " Performance achat validée."
 
         return {
             "kpis": {
@@ -473,6 +517,10 @@ class CortexEngine:
                 "total_budget": total_budget,
                 "global_pmc": global_pmc,
                 "nb_sites": len(sites_data)
+            },
+            "market_share": { # SPRINT B : DATA POUR CAMEMBERT
+                "labels": list(suppliers_stats.keys()),
+                "values": list(suppliers_stats.values())
             },
             "green_league": {
                 "gold": sorted_sites[0] if len(sorted_sites) > 0 else None,
