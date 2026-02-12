@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V13.9 | Retail Universal</title>
+    <title>ENERGISTRAT V14.0 | Retail Business</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -70,7 +70,7 @@
         <header class="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur sticky top-0 z-40">
             <div>
                 <h1 class="text-xl font-bold text-white" id="main-title">Vision Consolidée</h1>
-                <p class="text-xs text-gray-400" id="main-subtitle">Données Live • Cortex V44 Active</p>
+                <p class="text-xs text-gray-400" id="main-subtitle">Données Live • Cortex V45 Active</p>
             </div>
             <div class="flex gap-6 text-right" id="header-kpis">
                 <div>
@@ -88,16 +88,28 @@
             
             <!-- VUE 1 : FLEET -->
             <div id="view-fleet" class="view-section active space-y-6">
-                <div class="grid grid-cols-3 gap-6 h-64">
-                    <div class="bento-card p-6 flex flex-col">
+                <!-- EVOLUTION SPRINT B : GRID 4 COLONNES POUR INCLURE FOURNISSEURS -->
+                <div class="grid grid-cols-4 gap-6 h-64">
+                    
+                    <!-- 1. MIX ENERGETIQUE (EXISTANT) -->
+                    <div class="bento-card p-6 flex flex-col col-span-1">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Mix Énergétique</h3>
                         <div class="flex-1 relative"><canvas id="mixChart"></canvas></div>
                     </div>
+
+                    <!-- 2. PARTS DE MARCHÉ (NOUVEAU CAMEMBERT) -->
+                    <div class="bento-card p-6 flex flex-col col-span-1">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Parts de Marché</h3>
+                        <div class="flex-1 relative"><canvas id="supplierChart"></canvas></div>
+                    </div>
+
+                    <!-- 3. TOP 5 BUDGETS (EXISTANT - ETENDU SUR 2 COLONNES) -->
                     <div class="bento-card p-6 col-span-2 flex flex-col">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Top 5 Budgets</h3>
                         <div class="flex-1 relative"><canvas id="topChart"></canvas></div>
                     </div>
                 </div>
+
                 <div class="bento-card overflow-hidden">
                     <div class="px-6 py-4 border-b border-white/5 flex justify-between items-center">
                         <h3 class="font-bold text-white">Détail du Parc</h3>
@@ -110,13 +122,10 @@
                             <tr>
                                 <th class="px-4 py-3 w-10"></th>
                                 <th class="px-4 py-3">Site</th>
-                                <!-- EVOLUTION : NOUVELLES COLONNES -->
                                 <th class="px-4 py-3">CP</th>
                                 <th class="px-4 py-3">Ville</th>
-                                <!-- FIN EVOLUTION -->
                                 <th class="px-4 py-3">Lot</th>
                                 <th class="px-4 py-3 text-center">Énergie</th>
-                                <!-- EVOLUTION : SEMANTIQUE MWh -->
                                 <th class="px-4 py-3 text-right">Conso (MWh)</th>
                                 <th class="px-4 py-3 text-right">Budget Est.</th>
                                 <th class="px-4 py-3 text-right">Atterrissage</th>
@@ -127,7 +136,7 @@
                 </div>
             </div>
 
-            <!-- VUE 2 : GREEN LEAGUE -->
+            <!-- VUE 2 : GREEN LEAGUE (INCHANGEE) -->
             <div id="view-league" class="view-section hidden space-y-6">
                 <div class="text-center mb-8">
                     <h2 class="text-3xl font-black text-white italic tracking-tight">CHAMPIONNAT <span class="text-success">EFFICACITÉ</span></h2>
@@ -150,7 +159,7 @@
                 </div>
             </div>
 
-            <!-- VUE 3 : DÉTAIL -->
+            <!-- VUE 3 : DÉTAIL (INCHANGEE) -->
             <div id="view-detail" class="view-section hidden space-y-6">
                 <button onclick="switchView('fleet')" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4"><i class="fa-solid fa-arrow-left"></i> RETOUR LISTE</button>
                 <div class="flex justify-between items-start">
@@ -205,6 +214,7 @@
         let CURRENT_FILTER = 'all';
         let mixChartInstance = null;
         let topChartInstance = null;
+        let supplierChartInstance = null; // NOUVEAU
 
         function safeSetText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
         
@@ -254,7 +264,7 @@
 
                     if (GLOBAL_CORTEX && GLOBAL_CORTEX.main_message) {
                         const sub = document.getElementById('main-subtitle');
-                        if(sub) sub.innerHTML = `<span class="text-primary font-bold">CORTEX V44 :</span> ${GLOBAL_CORTEX.main_message}`;
+                        if(sub) sub.innerHTML = `<span class="text-primary font-bold">CORTEX V45 :</span> ${GLOBAL_CORTEX.main_message}`;
                     }
                 }
             } catch(e) { console.error(e); }
@@ -434,23 +444,19 @@
                 row.className = "site-row border-b border-white/5";
                 const detailAction = `onclick="loadDetail('${site.id}')"`;
                 
-                // MAPPING DES NOUVEAUX CHAMPS (UNIVERSAL STRUCTURE)
                 const city = site.city || '-';
-                const zip = site.zip || ''; // "zip" car mappé ainsi dans main.py V40.8
-                const conso = site.volume || 0; // "volume" (MWh) mappé dans main.py V40.8
+                const zip = site.zip || ''; 
+                const conso = site.volume || 0;
                 
                 row.innerHTML = `
                     <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
                         <input type="checkbox" class="accent-primary w-4 h-4 cursor-pointer" onchange="toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}>
                     </td>
                     <td class="px-4 py-3 font-bold text-white" ${detailAction}>${site.name}</td>
-                    <!-- NOUVELLES COLONNES -->
                     <td class="px-4 py-3 text-gray-400 font-mono text-xs" ${detailAction}>${zip}</td>
                     <td class="px-4 py-3 text-gray-300" ${detailAction}>${city}</td>
-                    <!-- FIN NOUVELLES COLONNES -->
                     <td class="px-4 py-3" ${detailAction}><span class="bg-white/5 px-2 py-1 rounded text-[10px]">${site.lot}</span></td>
                     <td class="px-4 py-3 text-center" ${detailAction}><span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-cyan bg-cyan/10'} px-2 py-1 rounded">${isGaz ? 'GAZ' : 'ELEC'}</span></td>
-                    <!-- VOLUME MWh -->
                     <td class="px-4 py-3 text-right font-mono text-gray-300" ${detailAction}>${Math.round(conso)} <span class="text-[10px] text-gray-600">MWh</span></td>
                     <td class="px-4 py-3 text-right font-bold text-white" ${detailAction}>${formatCurrency(site.budget)}</td>
                     <td class="px-4 py-3 text-right font-mono ${site.alert ? 'text-red-500' : 'text-success'}" ${detailAction}>${formatCurrency(site.landing)}</td>
@@ -466,7 +472,9 @@
             safeSetText('budget-display', formatCurrency(totalBudget));
         }
 
+        // --- EVOLUTION SPRINT B : CAMEMBERT FOURNISSEURS ---
         function updateCharts(data) {
+            // 1. MIX ENERGETIQUE (EXISTANT)
             let budgetElec = 0, budgetGaz = 0;
             data.forEach(s => { if(s.energy === 'gaz') budgetGaz += s.budget; else budgetElec += s.budget; });
             const ctxMix = document.getElementById('mixChart');
@@ -474,6 +482,42 @@
                 if(mixChartInstance) mixChartInstance.destroy();
                 mixChartInstance = new Chart(ctxMix.getContext('2d'), { type: 'doughnut', data: { labels: ['Élec', 'Gaz'], datasets: [{ data: [budgetElec, budgetGaz], backgroundColor: ['#00E5FF', '#EF4444'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 10 } } } } } });
             }
+
+            // 2. PARTS DE MARCHÉ (NOUVEAU)
+            const suppliers = {};
+            data.forEach(s => {
+                // On utilise le champ "provider" brut ou normalisé si dispo
+                const p = s.provider || 'Inconnu';
+                suppliers[p] = (suppliers[p] || 0) + s.budget;
+            });
+            
+            // Tri décroissant pour le camembert
+            const sortedSuppliers = Object.entries(suppliers).sort((a, b) => b[1] - a[1]);
+            const labelsSup = sortedSuppliers.map(x => x[0]);
+            const dataSup = sortedSuppliers.map(x => x[1]);
+
+            const ctxSup = document.getElementById('supplierChart');
+            if(ctxSup) {
+                if(supplierChartInstance) supplierChartInstance.destroy();
+                supplierChartInstance = new Chart(ctxSup.getContext('2d'), { 
+                    type: 'doughnut', // Style cohérent avec le Mix
+                    data: { 
+                        labels: labelsSup, 
+                        datasets: [{ 
+                            data: dataSup, 
+                            backgroundColor: ['#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#A855F7', '#64748B'], 
+                            borderWidth: 0 
+                        }] 
+                    }, 
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 9 }, boxWidth: 8 } } } 
+                    } 
+                });
+            }
+
+            // 3. TOP 5 (EXISTANT)
             const top5 = [...data].sort((a, b) => b.budget - a.budget).slice(0, 5);
             const ctxTop = document.getElementById('topChart');
             if(ctxTop) {
