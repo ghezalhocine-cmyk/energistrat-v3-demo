@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V22.14 | Settings ERP Master</title>
+    <title>ENERGISTRAT V22.15 | Settings RGPD Ready</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -54,7 +54,6 @@
             outline: none;
             box-shadow: 0 0 15px rgba(0, 229, 255, 0.1);
         }
-        /* Autocomplete & Scrollbar */
         .suggestions-list { position: absolute; background: #0F172A; border: 1px solid #334155; width: 100%; z-index: 50; max-height: 200px; overflow-y: auto; border-radius: 0 0 8px 8px; }
         .suggestion-item { padding: 8px 12px; cursor: pointer; font-size: 0.75rem; }
         .suggestion-item:hover { background: #00E5FF; color: black; }
@@ -62,7 +61,6 @@
         #toast { visibility: hidden; min-width: 250px; background-color: #10B981; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 100; right: 30px; bottom: 30px; font-size: 14px; box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); transform: translateY(100px); transition: all 0.5s; }
         #toast.show { visibility: visible; transform: translateY(0); }
         
-        /* Table Styles */
         .ticket-table th { font-size: 10px; text-transform: uppercase; color: #94a3b8; padding: 12px; text-align: left; }
         .ticket-table td { padding: 12px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 12px; }
 
@@ -97,6 +95,11 @@
                 <i class="fa-solid fa-headset w-5 text-center"></i> Assistance & Tickets
             </button>
 
+            <!-- SPRINT A : NOUVEAU MENU LÉGAL -->
+            <button onclick="switchTab('legal')" id="nav-legal" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
+                <i class="fa-solid fa-scale-balanced w-5 text-center"></i> Légal & Données
+            </button>
+
             <button onclick="switchTab('security')" id="nav-security" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
                 <i class="fa-solid fa-shield-halved w-5 text-center"></i> Sécurité & 2FA
             </button>
@@ -113,7 +116,7 @@
     <!-- CONTENT -->
     <main class="flex-1 overflow-y-auto p-10 relative bg-abysse">
         
-        <!-- TAB 1: CLIENTS & PARC (V22.14) -->
+        <!-- TAB 1: CLIENTS & PARC -->
         <div id="tab-clients" class="tab-content max-w-6xl mx-auto space-y-6">
             <header class="flex justify-between items-end">
                 <div><h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2><p class="text-gray-400 text-xs">Gestion Multi-Sites, Gaz/Élec et Lots.</p></div>
@@ -153,7 +156,7 @@
                 </div>
             </div>
 
-            <!-- 3. ÉNERGIE & PRIX (V22.14 - SWITCH DYNAMIQUE) -->
+            <!-- 3. ÉNERGIE & PRIX -->
             <div class="bento-card rounded-bento p-6 border-l-4 border-yellow-500 transition-colors" id="card-energy">
                 <h3 class="text-sm font-bold text-white mb-4 flex items-center justify-between">
                     <div class="flex items-center gap-2"><span class="w-6 h-6 rounded bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-[10px]">3</span> CONTRAT & PRIX</div>
@@ -163,7 +166,6 @@
                     </div>
                 </h3>
                 
-                <!-- LIGNE 1 -->
                 <div class="grid grid-cols-12 gap-4 mb-4">
                     <div class="col-span-3"><label id="lbl-ref" class="text-[10px] text-gray-500 font-bold uppercase">PDL / PRM (14)</label><input type="text" id="ref-input" placeholder="000..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
                     <div class="col-span-2"><label id="lbl-puiss" class="text-[10px] text-gray-500 font-bold uppercase">Puissance</label><input type="number" id="val-input" placeholder="kVA" class="w-full input-dark p-2 rounded text-xs font-mono text-yellow-500 font-bold" oninput="inferContract()"></div>
@@ -172,14 +174,12 @@
                     <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Fin Contrat</label><input type="date" class="w-full input-dark p-2 rounded text-xs text-gray-400"></div>
                 </div>
 
-                <!-- LIGNE 2 : PRIX (CORRECTION V22.14 : DOUBLE GRILLE) -->
                 <div class="bg-white/5 p-4 rounded-xl border border-white/5">
                     <div class="text-[10px] font-bold text-gray-400 uppercase mb-3 flex justify-between">
                         <span id="price-title">Structure Tarifaire (€ HT)</span>
                         <span class="text-cyan cursor-pointer hover:underline" onclick="openPropagationModal()"><i class="fa-solid fa-copy mr-1"></i>Dupliquer</span>
                     </div>
                     
-                    <!-- GRILLE ÉLEC (6 Colonnes) -->
                     <div id="grid-elec" class="grid grid-cols-6 gap-2">
                         <div><label class="text-[9px] text-gray-500 uppercase">Abonnement /an</label><input type="number" id="price-fix" placeholder="0.00" class="w-full input-dark p-2 rounded text-xs text-right text-yellow-500"></div>
                         <div><label class="text-[9px] text-gray-500 uppercase font-bold text-white">HPH (Hiver P)</label><input type="number" id="price-hph" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right"></div>
@@ -189,11 +189,71 @@
                         <div><label id="lbl-tax" class="text-[9px] text-gray-500 uppercase">CSPE / TICGN</label><input type="number" id="price-tax" placeholder="22.5" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
                     </div>
 
-                    <!-- GRILLE GAZ (3 Colonnes - NOUVEAU V22.14) -->
                     <div id="grid-gaz" class="grid grid-cols-3 gap-4 hidden">
                         <div><label class="text-[9px] text-gray-500 uppercase">Abonnement /an</label><input type="number" id="price-gaz-fix" placeholder="0.00" class="w-full input-dark p-2 rounded text-xs text-right text-yellow-500"></div>
                         <div><label class="text-[9px] text-gray-500 uppercase font-bold text-red-500">Prix Molécule (€/MWh)</label><input type="number" id="price-gaz-mol" placeholder="45.00" class="w-full input-dark p-2 rounded text-xs text-right border border-red-500/30 text-white"></div>
                         <div><label class="text-[9px] text-gray-500 uppercase">TICGN / Taxes</label><input type="number" id="price-gaz-tax" placeholder="8.44" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SPRINT A : TAB LEGAL (NOUVEAU V22.15) -->
+        <div id="tab-legal" class="tab-content hidden max-w-6xl mx-auto space-y-6">
+            <header class="flex justify-between items-end">
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-1"><i class="fa-solid fa-scale-balanced text-cyan mr-2"></i>Conformité & RGPD</h2>
+                    <p class="text-gray-400 text-xs">Gestion des consentements et mandats de collecte.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="generateMandatePDF()" class="bg-white text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-gray-200 transition shadow-lg"><i class="fa-solid fa-file-pdf mr-2"></i>Générer Mandat</button>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-2 gap-6">
+                <!-- COFFRE-FORT MANDATS -->
+                <div class="bento-card rounded-bento p-6 border-l-4 border-cyan">
+                    <h3 class="text-sm font-bold text-white mb-4">MANDAT SGE / GRDF</h3>
+                    <div class="bg-white/5 p-4 rounded-xl border border-white/5 mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs text-gray-400">Statut du consentement</span>
+                            <span id="consent-status" class="bg-red-500/20 text-red-400 px-2 py-1 rounded text-[10px] font-bold">MANQUANT</span>
+                        </div>
+                        <p class="text-[10px] text-gray-500">Le mandat est obligatoire pour la collecte automatique des courbes de charge.</p>
+                    </div>
+                    
+                    <label class="block w-full border-2 border-dashed border-gray-600 rounded-xl p-6 text-center hover:border-cyan cursor-pointer transition group">
+                        <i class="fa-solid fa-upload text-2xl text-gray-500 group-hover:text-cyan mb-2"></i>
+                        <div class="text-xs font-bold text-white">Déposer le mandat signé</div>
+                        <div class="text-[9px] text-gray-500">PDF uniquement (Max 5Mo)</div>
+                        <input type="file" id="mandate-upload" class="hidden" accept=".pdf" onchange="uploadMandate(this)">
+                    </label>
+                </div>
+
+                <!-- REGISTRE RGPD -->
+                <div class="bento-card rounded-bento p-6">
+                    <h3 class="text-sm font-bold text-white mb-4">REGISTRE DE TRAITEMENT</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
+                            <i class="fa-solid fa-database text-cyan"></i>
+                            <div class="flex-1">
+                                <div class="text-xs font-bold text-white">Données Techniques</div>
+                                <div class="text-[10px] text-gray-500">PDL, Puissances, Courbes de charge (5 ans)</div>
+                            </div>
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
+                            <i class="fa-solid fa-file-invoice text-purple-400"></i>
+                            <div class="flex-1">
+                                <div class="text-xs font-bold text-white">Données Facturation</div>
+                                <div class="text-[10px] text-gray-500">Factures PDF, Montants, RIB (Crypté)</div>
+                            </div>
+                            <i class="fa-solid fa-check text-green-500 text-xs"></i>
+                        </div>
+                        <div class="mt-4">
+                            <label class="text-[10px] text-gray-500 font-bold uppercase">Contact DPO (Optionnel)</label>
+                            <input type="email" id="dpo-email" placeholder="dpo@client.com" class="w-full input-dark p-2 rounded text-xs mt-1">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -273,7 +333,7 @@
 
     </main>
 
-    <!-- MODAL TICKET -->
+    <!-- MODAL TICKET & IMPORT & PROPAGATION (INCHANGÉS) -->
     <div id="ticket-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
         <div class="bento-card p-6 w-96 rounded-xl border border-white/10">
             <h3 class="font-bold text-lg mb-4">Nouveau Ticket</h3>
@@ -286,7 +346,6 @@
         </div>
     </div>
 
-    <!-- MODAL PROPAGATION -->
     <div id="propagate-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
         <div class="bento-card p-8 rounded-bento w-[500px] border border-cyan/30 shadow-2xl shadow-cyan/10">
             <div class="flex items-center gap-3 mb-4">
@@ -313,15 +372,11 @@
         </div>
     </div>
 
-    <!-- IMPORT MODAL -->
     <div id="import-modal" class="fixed inset-0 bg-black/90 z-[99] hidden flex items-center justify-center backdrop-blur-sm">
         <div class="bento-card p-8 rounded-bento w-[600px] relative">
             <button onclick="toggleImportModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
-            
             <h3 class="text-xl font-bold text-white mb-1"><i class="fa-solid fa-table-columns text-cyan mr-2"></i>Import de Parc</h3>
             <p class="text-xs text-gray-400 mb-6">Sélectionnez le modèle correspondant à votre énergie.</p>
-            
-            <!-- ZONE DE TÉLÉCHARGEMENT (DUAL FLUX) -->
             <div class="flex gap-4 mb-6">
                 <a href="/api/settings/template_csv" class="flex-1 bg-white/5 hover:bg-cyan/20 border border-white/10 hover:border-cyan text-white p-4 rounded-xl transition text-center group">
                     <div class="text-cyan font-bold text-lg mb-1"><i class="fa-solid fa-bolt"></i> ÉLEC</div>
@@ -332,20 +387,16 @@
                     <div class="text-[10px] text-gray-400 group-hover:text-white">Télécharger Modèle V1</div>
                 </a>
             </div>
-
-            <!-- ZONE D'UPLOAD -->
             <div class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-white transition cursor-pointer mb-4 group" onclick="document.getElementById('csv-upload').click()">
                 <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 group-hover:text-white mb-2 transition"></i>
                 <div class="text-sm font-bold text-white">Glisser votre fichier CSV rempli</div>
                 <div class="text-[10px] text-gray-500 mt-1">(Élec ou Gaz, détection automatique des colonnes)</div>
                 <input type="file" id="csv-upload" class="hidden" accept=".csv" onchange="showToast('Fichier sélectionné')">
             </div>
-            
             <button class="w-full bg-white text-black font-bold py-3 rounded-lg mt-4 hover:bg-gray-200 transition shadow-lg" onclick="processImport()">LANCER L'ANALYSE</button>
         </div>
     </div>
 
-    <!-- SCRIPT CORRIGÉ V22.14 (GESTION DYNAMIQUE GAZ/ELEC) -->
     <script>
         function switchTab(id) {
             document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
@@ -357,7 +408,44 @@
         function toggleImportModal() { document.getElementById('import-modal').classList.toggle('hidden'); }
         function openTicketModal() { document.getElementById('ticket-modal').classList.remove('hidden'); }
 
-        // --- IMPORT CSV ---
+        // --- SPRINT A : FONCTIONS LÉGALES ---
+        function generateMandatePDF() {
+            // Simulation : Dans le futur, appel vers /api/legal/generate_mandate
+            const company = document.getElementById('company-name').value || "Société";
+            const siret = document.getElementById('id-input').value || "00000000000000";
+            
+            // Création d'un PDF simple à la volée (via nouvelle fenêtre pour l'impression)
+            const win = window.open('', '_blank');
+            win.document.write(`
+                <html><head><title>MANDAT SGE</title></head><body style="font-family:sans-serif; padding:40px;">
+                <h1 style="text-align:center;">MANDAT DE COLLECTE DE DONNÉES</h1>
+                <p>Je soussigné, représentant légal de la société <b>${company}</b> (SIRET: ${siret}),<br>
+                autorise ENERGISTRAT à collecter mes données de consommation (P10, C5, Courbes de charge) auprès des gestionnaires de réseaux (Enedis/GRDF).</p>
+                <br><br>
+                <p>Fait à ____________________, le ${new Date().toLocaleDateString()}</p>
+                <br><br><br>
+                <p>Signature et Cachet :</p>
+                </body></html>
+            `);
+            win.document.close();
+            win.print();
+        }
+
+        async function uploadMandate(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                // Simulation d'upload réussi pour l'instant
+                // Dans le futur : FormData vers /api/settings/upload_mandate
+                setTimeout(() => {
+                    const status = document.getElementById('consent-status');
+                    status.innerText = "VALIDÉ";
+                    status.className = "bg-green-500/20 text-green-400 px-2 py-1 rounded text-[10px] font-bold";
+                    showToast("Mandat stocké dans le coffre-fort !");
+                }, 1000);
+            }
+        }
+
+        // --- FONCTIONS EXISTANTES (INCHANGÉES) ---
         async function processImport() {
             const input = document.getElementById('csv-upload');
             if (!input.files || input.files.length === 0) return alert("Veuillez sélectionner un fichier CSV.");
@@ -373,19 +461,12 @@
             try {
                 const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData });
                 const data = await res.json();
-                
-                if(data.success) {
-                    toggleImportModal();
-                    showToast(`Succès : ${data.imported} sites importés !`);
-                } else {
-                    alert("Erreur Import : " + (data.error || "Inconnue"));
-                }
+                if(data.success) { toggleImportModal(); showToast(`Succès : ${data.imported} sites importés !`); } 
+                else { alert("Erreur Import : " + (data.error || "Inconnue")); }
             } catch(e) { console.error(e); alert("Erreur réseau"); }
-            
             btn.innerText = original;
         }
 
-        // --- PROPAGATION LOGIC (DUAL) ---
         function openPropagationModal() {
             const segment = document.getElementById('segment-display').value;
             const lot = document.getElementById('lot-input').value;
@@ -407,12 +488,11 @@
             const btn = document.querySelector('#propagate-modal button:last-child');
             btn.innerHTML = 'TRAITEMENT...';
             
-            // LOGIQUE DE PRIX DYNAMIQUE (V22.14)
             let pricing = {};
             if(currentEnergy === 'gaz') {
                 pricing = {
                     fix: document.getElementById('price-gaz-fix').value,
-                    hph: document.getElementById('price-gaz-mol').value, // Molécule = HPH
+                    hph: document.getElementById('price-gaz-mol').value, 
                     hch: "0", hpe: "0", hce: "0",
                     tax: document.getElementById('price-gaz-tax').value
                 };
@@ -447,7 +527,6 @@
             btn.innerHTML = 'CONFIRMER';
         }
 
-        // --- 1. API GOUV ---
         async function checkIdentity() {
             const val = document.getElementById('id-input').value.replace(/\s/g, '');
             const status = document.getElementById('id-status');
@@ -469,7 +548,6 @@
             }
         }
 
-        // --- 2. BAN ---
         let timeout = null;
         async function searchAddress() {
             const query = document.getElementById('address-input').value;
@@ -496,7 +574,6 @@
         }
         document.addEventListener('click', function(e) { if (!document.getElementById('address-input').contains(e.target)) document.getElementById('address-suggestions').classList.add('hidden'); });
 
-        // --- 3. TICKETING ---
         async function submitTicket() {
             const subject = document.getElementById('tk-subject').value;
             const msg = document.getElementById('tk-msg').value;
@@ -517,7 +594,6 @@
             } catch(e) {}
         }
 
-        // --- 4. SAUVEGARDE CLIENT (V22.14 - LOGIQUE DUAL) ---
         async function saveSite() {
             const btn = document.activeElement;
             const original = btn.innerHTML;
@@ -528,12 +604,11 @@
             const companyName = document.getElementById('company-name').value;
             const siteName = document.getElementById('site-name-input').value || companyName;
 
-            // LOGIQUE DE PRIX DYNAMIQUE
             let pricing = {};
             if(currentEnergy === 'gaz') {
                 pricing = {
                     fix: document.getElementById('price-gaz-fix').value,
-                    hph: document.getElementById('price-gaz-mol').value, // Molécule
+                    hph: document.getElementById('price-gaz-mol').value,
                     hch: "0", hpe: "0", hce: "0",
                     tax: document.getElementById('price-gaz-tax').value
                 };
@@ -573,11 +648,9 @@
             btn.innerHTML = original;
         }
 
-        // UTILS
         function showToast(msg) { const t = document.getElementById('toast'); t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`; t.className = "show"; setTimeout(() => t.className = "", 3000); }
         function updateFormType() { /* ... */ }
         
-        // --- GESTION ENERGIE (V22.14) ---
         let currentEnergy = 'elec';
         function setEnergy(type) {
             currentEnergy = type;
@@ -591,21 +664,17 @@
             const gridGaz = document.getElementById('grid-gaz');
 
             if(type === 'elec') {
-                // UI SWITCH
                 btnElec.className = "px-3 py-1 text-[10px] font-bold rounded bg-cyan text-black transition shadow-lg";
                 btnGaz.className = "px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
                 lblRef.innerText = "PDL / PRM (14)"; lblPuiss.innerText = "Puissance (kVA)"; lblTax.innerText = "CSPE / TCFE";
                 card.style.borderColor = "#00E5FF";
-                // GRID SWITCH
                 gridElec.classList.remove('hidden');
                 gridGaz.classList.add('hidden');
             } else {
-                // UI SWITCH
                 btnGaz.className = "px-3 py-1 text-[10px] font-bold rounded bg-gas text-white transition shadow-lg";
                 btnElec.className = "px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
                 lblRef.innerText = "PCE (14)"; lblPuiss.innerText = "CAR (MWh/an)"; lblTax.innerText = "TICGN / CTA";
                 card.style.borderColor = "#EF4444";
-                // GRID SWITCH
                 gridElec.classList.add('hidden');
                 gridGaz.classList.remove('hidden');
             }
@@ -623,7 +692,6 @@
             }
         }
 
-        // Initialisation
         switchTab('clients');
     </script>
 </body>
