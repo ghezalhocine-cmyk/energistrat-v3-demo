@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V13.8 | Retail Fixed</title>
+    <title>ENERGISTRAT V13.9 | Retail Universal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -70,7 +70,7 @@
         <header class="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur sticky top-0 z-40">
             <div>
                 <h1 class="text-xl font-bold text-white" id="main-title">Vision Consolidée</h1>
-                <p class="text-xs text-gray-400" id="main-subtitle">Données Live • Cortex V43 Active</p>
+                <p class="text-xs text-gray-400" id="main-subtitle">Données Live • Cortex V44 Active</p>
             </div>
             <div class="flex gap-6 text-right" id="header-kpis">
                 <div>
@@ -110,10 +110,14 @@
                             <tr>
                                 <th class="px-4 py-3 w-10"></th>
                                 <th class="px-4 py-3">Site</th>
+                                <!-- EVOLUTION : NOUVELLES COLONNES -->
+                                <th class="px-4 py-3">CP</th>
                                 <th class="px-4 py-3">Ville</th>
+                                <!-- FIN EVOLUTION -->
                                 <th class="px-4 py-3">Lot</th>
                                 <th class="px-4 py-3 text-center">Énergie</th>
-                                <th class="px-4 py-3 text-right">Volume</th>
+                                <!-- EVOLUTION : SEMANTIQUE MWh -->
+                                <th class="px-4 py-3 text-right">Conso (MWh)</th>
                                 <th class="px-4 py-3 text-right">Budget Est.</th>
                                 <th class="px-4 py-3 text-right">Atterrissage</th>
                             </tr>
@@ -127,7 +131,6 @@
             <div id="view-league" class="view-section hidden space-y-6">
                 <div class="text-center mb-8">
                     <h2 class="text-3xl font-black text-white italic tracking-tight">CHAMPIONNAT <span class="text-success">EFFICACITÉ</span></h2>
-                    <!-- DIAMOND UPDATE : SOUS TITRE DYNAMIQUE -->
                     <p class="text-sm text-gray-500 mt-2" id="league-subtitle">Classement basé sur le Prix Moyen Complet (€/MWh)</p>
                 </div>
                 <div class="grid grid-cols-3 gap-6 mb-8">
@@ -141,8 +144,6 @@
                         <div class="text-4xl mb-2">🥉</div><div class="font-bold text-white text-lg" id="podium-3-name">--</div><div class="text-sm text-bronze font-mono" id="podium-3-score">--</div>
                     </div>
                 </div>
-                
-                <!-- DIAMOND UPDATE : LISTE DES CANCRES -->
                 <div class="bento-card p-6">
                     <h3 class="text-xs font-bold text-red-400 uppercase mb-4">⚠️ Alerte : Prix Élevés (Cancres)</h3>
                     <div class="space-y-2" id="league-list"></div>
@@ -207,36 +208,24 @@
 
         function safeSetText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
         
-        // --- CORRECTIF V13.8 : GESTION ROBUSTE DES VUES (TAILWIND HIDDEN) ---
         function switchView(viewName) {
-            // 1. Mise à jour des boutons de navigation (Visuel)
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             
-            // 2. MASQUAGE TOTAL (Force Tailwind 'hidden')
-            // On s'assure que TOUTES les vues sont cachées d'abord
             const views = ['view-fleet', 'view-league', 'view-detail'];
             views.forEach(id => {
                 const el = document.getElementById(id);
-                if(el) {
-                    el.classList.add('hidden'); // Tailwind hide
-                    el.classList.remove('active');
-                }
+                if(el) { el.classList.add('hidden'); el.classList.remove('active'); }
             });
 
-            // 3. AFFICHAGE CIBLÉ
-            let targetId = 'view-fleet'; // Par défaut
+            let targetId = 'view-fleet';
             if (viewName === 'league') targetId = 'view-league';
             if (viewName === 'detail') targetId = 'view-detail';
 
             const targetEl = document.getElementById(targetId);
-            if(targetEl) {
-                targetEl.classList.remove('hidden'); // Tailwind show
-                targetEl.classList.add('active');
-            }
+            if(targetEl) { targetEl.classList.remove('hidden'); targetEl.classList.add('active'); }
 
-            // 4. LOGIQUE HEADER (Titres & KPIs)
             if(viewName === 'detail') {
                 safeSetText('main-title', "Détail & Conseil");
                 document.getElementById('header-kpis').classList.add('hidden');
@@ -265,7 +254,7 @@
 
                     if (GLOBAL_CORTEX && GLOBAL_CORTEX.main_message) {
                         const sub = document.getElementById('main-subtitle');
-                        if(sub) sub.innerHTML = `<span class="text-primary font-bold">CORTEX V43 :</span> ${GLOBAL_CORTEX.main_message}`;
+                        if(sub) sub.innerHTML = `<span class="text-primary font-bold">CORTEX V44 :</span> ${GLOBAL_CORTEX.main_message}`;
                     }
                 }
             } catch(e) { console.error(e); }
@@ -286,7 +275,6 @@
                 }
                 return;
             }
-
             const ranked = [...FLEET_DATA].sort((a, b) => {
                 const ratioA = a.budget > 0 ? (a.ghost_savings / a.budget) : 0;
                 const ratioB = b.budget > 0 ? (b.ghost_savings / b.budget) : 0;
@@ -309,7 +297,6 @@
         function updatePodium(rank, site, isBackendMode) {
             const name = isBackendMode ? site.nom_site : site.name;
             safeSetText(`podium-${rank}-name`, name);
-            
             let scoreTxt = "";
             if (isBackendMode) {
                 scoreTxt = Math.round(site.pmc) + " €/MWh";
@@ -400,16 +387,12 @@
             
             safeSetText('budget-progress-txt', Math.round(budgetProgress) + "%");
             const budBar = document.getElementById('budget-progress-bar');
-            const landMsg = document.getElementById('landing-msg');
-            
             if(budBar) {
                 budBar.style.width = Math.min(budgetProgress, 100) + "%";
                 if(budgetProgress > timeProgress + 5) {
                     budBar.className = "gauge-fill bg-red-500 rounded-full";
-                    if(landMsg) { landMsg.innerText = "Attention : Sur-consommation détectée."; landMsg.className = "text-[10px] text-red-400 mt-2 italic text-right"; }
                 } else {
                     budBar.className = "gauge-fill bg-primary rounded-full";
-                    if(landMsg) { landMsg.innerText = "Trajectoire budgétaire maîtrisée."; landMsg.className = "text-[10px] text-success mt-2 italic text-right"; }
                 }
             }
         }
@@ -425,13 +408,6 @@
         
         function filterEnergy(type) {
             CURRENT_FILTER = type;
-            ['all', 'elec', 'gaz'].forEach(t => {
-                const btn = document.getElementById('btn-' + t);
-                if(btn) {
-                    btn.className = (t === type) ? "flex-1 py-1 text-[10px] font-bold rounded bg-primary text-white transition shadow-lg" : "flex-1 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
-                    if(t === type && t === 'gaz') btn.classList.replace('bg-primary', 'bg-gas');
-                }
-            });
             applyFilters();
         }
 
@@ -457,15 +433,25 @@
                 const row = document.createElement('tr');
                 row.className = "site-row border-b border-white/5";
                 const detailAction = `onclick="loadDetail('${site.id}')"`;
+                
+                // MAPPING DES NOUVEAUX CHAMPS (UNIVERSAL STRUCTURE)
+                const city = site.city || '-';
+                const zip = site.zip || ''; // "zip" car mappé ainsi dans main.py V40.8
+                const conso = site.volume || 0; // "volume" (MWh) mappé dans main.py V40.8
+                
                 row.innerHTML = `
                     <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
                         <input type="checkbox" class="accent-primary w-4 h-4 cursor-pointer" onchange="toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}>
                     </td>
                     <td class="px-4 py-3 font-bold text-white" ${detailAction}>${site.name}</td>
-                    <td class="px-4 py-3 text-gray-400" ${detailAction}>${site.city}</td>
+                    <!-- NOUVELLES COLONNES -->
+                    <td class="px-4 py-3 text-gray-400 font-mono text-xs" ${detailAction}>${zip}</td>
+                    <td class="px-4 py-3 text-gray-300" ${detailAction}>${city}</td>
+                    <!-- FIN NOUVELLES COLONNES -->
                     <td class="px-4 py-3" ${detailAction}><span class="bg-white/5 px-2 py-1 rounded text-[10px]">${site.lot}</span></td>
                     <td class="px-4 py-3 text-center" ${detailAction}><span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-cyan bg-cyan/10'} px-2 py-1 rounded">${isGaz ? 'GAZ' : 'ELEC'}</span></td>
-                    <td class="px-4 py-3 text-right font-mono text-gray-300" ${detailAction}>${site.power} <span class="text-[10px] text-gray-600">${isGaz ? 'MWh' : 'kVA'}</span></td>
+                    <!-- VOLUME MWh -->
+                    <td class="px-4 py-3 text-right font-mono text-gray-300" ${detailAction}>${Math.round(conso)} <span class="text-[10px] text-gray-600">MWh</span></td>
                     <td class="px-4 py-3 text-right font-bold text-white" ${detailAction}>${formatCurrency(site.budget)}</td>
                     <td class="px-4 py-3 text-right font-mono ${site.alert ? 'text-red-500' : 'text-success'}" ${detailAction}>${formatCurrency(site.landing)}</td>
                 `;
