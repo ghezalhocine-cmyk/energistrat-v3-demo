@@ -132,7 +132,7 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
         return JSONResponse({"success": True, "updated_at": new_payload["updated_at"], "history_archived": True})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET (BI & ANALYTICS - CORTEX V44 CONNECTED) ---
+# --- API DASHBOARD / FLEET (BI & ANALYTICS - CORTEX V45 CONNECTED) ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
     raw_sites = []
@@ -153,34 +153,54 @@ async def get_fleet_data():
             raw_sites.append(data)
         except: continue
     
-    # 2. Appel du Cerveau (Intelligence Collective)
+    # 2. Appel du Cerveau (Intelligence Collective V45)
+    # Cortex calcule maintenant les parts de marché et normalise les fournisseurs
     analysis_result = cortex.analyze_portfolio(raw_sites)
     
     # 3. Formatage pour le Frontend
     fleet_list = []
+    
+    # Ensembles pour les filtres (Optimisation Backend)
+    all_cities = set()
+    all_providers = set()
+    all_segments = set()
+    all_lots = set()
+
     for s in raw_sites:
         c, i, pr = s.get('contract',{}), s.get('identity',{}), s.get('pricing',{})
         loc = s.get('location', {})
         kpis = s.get('kpis', {})
         is_gaz = "T" in str(c.get('segment','')) or "gaz" in str(pr.get('hph','')).lower()
         
+        # Récupération des données normalisées par Cortex si disponibles
+        cortex_data = next((x for x in analysis_result.get('raw_data', []) if x['nom_site'] == i.get('site_name')), {})
+        
+        provider = cortex_data.get('fournisseur') or c.get('provider', 'Inconnu')
+        city = loc.get('city', loc.get('address','-').split(',')[-1].strip())
+        segment = c.get('segment','--')
+        lot = i.get('lot_name','Hors Lot')
+
+        # Collecte pour les filtres
+        if city and city != '-': all_cities.add(city)
+        if provider: all_providers.add(provider)
+        if segment: all_segments.add(segment)
+        if lot: all_lots.add(lot)
+
         fleet_list.append({
             "id": i.get('id', 'unknown'),
             "name": i.get('site_name', i.get('name', 'Site')),
-            # MAPPING NOUVEAUX CHAMPS (UNIVERSAL)
-            "city": loc.get('city', loc.get('address','-').split(',')[-1].strip()),
+            "city": city,
             "zip": loc.get('zip_code', ''),
-            "volume": kpis.get('volume_mwh', 0), # MWh
-            
+            "volume": kpis.get('volume_mwh', 0),
             "energy": "gaz" if is_gaz else "elec",
-            "segment": c.get('segment','--'),
-            "lot": i.get('lot_name','Hors Lot'),
+            "segment": segment,
+            "lot": lot,
+            "provider": provider, # Champ normalisé
             "power": cortex._safe_float(c.get('power',0)),
             "budget": kpis['budget_annual'],
             "ghost_savings": kpis['ghost_savings'],
             "landing": kpis['landing_forecast'],
-            "alert": kpis.get('is_alert_landing', False),
-            "provider": c.get('provider','Inconnu')
+            "alert": kpis.get('is_alert_landing', False)
         })
 
     return JSONResponse({
@@ -188,7 +208,14 @@ async def get_fleet_data():
         "count": len(fleet_list),
         "green_league": analysis_result.get('green_league'),
         "cortex": analysis_result.get('cortex'),
-        "global_kpis": analysis_result.get('kpis')
+        "global_kpis": analysis_result.get('kpis'),
+        "market_share": analysis_result.get('market_share'), # Pour le camembert
+        "filters_meta": { # NOUVEAU : Pour les listes déroulantes
+            "cities": sorted(list(all_cities)),
+            "providers": sorted(list(all_providers)),
+            "segments": sorted(list(all_segments)),
+            "lots": sorted(list(all_lots))
+        }
     })
 
 @app.get("/api/dashboard/data/{client_id}")
@@ -202,12 +229,20 @@ async def get_dashboard_data(client_id: str):
     try:
         market = get_market_ref()
         pricing = data.get('pricing', {})
-        is_gaz = "T" in str(data.get('contract',{}).get('segment',''))
+        contract = data.get('contract', {}) 
+        is_gaz = "T" in str(contract.get('segment',''))
+        segment = str(contract.get('segment', 'C5'))
+        
         market_price = market['gaz']['peg_n1'] if is_gaz else market['elec']['cal_n1']
         client_price = float(str(pricing.get('hph', '0')).replace(',', '.').replace(' ', ''))
         
-        # Appel Cortex V44 (Fix Unit)
-        data["market_analysis"] = cortex.analyze_market_position(client_price, market_price, "gaz" if is_gaz else "elec")
+        # Appel Cortex V44 (Fix Unit + TRVE)
+        data["market_analysis"] = cortex.analyze_market_position(
+            client_price, 
+            market_price, 
+            "gaz" if is_gaz else "elec",
+            segment=segment
+        )
     except:
         data["market_analysis"] = {"status": "NEUTRE", "action": "-", "color": "gray"}
 
@@ -355,6 +390,7 @@ async def get_import_template():
         "SIRET", "RAISON_SOCIALE", "NOM_SITE", 
         "ADRESSE_SITE", "CODE_POSTAL", "VILLE", "ADRESSE_FACTURATION", 
         "PDL", "PUISSANCE", "SEGMENT", "LOT", 
+        "FOURNISSEUR", # Ajout V45.1
         "ABO_AN", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES" 
     ]
     stream = io.StringIO()
@@ -363,7 +399,7 @@ async def get_import_template():
     writer.writerow([ 
         "12345678900012", "Mon Entreprise HQ", "Magasin Lyon", 
         "12 Rue de la République", "69002", "Lyon", "10 Rue du Siège Paris", 
-        "30000000000000", "36", "C5", "Lot 1", 
+        "30000000000000", "36", "C5", "Lot 1", "EDF",
         "150.00", "0.15", "0.10", "0.08", "0.04", "22.5" 
     ])
     stream.seek(0)
