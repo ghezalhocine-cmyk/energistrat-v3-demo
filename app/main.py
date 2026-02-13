@@ -352,7 +352,7 @@ async def generate_tender(payload: TenderRequest):
             raise HTTPException(status_code=500, detail="Erreur Interne : Excel vide.")
         
         timestamp = datetime.now().strftime("%Y%m%d")
-        filename = f"DQE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"
+        filename = f"DCE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"
 
         return StreamingResponse(
             io.BytesIO(excel_content), 
@@ -419,10 +419,10 @@ async def get_tickets():
     tickets = storage.list_tickets()
     return JSONResponse({"tickets": tickets})
 
-# --- TEMPLATES CSV (EVOLUTION V41.5 : GAZ EXPERT) ---
+# --- TEMPLATES CSV (EVOLUTION V41.6 : GAZ + INSEE) ---
 @app.get("/api/settings/template_csv")
 async def get_import_template():
-    # Template Elec Expert
+    # Template Elec Expert V7 (Multi-Prix)
     headers = [ 
         "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", 
         "SIRET_SITE", "NAF", "CEE_ELIGIBLE", "GO_PERCENT", "COMPTEUR_PRODUCTEUR",
@@ -457,9 +457,9 @@ async def get_import_template():
 
 @app.get("/api/settings/template_csv_gaz")
 async def get_import_template_gaz():
-    # Template Gaz Expert V2 (V41.5)
+    # Template Gaz Expert V3 (V41.6 avec INSEE)
     headers = [ 
-        "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", 
+        "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "CODE_INSEE", # Ajout INSEE
         "SIRET_SITE", "NAF", "CEE_ELIGIBLE",
         "PCE", "CAR_MWH", "CJA_MWH_J", "SEGMENT_GAZ", "PROFIL", "TARIF_ACHEMINEMENT", "GRD",
         "DATE_DEBUT", "DATE_FIN",
@@ -470,7 +470,7 @@ async def get_import_template_gaz():
     writer = csv.writer(stream, delimiter=';')
     writer.writerow(headers)
     writer.writerow([ 
-        "Mairie de Lyon", "Chaufferie Bât A", "10 Rue de la Paix", "69002", "Lyon", 
+        "Mairie de Lyon", "Chaufferie Bât A", "10 Rue de la Paix", "69002", "Lyon", "69123",
         "12345678900012", "8411Z", "OUI",
         "04500000000000", "150", "0.5", "T2", "P012", "T2", "GRDF",
         "01/01/2025", "31/12/2026",
@@ -481,7 +481,7 @@ async def get_import_template_gaz():
     return StreamingResponse(
         iter([stream.getvalue()]), 
         media_type="text/csv", 
-        headers={"Content-Disposition": "attachment; filename=template_import_gaz_expert.csv"}
+        headers={"Content-Disposition": "attachment; filename=template_import_gaz_expert_v2.csv"}
     )
 
 # --- ROUTES HTML (VUES) ---
