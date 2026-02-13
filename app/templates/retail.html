@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V16.2 | Retail Click Fix</title>
+    <title>ENERGISTRAT V16.3 | Retail Final Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -21,8 +21,8 @@
         body { background-color: #050505; color: #E2E8F0; font-family: 'Inter', sans-serif; }
         .bento-card { background: #0F172A; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1rem; position: relative; overflow: hidden; }
         
-        /* FIX V16.2 : Curseur main explicite sur la ligne */
-        tr.site-row { cursor: pointer; transition: background-color 0.2s; }
+        /* FIX NAVIGATION : Curseur main sur les cellules */
+        td.clickable { cursor: pointer; }
         tr.site-row:hover td { background-color: rgba(168, 85, 247, 0.1); color: white; }
 
         .gauge-container { background: rgba(255,255,255,0.1); height: 6px; border-radius: 4px; overflow: hidden; position: relative; }
@@ -31,6 +31,7 @@
         #action-bar.visible { transform: translateY(0); }
         .input-edit { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 6px; width: 100%; font-size: 12px; }
         .input-edit:focus { border-color: #00E5FF; outline: none; }
+        
         select { 
             -webkit-appearance: none; appearance: none; 
             background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
@@ -105,6 +106,7 @@
             <!-- VUE 1 : FLEET -->
             <div id="view-fleet" class="view-section active space-y-6">
                 
+                <!-- BARRE DE FILTRES INTELLIGENTE -->
                 <div class="grid grid-cols-5 gap-4 p-4 bg-white/5 rounded-xl border border-white/5 items-end">
                     <div class="col-span-1">
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Recherche Rapide</label>
@@ -212,7 +214,7 @@
                         <div><div class="text-[10px] text-primary font-bold uppercase tracking-wider mb-1">Analyse Cortex</div><div class="text-sm text-white font-medium leading-tight" id="cortex-msg">--</div></div>
                     </div>
                 </div>
-
+                
                 <div class="bento-card p-6 border-l-4 border-cyan/50">
                     <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-file-contract text-cyan"></i> DONNÉES CONTRACTUELLES & TECHNIQUES</h3>
                     <div class="grid grid-cols-4 gap-6 text-xs" id="dqe-grid"></div>
@@ -249,8 +251,13 @@
                     <p class="text-sm text-gray-500 mt-2">Analysez les réponses BPU de vos fournisseurs en un clic.</p>
                 </div>
 
-                <!-- ZONE UPLOAD BPU -->
-                <div class="max-w-2xl mx-auto mb-8">
+                <!-- ZONE UPLOAD BPU AVEC NOM (FIX V16.3) -->
+                <div class="max-w-2xl mx-auto mb-8 space-y-4">
+                    <div class="relative">
+                        <label class="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Nom de l'offre (ex: EDF Fixe 2 ans)</label>
+                        <input type="text" id="offer-name" placeholder="Saisir le nom du fournisseur..." class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-cyan outline-none font-bold">
+                    </div>
+
                     <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-cyan/30 border-dashed rounded-2xl cursor-pointer bg-white/5 hover:bg-white/10 transition group">
                         <div class="flex flex-col items-center justify-center pt-5 pb-6">
                             <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400 group-hover:text-cyan mb-2 transition"></i>
@@ -268,7 +275,7 @@
                             <div class="text-2xl font-bold text-white" id="sim-current">-- €</div>
                         </div>
                         <div class="bento-card p-6 border-l-4 border-cyan">
-                            <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Budget Offre</h3>
+                            <h3 class="text-xs font-bold text-gray-400 uppercase mb-2" id="lbl-sim-offer">Budget Offre</h3>
                             <div class="text-2xl font-bold text-cyan" id="sim-offer">-- €</div>
                         </div>
                         <div class="bento-card p-6 border-l-4 border-green-500">
@@ -350,11 +357,9 @@
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             
-            // MASQUAGE TOTAL (Tailwind hidden)
             const views = ['view-fleet', 'view-league', 'view-detail', 'view-offer-lab'];
             views.forEach(id => { const el = document.getElementById(id); if(el) { el.classList.add('hidden'); el.classList.remove('active'); } });
 
-            // AFFICHAGE CIBLE
             let targetId = 'view-fleet';
             if (viewName === 'league') targetId = 'view-league';
             if (viewName === 'detail') targetId = 'view-detail';
@@ -420,13 +425,6 @@
 
         function filterEnergy(type) {
             CURRENT_FILTER_ENERGY = type;
-            ['all', 'elec', 'gaz'].forEach(t => {
-                const btn = document.getElementById('btn-' + t);
-                if(btn) {
-                    btn.className = (t === type) ? "flex-1 py-1 text-[10px] font-bold rounded bg-primary text-white transition shadow-lg" : "flex-1 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
-                    if(t === type && t === 'gaz') btn.classList.replace('bg-primary', 'bg-gas');
-                }
-            });
             applyFilters();
         }
 
@@ -488,7 +486,7 @@
             return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-300">${name}</span>`;
         }
 
-        // --- CORRECTIF V16.2 : CLIC LIGNE ---
+        // --- CORRECTIF V16.2 & V16.3 : CLIC ROBUSTE ---
         function renderTable(data) {
             const tbody = document.getElementById('fleet-table-body');
             if(!tbody) return;
@@ -498,7 +496,9 @@
                 const isSelected = SELECTED_IDS.has(site.id);
                 const row = document.createElement('tr');
                 row.className = "site-row border-b border-white/5 hover:bg-white/5 cursor-pointer transition";
-                row.setAttribute('onclick', `loadDetail('${site.id}')`);
+                
+                // --- LA CORRECTION EST ICI : ONCLICK SUR LES CELLULES DE DONNÉES ---
+                const detailAction = `onclick="loadDetail('${site.id}')"`;
                 
                 const city = site.city || '-';
                 const zip = site.zip || ''; 
@@ -509,14 +509,14 @@
                     <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
                         <input type="checkbox" class="accent-primary w-4 h-4 cursor-pointer" onchange="toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}>
                     </td>
-                    <td class="px-4 py-3 font-bold text-white">${site.name}</td>
-                    <td class="px-4 py-3 text-gray-400 font-mono text-xs">${zip}</td>
-                    <td class="px-4 py-3 text-gray-300">${city}</td>
-                    <td class="px-4 py-3">${getProviderBadge(prov)}</td>
-                    <td class="px-4 py-3 text-center"><span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-cyan bg-cyan/10'} px-2 py-1 rounded">${isGaz ? 'GAZ' : 'ELEC'}</span></td>
-                    <td class="px-4 py-3 text-right font-mono text-gray-300">${Math.round(conso)} <span class="text-[10px] text-gray-600">MWh</span></td>
-                    <td class="px-4 py-3 text-right font-bold text-white">${formatCurrency(site.budget)}</td>
-                    <td class="px-4 py-3 text-right font-mono ${site.alert ? 'text-red-500' : 'text-success'}">${formatCurrency(site.landing)}</td>
+                    <td class="px-4 py-3 font-bold text-white clickable" ${detailAction}>${site.name}</td>
+                    <td class="px-4 py-3 text-gray-400 font-mono text-xs clickable" ${detailAction}>${zip}</td>
+                    <td class="px-4 py-3 text-gray-300 clickable" ${detailAction}>${city}</td>
+                    <td class="px-4 py-3 clickable" ${detailAction}>${getProviderBadge(prov)}</td>
+                    <td class="px-4 py-3 text-center clickable" ${detailAction}><span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-cyan bg-cyan/10'} px-2 py-1 rounded">${isGaz ? 'GAZ' : 'ELEC'}</span></td>
+                    <td class="px-4 py-3 text-right font-mono text-gray-300 clickable" ${detailAction}>${Math.round(conso)} <span class="text-[10px] text-gray-600">MWh</span></td>
+                    <td class="px-4 py-3 text-right font-bold text-white clickable" ${detailAction}>${formatCurrency(site.budget)}</td>
+                    <td class="px-4 py-3 text-right font-mono ${site.alert ? 'text-red-500' : 'text-success'} clickable" ${detailAction}>${formatCurrency(site.landing)}</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -591,10 +591,12 @@
         function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
         function addPriceLine(c, l, v, cl) { c.innerHTML += `<div class="flex justify-between text-xs border-b border-white/5 pb-2"><span class="text-gray-500">${l}</span><span class="font-mono ${cl}">${v}</span></div>`; }
         
-        // --- SPRINT C : TRIGGER OFFER LAB ---
+        // --- SPRINT C : TRIGGER OFFER LAB (Avec Nom) ---
         async function triggerOfferScan(input) {
             if(!input.files || input.files.length === 0) return;
             const file = input.files[0];
+            const name = document.getElementById('offer-name').value || "Offre Inconnue";
+            
             const formData = new FormData();
             formData.append("file", file);
             
@@ -607,7 +609,7 @@
                 const data = await res.json();
                 
                 if(data.success && data.summary) {
-                    renderSimulation(data);
+                    renderSimulation(data, name);
                 } else {
                     alert("Erreur Simulation : " + (data.error || "Inconnue"));
                 }
@@ -616,10 +618,13 @@
             setTimeout(() => { if(input) parent.innerHTML = originalHTML; }, 2000);
         }
 
-        function renderSimulation(data) {
+        function renderSimulation(data, offerName) {
             document.getElementById('sim-results').classList.remove('hidden');
+            
             safeSetText('sim-current', formatCurrency(data.summary.total_current));
             safeSetText('sim-offer', formatCurrency(data.summary.total_simulated));
+            safeSetText('lbl-sim-offer', `Budget ${offerName}`); // NOM DYNAMIQUE
+            
             safeSetText('sim-delta', (data.summary.savings_euro > 0 ? "+" : "") + formatCurrency(data.summary.savings_euro));
             safeSetText('sim-pct', (data.summary.savings_pct > 0 ? "+" : "") + data.summary.savings_pct + " %");
             
