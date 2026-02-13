@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V48_1_SIRET_EXPORT")
+logger = logging.getLogger("CORTEX_MASTER_V49_OFFER_LAB")
 
 # CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
@@ -32,7 +32,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "48.1 (Tender Factory: Added SIRET in BPU)"
+        self.version = "49.0 (Offer Lab: Simulation Engine)"
         # Base de connaissance Métier (NAF)
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
@@ -113,7 +113,7 @@ class CortexEngine:
                             "CP": loc.get('zip_code', ''),
                             "Ville": loc.get('city', ''),
                             "INSEE": loc.get('insee', ''), 
-                            "SIRET": siret_val, # Présent dans DQE
+                            "SIRET": siret_val,
                             "PDL": c.get('pdl', ''),
                             "Segment": c.get('segment', ''),
                             "FTA": c.get('fta', ''),
@@ -133,7 +133,7 @@ class CortexEngine:
                         rows_bpu.append({
                             "PDL (Clé)": c.get('pdl', ''),
                             "Nom Site": i.get('site_name', ''),
-                            "SIRET": siret_val, # AJOUT V48.1
+                            "SIRET": siret_val,
                             "Vol. Annuel (Ref)": s.get('kpis', {}).get('volume_mwh', 0) * 1000,
                             "OFFRE_ABO_AN (€)": "",
                             "OFFRE_HPH (€/MWh)": "",
@@ -167,7 +167,7 @@ class CortexEngine:
                             "CP": loc.get('zip_code', ''),
                             "Ville": loc.get('city', ''),
                             "INSEE": loc.get('insee', ''),
-                            "SIRET": siret_val, # Présent dans DQE
+                            "SIRET": siret_val,
                             "PCE": c.get('pdl', ''),
                             "CAR (MWh)": self._safe_float(c.get('power', 0)),
                             "CJA": c.get('cja', 0),
@@ -179,11 +179,11 @@ class CortexEngine:
                         rows_bpu_gaz.append({
                             "PCE (Clé)": c.get('pdl', ''),
                             "Nom Site": i.get('site_name', ''),
-                            "SIRET": siret_val, # AJOUT V48.1
+                            "SIRET": siret_val,
                             "CAR (Ref)": self._safe_float(c.get('power', 0)),
                             "OFFRE_ABO_AN (€)": "",
                             "OFFRE_PRIX_MOLECULE (€/MWh)": "",
-                            "OFFRE_TERME_STOCKAGE (€/MWh)": "", # CPB
+                            "OFFRE_TERME_STOCKAGE (€/MWh)": "",
                             "OFFRE_CEE (€/MWh)": ""
                         })
                         
@@ -241,7 +241,6 @@ class CortexEngine:
         conso_det = site_data.get('consumption_details', {})
         is_gaz = "T" in str(contract.get('segment', ''))
         
-        # 1. CALCUL DU VOLUME RÉEL
         imported_total_vol = site_data.get('contract', {}).get('annual_volume_estimated', 0)
         
         if imported_total_vol > 0:
@@ -260,10 +259,9 @@ class CortexEngine:
                 if is_gaz: vol_mwh = p_sous 
                 else: vol_mwh = (p_sous * 1500) / 1000 
             
-        # 2. CALCUL BUDGET
         price = self._safe_float(pricing.get('hph')) + self._safe_float(pricing.get('tax'))
         fix = self._safe_float(pricing.get('fix'))
-        storage_cost = self._safe_float(pricing.get('storage')) # CPB
+        storage_cost = self._safe_float(pricing.get('storage')) 
         
         calc_price = price
         if price < 2.0: calc_price = price * 1000
@@ -298,7 +296,6 @@ class CortexEngine:
             
             for _, row in df.iterrows():
                 try:
-                    # MAPPING COMMUN
                     col_entite = next((c for c in df.columns if "ENTIT" in str(c).upper()), None)
                     col_nom = next((c for c in df.columns if "NOM" in str(c).upper()), None)
                     col_adresse = next((c for c in df.columns if "ADRESSE" in str(c).upper()), None)
@@ -308,8 +305,6 @@ class CortexEngine:
                     col_siret_site = next((c for c in df.columns if "SIRET" in str(c).upper()), None)
                     col_naf = next((c for c in df.columns if "NAF" in str(c).upper()), None)
                     col_cee = next((c for c in df.columns if "CEE" in str(c).upper()), None)
-
-                    # DÉTECTION GAZ SPÉCIFIQUE
                     col_cpb = next((c for c in df.columns if "STOCKAGE" in str(c).upper() or "CPB" in str(c).upper()), None)
 
                     if is_gaz:
@@ -320,12 +315,10 @@ class CortexEngine:
                         col_profil = next((c for c in df.columns if "PROFIL" in c), None)
                         col_tarif = next((c for c in df.columns if "TARIF" in c), None)
                         col_grd = next((c for c in df.columns if "GRD" in c), None)
-                        
                         col_prix = next((c for c in df.columns if "PRIX" in c and "MWH" in c), None)
                         col_prov = next((c for c in df.columns if "FOURNISSEUR" in str(c).upper()), None)
                         col_abo = next((c for c in df.columns if "ABO" in str(c).upper()), None)
                         col_tax = next((c for c in df.columns if "TAXES" in str(c).upper()), None)
-                        
                         col_start = next((c for c in df.columns if "DEBUT" in str(c).upper()), None)
                         col_end = next((c for c in df.columns if "FIN" in str(c).upper()), None)
 
@@ -342,16 +335,9 @@ class CortexEngine:
                                 "siret_site": str(row.get(col_siret_site, '')),
                                 "naf": str(row.get(col_naf, ''))
                             },
-                            "location": { 
-                                "address": str(row.get(col_adresse)), 
-                                "zip_code": str(row.get(col_cp)), 
-                                "city": str(row.get(col_ville)),
-                                "insee": str(row.get(col_insee, '')) 
-                            },
+                            "location": { "address": str(row.get(col_adresse)), "zip_code": str(row.get(col_cp)), "city": str(row.get(col_ville)), "insee": str(row.get(col_insee, '')) },
                             "contract": { 
-                                "pdl": ref_id, 
-                                "power": power, 
-                                "segment": segment, 
+                                "pdl": ref_id, "power": power, "segment": segment, 
                                 "provider": str(row.get(col_prov, 'Import')),
                                 "cja": self._safe_float(row.get(col_cja, 0)),
                                 "profil": str(row.get(col_profil, '')),
@@ -360,9 +346,7 @@ class CortexEngine:
                                 "start_date": str(row.get(col_start, '')),
                                 "end_date": str(row.get(col_end, ''))
                             },
-                            "technical": {
-                                "cee_eligible": str(row.get(col_cee, 'NON'))
-                            },
+                            "technical": { "cee_eligible": str(row.get(col_cee, 'NON')) },
                             "pricing": {
                                 "fix": str(row.get(col_abo, '0')),
                                 "hph": str(row.get(col_prix, '0')),
@@ -373,7 +357,6 @@ class CortexEngine:
                         }
                         sites.append(site)
                     else:
-                        # LOGIQUE ELEC V6.2
                         col_pdl = next((c for c in df.columns if "PDL" in str(c).upper() or "PRM" in str(c).upper()), None)
                         if not col_pdl: continue
                         pdl = str(row.get(col_pdl, '')).strip()
@@ -412,12 +395,7 @@ class CortexEngine:
                                 "siret_site": str(row.get(col_siret_site, '')),
                                 "naf": str(row.get(col_naf, ''))
                             },
-                            "location": { 
-                                "address": str(row.get(col_adresse)), 
-                                "zip_code": str(row.get(col_cp)), 
-                                "city": str(row.get(col_ville)),
-                                "insee": str(row.get(col_insee, '')) 
-                            },
+                            "location": { "address": str(row.get(col_adresse)), "zip_code": str(row.get(col_cp)), "city": str(row.get(col_ville)), "insee": str(row.get(col_insee, '')) },
                             "contract": { 
                                 "pdl": pdl, 
                                 "power": self._safe_float(row.get(col_ps, 0)), 
@@ -449,7 +427,6 @@ class CortexEngine:
                             }
                         }
                         sites.append(site)
-
                 except Exception as e:
                     logger.warning(f"Row Error: {e}")
                     continue
@@ -677,5 +654,110 @@ class CortexEngine:
             except: continue
         output.seek(0)
         return output.getvalue()
+
+    # =========================================================
+    # MODULE 7 : OFFER LAB (SIMULATOR) - NOUVEAU V49.0
+    # =========================================================
+    def simulate_budget_from_bpu(self, bpu_content, current_sites):
+        """
+        Simulateur de budget basé sur un fichier BPU Excel rempli par un fournisseur.
+        """
+        try:
+            # 1. Lecture du BPU Excel
+            bpu_df = None
+            is_gaz = False
+            
+            # Détection auto du format (Elec ou Gaz)
+            try:
+                # Tentative Elec
+                bpu_df = pd.read_excel(io.BytesIO(bpu_content), sheet_name='2-BPU_ELEC_REPONSE')
+            except:
+                try:
+                    # Tentative Gaz
+                    bpu_df = pd.read_excel(io.BytesIO(bpu_content), sheet_name='4-BPU_GAZ_REPONSE')
+                    is_gaz = True
+                except:
+                    return {"error": "Format BPU non reconnu (Onglet manquant)"}
+
+            if bpu_df is None or bpu_df.empty:
+                return {"error": "Fichier BPU vide ou illisible"}
+
+            # 2. Indexation des sites actuels pour recherche rapide
+            sites_map = {s['contract']['pdl']: s for s in current_sites if 'contract' in s and 'pdl' in s['contract']}
+            
+            simulation_results = []
+            total_current_budget = 0.0
+            total_simulated_budget = 0.0
+            
+            # 3. Boucle de Simulation
+            for _, row in bpu_df.iterrows():
+                # Clé de jointure
+                ref_id = str(row.get('PDL (Clé)') or row.get('PCE (Clé)')).strip()
+                if ref_id not in sites_map: continue
+                
+                site = sites_map[ref_id]
+                
+                # Récupération des données actuelles
+                current_budget = site.get('kpis', {}).get('budget_annual', 0)
+                vol_mwh = site.get('kpis', {}).get('volume_mwh', 0)
+                
+                # Récupération de l'offre (Avec sécurité)
+                offer_budget = 0.0
+                
+                if is_gaz:
+                    # Simulation Gaz
+                    abo = self._safe_float(row.get('OFFRE_ABO_AN (€)'))
+                    prix_mol = self._safe_float(row.get('OFFRE_PRIX_MOLECULE (€/MWh)'))
+                    stockage = self._safe_float(row.get('OFFRE_TERME_STOCKAGE (€/MWh)'))
+                    cee = self._safe_float(row.get('OFFRE_CEE (€/MWh)'))
+                    
+                    offer_budget = abo + (vol_mwh * (prix_mol + stockage + cee))
+                else:
+                    # Simulation Elec
+                    abo = self._safe_float(row.get('OFFRE_ABO_AN (€)'))
+                    # On applique le prix unique ou détaillé selon dispo
+                    p_hph = self._safe_float(row.get('OFFRE_HPH (€/MWh)'))
+                    # ... (Logique détaillée possible ici si on a les volumes horaires)
+                    # Pour l'instant, on prend une moyenne si pas de détail horaire
+                    if p_hph == 0: p_hph = self._safe_float(row.get('OFFRE_PRIX_MOYEN', 0))
+                    
+                    offer_budget = abo + (vol_mwh * p_hph)
+
+                # Calculs Ecarts
+                delta = offer_budget - current_budget
+                delta_pct = (delta / current_budget * 100) if current_budget > 0 else 0
+                
+                total_current_budget += current_budget
+                total_simulated_budget += offer_budget
+                
+                simulation_results.append({
+                    "site_name": site['identity']['site_name'],
+                    "pdl": ref_id,
+                    "volume": vol_mwh,
+                    "current_budget": round(current_budget, 2),
+                    "simulated_budget": round(offer_budget, 2),
+                    "delta_euro": round(delta, 2),
+                    "delta_pct": round(delta_pct, 1)
+                })
+
+            # 4. Synthèse
+            global_delta = total_simulated_budget - total_current_budget
+            global_pct = (global_delta / total_current_budget * 100) if total_current_budget > 0 else 0
+            
+            return {
+                "success": True,
+                "summary": {
+                    "total_current": round(total_current_budget, 2),
+                    "total_simulated": round(total_simulated_budget, 2),
+                    "savings_euro": round(global_delta * -1, 2), # Inversé pour afficher le gain positif
+                    "savings_pct": round(global_pct * -1, 1),
+                    "nb_sites_simulated": len(simulation_results)
+                },
+                "details": simulation_results
+            }
+
+        except Exception as e:
+            logger.error(f"Simulation Error: {e}")
+            return {"error": str(e)}
 
 cortex = CortexEngine()
