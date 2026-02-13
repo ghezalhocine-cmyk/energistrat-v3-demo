@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V16.2 | Retail Hotfix Click</title>
+    <title>ENERGISTRAT V16.2 | Retail Click Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -20,10 +20,11 @@
     <style>
         body { background-color: #050505; color: #E2E8F0; font-family: 'Inter', sans-serif; }
         .bento-card { background: #0F172A; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1rem; position: relative; overflow: hidden; }
-        /* CORRECTION CSS : Curseur main sur toute la ligne */
+        
+        /* FIX V16.2 : Curseur main explicite sur la ligne */
         tr.site-row { cursor: pointer; transition: background-color 0.2s; }
         tr.site-row:hover td { background-color: rgba(168, 85, 247, 0.1); color: white; }
-        
+
         .gauge-container { background: rgba(255,255,255,0.1); height: 6px; border-radius: 4px; overflow: hidden; position: relative; }
         .gauge-fill { height: 100%; transition: width 1s ease-out; }
         #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
@@ -104,7 +105,6 @@
             <!-- VUE 1 : FLEET -->
             <div id="view-fleet" class="view-section active space-y-6">
                 
-                <!-- BARRE DE FILTRES INTELLIGENTE -->
                 <div class="grid grid-cols-5 gap-4 p-4 bg-white/5 rounded-xl border border-white/5 items-end">
                     <div class="col-span-1">
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Recherche Rapide</label>
@@ -131,7 +131,6 @@
                     </div>
                 </div>
 
-                <!-- GRAPHIQUES -->
                 <div class="grid grid-cols-4 gap-6 h-64">
                     <div class="bento-card p-6 flex flex-col col-span-1">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Mix Énergétique</h3>
@@ -147,7 +146,6 @@
                     </div>
                 </div>
 
-                <!-- TABLEAU -->
                 <div class="bento-card overflow-hidden">
                     <div class="px-6 py-4 border-b border-white/5 flex justify-between items-center">
                         <h3 class="font-bold text-white">Détail du Parc</h3>
@@ -200,6 +198,7 @@
             <!-- VUE 3 : DÉTAIL & MODIFICATION -->
             <div id="view-detail" class="view-section hidden space-y-6">
                 <button onclick="switchView('fleet')" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4"><i class="fa-solid fa-arrow-left"></i> RETOUR LISTE</button>
+                
                 <div class="flex justify-between items-start">
                     <div>
                         <div class="flex items-center gap-3">
@@ -213,8 +212,7 @@
                         <div><div class="text-[10px] text-primary font-bold uppercase tracking-wider mb-1">Analyse Cortex</div><div class="text-sm text-white font-medium leading-tight" id="cortex-msg">--</div></div>
                     </div>
                 </div>
-                
-                <!-- BLOC DQE EXPERT -->
+
                 <div class="bento-card p-6 border-l-4 border-cyan/50">
                     <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-file-contract text-cyan"></i> DONNÉES CONTRACTUELLES & TECHNIQUES</h3>
                     <div class="grid grid-cols-4 gap-6 text-xs" id="dqe-grid"></div>
@@ -264,7 +262,6 @@
 
                 <!-- RESULTATS SIMULATION -->
                 <div id="sim-results" class="hidden space-y-6">
-                    <!-- KPI CARDS -->
                     <div class="grid grid-cols-3 gap-6">
                         <div class="bento-card p-6 border-l-4 border-gray-500">
                             <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Budget Actuel (Ref)</h3>
@@ -281,7 +278,6 @@
                         </div>
                     </div>
 
-                    <!-- TABLEAU DETAIL -->
                     <div class="bento-card overflow-hidden">
                         <div class="px-6 py-4 border-b border-white/5">
                             <h3 class="font-bold text-white">Détail par Site</h3>
@@ -306,7 +302,6 @@
 
         </div>
 
-        <!-- ACTION BAR -->
         <div id="action-bar" class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-50 transform translate-y-32 transition-transform duration-300">
             <div class="font-bold"><span id="selected-count" class="text-primary">0</span> sites sélectionnés</div>
             <div class="h-6 w-px bg-gray-200"></div>
@@ -355,9 +350,11 @@
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             
+            // MASQUAGE TOTAL (Tailwind hidden)
             const views = ['view-fleet', 'view-league', 'view-detail', 'view-offer-lab'];
             views.forEach(id => { const el = document.getElementById(id); if(el) { el.classList.add('hidden'); el.classList.remove('active'); } });
 
+            // AFFICHAGE CIBLE
             let targetId = 'view-fleet';
             if (viewName === 'league') targetId = 'view-league';
             if (viewName === 'detail') targetId = 'view-detail';
@@ -423,6 +420,13 @@
 
         function filterEnergy(type) {
             CURRENT_FILTER_ENERGY = type;
+            ['all', 'elec', 'gaz'].forEach(t => {
+                const btn = document.getElementById('btn-' + t);
+                if(btn) {
+                    btn.className = (t === type) ? "flex-1 py-1 text-[10px] font-bold rounded bg-primary text-white transition shadow-lg" : "flex-1 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
+                    if(t === type && t === 'gaz') btn.classList.replace('bg-primary', 'bg-gas');
+                }
+            });
             applyFilters();
         }
 
