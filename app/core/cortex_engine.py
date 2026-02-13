@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V46_FULL_INTEGRAL")
+logger = logging.getLogger("CORTEX_MASTER_V46_3_INTEGRAL")
 
 # CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
@@ -32,7 +32,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "46.0 (Full Integral: DQE + Import Expert + BI)"
+        self.version = "46.3 (Full Integral: DQE + Import Expert + BI + Legacy Curves)"
         # Base de connaissance Métier (NAF)
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
@@ -77,6 +77,7 @@ class CortexEngine:
         if "IBERDROLA" in n: return "Iberdrola"
         if "AXPO" in n: return "Axpo"
         if "ALPIQ" in n: return "Alpiq"
+        if "GEG" in n: return "GEG"
         if "IMPORT" in n: return "Import CSV"
         return n.title() 
 
@@ -187,7 +188,8 @@ class CortexEngine:
     # MODULE 2 : MARKET WATCH (V44.1)
     # =========================================================
     def analyze_market_position(self, client_price, market_price, energy_type, segment="C5"):
-        if client_price <= 0: return {"status": "UNKNOWN", "message": "Prix manquant", "color": "gray", "action": "Renseigner"}
+        if not client_price or math.isnan(client_price) or client_price <= 0: 
+            return {"status": "INCONNU", "message": "Prix non détecté", "color": "gray", "action": "Vérifier Import"}
         
         adjusted_client_price = client_price
         if client_price < 2.0: adjusted_client_price = client_price * 1000
@@ -219,24 +221,55 @@ class CortexEngine:
             return {"status": "ALIGNE", "color": "blue", "message": f"Prix cohérent avec le {ref_label}.", "action": "Pas d'action requise."}
 
     # =========================================================
-    # MODULE 3 : ROI & KPI (V44)
+    # MODULE 3 : ROI & KPI (V46.2 - Multi-Price Budget)
     # =========================================================
     def enrich_fleet_kpis(self, site_data):
         contract = site_data.get('contract', {}) or {}
         pricing = site_data.get('pricing', {}) or {}
+        conso_det = site_data.get('consumption_details', {})
         is_gaz = "T" in str(contract.get('segment', ''))
         
-        p_sous = self._safe_float(contract.get('power'))
-        if is_gaz: vol_mwh = p_sous 
-        else: vol_mwh = (p_sous * 1500) / 1000 
+        # 1. CALCUL DU VOLUME RÉEL
+        real_conso_kwh = (
+            self._safe_float(conso_det.get('hph')) +
+            self._safe_float(conso_det.get('hch')) +
+            self._safe_float(conso_det.get('hpe')) +
+            self._safe_float(conso_det.get('hce'))
+        )
+        
+        if real_conso_kwh > 0:
+            vol_mwh = real_conso_kwh / 1000
+        else:
+            p_sous = self._safe_float(contract.get('power'))
+            if is_gaz: vol_mwh = p_sous 
+            else: vol_mwh = (p_sous * 1500) / 1000 
             
-        price = self._safe_float(pricing.get('hph')) + self._safe_float(pricing.get('tax'))
+        # 2. CALCUL BUDGET MULTI-PRIX
         fix = self._safe_float(pricing.get('fix'))
         
-        calc_price = price
-        if price < 2.0: calc_price = price * 1000
+        p_hph = self._safe_float(pricing.get('hph'))
+        p_hch = self._safe_float(pricing.get('hch'))
+        p_hpe = self._safe_float(pricing.get('hpe'))
+        p_hce = self._safe_float(pricing.get('hce'))
+        
+        # Normalisation
+        if p_hph < 2.0: p_hph *= 1000
+        if p_hch < 2.0: p_hch *= 1000
+        if p_hpe < 2.0: p_hpe *= 1000
+        if p_hce < 2.0: p_hce *= 1000
+
+        if real_conso_kwh > 0 and p_hph > 0:
+            budget_var = (
+                (self._safe_float(conso_det.get('hph'))/1000 * p_hph) +
+                (self._safe_float(conso_det.get('hch'))/1000 * p_hch) +
+                (self._safe_float(conso_det.get('hpe'))/1000 * p_hpe) +
+                (self._safe_float(conso_det.get('hce'))/1000 * p_hce)
+            )
+        else:
+            budget_var = vol_mwh * p_hph
             
-        budget = fix + (vol_mwh * calc_price)
+        budget = fix + budget_var
+        
         day = datetime.now().timetuple().tm_yday
         landing = budget * (1 / (day/365 if day>0 else 1)) * (day/365)
         
@@ -300,7 +333,16 @@ class CortexEngine:
                     col_start = next((c for c in df.columns if "DEBUT" in str(c).upper()), None)
                     col_end = next((c for c in df.columns if "FIN" in str(c).upper()), None)
                     col_prov = next((c for c in df.columns if "FOURNISSEUR" in str(c).upper()), None)
-                    col_prix = next((c for c in df.columns if "PRIX" in str(c).upper() or "MOLECULE" in str(c).upper()), None)
+                    
+                    # CORRECTION PRIX DÉTAILLÉS
+                    col_prix_hph = next((c for c in df.columns if "PRIX_HPH" in str(c).upper()), None)
+                    col_prix_hch = next((c for c in df.columns if "PRIX_HCH" in str(c).upper()), None)
+                    col_prix_hpe = next((c for c in df.columns if "PRIX_HPE" in str(c).upper()), None)
+                    col_prix_hce = next((c for c in df.columns if "PRIX_HCE" in str(c).upper()), None)
+                    
+                    if not col_prix_hph:
+                        col_prix_hph = next((c for c in df.columns if "PRIX" in str(c).upper() or "MOLECULE" in str(c).upper()), None)
+
                     col_abo = next((c for c in df.columns if "ABO" in str(c).upper()), None)
 
                     pdl = str(row.get(col_pdl, '')).strip()
@@ -353,8 +395,11 @@ class CortexEngine:
                         },
                         "pricing": {
                             "fix": str(row.get(col_abo, '0')),
-                            "hph": str(row.get(col_prix, '0')),
-                            "hch": "0", "hpe": "0", "hce": "0", "tax": "0"
+                            "hph": str(row.get(col_prix_hph, '0')),
+                            "hch": str(row.get(col_prix_hch, '0')),
+                            "hpe": str(row.get(col_prix_hpe, '0')),
+                            "hce": str(row.get(col_prix_hce, '0')),
+                            "tax": "0"
                         },
                         "meta": {
                             "comments": str(row.get("Commentaires", ""))
