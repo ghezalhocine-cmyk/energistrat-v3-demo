@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
-# --- BLOC DIAGNOSTIC IMPORT (AJOUT SÉCURITÉ EXCEL) ---
+# --- BLOC DIAGNOSTIC IMPORT ---
 try:
     import pandas as pd
     import openpyxl
@@ -29,7 +29,7 @@ from app.core.storage_engine import storage
 
 app = FastAPI(title="ENERGISTRAT V3", version="PROD")
 
-# CONFIGURATION DU CHEMIN (EVOLUTION : FORCE PATH)
+# CONFIGURATION DU CHEMIN
 DATA_DIR = "/app/data"
 if not os.path.exists(DATA_DIR):
     if os.path.exists("data"): 
@@ -37,9 +37,17 @@ if not os.path.exists(DATA_DIR):
     else: 
         os.makedirs(DATA_DIR, exist_ok=True)
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=["*"], 
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"]
+)
+
 if os.path.exists("static"): 
     app.mount("/static", StaticFiles(directory="static"), name="static")
+
 templates = Jinja2Templates(directory="app/templates")
 
 @app.get("/health")
@@ -77,7 +85,7 @@ class MarketUpdateModel(BaseModel):
     elec: dict
     gaz: dict
 
-# --- MARKET WATCH ENGINE (EVOLUTION DIAMOND : HISTORY) ---
+# --- MARKET WATCH ENGINE ---
 def get_market_ref():
     path = f"{DATA_DIR}/market_ref.json"
     if os.path.exists(path):
@@ -101,21 +109,18 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
     if x_admin_token != "BOSS_V5": 
         raise HTTPException(status_code=401, detail="Accès refusé")
     try:
-        # 1. Préparation de la nouvelle donnée
         new_payload = data.dict()
         new_payload["updated_at"] = datetime.now().isoformat()
         
         ref_path = f"{DATA_DIR}/market_ref.json"
         hist_path = f"{DATA_DIR}/market_history.json"
         
-        # 2. Logique d'Historisation (Avant écrasement)
+        # Historisation
         if os.path.exists(ref_path):
             try:
-                # On lit la version actuelle (qui va devenir "l'ancienne")
                 with open(ref_path, 'r') as f: 
                     old_data = json.load(f)
                 
-                # On charge l'historique existant ou on le crée
                 history = []
                 if os.path.exists(hist_path):
                     try:
@@ -124,35 +129,34 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
                     except: 
                         history = [] 
                 
-                # On ajoute l'ancienne version à l'historique
                 history.append(old_data)
                 
-                # Rotation : On ne garde que les 104 dernières semaines (2 ans) pour ne pas saturer
                 if len(history) > 104: 
                     history = history[-104:]
                 
-                # Sauvegarde de l'historique
                 with open(hist_path, 'w') as f: 
                     json.dump(history, f, indent=4)
                 
             except Exception as e:
                 print(f"[WARNING] Market History Failed: {str(e)}")
 
-        # 3. Mise à jour du Référentiel LIVE (Cortex V43 lit ce fichier)
         with open(ref_path, "w") as f: 
             json.dump(new_payload, f, indent=4)
         
-        return JSONResponse({"success": True, "updated_at": new_payload["updated_at"], "history_archived": True})
+        return JSONResponse({
+            "success": True, 
+            "updated_at": new_payload["updated_at"], 
+            "history_archived": True
+        })
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET (BI & ANALYTICS - CORTEX V45 CONNECTED) ---
+# --- API DASHBOARD / FLEET ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
     raw_sites = []
     files = glob.glob(f"{DATA_DIR}/*.json")
     
-    # 1. Chargement des données brutes
     for p in files:
         if "master_index" in p or "market_ref" in p or "market_history" in p: 
             continue
@@ -162,25 +166,28 @@ async def get_fleet_data():
             if not data or 'identity' not in data: 
                 continue
             
-            # Enrichissement KPI basique (Cortex V44)
             try: 
                 kpis = cortex.enrich_fleet_kpis(data)
             except: 
-                kpis = {"budget_annual": 0, "ghost_savings": 0, "landing_forecast": 0, "is_alert_landing": False, "volume_mwh": 0}
+                kpis = {
+                    "budget_annual": 0, 
+                    "ghost_savings": 0, 
+                    "landing_forecast": 0, 
+                    "is_alert_landing": False, 
+                    "volume_mwh": 0
+                }
             data['kpis'] = kpis 
             
             raw_sites.append(data)
         except: 
             continue
     
-    # 2. Appel du Cerveau (Intelligence Collective V45)
-    # Cortex calcule maintenant les parts de marché et normalise les fournisseurs
+    # Intelligence Collective
     analysis_result = cortex.analyze_portfolio(raw_sites)
     
-    # 3. Formatage pour le Frontend
     fleet_list = []
     
-    # Ensembles pour les filtres (Optimisation Backend)
+    # Filtres
     all_cities = set()
     all_providers = set()
     all_segments = set()
@@ -192,7 +199,6 @@ async def get_fleet_data():
         kpis = s.get('kpis', {})
         is_gaz = "T" in str(c.get('segment','')) or "gaz" in str(pr.get('hph','')).lower()
         
-        # Récupération des données normalisées par Cortex si disponibles
         cortex_data = next((x for x in analysis_result.get('raw_data', []) if x['nom_site'] == i.get('site_name')), {})
         
         provider = cortex_data.get('fournisseur') or c.get('provider', 'Inconnu')
@@ -200,7 +206,6 @@ async def get_fleet_data():
         segment = c.get('segment','--')
         lot = i.get('lot_name','Hors Lot')
 
-        # Collecte pour les filtres
         if city and city != '-': all_cities.add(city)
         if provider: all_providers.add(provider)
         if segment: all_segments.add(segment)
@@ -215,7 +220,7 @@ async def get_fleet_data():
             "energy": "gaz" if is_gaz else "elec",
             "segment": segment,
             "lot": lot,
-            "provider": provider, # Champ normalisé
+            "provider": provider,
             "power": cortex._safe_float(c.get('power',0)),
             "budget": kpis['budget_annual'],
             "ghost_savings": kpis['ghost_savings'],
@@ -229,8 +234,8 @@ async def get_fleet_data():
         "green_league": analysis_result.get('green_league'),
         "cortex": analysis_result.get('cortex'),
         "global_kpis": analysis_result.get('kpis'),
-        "market_share": analysis_result.get('market_share'), # Pour le camembert
-        "filters_meta": { # NOUVEAU : Pour les listes déroulantes
+        "market_share": analysis_result.get('market_share'),
+        "filters_meta": { 
             "cities": sorted(list(all_cities)),
             "providers": sorted(list(all_providers)),
             "segments": sorted(list(all_segments)),
@@ -247,7 +252,6 @@ async def get_dashboard_data(client_id: str):
     with open(path, 'r') as f: 
         data = json.load(f)
     
-    # Enrichissement Live
     try:
         market = get_market_ref()
         pricing = data.get('pricing', {})
@@ -258,7 +262,6 @@ async def get_dashboard_data(client_id: str):
         market_price = market['gaz']['peg_n1'] if is_gaz else market['elec']['cal_n1']
         client_price = float(str(pricing.get('hph', '0')).replace(',', '.').replace(' ', ''))
         
-        # Appel Cortex V44 (Fix Unit + TRVE)
         data["market_analysis"] = cortex.analyze_market_position(
             client_price, 
             market_price, 
@@ -273,7 +276,7 @@ async def get_dashboard_data(client_id: str):
     
     return JSONResponse(data)
 
-# --- API OPS (ADMIN & ANALYSE) ---
+# --- API OPS ---
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), site_name: str = Form("Site_1"), x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": 
@@ -292,10 +295,13 @@ async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), 
                     detected_pdl = content_match.group(1)
             except: 
                 pass
+        
         site_data = None
-        if detected_pdl: 
+        if detected_pdl:
             site_data = storage.find_site_by_pdl(detected_pdl)
+            
         res = cortex.analyze_file(content, file.filename, target_profile=target, known_site_data=site_data)
+        
         if res.get("success"): 
             res["secure_link"] = f"/dashboard/{target}?site={site_name}"
             if site_data: 
@@ -327,19 +333,17 @@ async def api_chaos(x_admin_token: str = Header(None)):
         return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
-# --- API TENDER (GENERATION EXCEL - EVOLUTION) ---
+# --- API TENDER ---
 @app.post("/api/ops/generate_tender")
 async def generate_tender(payload: TenderRequest):
-    # Check Moteur
-    if not EXCEL_ENGINE_READY:
+    if not EXCEL_ENGINE_READY: 
         raise HTTPException(status_code=503, detail="CRITIQUE: Librairie 'openpyxl' manquante.")
-
+    
     selected_sites = []
     for site_id in payload.site_ids:
         if not site_id or "master" in site_id: 
             continue
         
-        # Lecture via Storage (Chemin unifié)
         data = storage.get_client_settings(site_id)
         if data: 
             selected_sites.append(data)
@@ -348,14 +352,13 @@ async def generate_tender(payload: TenderRequest):
         raise HTTPException(status_code=400, detail="Aucun site valide sélectionné.")
 
     try:
-        # Appel Cortex V39/41
         excel_content = cortex.generate_advanced_tender_excel(selected_sites)
         
-        if not excel_content or len(excel_content) == 0:
+        if not excel_content: 
             raise HTTPException(status_code=500, detail="Erreur Interne : Excel vide.")
         
         timestamp = datetime.now().strftime("%Y%m%d")
-        filename = f"DCE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"
+        filename = f"DQE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"
 
         return StreamingResponse(
             io.BytesIO(excel_content), 
@@ -374,6 +377,7 @@ async def api_import_csv(file: UploadFile = File(...)):
         sites = cortex.parse_mass_import_v5(content)
         if not sites: 
             return JSONResponse({"success": False, "error": "Format incorrect"})
+        
         saved = 0
         for s in sites:
             cid = s['identity'].get('id')
@@ -408,7 +412,6 @@ async def api_save_partner(request: Request):
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
 
-# --- API TICKETING ---
 @app.post("/api/support/ticket")
 async def create_ticket(request: Request):
     try:
@@ -423,19 +426,20 @@ async def get_tickets():
     tickets = storage.list_tickets()
     return JSONResponse({"tickets": tickets})
 
-# --- TEMPLATES CSV ---
+# --- TEMPLATES CSV (CORRECTION V41.3) ---
 @app.get("/api/settings/template_csv")
 async def get_import_template():
-    # Template Elec Expert V6 (DQE)
+    # Template Elec Expert V7 (Multi-Prix)
     headers = [ 
         "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", 
         "SIRET_SITE", "NAF", "CEE_ELIGIBLE", "GO_PERCENT", "COMPTEUR_PRODUCTEUR",
         "PDL", "SEGMENT", "FTA", "GRD", "TYPOLOGIE",
         "PUISSANCE_SOUSCRITE_MAX", "POINTE_MAX", 
-        "PS_HPH", "PS_HCH", "PS_HPE", "PS_HCE", # Puissances Souscrites
-        "CONSO_HPH", "CONSO_HCH", "CONSO_HPE", "CONSO_HCE", # Volumes Consommés
+        "PS_HPH", "PS_HCH", "PS_HPE", "PS_HCE", 
+        "CONSO_HPH", "CONSO_HCH", "CONSO_HPE", "CONSO_HCE", 
         "VOLUME_ANNUEL_TOTAL", "COMMENTAIRES", "DATE_DEBUT", "DATE_FIN",
-        "FOURNISSEUR", "PRIX_MOLECULE", "ABONNEMENT"
+        "FOURNISSEUR", 
+        "ABONNEMENT", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES"
     ]
     stream = io.StringIO()
     writer = csv.writer(stream, delimiter=';')
@@ -444,25 +448,33 @@ async def get_import_template():
         "Mairie de Lyon", "Ecole J.Ferry", "10 Rue de la Paix", "69002", "Lyon",
         "12345678900012", "8411Z", "OUI", "100", "NON",
         "30000000000000", "C4", "CU", "Enedis", "Bâtiment",
-        "60", "45", # Max
-        "60", "50", "40", "30", # PS par poste
-        "15000", "10000", "8000", "4000", # Conso par poste
+        "60", "45", 
+        "60", "50", "40", "30", 
+        "15000", "10000", "8000", "4000", 
         "37000", "Site à rénover", "01/01/2025", "31/12/2026",
-        "EDF", "120.50", "350.00"
+        "EDF", 
+        "350.00", "0.15", "0.10", "0.08", "0.04", "22.5"
     ])
     stream.seek(0)
-    return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=template_dqe_expert.csv"})
+    return StreamingResponse(
+        iter([stream.getvalue()]), 
+        media_type="text/csv", 
+        headers={"Content-Disposition": "attachment; filename=template_dqe_expert_v2.csv"}
+    )
 
 @app.get("/api/settings/template_csv_gaz")
 async def get_import_template_gaz():
-    # Template Gaz V1
     headers = [ "SIRET", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", "PCE", "CAR_MWH", "SEGMENT_GAZ", "LOT", "ABO_AN", "PRIX_MWH", "TAXES" ]
     stream = io.StringIO()
     writer = csv.writer(stream, delimiter=';')
     writer.writerow(headers)
     writer.writerow([ "12345678900012", "Mon Entreprise", "Chaufferie Bât A", "10 Rue de la Paix", "04500000000000", "150", "T2", "Lot Chauffage", "250.00", "45.50", "8.44" ])
     stream.seek(0)
-    return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=template_import_gaz_v1.csv"})
+    return StreamingResponse(
+        iter([stream.getvalue()]), 
+        media_type="text/csv", 
+        headers={"Content-Disposition": "attachment; filename=template_import_gaz_v1.csv"}
+    )
 
 # --- ROUTES HTML (VUES) ---
 @app.get("/nexus")
