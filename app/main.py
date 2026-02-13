@@ -115,7 +115,6 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
         ref_path = f"{DATA_DIR}/market_ref.json"
         hist_path = f"{DATA_DIR}/market_history.json"
         
-        # Historisation
         if os.path.exists(ref_path):
             try:
                 with open(ref_path, 'r') as f: 
@@ -182,12 +181,9 @@ async def get_fleet_data():
         except: 
             continue
     
-    # Intelligence Collective
     analysis_result = cortex.analyze_portfolio(raw_sites)
     
     fleet_list = []
-    
-    # Filtres
     all_cities = set()
     all_providers = set()
     all_segments = set()
@@ -276,7 +272,6 @@ async def get_dashboard_data(client_id: str):
     
     return JSONResponse(data)
 
-# --- API OPS ---
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), site_name: str = Form("Site_1"), x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": 
@@ -333,7 +328,6 @@ async def api_chaos(x_admin_token: str = Header(None)):
         return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
-# --- API TENDER ---
 @app.post("/api/ops/generate_tender")
 async def generate_tender(payload: TenderRequest):
     if not EXCEL_ENGINE_READY: 
@@ -369,7 +363,6 @@ async def generate_tender(payload: TenderRequest):
         print(f"[CRASH TENDER] {e}")
         raise HTTPException(status_code=500, detail=f"Crash Serveur : {str(e)}")
 
-# --- API SETTINGS & IMPORT ---
 @app.post("/api/settings/import_csv")
 async def api_import_csv(file: UploadFile = File(...)):
     try:
@@ -426,10 +419,10 @@ async def get_tickets():
     tickets = storage.list_tickets()
     return JSONResponse({"tickets": tickets})
 
-# --- TEMPLATES CSV ---
+# --- TEMPLATES CSV (EVOLUTION V41.5 : GAZ EXPERT) ---
 @app.get("/api/settings/template_csv")
 async def get_import_template():
-    # Template Elec Expert V7 (Multi-Prix)
+    # Template Elec Expert
     headers = [ 
         "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", 
         "SIRET_SITE", "NAF", "CEE_ELIGIBLE", "GO_PERCENT", "COMPTEUR_PRODUCTEUR",
@@ -464,19 +457,23 @@ async def get_import_template():
 
 @app.get("/api/settings/template_csv_gaz")
 async def get_import_template_gaz():
-    # Template Gaz V2 (Option B : CPB)
+    # Template Gaz Expert V2 (V41.5)
     headers = [ 
-        "SIRET", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", 
-        "PCE", "CAR_MWH", "SEGMENT_GAZ", "LOT", 
+        "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", 
+        "SIRET_SITE", "NAF", "CEE_ELIGIBLE",
+        "PCE", "CAR_MWH", "CJA_MWH_J", "SEGMENT_GAZ", "PROFIL", "TARIF_ACHEMINEMENT", "GRD",
+        "DATE_DEBUT", "DATE_FIN",
         "FOURNISSEUR", 
-        "ABO_AN", "PRIX_MOLECULE_MWH", "TERME_STOCKAGE_CPB", "TAXES" 
+        "ABONNEMENT", "PRIX_MOLECULE_MWH", "TERME_STOCKAGE_CPB", "TAXES" 
     ]
     stream = io.StringIO()
     writer = csv.writer(stream, delimiter=';')
     writer.writerow(headers)
     writer.writerow([ 
-        "12345678900012", "Mon Entreprise", "Chaufferie Bât A", "10 Rue de la Paix", 
-        "04500000000000", "150", "T2", "Lot Chauffage", 
+        "Mairie de Lyon", "Chaufferie Bât A", "10 Rue de la Paix", "69002", "Lyon", 
+        "12345678900012", "8411Z", "OUI",
+        "04500000000000", "150", "0.5", "T2", "P012", "T2", "GRDF",
+        "01/01/2025", "31/12/2026",
         "ENGIE", 
         "250.00", "45.50", "0.70", "8.44" 
     ])
