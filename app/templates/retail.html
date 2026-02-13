@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V16.1 | Retail Offer Lab</title>
+    <title>ENERGISTRAT V16.2 | Retail Hotfix Click</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -20,20 +20,23 @@
     <style>
         body { background-color: #050505; color: #E2E8F0; font-family: 'Inter', sans-serif; }
         .bento-card { background: #0F172A; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1rem; position: relative; overflow: hidden; }
-        tr.site-row:hover td { background-color: rgba(168, 85, 247, 0.1); cursor: pointer; color: white; }
+        /* CORRECTION CSS : Curseur main sur toute la ligne */
+        tr.site-row { cursor: pointer; transition: background-color 0.2s; }
+        tr.site-row:hover td { background-color: rgba(168, 85, 247, 0.1); color: white; }
+        
         .gauge-container { background: rgba(255,255,255,0.1); height: 6px; border-radius: 4px; overflow: hidden; position: relative; }
         .gauge-fill { height: 100%; transition: width 1s ease-out; }
         #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
         #action-bar.visible { transform: translateY(0); }
         .input-edit { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 6px; width: 100%; font-size: 12px; }
         .input-edit:focus { border-color: #00E5FF; outline: none; }
-        /* Style Select V15.1 conservé */
         select { 
             -webkit-appearance: none; appearance: none; 
             background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
             background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; 
             background-color: #0F172A; 
             color: white; 
+            padding: 5px;
         }
         option { background-color: #0F172A; color: white; padding: 5px; }
     </style>
@@ -54,7 +57,6 @@
             <div onclick="switchView('league')" id="nav-league" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 cursor-pointer hover:bg-white/5 transition">
                 <i class="fa-solid fa-trophy w-5 text-center text-yellow-500"></i> Green League
             </div>
-            <!-- AJOUT SPRINT C : BOUTON COMPARATEUR -->
             <div onclick="switchView('offer-lab')" id="nav-offer-lab" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 cursor-pointer hover:bg-white/5 transition">
                 <i class="fa-solid fa-scale-balanced w-5 text-center text-cyan"></i> Comparateur
             </div>
@@ -102,7 +104,7 @@
             <!-- VUE 1 : FLEET -->
             <div id="view-fleet" class="view-section active space-y-6">
                 
-                <!-- BARRE DE FILTRES INTELLIGENTE (V15.2) -->
+                <!-- BARRE DE FILTRES INTELLIGENTE -->
                 <div class="grid grid-cols-5 gap-4 p-4 bg-white/5 rounded-xl border border-white/5 items-end">
                     <div class="col-span-1">
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Recherche Rapide</label>
@@ -129,7 +131,7 @@
                     </div>
                 </div>
 
-                <!-- GRAPHIQUES (4 COLONNES - V15.0) -->
+                <!-- GRAPHIQUES -->
                 <div class="grid grid-cols-4 gap-6 h-64">
                     <div class="bento-card p-6 flex flex-col col-span-1">
                         <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Mix Énergétique</h3>
@@ -212,7 +214,7 @@
                     </div>
                 </div>
                 
-                <!-- BLOC DQE EXPERT (V15.1 + V15.3) -->
+                <!-- BLOC DQE EXPERT -->
                 <div class="bento-card p-6 border-l-4 border-cyan/50">
                     <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-file-contract text-cyan"></i> DONNÉES CONTRACTUELLES & TECHNIQUES</h3>
                     <div class="grid grid-cols-4 gap-6 text-xs" id="dqe-grid"></div>
@@ -242,7 +244,7 @@
                 </div>
             </div>
 
-            <!-- VUE 4 : OFFER LAB (NOUVEAU SPRINT C) -->
+            <!-- VUE 4 : OFFER LAB (COMPARATEUR) -->
             <div id="view-offer-lab" class="view-section hidden space-y-6">
                 <div class="text-center mb-8">
                     <h2 class="text-3xl font-black text-white italic tracking-tight">COMPARATEUR <span class="text-cyan">D'OFFRES</span></h2>
@@ -304,6 +306,7 @@
 
         </div>
 
+        <!-- ACTION BAR -->
         <div id="action-bar" class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-50 transform translate-y-32 transition-transform duration-300">
             <div class="font-bold"><span id="selected-count" class="text-primary">0</span> sites sélectionnés</div>
             <div class="h-6 w-px bg-gray-200"></div>
@@ -358,7 +361,7 @@
             let targetId = 'view-fleet';
             if (viewName === 'league') targetId = 'view-league';
             if (viewName === 'detail') targetId = 'view-detail';
-            if (viewName === 'offer-lab') targetId = 'view-offer-lab'; // SPRINT C
+            if (viewName === 'offer-lab') targetId = 'view-offer-lab';
 
             const targetEl = document.getElementById(targetId);
             if(targetEl) { targetEl.classList.remove('hidden'); targetEl.classList.add('active'); }
@@ -401,59 +404,6 @@
             } catch(e) { console.error(e); }
         }
 
-        // --- SPRINT C : SIMULATION OFFRE ---
-        async function triggerOfferScan(input) {
-            if(!input.files || input.files.length === 0) return;
-            const file = input.files[0];
-            const formData = new FormData();
-            formData.append("file", file);
-            
-            const parent = input.parentElement;
-            const originalHTML = parent.innerHTML;
-            parent.innerHTML = '<div class="flex flex-col items-center justify-center pt-5 pb-6"><i class="fa-solid fa-spinner fa-spin text-3xl text-cyan mb-2"></i><p class="text-sm text-gray-400">Simulation en cours...</p></div>';
-
-            try {
-                const res = await fetch('/api/ops/simulate_offer', { method: 'POST', body: formData });
-                const data = await res.json();
-                
-                if(data.success && data.summary) {
-                    renderSimulation(data);
-                } else {
-                    alert("Erreur Simulation : " + (data.error || "Inconnue"));
-                }
-            } catch(e) { console.error(e); alert("Erreur réseau"); }
-            
-            setTimeout(() => { if(input) parent.innerHTML = originalHTML; }, 2000);
-        }
-
-        function renderSimulation(data) {
-            document.getElementById('sim-results').classList.remove('hidden');
-            
-            safeSetText('sim-current', formatCurrency(data.summary.total_current));
-            safeSetText('sim-offer', formatCurrency(data.summary.total_simulated));
-            safeSetText('sim-delta', (data.summary.savings_euro > 0 ? "+" : "") + formatCurrency(data.summary.savings_euro));
-            safeSetText('sim-pct', (data.summary.savings_pct > 0 ? "+" : "") + data.summary.savings_pct + " %");
-            
-            const isGain = data.summary.savings_euro > 0;
-            const colorClass = isGain ? 'text-green-500' : 'text-red-500';
-            document.getElementById('sim-delta').className = `text-3xl font-black ${colorClass}`;
-            
-            const tbody = document.getElementById('sim-table-body');
-            tbody.innerHTML = '';
-            data.details.forEach(row => {
-                const rowColor = row.delta_euro < 0 ? 'text-green-400' : 'text-red-400';
-                tbody.innerHTML += `
-                    <tr class="border-b border-white/5">
-                        <td class="px-4 py-2 font-bold text-white">${row.site_name}</td>
-                        <td class="px-4 py-2 text-right text-gray-400 font-mono">${Math.round(row.volume)} MWh</td>
-                        <td class="px-4 py-2 text-right text-gray-300 font-mono">${formatCurrency(row.current_budget)}</td>
-                        <td class="px-4 py-2 text-right text-cyan font-mono">${formatCurrency(row.simulated_budget)}</td>
-                        <td class="px-4 py-2 text-right font-bold ${rowColor}">${Math.round(row.delta_euro)} € (${row.delta_pct}%)</td>
-                    </tr>
-                `;
-            });
-        }
-
         function initFilters() {
             const populate = (id, list) => {
                 const sel = document.getElementById(id);
@@ -473,13 +423,6 @@
 
         function filterEnergy(type) {
             CURRENT_FILTER_ENERGY = type;
-            ['all', 'elec', 'gaz'].forEach(t => {
-                const btn = document.getElementById('btn-' + t);
-                if(btn) {
-                    btn.className = (t === type) ? "flex-1 py-1 text-[10px] font-bold rounded bg-primary text-white transition shadow-lg" : "flex-1 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
-                    if(t === type && t === 'gaz') btn.classList.replace('bg-primary', 'bg-gas');
-                }
-            });
             applyFilters();
         }
 
@@ -511,8 +454,10 @@
             document.getElementById('edit-provider').value = CURRENT_DETAIL_SITE.contract.provider || "";
             document.getElementById('edit-power').value = CURRENT_DETAIL_SITE.contract.power || 0;
             document.getElementById('edit-price').value = CURRENT_DETAIL_SITE.pricing.hph || 0;
+            
             const isGaz = CURRENT_DETAIL_SITE.energy_type === 'gaz';
             document.getElementById('lbl-edit-power').innerText = isGaz ? "CAR (MWh)" : "Puissance (kVA)";
+            
             document.getElementById('edit-modal').classList.remove('hidden');
         }
 
@@ -539,6 +484,7 @@
             return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-300">${name}</span>`;
         }
 
+        // --- CORRECTIF V16.2 : CLIC LIGNE ---
         function renderTable(data) {
             const tbody = document.getElementById('fleet-table-body');
             if(!tbody) return;
@@ -547,8 +493,8 @@
                 const isGaz = site.energy === 'gaz';
                 const isSelected = SELECTED_IDS.has(site.id);
                 const row = document.createElement('tr');
-                row.className = "site-row border-b border-white/5";
-                const detailAction = `onclick="loadDetail('${site.id}')"`;
+                row.className = "site-row border-b border-white/5 hover:bg-white/5 cursor-pointer transition";
+                row.setAttribute('onclick', `loadDetail('${site.id}')`);
                 
                 const city = site.city || '-';
                 const zip = site.zip || ''; 
@@ -559,14 +505,14 @@
                     <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
                         <input type="checkbox" class="accent-primary w-4 h-4 cursor-pointer" onchange="toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}>
                     </td>
-                    <td class="px-4 py-3 font-bold text-white" ${detailAction}>${site.name}</td>
-                    <td class="px-4 py-3 text-gray-400 font-mono text-xs" ${detailAction}>${zip}</td>
-                    <td class="px-4 py-3 text-gray-300" ${detailAction}>${city}</td>
-                    <td class="px-4 py-3" ${detailAction}>${getProviderBadge(prov)}</td>
-                    <td class="px-4 py-3 text-center" ${detailAction}><span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-cyan bg-cyan/10'} px-2 py-1 rounded">${isGaz ? 'GAZ' : 'ELEC'}</span></td>
-                    <td class="px-4 py-3 text-right font-mono text-gray-300" ${detailAction}>${Math.round(conso)} <span class="text-[10px] text-gray-600">MWh</span></td>
-                    <td class="px-4 py-3 text-right font-bold text-white" ${detailAction}>${formatCurrency(site.budget)}</td>
-                    <td class="px-4 py-3 text-right font-mono ${site.alert ? 'text-red-500' : 'text-success'}" ${detailAction}>${formatCurrency(site.landing)}</td>
+                    <td class="px-4 py-3 font-bold text-white">${site.name}</td>
+                    <td class="px-4 py-3 text-gray-400 font-mono text-xs">${zip}</td>
+                    <td class="px-4 py-3 text-gray-300">${city}</td>
+                    <td class="px-4 py-3">${getProviderBadge(prov)}</td>
+                    <td class="px-4 py-3 text-center"><span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-cyan bg-cyan/10'} px-2 py-1 rounded">${isGaz ? 'GAZ' : 'ELEC'}</span></td>
+                    <td class="px-4 py-3 text-right font-mono text-gray-300">${Math.round(conso)} <span class="text-[10px] text-gray-600">MWh</span></td>
+                    <td class="px-4 py-3 text-right font-bold text-white">${formatCurrency(site.budget)}</td>
+                    <td class="px-4 py-3 text-right font-mono ${site.alert ? 'text-red-500' : 'text-success'}">${formatCurrency(site.landing)}</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -641,6 +587,58 @@
         function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
         function addPriceLine(c, l, v, cl) { c.innerHTML += `<div class="flex justify-between text-xs border-b border-white/5 pb-2"><span class="text-gray-500">${l}</span><span class="font-mono ${cl}">${v}</span></div>`; }
         
+        // --- SPRINT C : TRIGGER OFFER LAB ---
+        async function triggerOfferScan(input) {
+            if(!input.files || input.files.length === 0) return;
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append("file", file);
+            
+            const parent = input.parentElement;
+            const originalHTML = parent.innerHTML;
+            parent.innerHTML = '<div class="flex flex-col items-center justify-center pt-5 pb-6"><i class="fa-solid fa-spinner fa-spin text-3xl text-cyan mb-2"></i><p class="text-sm text-gray-400">Simulation en cours...</p></div>';
+
+            try {
+                const res = await fetch('/api/ops/simulate_offer', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                if(data.success && data.summary) {
+                    renderSimulation(data);
+                } else {
+                    alert("Erreur Simulation : " + (data.error || "Inconnue"));
+                }
+            } catch(e) { console.error(e); alert("Erreur réseau"); }
+            
+            setTimeout(() => { if(input) parent.innerHTML = originalHTML; }, 2000);
+        }
+
+        function renderSimulation(data) {
+            document.getElementById('sim-results').classList.remove('hidden');
+            safeSetText('sim-current', formatCurrency(data.summary.total_current));
+            safeSetText('sim-offer', formatCurrency(data.summary.total_simulated));
+            safeSetText('sim-delta', (data.summary.savings_euro > 0 ? "+" : "") + formatCurrency(data.summary.savings_euro));
+            safeSetText('sim-pct', (data.summary.savings_pct > 0 ? "+" : "") + data.summary.savings_pct + " %");
+            
+            const isGain = data.summary.savings_euro > 0;
+            const colorClass = isGain ? 'text-green-500' : 'text-red-500';
+            document.getElementById('sim-delta').className = `text-3xl font-black ${colorClass}`;
+            
+            const tbody = document.getElementById('sim-table-body');
+            tbody.innerHTML = '';
+            data.details.forEach(row => {
+                const rowColor = row.delta_euro < 0 ? 'text-green-400' : 'text-red-400';
+                tbody.innerHTML += `
+                    <tr class="border-b border-white/5">
+                        <td class="px-4 py-2 font-bold text-white">${row.site_name}</td>
+                        <td class="px-4 py-2 text-right text-gray-400 font-mono">${Math.round(row.volume)} MWh</td>
+                        <td class="px-4 py-2 text-right text-gray-300 font-mono">${formatCurrency(row.current_budget)}</td>
+                        <td class="px-4 py-2 text-right text-cyan font-mono">${formatCurrency(row.simulated_budget)}</td>
+                        <td class="px-4 py-2 text-right font-bold ${rowColor}">${Math.round(row.delta_euro)} € (${row.delta_pct}%)</td>
+                    </tr>
+                `;
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', loadFleet);
     </script>
 </body>
