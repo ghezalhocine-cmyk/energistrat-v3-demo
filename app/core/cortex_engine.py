@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V47_GAZ_EXPERT")
+logger = logging.getLogger("CORTEX_MASTER_V48_TENDER_FACTORY")
 
 try:
     import pdfplumber
@@ -31,7 +31,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "47.0 (Gaz Expert Integral)"
+        self.version = "48.0 (Tender Factory V2: Round-Trip Ready)"
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
             "1013B": "Boucherie", "5610A": "Restauration Trad.", "5610C": "Fast Food",
@@ -79,104 +79,114 @@ class CortexEngine:
         return n.title() 
 
     # =========================================================
-    # MODULE 1 : TENDER FACTORY EXCEL (V46)
+    # MODULE 1 : TENDER FACTORY V2 (DQE & BPU MIROIR)
     # =========================================================
     def generate_advanced_tender_excel(self, sites_data):
         if not sites_data: return b""
         try:
-            first_site = sites_data[0]
-            contract = first_site.get('contract', {}) or {}
-            is_gaz = "T" in str(contract.get('segment', '')).upper() or "GAZ" in str(contract.get('segment', '')).upper()
-            if is_gaz: return self._generate_gaz_tender(sites_data)
-            else: return self._generate_elec_tender(sites_data)
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                
+                # --- TRAITEMENT ELEC ---
+                elec_sites = [s for s in sites_data if "T" not in str(s.get('contract',{}).get('segment','')).upper()]
+                if elec_sites:
+                    rows_dqe = []
+                    rows_bpu = []
+                    for s in elec_sites:
+                        c = s.get('contract', {})
+                        i = s.get('identity', {})
+                        loc = s.get('location', {})
+                        tech = s.get('technical', {})
+                        conso_det = s.get('consumption_details', {})
+                        power_det = c.get('power_details', {})
+                        
+                        # DQE ROW
+                        rows_dqe.append({
+                            "Entité": s.get('client_name', ''),
+                            "Nom du site": i.get('site_name', ''),
+                            "Adresse": loc.get('address', ''),
+                            "CP": loc.get('zip_code', ''),
+                            "Ville": loc.get('city', ''),
+                            "INSEE": loc.get('insee', ''), # V48
+                            "PDL": c.get('pdl', ''),
+                            "Segment": c.get('segment', ''),
+                            "FTA": c.get('fta', ''),
+                            "PS Max (kVA)": self._safe_float(c.get('power', 0)),
+                            "PS HPH": power_det.get('hph', 0),
+                            "PS HCH": power_det.get('hch', 0),
+                            "PS HPE": power_det.get('hpe', 0),
+                            "PS HCE": power_det.get('hce', 0),
+                            "Conso HPH": conso_det.get('hph', 0),
+                            "Conso HCH": conso_det.get('hch', 0),
+                            "Conso HPE": conso_det.get('hpe', 0),
+                            "Conso HCE": conso_det.get('hce', 0),
+                            "Vol. Annuel": s.get('kpis', {}).get('volume_mwh', 0) * 1000
+                        })
+                        
+                        # BPU ROW (Cadre de réponse)
+                        rows_bpu.append({
+                            "PDL (Clé)": c.get('pdl', ''),
+                            "Nom Site": i.get('site_name', ''),
+                            "Vol. Annuel (Ref)": s.get('kpis', {}).get('volume_mwh', 0) * 1000,
+                            "OFFRE_ABO_AN (€)": "",
+                            "OFFRE_HPH (€/MWh)": "",
+                            "OFFRE_HCH (€/MWh)": "",
+                            "OFFRE_HPE (€/MWh)": "",
+                            "OFFRE_HCE (€/MWh)": "",
+                            "OFFRE_GESTION (€/an)": "",
+                            "OFFRE_CEE (€/MWh)": ""
+                        })
+                        
+                    pd.DataFrame(rows_dqe).to_excel(writer, sheet_name='1-DQE_ELEC', index=False)
+                    pd.DataFrame(rows_bpu).to_excel(writer, sheet_name='2-BPU_ELEC_REPONSE', index=False)
+
+                # --- TRAITEMENT GAZ ---
+                gaz_sites = [s for s in sites_data if "T" in str(s.get('contract',{}).get('segment','')).upper()]
+                if gaz_sites:
+                    rows_dqe_gaz = []
+                    rows_bpu_gaz = []
+                    for s in gaz_sites:
+                        c = s.get('contract', {})
+                        i = s.get('identity', {})
+                        loc = s.get('location', {})
+                        
+                        # DQE GAZ
+                        rows_dqe_gaz.append({
+                            "Entité": s.get('client_name', ''),
+                            "Nom du site": i.get('site_name', ''),
+                            "Adresse": loc.get('address', ''),
+                            "CP": loc.get('zip_code', ''),
+                            "Ville": loc.get('city', ''),
+                            "INSEE": loc.get('insee', ''), # V48
+                            "PCE": c.get('pdl', ''),
+                            "CAR (MWh)": self._safe_float(c.get('power', 0)),
+                            "CJA": c.get('cja', 0),
+                            "Profil": c.get('profil', ''),
+                            "Tarif Ach.": c.get('tarif_acheminement', '')
+                        })
+                        
+                        # BPU GAZ (Cadre de réponse)
+                        rows_bpu_gaz.append({
+                            "PCE (Clé)": c.get('pdl', ''),
+                            "Nom Site": i.get('site_name', ''),
+                            "CAR (Ref)": self._safe_float(c.get('power', 0)),
+                            "OFFRE_ABO_AN (€)": "",
+                            "OFFRE_PRIX_MOLECULE (€/MWh)": "",
+                            "OFFRE_TERME_STOCKAGE (€/MWh)": "", # CPB
+                            "OFFRE_CEE (€/MWh)": ""
+                        })
+                        
+                    pd.DataFrame(rows_dqe_gaz).to_excel(writer, sheet_name='3-DQE_GAZ', index=False)
+                    pd.DataFrame(rows_bpu_gaz).to_excel(writer, sheet_name='4-BPU_GAZ_REPONSE', index=False)
+
+            output.seek(0)
+            return output.getvalue()
         except Exception as e:
             logger.error(f"Erreur Fatale Excel Generator: {e}")
             return b""
 
-    def _generate_elec_tender(self, sites_data):
-        output = io.BytesIO()
-        rows = []
-        for s in sites_data:
-            try:
-                c = s.get('contract', {})
-                i = s.get('identity', {})
-                loc = s.get('location', {})
-                tech = s.get('technical', {})
-                conso_det = s.get('consumption_details', {})
-                power_det = c.get('power_details', {})
-                
-                power = self._safe_float(c.get('power', 0))
-                
-                rows.append({
-                    "Entité": s.get('client_name', ''),
-                    "Nom du site": i.get('site_name', ''),
-                    "Adresse": loc.get('address', ''),
-                    "CP": loc.get('zip_code', ''),
-                    "Commune": loc.get('city', ''),
-                    "SIRET Site": i.get('siret_site', ''),
-                    "NAF": i.get('naf', ''),
-                    "CEE": tech.get('cee_eligible', 'NON'),
-                    "GO %": tech.get('go_percentage', '0'),
-                    "Compteur Prod.": tech.get('producer_meter', 'Non'),
-                    "PRM": c.get('pdl', ''),
-                    "Segment": c.get('segment', ''),
-                    "FTA": c.get('fta', ''),
-                    "GRD": c.get('grd', ''),
-                    "Typologie": tech.get('typology', ''),
-                    "PS Max (kVA)": power,
-                    "Pointe (kW)": c.get('p_max', 0),
-                    "PS HPH": power_det.get('hph', 0),
-                    "PS HCH": power_det.get('hch', 0),
-                    "PS HPE": power_det.get('hpe', 0),
-                    "PS HCE": power_det.get('hce', 0),
-                    "Conso HPH": conso_det.get('hph', 0),
-                    "Conso HCH": conso_det.get('hch', 0),
-                    "Conso HPE": conso_det.get('hpe', 0),
-                    "Conso HCE": conso_det.get('hce', 0),
-                    "Vol. Annuel": s.get('kpis', {}).get('volume_mwh', 0) * 1000,
-                    "Commentaires": s.get('meta', {}).get('comments', ''),
-                    "Date début": c.get('start_date', ''),
-                    "Date fin": c.get('end_date', '')
-                })
-            except: continue
-        df_dqe = pd.DataFrame(rows)
-        try:
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
-        except: return b""
-        output.seek(0)
-        return output.getvalue()
-
-    def _generate_gaz_tender(self, sites_data):
-        output = io.BytesIO()
-        rows = []
-        for s in sites_data:
-            try:
-                c = s.get('contract', {})
-                i = s.get('identity', {})
-                loc = s.get('location', {})
-                car = self._safe_float(c.get('power', 0))
-                rows.append({
-                    "PCE": c.get('pdl', ''),
-                    "Nom Site": i.get('site_name', ''),
-                    "Adresse": loc.get('address', ''),
-                    "CP": loc.get('zip_code', ''),
-                    "Ville": loc.get('city', ''),
-                    "CAR (MWh)": car,
-                    "Profil": c.get('segment', 'T1'),
-                    "Fournisseur": c.get('provider', '')
-                })
-            except: continue
-        df_dqe = pd.DataFrame(rows)
-        try:
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_dqe.to_excel(writer, sheet_name='1-DQE_Sites', index=False)
-        except: return b""
-        output.seek(0)
-        return output.getvalue()
-
     # =========================================================
-    # MODULE 2 : MARKET WATCH (V46.1)
+    # MODULE 2 : MARKET WATCH (V44.1)
     # =========================================================
     def analyze_market_position(self, client_price, market_price, energy_type, segment="C5"):
         if not client_price or math.isnan(client_price) or client_price <= 0: 
@@ -212,7 +222,7 @@ class CortexEngine:
             return {"status": "ALIGNE", "color": "blue", "message": f"Prix cohérent avec le {ref_label}.", "action": "Pas d'action requise."}
 
     # =========================================================
-    # MODULE 3 : ROI & KPI (V46.5 - Gaz CPB + Fixes)
+    # MODULE 3 : ROI & KPI (V46.5)
     # =========================================================
     def enrich_fleet_kpis(self, site_data):
         contract = site_data.get('contract', {}) or {}
@@ -261,7 +271,7 @@ class CortexEngine:
         }
 
     # =========================================================
-    # MODULE 4 : IMPORT MASSE V6.3 (GAZ EXPERT)
+    # MODULE 4 : IMPORT MASSE V6.4 (GAZ EXPERT + INSEE)
     # =========================================================
     def parse_mass_import_v5(self, file_content):
         try:
@@ -283,6 +293,10 @@ class CortexEngine:
                     col_adresse = next((c for c in df.columns if "ADRESSE" in str(c).upper()), None)
                     col_cp = next((c for c in df.columns if "CP" == str(c).upper() or "CODE" in str(c).upper()), None)
                     col_ville = next((c for c in df.columns if "COMMUNE" in str(c).upper() or "VILLE" in str(c).upper()), None)
+                    
+                    # NOUVEAU V48 : INSEE
+                    col_insee = next((c for c in df.columns if "INSEE" in str(c).upper()), None)
+
                     col_siret_site = next((c for c in df.columns if "SIRET" in str(c).upper()), None)
                     col_naf = next((c for c in df.columns if "NAF" in str(c).upper()), None)
                     col_cee = next((c for c in df.columns if "CEE" in str(c).upper()), None)
@@ -323,7 +337,8 @@ class CortexEngine:
                             "location": { 
                                 "address": str(row.get(col_adresse)), 
                                 "zip_code": str(row.get(col_cp)), 
-                                "city": str(row.get(col_ville)) 
+                                "city": str(row.get(col_ville)),
+                                "insee": str(row.get(col_insee, '')) # Stockage INSEE
                             },
                             "contract": { 
                                 "pdl": ref_id, 
@@ -350,7 +365,7 @@ class CortexEngine:
                         }
                         sites.append(site)
                     else:
-                        # LOGIQUE ELEC V6.2 (COMPLÈTE)
+                        # LOGIQUE ELEC V6.2 (INCHANGÉE MAIS COMPLÈTE)
                         col_pdl = next((c for c in df.columns if "PDL" in str(c).upper() or "PRM" in str(c).upper()), None)
                         if not col_pdl: continue
                         pdl = str(row.get(col_pdl, '')).strip()
@@ -370,13 +385,11 @@ class CortexEngine:
                         col_prix_hpe = next((c for c in df.columns if "PRIX_HPE" in str(c).upper()), None)
                         col_prix_hce = next((c for c in df.columns if "PRIX_HCE" in str(c).upper()), None)
                         
-                        # Puissances Détail
                         col_ps_hph = next((c for c in df.columns if "PS_HPH" in str(c).upper()), None)
                         col_ps_hch = next((c for c in df.columns if "PS_HCH" in str(c).upper()), None)
                         col_ps_hpe = next((c for c in df.columns if "PS_HPE" in str(c).upper()), None)
                         col_ps_hce = next((c for c in df.columns if "PS_HCE" in str(c).upper()), None)
                         
-                        # Consommations Détail
                         col_conso_hph = next((c for c in df.columns if "CONSO_HPH" in str(c).upper() or "HPH" in str(c).upper()), None)
                         col_conso_hch = next((c for c in df.columns if "CONSO_HCH" in str(c).upper() or "HCH" in str(c).upper()), None)
                         col_conso_hpe = next((c for c in df.columns if "CONSO_HPE" in str(c).upper() or "HPE" in str(c).upper()), None)
@@ -391,7 +404,12 @@ class CortexEngine:
                                 "siret_site": str(row.get(col_siret_site, '')),
                                 "naf": str(row.get(col_naf, ''))
                             },
-                            "location": { "address": str(row.get(col_adresse)), "zip_code": str(row.get(col_cp)), "city": str(row.get(col_ville)) },
+                            "location": { 
+                                "address": str(row.get(col_adresse)), 
+                                "zip_code": str(row.get(col_cp)), 
+                                "city": str(row.get(col_ville)),
+                                "insee": str(row.get(col_insee, '')) # Stockage INSEE
+                            },
                             "contract": { 
                                 "pdl": pdl, 
                                 "power": self._safe_float(row.get(col_ps, 0)), 
