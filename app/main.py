@@ -426,7 +426,7 @@ async def get_tickets():
     tickets = storage.list_tickets()
     return JSONResponse({"tickets": tickets})
 
-# --- TEMPLATES CSV (CORRECTION V41.3) ---
+# --- TEMPLATES CSV ---
 @app.get("/api/settings/template_csv")
 async def get_import_template():
     # Template Elec Expert V7 (Multi-Prix)
@@ -464,16 +464,27 @@ async def get_import_template():
 
 @app.get("/api/settings/template_csv_gaz")
 async def get_import_template_gaz():
-    headers = [ "SIRET", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", "PCE", "CAR_MWH", "SEGMENT_GAZ", "LOT", "ABO_AN", "PRIX_MWH", "TAXES" ]
+    # Template Gaz V2 (Option B : CPB)
+    headers = [ 
+        "SIRET", "RAISON_SOCIALE", "NOM_SITE", "ADRESSE", 
+        "PCE", "CAR_MWH", "SEGMENT_GAZ", "LOT", 
+        "FOURNISSEUR", 
+        "ABO_AN", "PRIX_MOLECULE_MWH", "TERME_STOCKAGE_CPB", "TAXES" 
+    ]
     stream = io.StringIO()
     writer = csv.writer(stream, delimiter=';')
     writer.writerow(headers)
-    writer.writerow([ "12345678900012", "Mon Entreprise", "Chaufferie Bât A", "10 Rue de la Paix", "04500000000000", "150", "T2", "Lot Chauffage", "250.00", "45.50", "8.44" ])
+    writer.writerow([ 
+        "12345678900012", "Mon Entreprise", "Chaufferie Bât A", "10 Rue de la Paix", 
+        "04500000000000", "150", "T2", "Lot Chauffage", 
+        "ENGIE", 
+        "250.00", "45.50", "0.70", "8.44" 
+    ])
     stream.seek(0)
     return StreamingResponse(
         iter([stream.getvalue()]), 
         media_type="text/csv", 
-        headers={"Content-Disposition": "attachment; filename=template_import_gaz_v1.csv"}
+        headers={"Content-Disposition": "attachment; filename=template_import_gaz_expert.csv"}
     )
 
 # --- ROUTES HTML (VUES) ---
