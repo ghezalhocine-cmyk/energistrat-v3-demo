@@ -12,8 +12,9 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V48_TENDER_FACTORY")
+logger = logging.getLogger("CORTEX_MASTER_V48_1_SIRET_EXPORT")
 
+# CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
     import pdfplumber
     PDF_AVAILABLE = True
@@ -31,7 +32,8 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "48.0 (Tender Factory V2: Round-Trip Ready)"
+        self.version = "48.1 (Tender Factory: Added SIRET in BPU)"
+        # Base de connaissance Métier (NAF)
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
             "1013B": "Boucherie", "5610A": "Restauration Trad.", "5610C": "Fast Food",
@@ -47,6 +49,7 @@ class CortexEngine:
             "5510Z": "Hôtellerie", "6832A": "Administration Immeubles", "6832B": "Supports Immobiliers"
         }
 
+    # --- HELPERS DE NETTOYAGE ---
     def _safe_int(self, value):
         try:
             if value is None: return 0
@@ -79,7 +82,7 @@ class CortexEngine:
         return n.title() 
 
     # =========================================================
-    # MODULE 1 : TENDER FACTORY V2 (DQE & BPU MIROIR)
+    # MODULE 1 : TENDER FACTORY V2 (DQE & BPU MIROIR + SIRET)
     # =========================================================
     def generate_advanced_tender_excel(self, sites_data):
         if not sites_data: return b""
@@ -100,6 +103,8 @@ class CortexEngine:
                         conso_det = s.get('consumption_details', {})
                         power_det = c.get('power_details', {})
                         
+                        siret_val = i.get('siret_site') or i.get('siret', '')
+
                         # DQE ROW
                         rows_dqe.append({
                             "Entité": s.get('client_name', ''),
@@ -107,7 +112,8 @@ class CortexEngine:
                             "Adresse": loc.get('address', ''),
                             "CP": loc.get('zip_code', ''),
                             "Ville": loc.get('city', ''),
-                            "INSEE": loc.get('insee', ''), # V48
+                            "INSEE": loc.get('insee', ''), 
+                            "SIRET": siret_val, # Présent dans DQE
                             "PDL": c.get('pdl', ''),
                             "Segment": c.get('segment', ''),
                             "FTA": c.get('fta', ''),
@@ -127,6 +133,7 @@ class CortexEngine:
                         rows_bpu.append({
                             "PDL (Clé)": c.get('pdl', ''),
                             "Nom Site": i.get('site_name', ''),
+                            "SIRET": siret_val, # AJOUT V48.1
                             "Vol. Annuel (Ref)": s.get('kpis', {}).get('volume_mwh', 0) * 1000,
                             "OFFRE_ABO_AN (€)": "",
                             "OFFRE_HPH (€/MWh)": "",
@@ -150,6 +157,8 @@ class CortexEngine:
                         i = s.get('identity', {})
                         loc = s.get('location', {})
                         
+                        siret_val = i.get('siret_site') or i.get('siret', '')
+
                         # DQE GAZ
                         rows_dqe_gaz.append({
                             "Entité": s.get('client_name', ''),
@@ -157,7 +166,8 @@ class CortexEngine:
                             "Adresse": loc.get('address', ''),
                             "CP": loc.get('zip_code', ''),
                             "Ville": loc.get('city', ''),
-                            "INSEE": loc.get('insee', ''), # V48
+                            "INSEE": loc.get('insee', ''),
+                            "SIRET": siret_val, # Présent dans DQE
                             "PCE": c.get('pdl', ''),
                             "CAR (MWh)": self._safe_float(c.get('power', 0)),
                             "CJA": c.get('cja', 0),
@@ -169,6 +179,7 @@ class CortexEngine:
                         rows_bpu_gaz.append({
                             "PCE (Clé)": c.get('pdl', ''),
                             "Nom Site": i.get('site_name', ''),
+                            "SIRET": siret_val, # AJOUT V48.1
                             "CAR (Ref)": self._safe_float(c.get('power', 0)),
                             "OFFRE_ABO_AN (€)": "",
                             "OFFRE_PRIX_MOLECULE (€/MWh)": "",
@@ -186,7 +197,7 @@ class CortexEngine:
             return b""
 
     # =========================================================
-    # MODULE 2 : MARKET WATCH (V44.1)
+    # MODULE 2 : MARKET WATCH (V46.1)
     # =========================================================
     def analyze_market_position(self, client_price, market_price, energy_type, segment="C5"):
         if not client_price or math.isnan(client_price) or client_price <= 0: 
@@ -293,10 +304,7 @@ class CortexEngine:
                     col_adresse = next((c for c in df.columns if "ADRESSE" in str(c).upper()), None)
                     col_cp = next((c for c in df.columns if "CP" == str(c).upper() or "CODE" in str(c).upper()), None)
                     col_ville = next((c for c in df.columns if "COMMUNE" in str(c).upper() or "VILLE" in str(c).upper()), None)
-                    
-                    # NOUVEAU V48 : INSEE
                     col_insee = next((c for c in df.columns if "INSEE" in str(c).upper()), None)
-
                     col_siret_site = next((c for c in df.columns if "SIRET" in str(c).upper()), None)
                     col_naf = next((c for c in df.columns if "NAF" in str(c).upper()), None)
                     col_cee = next((c for c in df.columns if "CEE" in str(c).upper()), None)
@@ -338,7 +346,7 @@ class CortexEngine:
                                 "address": str(row.get(col_adresse)), 
                                 "zip_code": str(row.get(col_cp)), 
                                 "city": str(row.get(col_ville)),
-                                "insee": str(row.get(col_insee, '')) # Stockage INSEE
+                                "insee": str(row.get(col_insee, '')) 
                             },
                             "contract": { 
                                 "pdl": ref_id, 
@@ -365,7 +373,7 @@ class CortexEngine:
                         }
                         sites.append(site)
                     else:
-                        # LOGIQUE ELEC V6.2 (INCHANGÉE MAIS COMPLÈTE)
+                        # LOGIQUE ELEC V6.2
                         col_pdl = next((c for c in df.columns if "PDL" in str(c).upper() or "PRM" in str(c).upper()), None)
                         if not col_pdl: continue
                         pdl = str(row.get(col_pdl, '')).strip()
@@ -408,7 +416,7 @@ class CortexEngine:
                                 "address": str(row.get(col_adresse)), 
                                 "zip_code": str(row.get(col_cp)), 
                                 "city": str(row.get(col_ville)),
-                                "insee": str(row.get(col_insee, '')) # Stockage INSEE
+                                "insee": str(row.get(col_insee, '')) 
                             },
                             "contract": { 
                                 "pdl": pdl, 
