@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V49_OFFER_LAB")
+logger = logging.getLogger("CORTEX_MASTER_V49_1_FUSION")
 
 # CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
@@ -32,7 +32,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "49.0 (Offer Lab: Simulation Engine)"
+        self.version = "49.1 (Integral Fusion: Import V6.4 + Simulator)"
         # Base de connaissance Métier (NAF)
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
@@ -183,7 +183,7 @@ class CortexEngine:
                             "CAR (Ref)": self._safe_float(c.get('power', 0)),
                             "OFFRE_ABO_AN (€)": "",
                             "OFFRE_PRIX_MOLECULE (€/MWh)": "",
-                            "OFFRE_TERME_STOCKAGE (€/MWh)": "",
+                            "OFFRE_TERME_STOCKAGE (€/MWh)": "", # CPB
                             "OFFRE_CEE (€/MWh)": ""
                         })
                         
@@ -233,7 +233,7 @@ class CortexEngine:
             return {"status": "ALIGNE", "color": "blue", "message": f"Prix cohérent avec le {ref_label}.", "action": "Pas d'action requise."}
 
     # =========================================================
-    # MODULE 3 : ROI & KPI (V46.5)
+    # MODULE 3 : ROI & KPI (V46.5 - Gaz CPB + Fixes)
     # =========================================================
     def enrich_fleet_kpis(self, site_data):
         contract = site_data.get('contract', {}) or {}
@@ -241,6 +241,7 @@ class CortexEngine:
         conso_det = site_data.get('consumption_details', {})
         is_gaz = "T" in str(contract.get('segment', ''))
         
+        # 1. CALCUL DU VOLUME RÉEL
         imported_total_vol = site_data.get('contract', {}).get('annual_volume_estimated', 0)
         
         if imported_total_vol > 0:
@@ -259,9 +260,10 @@ class CortexEngine:
                 if is_gaz: vol_mwh = p_sous 
                 else: vol_mwh = (p_sous * 1500) / 1000 
             
+        # 2. CALCUL BUDGET
         price = self._safe_float(pricing.get('hph')) + self._safe_float(pricing.get('tax'))
         fix = self._safe_float(pricing.get('fix'))
-        storage_cost = self._safe_float(pricing.get('storage')) 
+        storage_cost = self._safe_float(pricing.get('storage')) # CPB
         
         calc_price = price
         if price < 2.0: calc_price = price * 1000
@@ -280,7 +282,7 @@ class CortexEngine:
         }
 
     # =========================================================
-    # MODULE 4 : IMPORT MASSE V6.4 (GAZ EXPERT + INSEE)
+    # MODULE 4 : IMPORT MASSE V6.4 (GAZ EXPERT + INSEE - RESTAURÉ)
     # =========================================================
     def parse_mass_import_v5(self, file_content):
         try:
@@ -296,15 +298,21 @@ class CortexEngine:
             
             for _, row in df.iterrows():
                 try:
+                    # MAPPING COMMUN
                     col_entite = next((c for c in df.columns if "ENTIT" in str(c).upper()), None)
                     col_nom = next((c for c in df.columns if "NOM" in str(c).upper()), None)
                     col_adresse = next((c for c in df.columns if "ADRESSE" in str(c).upper()), None)
                     col_cp = next((c for c in df.columns if "CP" == str(c).upper() or "CODE" in str(c).upper()), None)
                     col_ville = next((c for c in df.columns if "COMMUNE" in str(c).upper() or "VILLE" in str(c).upper()), None)
+                    
+                    # RESTAURATION INSEE
                     col_insee = next((c for c in df.columns if "INSEE" in str(c).upper()), None)
+
                     col_siret_site = next((c for c in df.columns if "SIRET" in str(c).upper()), None)
                     col_naf = next((c for c in df.columns if "NAF" in str(c).upper()), None)
                     col_cee = next((c for c in df.columns if "CEE" in str(c).upper()), None)
+
+                    # DÉTECTION GAZ SPÉCIFIQUE (RESTAURATION CPB)
                     col_cpb = next((c for c in df.columns if "STOCKAGE" in str(c).upper() or "CPB" in str(c).upper()), None)
 
                     if is_gaz:
@@ -315,10 +323,12 @@ class CortexEngine:
                         col_profil = next((c for c in df.columns if "PROFIL" in c), None)
                         col_tarif = next((c for c in df.columns if "TARIF" in c), None)
                         col_grd = next((c for c in df.columns if "GRD" in c), None)
+                        
                         col_prix = next((c for c in df.columns if "PRIX" in c and "MWH" in c), None)
                         col_prov = next((c for c in df.columns if "FOURNISSEUR" in str(c).upper()), None)
                         col_abo = next((c for c in df.columns if "ABO" in str(c).upper()), None)
                         col_tax = next((c for c in df.columns if "TAXES" in str(c).upper()), None)
+                        
                         col_start = next((c for c in df.columns if "DEBUT" in str(c).upper()), None)
                         col_end = next((c for c in df.columns if "FIN" in str(c).upper()), None)
 
@@ -335,9 +345,16 @@ class CortexEngine:
                                 "siret_site": str(row.get(col_siret_site, '')),
                                 "naf": str(row.get(col_naf, ''))
                             },
-                            "location": { "address": str(row.get(col_adresse)), "zip_code": str(row.get(col_cp)), "city": str(row.get(col_ville)), "insee": str(row.get(col_insee, '')) },
+                            "location": { 
+                                "address": str(row.get(col_adresse)), 
+                                "zip_code": str(row.get(col_cp)), 
+                                "city": str(row.get(col_ville)),
+                                "insee": str(row.get(col_insee, '')) 
+                            },
                             "contract": { 
-                                "pdl": ref_id, "power": power, "segment": segment, 
+                                "pdl": ref_id, 
+                                "power": power, 
+                                "segment": segment, 
                                 "provider": str(row.get(col_prov, 'Import')),
                                 "cja": self._safe_float(row.get(col_cja, 0)),
                                 "profil": str(row.get(col_profil, '')),
@@ -346,7 +363,9 @@ class CortexEngine:
                                 "start_date": str(row.get(col_start, '')),
                                 "end_date": str(row.get(col_end, ''))
                             },
-                            "technical": { "cee_eligible": str(row.get(col_cee, 'NON')) },
+                            "technical": {
+                                "cee_eligible": str(row.get(col_cee, 'NON'))
+                            },
                             "pricing": {
                                 "fix": str(row.get(col_abo, '0')),
                                 "hph": str(row.get(col_prix, '0')),
@@ -357,6 +376,7 @@ class CortexEngine:
                         }
                         sites.append(site)
                     else:
+                        # LOGIQUE ELEC V6.2
                         col_pdl = next((c for c in df.columns if "PDL" in str(c).upper() or "PRM" in str(c).upper()), None)
                         if not col_pdl: continue
                         pdl = str(row.get(col_pdl, '')).strip()
@@ -395,7 +415,12 @@ class CortexEngine:
                                 "siret_site": str(row.get(col_siret_site, '')),
                                 "naf": str(row.get(col_naf, ''))
                             },
-                            "location": { "address": str(row.get(col_adresse)), "zip_code": str(row.get(col_cp)), "city": str(row.get(col_ville)), "insee": str(row.get(col_insee, '')) },
+                            "location": { 
+                                "address": str(row.get(col_adresse)), 
+                                "zip_code": str(row.get(col_cp)), 
+                                "city": str(row.get(col_ville)),
+                                "insee": str(row.get(col_insee, '')) 
+                            },
                             "contract": { 
                                 "pdl": pdl, 
                                 "power": self._safe_float(row.get(col_ps, 0)), 
@@ -427,6 +452,7 @@ class CortexEngine:
                             }
                         }
                         sites.append(site)
+
                 except Exception as e:
                     logger.warning(f"Row Error: {e}")
                     continue
@@ -612,49 +638,6 @@ class CortexEngine:
             "raw_data": sites_analysis
         }
 
-    # --- AUDIT (Inchangé) ---
-    def analyze_invoice_real(self, inv_b, ctr_b):
-        txt = ""
-        if PDF_AVAILABLE and inv_b:
-            try:
-                with pdfplumber.open(io.BytesIO(inv_b)) as pdf:
-                    for p in pdf.pages: txt += p.extract_text() + "\n"
-            except: pass
-        m_sous = re.search(r"(?:souscrite|ps|p\.souscrite).*?(\d+[.,]?\d*)", txt, re.I)
-        m_max = re.search(r"(?:atteinte|max|pointe).*?(\d+[.,]?\d*)", txt, re.I)
-        p_sous = float(m_sous.group(1).replace(',', '.')) if m_sous else 0
-        p_att = float(m_max.group(1).replace(',', '.')) if m_max else 0
-        checks = [
-            {"point": "Puissance Souscrite", "a": f"{p_sous} kVA", "b": "Seuil", "status": "INFO", "error": False},
-            {"point": "Puissance Atteinte", "a": f"{p_att} kVA", "b": "Relevé", "status": "ALERTE" if p_att > p_sous else "OK", "error": p_att > p_sous},
-            {"point": "Contrat Associé", "a": "Présent" if ctr_b else "Manquant", "b": "-", "status": "OK" if ctr_b else "MANQUANT", "error": not ctr_b}
-        ]
-        return {"score": 100, "checks": checks}
-
-    def run_chaos_monkey(self): return [{"test": "Maths", "status": "OK"}]
-    def ask_agent(self, msg): return self._generate_insight({}, {"p_souscrite": 0})
-    
-    # --- LEGACY CSV (POUR COMPATIBILITÉ TOTALE) ---
-    def generate_tender_package(self, sites_data):
-        output = io.StringIO()
-        writer = csv.writer(output, delimiter=';')
-        writer.writerow(["REF_ID", "NOM", "ADRESSE", "CONSO", "PUISSANCE", "SEGMENT"])
-        for s in sites_data:
-            try:
-                c = s.get('contract', {})
-                i = s.get('identity', {})
-                writer.writerow([
-                    c.get('pdl', ''), 
-                    i.get('name', ''), 
-                    s.get('location', {}).get('address', ''), 
-                    c.get('power', 0), 
-                    c.get('power', 0), 
-                    c.get('segment', '')
-                ])
-            except: continue
-        output.seek(0)
-        return output.getvalue()
-
     # =========================================================
     # MODULE 7 : OFFER LAB (SIMULATOR) - NOUVEAU V49.0
     # =========================================================
@@ -759,5 +742,48 @@ class CortexEngine:
         except Exception as e:
             logger.error(f"Simulation Error: {e}")
             return {"error": str(e)}
+
+    # --- AUDIT (Inchangé) ---
+    def analyze_invoice_real(self, inv_b, ctr_b):
+        txt = ""
+        if PDF_AVAILABLE and inv_b:
+            try:
+                with pdfplumber.open(io.BytesIO(inv_b)) as pdf:
+                    for p in pdf.pages: txt += p.extract_text() + "\n"
+            except: pass
+        m_sous = re.search(r"(?:souscrite|ps|p\.souscrite).*?(\d+[.,]?\d*)", txt, re.I)
+        m_max = re.search(r"(?:atteinte|max|pointe).*?(\d+[.,]?\d*)", txt, re.I)
+        p_sous = float(m_sous.group(1).replace(',', '.')) if m_sous else 0
+        p_att = float(m_max.group(1).replace(',', '.')) if m_max else 0
+        checks = [
+            {"point": "Puissance Souscrite", "a": f"{p_sous} kVA", "b": "Seuil", "status": "INFO", "error": False},
+            {"point": "Puissance Atteinte", "a": f"{p_att} kVA", "b": "Relevé", "status": "ALERTE" if p_att > p_sous else "OK", "error": p_att > p_sous},
+            {"point": "Contrat Associé", "a": "Présent" if ctr_b else "Manquant", "b": "-", "status": "OK" if ctr_b else "MANQUANT", "error": not ctr_b}
+        ]
+        return {"score": 100, "checks": checks}
+
+    def run_chaos_monkey(self): return [{"test": "Maths", "status": "OK"}]
+    def ask_agent(self, msg): return self._generate_insight({}, {"p_souscrite": 0})
+    
+    # --- LEGACY CSV (POUR COMPATIBILITÉ TOTALE) ---
+    def generate_tender_package(self, sites_data):
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=';')
+        writer.writerow(["REF_ID", "NOM", "ADRESSE", "CONSO", "PUISSANCE", "SEGMENT"])
+        for s in sites_data:
+            try:
+                c = s.get('contract', {})
+                i = s.get('identity', {})
+                writer.writerow([
+                    c.get('pdl', ''), 
+                    i.get('name', ''), 
+                    s.get('location', {}).get('address', ''), 
+                    c.get('power', 0), 
+                    c.get('power', 0), 
+                    c.get('segment', '')
+                ])
+            except: continue
+        output.seek(0)
+        return output.getvalue()
 
 cortex = CortexEngine()
