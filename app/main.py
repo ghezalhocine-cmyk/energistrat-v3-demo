@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
-# --- BLOC DIAGNOSTIC IMPORT (AJOUT SÉCURITÉ EXCEL) ---
+# --- BLOC DIAGNOSTIC IMPORT ---
 try:
     import pandas as pd
     import openpyxl
@@ -26,12 +26,11 @@ except ImportError as e:
 # IMPORT DES MOTEURS
 from app.core.cortex_engine import cortex
 from app.core.storage_engine import storage
-# NOUVEAU SPRINT D : MOTEUR PHYSIQUE
 from app.core.cortex_physics import physics 
 
 app = FastAPI(title="ENERGISTRAT V3", version="PROD")
 
-# CONFIGURATION DU CHEMIN (EVOLUTION : FORCE PATH)
+# CONFIGURATION DU CHEMIN
 DATA_DIR = "/app/data"
 if not os.path.exists(DATA_DIR):
     if os.path.exists("data"): 
@@ -57,7 +56,7 @@ async def health_check():
     return {
         "status": "ONLINE", 
         "cortex": cortex.version, 
-        "physics": physics.version, # NOUVEAU SPRINT D
+        "physics": physics.version, 
         "storage": storage.version,
         "excel_engine": "READY" if EXCEL_ENGINE_READY else "MISSING"
     }
@@ -315,10 +314,10 @@ async def update_surface(payload: SurfaceUpdateModel):
 
 @app.post("/api/physics/solar")
 async def api_solar_sim(payload: SolarSimRequest):
-    """ Proxy vers PVGIS via Cortex Physics """
-    # 1. Geocodage (Mock pour MVP, à remplacer par appel API Adresse si besoin)
-    # Pour l'instant on fixe une lat/lon moyenne France si pas d'adresse précise
-    lat, lon = 45.75, 4.85 # Lyon par défaut
+    """ Proxy vers PVGIS via Cortex Physics avec Geocodage """
+    # 1. Geocodage Dynamique
+    lat, lon = physics.get_coordinates_from_address(payload.address)
+    # 2. Simulation Solaire
     return JSONResponse(physics.simulate_solar_roi(lat, lon, payload.surface_roof, payload.electricity_price))
 
 # --- API OPS (ADMIN & ANALYSE) ---
@@ -366,7 +365,6 @@ async def api_audit(invoice: UploadFile = File(...), contract: UploadFile = File
     except Exception as e: 
         return JSONResponse({"score": 0, "checks": [], "error": str(e)})
 
-# --- SPRINT C : SIMULATEUR D'OFFRE ---
 @app.post("/api/ops/simulate_offer")
 async def api_simulate_offer(file: UploadFile = File(...)):
     """
@@ -506,7 +504,7 @@ async def get_tickets():
     tickets = storage.list_tickets()
     return JSONResponse({"tickets": tickets})
 
-# --- TEMPLATES CSV (EVOLUTION V42.2 : SURFACE) ---
+# --- TEMPLATES CSV ---
 @app.get("/api/settings/template_csv")
 async def get_import_template():
     # Template Elec Expert V8
@@ -555,7 +553,7 @@ async def get_import_template():
     writer.writerow(headers)
     writer.writerow([ 
         "Mairie de Lyon", "Ecole J.Ferry", "10 Rue de la Paix", "69002", "Lyon", "69123",
-        "1500", # Surface
+        "1500",
         "12345678900012", "8411Z", "OUI", "100", "NON",
         "30000000000000", "C4", "CU", "Enedis", "Bâtiment",
         "60", "45", 
@@ -606,7 +604,7 @@ async def get_import_template_gaz():
     writer.writerow(headers)
     writer.writerow([ 
         "Mairie de Lyon", "Chaufferie Bât A", "10 Rue de la Paix", "69002", "Lyon", "69123",
-        "850", # Surface
+        "850",
         "12345678900012", "8411Z", "OUI",
         "04500000000000", "150", "0.5", "T2", "P012", "T2", "GRDF",
         "01/01/2025", "31/12/2026",
@@ -634,7 +632,6 @@ async def view_dashboard(request: Request, profile: str):
         return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
     return JSONResponse({"error": f"Template missing: {f}"}, 404)
 
-# --- SPRINT D : NOUVELLES PAGES SATELLITES ---
 @app.get("/audit")
 async def view_audit(request: Request): 
     return templates.TemplateResponse("audit.html", {"request": request})
