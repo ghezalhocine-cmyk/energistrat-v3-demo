@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>ENERGISTRAT | Audit & Benchmark</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { abysse: '#050505', card: '#0F172A', eco: '#10B981', warning: '#F59E0B', bad: '#EF4444' },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #050505; color: white; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; backdrop-filter: blur(10px); }
+        .input-bento { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px; border-radius: 8px; width: 100%; text-align: center; font-family: 'JetBrains Mono'; }
+        .input-bento:focus { border-color: #10B981; outline: none; }
+        
+        /* DPE BARS */
+        .dpe-bar { height: 30px; margin-bottom: 8px; border-radius: 4px; position: relative; clip-path: polygon(0% 0%, 95% 0%, 100% 50%, 95% 100%, 0% 100%); display: flex; align-items: center; padding-left: 15px; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5); opacity: 0.3; transition: all 0.3s; }
+        .dpe-bar.active { opacity: 1; transform: scale(1.02); box-shadow: 0 0 20px rgba(255,255,255,0.1); border: 2px solid white; }
+        .dpe-A { background: #009C3D; width: 30%; }
+        .dpe-B { background: #52B153; width: 40%; }
+        .dpe-C { background: #78BD76; width: 50%; }
+        .dpe-D { background: #F4E70F; width: 60%; color: black; text-shadow: none; }
+        .dpe-E { background: #F0B50F; width: 70%; color: black; text-shadow: none; }
+        .dpe-F { background: #EB8235; width: 80%; }
+        .dpe-G { background: #D7221F; width: 90%; }
+    </style>
+</head>
+<body class="flex h-screen w-screen overflow-hidden">
+
+    <!-- SIDEBAR -->
+    <aside class="w-20 bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-50">
+        <a href="/dashboard/retail" class="w-10 h-10 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <div class="w-10 h-10 rounded-xl bg-eco/20 text-eco flex items-center justify-center font-bold mb-4 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+            <i class="fa-solid fa-stethoscope"></i>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 flex flex-col relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-eco/10 via-abysse to-abysse">
+        
+        <header class="h-20 flex items-center justify-between px-10 border-b border-white/5">
+            <div>
+                <h1 class="text-2xl font-black text-white tracking-tight">AUDIT <span class="text-eco">& BENCHMARK</span></h1>
+                <p class="text-xs text-gray-400">Analyse de performance énergétique (IPE & NAF)</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <select id="site-selector" onchange="loadSiteContext()" class="bg-card border border-white/10 text-sm rounded-xl px-4 py-2 text-white outline-none focus:border-eco min-w-[300px]">
+                    <option value="">-- Sélectionner un site --</option>
+                </select>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-10">
+            
+            <!-- ETAT INITIAL : DEMANDE SURFACE -->
+            <div id="surface-request" class="hidden h-full flex flex-col items-center justify-center">
+                <div class="bento-card p-10 text-center max-w-md border border-eco/30 shadow-[0_0_50px_rgba(16,185,129,0.1)]">
+                    <div class="w-16 h-16 rounded-full bg-eco/10 text-eco flex items-center justify-center text-3xl mx-auto mb-6"><i class="fa-solid fa-ruler-combined"></i></div>
+                    <h2 class="text-xl font-bold text-white mb-2">Donnée Manquante</h2>
+                    <p class="text-sm text-gray-400 mb-6">Pour calculer l'efficacité (kWh/m²), Cortex a besoin de la surface du bâtiment.</p>
+                    
+                    <div class="relative mb-6">
+                        <input type="number" id="input-surface" placeholder="Surface en m²" class="input-bento text-xl font-bold">
+                        <span class="absolute right-4 top-3 text-gray-500 font-mono">m²</span>
+                    </div>
+                    
+                    <button onclick="saveSurface()" class="w-full bg-eco text-abysse font-black py-3 rounded-xl hover:bg-white transition">LANCER L'AUDIT</button>
+                </div>
+            </div>
+
+            <!-- RESULTATS AUDIT -->
+            <div id="audit-results" class="hidden grid grid-cols-12 gap-8 h-full">
+                
+                <!-- GAUCHE : DPE -->
+                <div class="col-span-5 bento-card p-8 border-l-4 border-eco flex flex-col">
+                    <h3 class="text-sm font-bold text-gray-400 uppercase mb-6">Performance Énergétique</h3>
+                    
+                    <div class="flex-1 flex flex-col justify-center space-y-1" id="dpe-scale">
+                        <div class="dpe-bar dpe-A" id="bar-A">A <span class="ml-auto mr-4 text-[10px] font-normal">&lt; 0.5x Ref</span></div>
+                        <div class="dpe-bar dpe-B" id="bar-B">B</div>
+                        <div class="dpe-bar dpe-C" id="bar-C">C <span class="ml-auto mr-4 text-[10px] font-normal">Standard</span></div>
+                        <div class="dpe-bar dpe-D" id="bar-D">D</div>
+                        <div class="dpe-bar dpe-E" id="bar-E">E</div>
+                        <div class="dpe-bar dpe-F" id="bar-F">F</div>
+                        <div class="dpe-bar dpe-G" id="bar-G">G <span class="ml-auto mr-4 text-[10px] font-normal">&gt; 1.5x Ref</span></div>
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t border-white/5 flex justify-between items-center">
+                        <div>
+                            <div class="text-[10px] text-gray-500 uppercase">Votre IPE</div>
+                            <div class="text-3xl font-bold text-white"><span id="val-ipe">--</span> <span class="text-sm text-gray-500 font-normal">kWh/m²/an</span></div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] text-gray-500 uppercase">Moyenne Secteur</div>
+                            <div class="text-xl font-bold text-gray-300" id="val-ref">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DROITE : IMPACT & SECTEUR -->
+                <div class="col-span-7 flex flex-col gap-6">
+                    
+                    <!-- CONTEXTE SECTEUR -->
+                    <div class="bento-card p-6 flex items-center gap-6">
+                        <div class="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-2xl"><i class="fa-solid fa-briefcase"></i></div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white mb-1">Comparaison Sectorielle</h3>
+                            <p class="text-sm text-gray-400">Basé sur le code NAF : <span id="val-naf" class="text-white font-mono bg-white/10 px-2 rounded">--</span></p>
+                            <p class="text-xs text-blue-400 mt-2" id="txt-comparison">Analyse en cours...</p>
+                        </div>
+                    </div>
+
+                    <!-- IMPACT ECOLOGIQUE -->
+                    <div class="grid grid-cols-2 gap-6 flex-1">
+                        <div class="bento-card p-6 flex flex-col items-center justify-center text-center group hover:border-eco/50 transition">
+                            <i class="fa-solid fa-cloud text-4xl text-gray-600 group-hover:text-white mb-4 transition"></i>
+                            <div class="text-3xl font-bold text-white mb-1" id="val-co2">-- t</div>
+                            <div class="text-xs text-gray-500 uppercase">CO2 émis / an</div>
+                        </div>
+                        <div class="bento-card p-6 flex flex-col items-center justify-center text-center group hover:border-eco/50 transition">
+                            <i class="fa-solid fa-tree text-4xl text-green-800 group-hover:text-green-500 mb-4 transition"></i>
+                            <div class="text-3xl font-bold text-white mb-1" id="val-trees">--</div>
+                            <div class="text-xs text-gray-500 uppercase">Arbres à planter</div>
+                            <p class="text-[9px] text-gray-600 mt-2">Pour compenser l'empreinte</p>
+                        </div>
+                    </div>
+
+                    <!-- BOUTON MODIFIER SURFACE -->
+                    <div class="text-right">
+                        <button onclick="editSurface()" class="text-xs text-gray-500 hover:text-white underline">La surface est incorrecte ? Modifier</button>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let FLEET_DATA = [];
+        let CURRENT_SITE = null;
+
+        async function loadSites() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                if(data.fleet) {
+                    FLEET_DATA = data.fleet;
+                    const sel = document.getElementById('site-selector');
+                    FLEET_DATA.forEach(site => {
+                        const opt = document.createElement('option');
+                        opt.value = site.id;
+                        opt.innerText = `${site.name} (${site.city})`;
+                        sel.appendChild(opt);
+                    });
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadSiteContext() {
+            const id = document.getElementById('site-selector').value;
+            if(!id) return;
+
+            // Appel API pour avoir les détails (dont le benchmark calculé par Cortex Physics)
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                const data = await res.json();
+                CURRENT_SITE = data;
+                
+                // Vérification si le benchmark existe déjà (donc surface déjà saisie)
+                if (data.benchmark) {
+                    renderAudit(data.benchmark, data.identity.naf);
+                } else {
+                    showSurfaceForm();
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function showSurfaceForm() {
+            document.getElementById('audit-results').classList.add('hidden');
+            document.getElementById('surface-request').classList.remove('hidden');
+            // Pré-remplissage si une surface existe mais pas de benchmark (cas rare)
+            if(CURRENT_SITE.location && CURRENT_SITE.location.surface) {
+                document.getElementById('input-surface').value = CURRENT_SITE.location.surface;
+            }
+        }
+
+        async function saveSurface() {
+            const surface = document.getElementById('input-surface').value;
+            if(!surface || surface <= 0) return alert("Surface invalide");
+
+            const btn = document.querySelector('#surface-request button');
+            const original = btn.innerText;
+            btn.innerText = "CALCUL EN COURS...";
+
+            try {
+                // 1. Sauvegarde
+                await fetch('/api/settings/update_surface', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ client_id: CURRENT_SITE.identity.id, surface: parseFloat(surface) })
+                });
+
+                // 2. Rechargement pour forcer le calcul du benchmark côté backend
+                await loadSiteContext();
+
+            } catch(e) { alert("Erreur réseau"); }
+            btn.innerText = original;
+        }
+
+        function renderAudit(bench, naf) {
+            document.getElementById('surface-request').classList.add('hidden');
+            document.getElementById('audit-results').classList.remove('hidden');
+
+            // 1. DPE
+            document.querySelectorAll('.dpe-bar').forEach(el => el.classList.remove('active'));
+            const activeBar = document.getElementById(`bar-${bench.grade}`);
+            if(activeBar) activeBar.classList.add('active');
+
+            // 2. Chiffres
+            document.getElementById('val-ipe').innerText = bench.ipe;
+            document.getElementById('val-ref').innerText = bench.reference_ipe;
+            document.getElementById('val-naf').innerText = naf || "Inconnu";
+
+            // 3. Texte
+            const diff = bench.performance_pct;
+            const perfText = diff > 0 ? `Plus performant que la moyenne de ${diff}%` : `Surconsommation de ${Math.abs(diff)}% vs secteur`;
+            document.getElementById('txt-comparison').innerText = perfText;
+            document.getElementById('txt-comparison').className = diff > 0 ? "text-sm text-eco mt-2 font-bold" : "text-sm text-bad mt-2 font-bold";
+
+            // 4. Impact
+            document.getElementById('val-co2').innerText = bench.impact.co2_tons + " t";
+            document.getElementById('val-trees').innerText = bench.impact.trees;
+        }
+
+        function editSurface() {
+            showSurfaceForm();
+        }
+
+        loadSites();
+    </script>
+</body>
+</html>
