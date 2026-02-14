@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V17.0 | Retail Final Suite</title>
+    <title>ENERGISTRAT V16.7 | Retail Full Integral</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -21,7 +21,7 @@
         body { background-color: #050505; color: #E2E8F0; font-family: 'Inter', sans-serif; }
         .bento-card { background: #0F172A; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1rem; position: relative; overflow: hidden; }
         
-        /* STYLE LIGNE CLIQUABLE */
+        /* STYLE LIGNE CLIQUABLE ROBUSTE */
         tr.site-row { cursor: pointer; transition: background-color 0.15s ease; }
         tr.site-row:hover td { background-color: rgba(168, 85, 247, 0.15) !important; color: white; }
 
@@ -44,14 +44,13 @@
 <body class="flex h-screen w-screen overflow-hidden">
 
     <!-- SIDEBAR -->
-    <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col flex-shrink-0 z-50 overflow-y-auto">
-        <div class="h-16 flex items-center px-6 border-b border-white/5 shrink-0">
+    <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col flex-shrink-0 z-50">
+        <div class="h-16 flex items-center px-6 border-b border-white/5">
             <div class="w-8 h-8 rounded bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white font-bold shadow-lg">E</div>
             <span class="ml-3 font-bold tracking-wide text-white">RETAIL<span class="text-primary">.OS</span></span>
         </div>
-        
         <div class="p-4 space-y-4">
-            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider">Pilotage</div>
+            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider">Navigation</div>
             <div onclick="window.switchView('fleet')" id="nav-fleet" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 cursor-pointer hover:bg-white/5 transition">
                 <i class="fa-solid fa-earth-europe w-5 text-center"></i> Vision Parc
             </div>
@@ -63,7 +62,7 @@
             </div>
         </div>
 
-        <!-- BLOC OUTILS EXPERTS (NOUVEAU V17.0) -->
+        <!-- BLOC OUTILS EXPERTS -->
         <div class="px-4 mt-2 mb-4">
             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-2">Outils Experts</div>
             <a href="/audit" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition group">
@@ -216,6 +215,7 @@
             <!-- VUE 3 : DÉTAIL & MODIFICATION -->
             <div id="view-detail" class="view-section hidden space-y-6">
                 <button onclick="window.switchView('fleet')" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4"><i class="fa-solid fa-arrow-left"></i> RETOUR LISTE</button>
+                
                 <div class="flex justify-between items-start">
                     <div>
                         <div class="flex items-center gap-3">
@@ -325,7 +325,6 @@
 
         </div>
 
-        <!-- ACTION BAR -->
         <div id="action-bar" class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-50 transform translate-y-32 transition-transform duration-300">
             <div class="font-bold"><span id="selected-count" class="text-primary">0</span> sites sélectionnés</div>
             <div class="h-6 w-px bg-gray-200"></div>
@@ -542,11 +541,8 @@
                 row.className = "site-row border-b border-white/5 hover:bg-white/5 cursor-pointer transition";
                 
                 // ATTACHEMENT DIRECT ET ROBUSTE
-                row.onclick = function(e) {
-                    // Si on clique sur la checkbox, on ne déclenche pas le détail
-                    if(e.target.type === 'checkbox' || e.target.tagName === 'INPUT') return;
-                    window.loadDetail(site.id);
-                };
+                row.setAttribute('data-id', site.id);
+                row.setAttribute('onclick', 'window.openDetail(this)');
                 
                 const city = site.city || '-';
                 const zip = site.zip || ''; 
@@ -554,7 +550,7 @@
                 const prov = site.provider || 'Inconnu';
                 
                 row.innerHTML = `
-                    <td class="px-4 py-3 text-center">
+                    <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
                         <input type="checkbox" class="accent-primary w-4 h-4 cursor-pointer" onchange="window.toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}>
                     </td>
                     <td class="px-4 py-3 font-bold text-white">${site.name}</td>
@@ -609,8 +605,8 @@
             }
         }
 
-        window.toggleSelection = function(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
-        window.selectAll = function() { if(SELECTED_IDS.size === FLEET_DATA.length) SELECTED_IDS.clear(); else FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); renderTable(FLEET_DATA); updateActionBar(); }
+        function toggleSelection(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
+        function selectAll() { if(SELECTED_IDS.size === FLEET_DATA.length) SELECTED_IDS.clear(); else FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); renderTable(FLEET_DATA); updateActionBar(); }
         function updateActionBar() { 
             const count = SELECTED_IDS.size; 
             safeSetText('selected-count', count);
@@ -618,7 +614,7 @@
             if(bar) { if(count > 0) bar.classList.add('visible'); else bar.classList.remove('visible'); bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; }
         }
 
-        window.generateTender = async function() {
+        async function generateTender() {
             if(SELECTED_IDS.size === 0) return alert("Veuillez sélectionner au moins un site.");
             const btn = document.querySelector('#action-bar button');
             const original = btn.innerHTML;
@@ -642,30 +638,21 @@
         function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
         function addPriceLine(c, l, v, cl) { c.innerHTML += `<div class="flex justify-between text-xs border-b border-white/5 pb-2"><span class="text-gray-500">${l}</span><span class="font-mono ${cl}">${v}</span></div>`; }
         
-        // --- SPRINT C : TRIGGER OFFER LAB ---
         async function triggerOfferScan(input) {
             if(!input.files || input.files.length === 0) return;
             const file = input.files[0];
             const name = document.getElementById('offer-name').value || "Offre Inconnue";
-            
             const formData = new FormData();
             formData.append("file", file);
-            
             const parent = input.parentElement;
             const originalHTML = parent.innerHTML;
             parent.innerHTML = '<div class="flex flex-col items-center justify-center pt-5 pb-6"><i class="fa-solid fa-spinner fa-spin text-3xl text-cyan mb-2"></i><p class="text-sm text-gray-400">Simulation en cours...</p></div>';
-
             try {
                 const res = await fetch('/api/ops/simulate_offer', { method: 'POST', body: formData });
                 const data = await res.json();
-                
-                if(data.success && data.summary) {
-                    renderSimulation(data, name);
-                } else {
-                    alert("Erreur Simulation : " + (data.error || "Inconnue"));
-                }
+                if(data.success && data.summary) { renderSimulation(data, name); } 
+                else { alert("Erreur Simulation : " + (data.error || "Inconnue")); }
             } catch(e) { console.error(e); alert("Erreur réseau"); }
-            
             setTimeout(() => { if(input) parent.innerHTML = originalHTML; }, 2000);
         }
 
@@ -699,54 +686,28 @@
             const isGaz = data.energy_type === 'gaz';
             safeSetText('detail-title', data.identity.site_name || "Site");
             safeSetText('detail-address', data.location.address);
-            
             const badge = document.getElementById('detail-badge');
             if(badge) {
                 badge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
                 badge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${isGaz ? 'bg-gas/10 text-gas' : 'bg-cyan/10 text-cyan'}`;
             }
-
             const dqeGrid = document.getElementById('dqe-grid');
             if(dqeGrid) {
                 const c = data.contract || {};
                 const t = data.technical || {};
                 const p = c.power_details || {};
                 const safeVal = (v, unit) => v ? `${v} ${unit}` : '-';
-                
-                let html = `
-                    <div><span class="text-gray-500 block mb-1">PDL / PCE</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div>
-                    <div><span class="text-gray-500 block mb-1">Segment</span><span class="text-white font-bold">${c.segment || '-'}</span></div>
-                    <div><span class="text-gray-500 block mb-1">Début Contrat</span><span class="text-white">${c.start_date || '-'}</span></div>
-                    <div><span class="text-gray-500 block mb-1">Fin Contrat</span><span class="text-white">${c.end_date || '-'}</span></div>
-                `;
-                
+                let html = `<div><span class="text-gray-500 block mb-1">PDL / PCE</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block mb-1">Segment</span><span class="text-white font-bold">${c.segment || '-'}</span></div><div><span class="text-gray-500 block mb-1">Début Contrat</span><span class="text-white">${c.start_date || '-'}</span></div><div><span class="text-gray-500 block mb-1">Fin Contrat</span><span class="text-white">${c.end_date || '-'}</span></div>`;
                 if(isGaz) {
-                    html += `
-                        <div><span class="text-gray-500 block mb-1">CAR</span><span class="text-white font-bold text-yellow-500">${safeVal(c.power, 'MWh')}</span></div>
-                        <div><span class="text-gray-500 block mb-1">CJA</span><span class="text-white font-mono">${safeVal(c.cja, 'MWh/j')}</span></div>
-                        <div><span class="text-gray-500 block mb-1">Profil</span><span class="text-white font-mono">${c.profil || '-'}</span></div>
-                        <div><span class="text-gray-500 block mb-1">Tarif Ach.</span><span class="text-white font-mono">${c.tarif_acheminement || '-'}</span></div>
-                    `;
+                    html += `<div><span class="text-gray-500 block mb-1">CAR</span><span class="text-white font-bold text-yellow-500">${safeVal(c.power, 'MWh')}</span></div><div><span class="text-gray-500 block mb-1">CJA</span><span class="text-white font-mono">${safeVal(c.cja, 'MWh/j')}</span></div><div><span class="text-gray-500 block mb-1">Profil</span><span class="text-white font-mono">${c.profil || '-'}</span></div><div><span class="text-gray-500 block mb-1">Tarif Ach.</span><span class="text-white font-mono">${c.tarif_acheminement || '-'}</span></div>`;
                 } else {
-                    html += `
-                        <div><span class="text-gray-500 block mb-1">FTA</span><span class="text-white">${c.fta || '-'}</span></div>
-                        <div><span class="text-gray-500 block mb-1">PS Max</span><span class="text-white font-bold text-yellow-500">${safeVal(c.power, 'kVA')}</span></div>
-                        <div><span class="text-gray-500 block mb-1">Pointe Max</span><span class="text-white font-mono">${safeVal(c.p_max, 'kW')}</span></div>
-                        <div><span class="text-gray-500 block mb-1">GRD</span><span class="text-white">${c.grd || 'Enedis'}</span></div>
-                        <div class="col-span-4 h-px bg-white/5 my-2"></div>
-                        <div><span class="text-gray-500 block mb-1">PS HPH</span><span class="text-white font-mono">${safeVal(p.hph, 'kVA')}</span></div>
-                        <div><span class="text-gray-500 block mb-1">PS HCH</span><span class="text-white font-mono">${safeVal(p.hch, 'kVA')}</span></div>
-                        <div><span class="text-gray-500 block mb-1">PS HPE</span><span class="text-white font-mono">${safeVal(p.hpe, 'kVA')}</span></div>
-                        <div><span class="text-gray-500 block mb-1">PS HCE</span><span class="text-white font-mono">${safeVal(p.hce, 'kVA')}</span></div>
-                    `;
+                    html += `<div><span class="text-gray-500 block mb-1">FTA</span><span class="text-white">${c.fta || '-'}</span></div><div><span class="text-gray-500 block mb-1">PS Max</span><span class="text-white font-bold text-yellow-500">${safeVal(c.power, 'kVA')}</span></div><div><span class="text-gray-500 block mb-1">Pointe Max</span><span class="text-white font-mono">${safeVal(c.p_max, 'kW')}</span></div><div><span class="text-gray-500 block mb-1">GRD</span><span class="text-white">${c.grd || 'Enedis'}</span></div><div class="col-span-4 h-px bg-white/5 my-2"></div><div><span class="text-gray-500 block mb-1">PS HPH</span><span class="text-white font-mono">${safeVal(p.hph, 'kVA')}</span></div><div><span class="text-gray-500 block mb-1">PS HCH</span><span class="text-white font-mono">${safeVal(p.hch, 'kVA')}</span></div><div><span class="text-gray-500 block mb-1">PS HPE</span><span class="text-white font-mono">${safeVal(p.hpe, 'kVA')}</span></div><div><span class="text-gray-500 block mb-1">PS HCE</span><span class="text-white font-mono">${safeVal(p.hce, 'kVA')}</span></div>`;
                 }
                 dqeGrid.innerHTML = html;
             }
-
             const coach = data.cortex_insight;
             const msgEl = document.getElementById('cortex-msg');
             if(msgEl) msgEl.innerText = coach.message + " " + coach.conseil;
-
             const market = data.market_analysis;
             if(market) {
                 safeSetText('market-badge', market.status);
@@ -757,7 +718,6 @@
                 const mBadge = document.getElementById('market-badge');
                 if(mBadge) mBadge.style.backgroundColor = color;
             }
-
             const list = document.getElementById('detail-pricing');
             if(list) {
                 list.innerHTML = '';
@@ -774,7 +734,6 @@
                     addPriceLine(list, "HCE", data.pricing.hce, "text-cyan");
                 }
             }
-
             const pSub = parseFloat(data.contract.power);
             const pReach = pSub * (isGaz ? 0.9 : 0.7); 
             safeSetText('detail-sub', `Souscrit: ${pSub} ${isGaz ? 'MWh' : 'kVA'}`);
@@ -788,7 +747,6 @@
             const gain = (!isGaz && ratio < 60) ? Math.floor((pSub - pReach*1.2) * 18) : 0;
             safeSetText('detail-gain', gain > 0 ? `+ ${gain} €/an` : "OPTIMISÉ");
             safeSetText('detail-advice', gain > 0 ? "Conseil: Baissez votre puissance souscrite." : "Votre contrat est bien calibré.");
-
             const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
             const timeProgress = (dayOfYear / 365) * 100;
             const budgetProgress = timeProgress * 1.05; 
@@ -801,6 +759,42 @@
                 budBar.style.width = Math.min(budgetProgress, 100) + "%";
                 if(budgetProgress > timeProgress + 5) { budBar.className = "gauge-fill bg-red-500 rounded-full"; } 
                 else { budBar.className = "gauge-fill bg-primary rounded-full"; }
+            }
+        }
+
+        // --- FONCTION CALCULATE LEAGUE RESTAURÉE (INTEGRALE) ---
+        function calculateLeague() {
+            if (LEAGUE_DATA && LEAGUE_DATA.gold) {
+                updatePodium('1', LEAGUE_DATA.gold, true);
+                if(LEAGUE_DATA.silver) updatePodium('2', LEAGUE_DATA.silver, true);
+                if(LEAGUE_DATA.bronze) updatePodium('3', LEAGUE_DATA.bronze, true);
+                const list = document.getElementById('league-list');
+                if(list && LEAGUE_DATA.cancres) {
+                    list.innerHTML = '';
+                    LEAGUE_DATA.cancres.forEach((site, index) => {
+                        list.innerHTML += `<div class="flex items-center gap-4 p-3 bg-white/5 rounded-lg border border-white/5"><div class="w-6 h-6 rounded-full bg-red-900 text-red-200 text-xs font-bold flex items-center justify-center">!</div><div class="flex-1 font-bold text-sm text-white">${site.nom_site}</div><div class="text-right font-mono text-xs text-red-400">${Math.round(site.pmc)} €/MWh</div></div>`;
+                    });
+                }
+                return;
+            }
+            // Fallback Local
+            const ranked = [...FLEET_DATA].sort((a, b) => {
+                const ratioA = a.budget > 0 ? (a.ghost_savings / a.budget) : 0;
+                const ratioB = b.budget > 0 ? (b.ghost_savings / b.budget) : 0;
+                return ratioA - ratioB; 
+            });
+            if(ranked[0]) updatePodium('1', ranked[0], false);
+            if(ranked[1]) updatePodium('2', ranked[1], false);
+            if(ranked[2]) updatePodium('3', ranked[2], false);
+            const list = document.getElementById('league-list');
+            if(list) {
+                list.innerHTML = '';
+                ranked.slice(3).forEach((site, index) => {
+                    const ratio = site.budget > 0 ? Math.round((site.ghost_savings / site.budget) * 100) : 0;
+                    if(ratio > 10) {
+                        list.innerHTML += `<div class="flex items-center gap-4 p-3 bg-white/5 rounded-lg border border-white/5"><div class="w-6 h-6 rounded-full bg-gray-700 text-xs font-bold flex items-center justify-center">${index + 4}</div><div class="flex-1 font-bold text-sm text-white">${site.name}</div><div class="text-right font-mono text-xs text-red-400">${ratio}% Gaspillage</div></div>`;
+                    }
+                });
             }
         }
 
