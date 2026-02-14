@@ -135,6 +135,9 @@
                 if(data.fleet) {
                     FLEET_DATA = data.fleet;
                     const sel = document.getElementById('site-selector');
+                    // Reset pour éviter doublons
+                    sel.innerHTML = '<option value="">-- Sélectionner un site --</option>';
+                    
                     FLEET_DATA.forEach(site => {
                         const opt = document.createElement('option');
                         opt.value = site.id;
@@ -154,15 +157,15 @@
             }
 
             try {
-                // 1. Récupération Données Site
                 const res = await fetch(`/api/dashboard/data/${id}`);
                 const data = await res.json();
                 CURRENT_SITE = data;
                 
                 renderAnalysis(data);
                 
-                // 2. Appel Météo avec VRAIE Géolocalisation
-                fetchWeatherData(data.location.city || "Paris");
+                // Appel Météo avec ville
+                const city = data.location.city || "Paris";
+                fetchWeatherData(city);
 
             } catch(e) { console.error(e); }
         }
@@ -172,13 +175,11 @@
             document.getElementById('climate-dashboard').classList.remove('hidden');
             document.getElementById('loc-city').innerText = data.location.city || "France";
 
-            // Calcul Hiver / Eté basé sur DQE
             const conso = data.consumption_details || {};
             const winter = (conso.hph || 0) + (conso.hch || 0);
             const summer = (conso.hpe || 0) + (conso.hce || 0);
             const total = winter + summer;
 
-            // Fallback si pas de détail horaire
             const wVal = total > 0 ? winter : (data.contract.power * 1500 * 0.65);
             const sVal = total > 0 ? summer : (data.contract.power * 1500 * 0.35);
             const tVal = wVal + sVal;
@@ -192,7 +193,6 @@
             
             document.getElementById('bar-winter').style.width = pctWinter + "%";
 
-            // Diagnostic
             const label = document.getElementById('sensi-label');
             const icon = document.getElementById('sensi-icon');
             const desc = document.getElementById('sensi-desc');
@@ -216,7 +216,6 @@
         }
 
         async function fetchWeatherData(city) {
-            // STEP 1 : GEOCODAGE RÉEL (API GOUV)
             let lat = 46.22; 
             let lon = 2.21;
             
@@ -230,22 +229,72 @@
                 }
             } catch(e) { console.error("Geo Error", e); }
 
-            // STEP 2 : DATE DYNAMIQUE (Année N-1)
             const currentYear = new Date().getFullYear();
             const lastYear = currentYear - 1;
             document.getElementById('ref-year').innerText = lastYear;
             document.getElementById('chart-title').innerText = `Corrélation Conso / Température (${lastYear})`;
 
             try {
-                // STEP 3 : DONNÉES HISTORIQUES RÉELLES
                 const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${lastYear}-01-01&end_date=${lastYear}-12-31&daily=temperature_2m_mean&timezone=Europe%2FParis`;
                 
                 const res = await fetch(url);
                 const meteo = await res.json();
                 
-                // Agrégation Mensuelle
                 const monthlyTemps = new Array(12).fill(0);
                 const counts = new Array(12).fill(0);
                 
-                meteo.daily.time.forEach((dateStr, i) => {
-                    const month = new Date(dateStr).getMonth();
+                if (meteo.daily) {
+                    meteo.daily.time.forEach((dateStr, i) => {
+                        const month = new Date(dateStr).getMonth();
+                        monthlyTemps[month] += meteo.daily.temperature_2m_mean[i];
+                        counts[month]++;
+                    });
+                }
+                
+                const avgTemps = monthlyTemps.map((sum, i) => counts[i] ? Math.round(sum / counts[i]) : 0);
+                
+                updateChart(avgTemps);
+
+            } catch(e) { console.error("Météo Error", e); }
+        }
+
+        function updateChart(temps) {
+            const ctx = document.getElementById('climateChart').getContext('2d');
+            if(chartInstance) chartInstance.destroy();
+
+            const wLoad = parseFloat(document.getElementById('vol-winter').innerText) * 1000 / 7; 
+            const sLoad = parseFloat(document.getElementById('vol-summer').innerText) * 1000 / 5; 
+            
+            const consoData = [
+                wLoad, wLoad, wLoad, wLoad, // Jan-Avr
+                sLoad, sLoad, sLoad, sLoad, sLoad, // Mai-Sep
+                wLoad, wLoad, wLoad // Oct-Dec
+            ];
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Jui', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
+                    datasets: [
+                        { label: 'Consommation (kWh)', data: consoData, backgroundColor: '#3B82F6', order: 2, yAxisID: 'y' },
+                        { type: 'line', label: 'Température Ext. (°C)', data: temps, borderColor: '#EF4444', borderWidth: 2, yAxisID: 'y1', order: 1, tension: 0.4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: 'white' } } },
+                    scales: {
+                        y: { position: 'left', grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'gray' } },
+                        y1: { position: 'right', grid: { display: false }, ticks: { color: '#EF4444' }, reverse: true },
+                        x: { grid: { display: false }, ticks: { color: 'gray' } }
+                    }
+                }
+            });
+        }
+
+        // --- FIX : CHARGEMENT AU DEMARRAGE ---
+        document.addEventListener('DOMContentLoaded', loadSites);
+    </script>
+</body>
+</html>
