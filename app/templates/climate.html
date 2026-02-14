@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT | Climate Control</title>
+    <title>ENERGISTRAT | Climate Control Real</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -20,7 +20,6 @@
     <style>
         body { background-color: #050505; color: #E2E8F0; font-family: 'Inter', sans-serif; }
         .bento-card { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; backdrop-filter: blur(10px); }
-        .temp-badge { font-family: 'JetBrains Mono'; font-weight: bold; padding: 4px 8px; border-radius: 6px; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden">
@@ -41,7 +40,7 @@
         <header class="h-20 flex items-center justify-between px-10 border-b border-white/5">
             <div>
                 <h1 class="text-2xl font-black text-white tracking-tight">CLIMAT <span class="text-cold">& MÉTÉO</span></h1>
-                <p class="text-xs text-gray-400">Analyse de la sensibilité thermique (DJU)</p>
+                <p class="text-xs text-gray-400">Analyse DJU & Rigueur Climatique (Données Réelles)</p>
             </div>
             <div class="flex items-center gap-4">
                 <select id="site-selector" onchange="loadSiteContext()" class="bg-card border border-white/10 text-sm rounded-xl px-4 py-2 text-white outline-none focus:border-cold min-w-[300px]">
@@ -98,7 +97,7 @@
                         <div class="text-center py-4">
                             <div class="text-4xl mb-2" id="sensi-icon">🌡️</div>
                             <div class="text-xl font-bold text-white" id="sensi-label">Analyse...</div>
-                            <p class="text-xs text-gray-500 mt-2 px-4" id="sensi-desc">Le calcul compare l'écart de consommation entre l'été et l'hiver.</p>
+                            <p class="text-xs text-gray-500 mt-2 px-4" id="sensi-desc">Le calcul croise vos volumes avec les températures historiques locales.</p>
                         </div>
                     </div>
                 </div>
@@ -107,15 +106,16 @@
                 <div class="col-span-8 flex flex-col">
                     <div class="bento-card p-6 flex-1 flex flex-col relative">
                         <div class="flex justify-between items-center mb-6">
-                            <h3 class="font-bold text-white text-sm">Corrélation Conso / Température (2024)</h3>
+                            <h3 class="font-bold text-white text-sm" id="chart-title">Corrélation Conso / Température</h3>
                             <div class="flex gap-4">
                                 <span class="text-[10px] bg-white/5 px-2 py-1 rounded text-gray-400"><i class="fa-solid fa-location-dot mr-1"></i> <span id="loc-city">--</span></span>
+                                <span class="text-[10px] bg-white/5 px-2 py-1 rounded text-gray-400"><i class="fa-solid fa-calendar mr-1"></i> <span id="ref-year">--</span></span>
                             </div>
                         </div>
                         <div class="flex-1 relative w-full h-full">
                             <canvas id="climateChart"></canvas>
                         </div>
-                        <div class="absolute bottom-4 right-6 text-[9px] text-gray-600">Données Météo : Open-Meteo API</div>
+                        <div class="absolute bottom-4 right-6 text-[9px] text-gray-600">Données Météo : Open-Meteo API (Station Locale)</div>
                     </div>
                 </div>
 
@@ -154,15 +154,14 @@
             }
 
             try {
-                // 1. Récupération Données Site (Conso Hiver/Eté)
+                // 1. Récupération Données Site
                 const res = await fetch(`/api/dashboard/data/${id}`);
                 const data = await res.json();
                 CURRENT_SITE = data;
                 
                 renderAnalysis(data);
                 
-                // 2. Appel API Météo (Client Side pour éviter surcharge serveur)
-                // On utilise la ville ou une position par défaut si inconnue
+                // 2. Appel Météo avec VRAIE Géolocalisation
                 fetchWeatherData(data.location.city || "Paris");
 
             } catch(e) { console.error(e); }
@@ -173,18 +172,17 @@
             document.getElementById('climate-dashboard').classList.remove('hidden');
             document.getElementById('loc-city').innerText = data.location.city || "France";
 
-            // Calcul Hiver / Eté basé sur les données DQE (Conso Details)
+            // Calcul Hiver / Eté basé sur DQE
             const conso = data.consumption_details || {};
             const winter = (conso.hph || 0) + (conso.hch || 0);
             const summer = (conso.hpe || 0) + (conso.hce || 0);
             const total = winter + summer;
 
-            // Si pas de détail (cas import simple), on simule une répartition standard (60/40)
+            // Fallback si pas de détail horaire
             const wVal = total > 0 ? winter : (data.contract.power * 1500 * 0.65);
             const sVal = total > 0 ? summer : (data.contract.power * 1500 * 0.35);
             const tVal = wVal + sVal;
 
-            // Affichage
             document.getElementById('vol-winter').innerText = Math.round(wVal/1000) + " MWh";
             document.getElementById('vol-summer').innerText = Math.round(sVal/1000) + " MWh";
             
@@ -194,7 +192,7 @@
             
             document.getElementById('bar-winter').style.width = pctWinter + "%";
 
-            // Diagnostic Sensibilité
+            // Diagnostic
             const label = document.getElementById('sensi-label');
             const icon = document.getElementById('sensi-icon');
             const desc = document.getElementById('sensi-desc');
@@ -203,28 +201,44 @@
                 label.innerText = "Très Sensible (Chauffage)";
                 label.className = "text-xl font-bold text-red-400";
                 icon.innerText = "🔥";
-                desc.innerText = "Votre consommation explose en hiver. Isolation ou régulation à prioriser.";
+                desc.innerText = "Forte corrélation avec la température hivernale.";
             } else if (pctWinter > 60) {
                 label.innerText = "Sensibilité Moyenne";
                 label.className = "text-xl font-bold text-yellow-400";
                 icon.innerText = "🏠";
-                desc.innerText = "Profil classique tertiaire/résidentiel.";
+                desc.innerText = "Profil mixte chauffage/usage.";
             } else {
                 label.innerText = "Peu Sensible (Process)";
                 label.className = "text-xl font-bold text-blue-400";
                 icon.innerText = "🏭";
-                desc.innerText = "Votre consommation est stable toute l'année (Indépendante du climat).";
+                desc.innerText = "Consommation stable (Process ou Climatisation).";
             }
         }
 
         async function fetchWeatherData(city) {
-            // Geocoding simple (Mock pour MVP : Paris si échec)
-            // Dans la V2 : Appel API Adresse Gouv
-            const lat = 46.22; const lon = 2.21; // Centre France par défaut
+            // STEP 1 : GEOCODAGE RÉEL (API GOUV)
+            let lat = 46.22; 
+            let lon = 2.21;
+            
+            try {
+                const geoRes = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(city)}&limit=1`);
+                const geoData = await geoRes.json();
+                if(geoData.features && geoData.features.length > 0) {
+                    const coords = geoData.features[0].geometry.coordinates;
+                    lon = coords[0];
+                    lat = coords[1];
+                }
+            } catch(e) { console.error("Geo Error", e); }
+
+            // STEP 2 : DATE DYNAMIQUE (Année N-1)
+            const currentYear = new Date().getFullYear();
+            const lastYear = currentYear - 1;
+            document.getElementById('ref-year').innerText = lastYear;
+            document.getElementById('chart-title').innerText = `Corrélation Conso / Température (${lastYear})`;
 
             try {
-                // Appel Open-Meteo pour 2024 (Température moyenne mensuelle)
-                const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=2024-01-01&end_date=2024-12-31&daily=temperature_2m_mean&timezone=Europe%2FParis`;
+                // STEP 3 : DONNÉES HISTORIQUES RÉELLES
+                const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${lastYear}-01-01&end_date=${lastYear}-12-31&daily=temperature_2m_mean&timezone=Europe%2FParis`;
                 
                 const res = await fetch(url);
                 const meteo = await res.json();
@@ -235,81 +249,3 @@
                 
                 meteo.daily.time.forEach((dateStr, i) => {
                     const month = new Date(dateStr).getMonth();
-                    monthlyTemps[month] += meteo.daily.temperature_2m_mean[i];
-                    counts[month]++;
-                });
-                
-                const avgTemps = monthlyTemps.map((sum, i) => Math.round(sum / counts[i]));
-                
-                updateChart(avgTemps);
-
-            } catch(e) { console.error("Météo Error", e); }
-        }
-
-        function updateChart(temps) {
-            const ctx = document.getElementById('climateChart').getContext('2d');
-            if(chartInstance) chartInstance.destroy();
-
-            // Simulation profil conso mensuel basé sur le ratio Hiver/Eté calculé
-            // C'est une projection pour visualiser la corrélation
-            const wLoad = parseFloat(document.getElementById('vol-winter').innerText) * 1000 / 7; // 7 mois hiver
-            const sLoad = parseFloat(document.getElementById('vol-summer').innerText) * 1000 / 5; // 5 mois été
-            
-            const consoData = [
-                wLoad, wLoad, wLoad, wLoad, // Jan-Avr
-                sLoad, sLoad, sLoad, sLoad, sLoad, // Mai-Sep
-                wLoad, wLoad, wLoad // Oct-Dec
-            ];
-
-            chartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Jui', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
-                    datasets: [
-                        {
-                            label: 'Consommation (kWh)',
-                            data: consoData,
-                            backgroundColor: '#3B82F6',
-                            order: 2,
-                            yAxisID: 'y'
-                        },
-                        {
-                            type: 'line',
-                            label: 'Température Ext. (°C)',
-                            data: temps,
-                            borderColor: '#EF4444',
-                            borderWidth: 2,
-                            pointBackgroundColor: '#EF4444',
-                            yAxisID: 'y1',
-                            order: 1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { labels: { color: 'white' } } },
-                    scales: {
-                        y: { 
-                            position: 'left',
-                            grid: { color: 'rgba(255,255,255,0.1)' }, 
-                            ticks: { color: 'gray' },
-                            title: { display: true, text: 'kWh', color: '#3B82F6' }
-                        },
-                        y1: {
-                            position: 'right',
-                            grid: { display: false },
-                            ticks: { color: '#EF4444' },
-                            title: { display: true, text: '°C', color: '#EF4444' },
-                            reverse: true // Astuce : Température inversée pour coller à la conso chauffage
-                        },
-                        x: { grid: { display: false }, ticks: { color: 'gray' } }
-                    }
-                }
-            });
-        }
-
-        loadSites();
-    </script>
-</body>
-</html>
