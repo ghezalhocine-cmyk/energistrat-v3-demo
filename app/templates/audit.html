@@ -20,26 +20,24 @@
     <style>
         body { background-color: #050505; color: white; font-family: 'Inter', sans-serif; }
         .bento-card { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; backdrop-filter: blur(10px); }
-        .input-bento { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px; border-radius: 8px; width: 100%; text-align: center; font-family: 'JetBrains Mono'; }
+        .input-bento { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px; border-radius: 8px; width: 100%; text-align: center; font-family: 'JetBrains Mono'; font-size: 1.2rem; }
         .input-bento:focus { border-color: #10B981; outline: none; }
         
-        /* DPE BARS */
+        /* DPE BARS - DESIGN OFFICIEL */
         .dpe-bar { height: 30px; margin-bottom: 8px; border-radius: 4px; position: relative; clip-path: polygon(0% 0%, 95% 0%, 100% 50%, 95% 100%, 0% 100%); display: flex; align-items: center; padding-left: 15px; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5); opacity: 0.3; transition: all 0.3s; }
-        .dpe-bar.active { opacity: 1; transform: scale(1.02); box-shadow: 0 0 20px rgba(255,255,255,0.1); border: 2px solid white; }
+        .dpe-bar.active { opacity: 1; transform: scale(1.02); box-shadow: 0 0 20px rgba(255,255,255,0.2); border: 2px solid white; z-index: 10; }
         .dpe-A { background: #009C3D; width: 30%; }
         .dpe-B { background: #52B153; width: 40%; }
         .dpe-C { background: #78BD76; width: 50%; }
         .dpe-D { background: #F4E70F; width: 60%; color: black; text-shadow: none; }
-        .dpe-E { background: #F0B50F; width: 70%; color: black; text-shadow: none; }
-        .dpe-F { background: #EB8235; width: 80%; }
-        .dpe-G { background: #D7221F; width: 90%; }
+        .dpe-E { background: #EB8235; width: 70%; } /* Simplification E/F/G pour lisibilité */
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden">
 
     <!-- SIDEBAR -->
     <aside class="w-20 bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-50">
-        <a href="/dashboard/retail" class="w-10 h-10 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8">
+        <a href="/dashboard/retail" class="w-10 h-10 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8" title="Retour Dashboard">
             <i class="fa-solid fa-arrow-left"></i>
         </a>
         <div class="w-10 h-10 rounded-xl bg-eco/20 text-eco flex items-center justify-center font-bold mb-4 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
@@ -53,7 +51,7 @@
         <header class="h-20 flex items-center justify-between px-10 border-b border-white/5">
             <div>
                 <h1 class="text-2xl font-black text-white tracking-tight">AUDIT <span class="text-eco">& BENCHMARK</span></h1>
-                <p class="text-xs text-gray-400">Analyse de performance énergétique (IPE & NAF)</p>
+                <p class="text-xs text-gray-400">Indicateur de Performance Énergétique (IPE)</p>
             </div>
             <div class="flex items-center gap-4">
                 <select id="site-selector" onchange="loadSiteContext()" class="bg-card border border-white/10 text-sm rounded-xl px-4 py-2 text-white outline-none focus:border-eco min-w-[300px]">
@@ -64,7 +62,13 @@
 
         <div class="flex-1 overflow-y-auto p-10">
             
-            <!-- ETAT INITIAL : DEMANDE SURFACE -->
+            <!-- ETAT 0 : RIEN SÉLECTIONNÉ -->
+            <div id="blank-state" class="h-full flex flex-col items-center justify-center text-gray-600 border-2 border-dashed border-white/5 rounded-[2rem]">
+                <i class="fa-solid fa-building-user text-6xl mb-4 opacity-20"></i>
+                <p>Sélectionnez un site pour lancer l'audit sectoriel</p>
+            </div>
+
+            <!-- ETAT 1 : DEMANDE SURFACE (Si manquante) -->
             <div id="surface-request" class="hidden h-full flex flex-col items-center justify-center">
                 <div class="bento-card p-10 text-center max-w-md border border-eco/30 shadow-[0_0_50px_rgba(16,185,129,0.1)]">
                     <div class="w-16 h-16 rounded-full bg-eco/10 text-eco flex items-center justify-center text-3xl mx-auto mb-6"><i class="fa-solid fa-ruler-combined"></i></div>
@@ -72,29 +76,27 @@
                     <p class="text-sm text-gray-400 mb-6">Pour calculer l'efficacité (kWh/m²), Cortex a besoin de la surface du bâtiment.</p>
                     
                     <div class="relative mb-6">
-                        <input type="number" id="input-surface" placeholder="Surface en m²" class="input-bento text-xl font-bold">
-                        <span class="absolute right-4 top-3 text-gray-500 font-mono">m²</span>
+                        <input type="number" id="input-surface" placeholder="Surface en m²" class="input-bento font-bold">
+                        <span class="absolute right-4 top-3 text-gray-500 font-mono text-sm">m²</span>
                     </div>
                     
-                    <button onclick="saveSurface()" class="w-full bg-eco text-abysse font-black py-3 rounded-xl hover:bg-white transition">LANCER L'AUDIT</button>
+                    <button onclick="saveSurface()" class="w-full bg-eco text-abysse font-black py-3 rounded-xl hover:bg-white transition shadow-lg">LANCER L'AUDIT</button>
                 </div>
             </div>
 
-            <!-- RESULTATS AUDIT -->
+            <!-- ETAT 2 : RESULTATS AUDIT -->
             <div id="audit-results" class="hidden grid grid-cols-12 gap-8 h-full">
                 
                 <!-- GAUCHE : DPE -->
                 <div class="col-span-5 bento-card p-8 border-l-4 border-eco flex flex-col">
                     <h3 class="text-sm font-bold text-gray-400 uppercase mb-6">Performance Énergétique</h3>
                     
-                    <div class="flex-1 flex flex-col justify-center space-y-1" id="dpe-scale">
-                        <div class="dpe-bar dpe-A" id="bar-A">A <span class="ml-auto mr-4 text-[10px] font-normal">&lt; 0.5x Ref</span></div>
+                    <div class="flex-1 flex flex-col justify-center space-y-2" id="dpe-scale">
+                        <div class="dpe-bar dpe-A" id="bar-A">A <span class="ml-auto mr-4 text-[10px] font-normal text-white">Excellent</span></div>
                         <div class="dpe-bar dpe-B" id="bar-B">B</div>
-                        <div class="dpe-bar dpe-C" id="bar-C">C <span class="ml-auto mr-4 text-[10px] font-normal">Standard</span></div>
+                        <div class="dpe-bar dpe-C" id="bar-C">C <span class="ml-auto mr-4 text-[10px] font-normal text-black">Standard</span></div>
                         <div class="dpe-bar dpe-D" id="bar-D">D</div>
-                        <div class="dpe-bar dpe-E" id="bar-E">E</div>
-                        <div class="dpe-bar dpe-F" id="bar-F">F</div>
-                        <div class="dpe-bar dpe-G" id="bar-G">G <span class="ml-auto mr-4 text-[10px] font-normal">&gt; 1.5x Ref</span></div>
+                        <div class="dpe-bar dpe-E" id="bar-E">E <span class="ml-auto mr-4 text-[10px] font-normal text-white">Énergivore</span></div>
                     </div>
 
                     <div class="mt-6 pt-6 border-t border-white/5 flex justify-between items-center">
@@ -117,7 +119,7 @@
                         <div class="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-2xl"><i class="fa-solid fa-briefcase"></i></div>
                         <div>
                             <h3 class="text-lg font-bold text-white mb-1">Comparaison Sectorielle</h3>
-                            <p class="text-sm text-gray-400">Basé sur le code NAF : <span id="val-naf" class="text-white font-mono bg-white/10 px-2 rounded">--</span></p>
+                            <p class="text-sm text-gray-400">Basé sur le code NAF : <span id="val-naf" class="text-white font-mono bg-white/10 px-2 rounded font-bold">--</span></p>
                             <p class="text-xs text-blue-400 mt-2" id="txt-comparison">Analyse en cours...</p>
                         </div>
                     </div>
@@ -139,7 +141,7 @@
 
                     <!-- BOUTON MODIFIER SURFACE -->
                     <div class="text-right">
-                        <button onclick="editSurface()" class="text-xs text-gray-500 hover:text-white underline">La surface est incorrecte ? Modifier</button>
+                        <button onclick="editSurface()" class="text-xs text-gray-500 hover:text-white underline"><i class="fa-solid fa-pen mr-1"></i> Corriger la surface</button>
                     </div>
 
                 </div>
@@ -171,18 +173,25 @@
 
         async function loadSiteContext() {
             const id = document.getElementById('site-selector').value;
-            if(!id) return;
+            if(!id) {
+                document.getElementById('blank-state').classList.remove('hidden');
+                document.getElementById('audit-results').classList.add('hidden');
+                document.getElementById('surface-request').classList.add('hidden');
+                return;
+            }
 
-            // Appel API pour avoir les détails (dont le benchmark calculé par Cortex Physics)
             try {
                 const res = await fetch(`/api/dashboard/data/${id}`);
                 const data = await res.json();
                 CURRENT_SITE = data;
                 
-                // Vérification si le benchmark existe déjà (donc surface déjà saisie)
-                if (data.benchmark) {
+                document.getElementById('blank-state').classList.add('hidden');
+
+                // Si le benchmark est déjà calculé (car surface présente)
+                if (data.benchmark && data.benchmark.status === "OK") {
                     renderAudit(data.benchmark, data.identity.naf);
                 } else {
+                    // Sinon on demande la surface
                     showSurfaceForm();
                 }
             } catch(e) { console.error(e); }
@@ -191,9 +200,12 @@
         function showSurfaceForm() {
             document.getElementById('audit-results').classList.add('hidden');
             document.getElementById('surface-request').classList.remove('hidden');
-            // Pré-remplissage si une surface existe mais pas de benchmark (cas rare)
+            
+            // Pré-remplissage si existe mais incomplet
             if(CURRENT_SITE.location && CURRENT_SITE.location.surface) {
                 document.getElementById('input-surface').value = CURRENT_SITE.location.surface;
+            } else {
+                document.getElementById('input-surface').value = "";
             }
         }
 
@@ -213,7 +225,7 @@
                     body: JSON.stringify({ client_id: CURRENT_SITE.identity.id, surface: parseFloat(surface) })
                 });
 
-                // 2. Rechargement pour forcer le calcul du benchmark côté backend
+                // 2. Rechargement (Force le recalcul Backend)
                 await loadSiteContext();
 
             } catch(e) { alert("Erreur réseau"); }
@@ -224,23 +236,42 @@
             document.getElementById('surface-request').classList.add('hidden');
             document.getElementById('audit-results').classList.remove('hidden');
 
-            // 1. DPE
+            // 1. DPE Reset
             document.querySelectorAll('.dpe-bar').forEach(el => el.classList.remove('active'));
+            
+            // 2. Activation Barre (A, B, C...)
+            // Note: Cortex Physics renvoie E pour E,F,G pour simplifier
             const activeBar = document.getElementById(`bar-${bench.grade}`);
             if(activeBar) activeBar.classList.add('active');
 
-            // 2. Chiffres
+            // 3. Chiffres
             document.getElementById('val-ipe').innerText = bench.ipe;
             document.getElementById('val-ref').innerText = bench.reference_ipe;
-            document.getElementById('val-naf').innerText = naf || "Inconnu";
+            document.getElementById('val-naf').innerText = naf || "Non défini";
 
-            // 3. Texte
+            // 4. Texte Analyse
             const diff = bench.performance_pct;
-            const perfText = diff > 0 ? `Plus performant que la moyenne de ${diff}%` : `Surconsommation de ${Math.abs(diff)}% vs secteur`;
-            document.getElementById('txt-comparison').innerText = perfText;
-            document.getElementById('txt-comparison').className = diff > 0 ? "text-sm text-eco mt-2 font-bold" : "text-sm text-bad mt-2 font-bold";
+            // Si positif = meilleur, Si négatif = pire (logique inversée dans le texte)
+            // Dans Cortex Physics: ratio = ipe/ref. perf = (1-ratio)*100.
+            // Si ipe=100, ref=200 -> ratio=0.5 -> perf=50% (Positif = Bon)
+            // Si ipe=300, ref=200 -> ratio=1.5 -> perf=-50% (Négatif = Mauvais)
+            
+            let perfText = "";
+            let colorClass = "";
+            
+            if (diff > 0) {
+                perfText = `👏 Excellent ! Vous consommez ${Math.round(diff)}% de moins que la moyenne.`;
+                colorClass = "text-eco";
+            } else {
+                perfText = `⚠️ Attention : Surconsommation de ${Math.abs(Math.round(diff))}% par rapport au secteur.`;
+                colorClass = "text-bad";
+            }
+            
+            const txtComp = document.getElementById('txt-comparison');
+            txtComp.innerText = perfText;
+            txtComp.className = `text-sm mt-2 font-bold ${colorClass}`;
 
-            // 4. Impact
+            // 5. Impact
             document.getElementById('val-co2').innerText = bench.impact.co2_tons + " t";
             document.getElementById('val-trees').innerText = bench.impact.trees;
         }
