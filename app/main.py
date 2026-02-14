@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
-# --- BLOC DIAGNOSTIC IMPORT ---
+# --- BLOC DIAGNOSTIC IMPORT (AJOUT SÉCURITÉ EXCEL) ---
 try:
     import pandas as pd
     import openpyxl
@@ -25,11 +25,13 @@ except ImportError as e:
 
 # IMPORT DES MOTEURS
 from app.core.cortex_engine import cortex
-from app.core.storage_engine import storage 
+from app.core.storage_engine import storage
+# NOUVEAU SPRINT D : MOTEUR PHYSIQUE
+from app.core.cortex_physics import physics 
 
 app = FastAPI(title="ENERGISTRAT V3", version="PROD")
 
-# CONFIGURATION DU CHEMIN
+# CONFIGURATION DU CHEMIN (EVOLUTION : FORCE PATH)
 DATA_DIR = "/app/data"
 if not os.path.exists(DATA_DIR):
     if os.path.exists("data"): 
@@ -55,6 +57,7 @@ async def health_check():
     return {
         "status": "ONLINE", 
         "cortex": cortex.version, 
+        "physics": physics.version, # NOUVEAU SPRINT D
         "storage": storage.version,
         "excel_engine": "READY" if EXCEL_ENGINE_READY else "MISSING"
     }
@@ -84,6 +87,16 @@ class TenderRequest(BaseModel):
 class MarketUpdateModel(BaseModel):
     elec: dict
     gaz: dict
+
+# NOUVEAU SPRINT D : MODELES PHYSICS
+class SurfaceUpdateModel(BaseModel):
+    client_id: str
+    surface: float
+
+class SolarSimRequest(BaseModel):
+    address: str
+    surface_roof: float
+    electricity_price: float
 
 # --- MARKET WATCH ENGINE ---
 def get_market_ref():
@@ -115,7 +128,7 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
         ref_path = f"{DATA_DIR}/market_ref.json"
         hist_path = f"{DATA_DIR}/market_history.json"
         
-        # Historisation
+        # Logique d'Historisation
         if os.path.exists(ref_path):
             try:
                 with open(ref_path, 'r') as f: 
@@ -151,7 +164,7 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET ---
+# --- API DASHBOARD / FLEET (BI & ANALYTICS) ---
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
     raw_sites = []
@@ -182,12 +195,12 @@ async def get_fleet_data():
         except: 
             continue
     
-    # Intelligence Collective
+    # Appel du Cerveau (Intelligence Collective)
     analysis_result = cortex.analyze_portfolio(raw_sites)
     
     fleet_list = []
     
-    # Filtres
+    # Ensembles pour les filtres (Optimisation Backend)
     all_cities = set()
     all_providers = set()
     all_segments = set()
@@ -252,6 +265,7 @@ async def get_dashboard_data(client_id: str):
     with open(path, 'r') as f: 
         data = json.load(f)
     
+    # Enrichissement Live
     try:
         market = get_market_ref()
         pricing = data.get('pricing', {})
@@ -268,6 +282,14 @@ async def get_dashboard_data(client_id: str):
             "gaz" if is_gaz else "elec",
             segment=segment
         )
+        
+        # SPRINT D : ENRICHISSEMENT PHYSICS (AUDIT)
+        if "location" in data and "surface" in data["location"]:
+            naf = data.get("identity", {}).get("naf", "")
+            surf = data["location"]["surface"]
+            vol = data.get("kpis", {}).get("volume_mwh", 0)
+            data["benchmark"] = physics.calculate_benchmark(naf, surf, vol)
+
     except:
         data["market_analysis"] = {"status": "NEUTRE", "action": "-", "color": "gray"}
 
@@ -276,7 +298,30 @@ async def get_dashboard_data(client_id: str):
     
     return JSONResponse(data)
 
-# --- API OPS ---
+# --- SPRINT D : API PHYSICS (NOUVEAU) ---
+@app.post("/api/settings/update_surface")
+async def update_surface(payload: SurfaceUpdateModel):
+    """ Sauvegarde la surface m2 pour le benchmark """
+    try:
+        data = storage.get_client_settings(payload.client_id)
+        if not data: return JSONResponse({"success": False, "error": "Client introuvable"})
+        
+        if "location" not in data: data["location"] = {}
+        data["location"]["surface"] = payload.surface
+        
+        storage.save_client_settings(payload.client_id, data)
+        return JSONResponse({"success": True})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
+
+@app.post("/api/physics/solar")
+async def api_solar_sim(payload: SolarSimRequest):
+    """ Proxy vers PVGIS via Cortex Physics """
+    # 1. Geocodage (Mock pour MVP, à remplacer par appel API Adresse si besoin)
+    # Pour l'instant on fixe une lat/lon moyenne France si pas d'adresse précise
+    lat, lon = 45.75, 4.85 # Lyon par défaut
+    return JSONResponse(physics.simulate_solar_roi(lat, lon, payload.surface_roof, payload.electricity_price))
+
+# --- API OPS (ADMIN & ANALYSE) ---
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), site_name: str = Form("Site_1"), x_admin_token: str = Header(None)):
     if x_admin_token != "BOSS_V5": 
@@ -321,7 +366,7 @@ async def api_audit(invoice: UploadFile = File(...), contract: UploadFile = File
     except Exception as e: 
         return JSONResponse({"score": 0, "checks": [], "error": str(e)})
 
-# --- NOUVEAU SPRINT C : SIMULATEUR D'OFFRE ---
+# --- API SIMULATEUR OFFRE (SPRINT C) ---
 @app.post("/api/ops/simulate_offer")
 async def api_simulate_offer(file: UploadFile = File(...)):
     """
@@ -334,14 +379,18 @@ async def api_simulate_offer(file: UploadFile = File(...)):
         current_sites = []
         files = glob.glob(f"{DATA_DIR}/*.json")
         for p in files:
-            if "master_index" in p or "market_ref" in p or "market_history" in p: continue
+            if "master_index" in p or "market_ref" in p or "market_history" in p: 
+                continue
             try:
-                with open(p, 'r') as f: data = json.load(f)
-                if not data or 'identity' not in data: continue
+                with open(p, 'r') as f: 
+                    data = json.load(f)
+                if not data or 'identity' not in data: 
+                    continue
                 # Calcul KPI frais pour avoir le volume
                 data['kpis'] = cortex.enrich_fleet_kpis(data)
                 current_sites.append(data)
-            except: continue
+            except: 
+                continue
 
         # 2. Appel du Moteur de Simulation
         simulation_result = cortex.simulate_budget_from_bpu(content, current_sites)
@@ -363,7 +412,7 @@ async def api_chaos(x_admin_token: str = Header(None)):
         return JSONResponse({}, 401)
     return JSONResponse(cortex.run_chaos_monkey())
 
-# --- API TENDER ---
+# --- API TENDER (GENERATION EXCEL) ---
 @app.post("/api/ops/generate_tender")
 async def generate_tender(payload: TenderRequest):
     if not EXCEL_ENGINE_READY: 
@@ -442,6 +491,7 @@ async def api_save_partner(request: Request):
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
 
+# --- API TICKETING ---
 @app.post("/api/support/ticket")
 async def create_ticket(request: Request):
     try:
@@ -494,7 +544,7 @@ async def get_import_template():
 
 @app.get("/api/settings/template_csv_gaz")
 async def get_import_template_gaz():
-    # Template Gaz Expert V3 (V41.6 avec INSEE)
+    # Template Gaz Expert V3
     headers = [ 
         "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "CODE_INSEE", 
         "SIRET_SITE", "NAF", "CEE_ELIGIBLE",
@@ -534,6 +584,19 @@ async def view_dashboard(request: Request, profile: str):
     if os.path.exists("app/templates/dashboard.html"): 
         return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
     return JSONResponse({"error": f"Template missing: {f}"}, 404)
+
+# --- SPRINT D : NOUVELLES PAGES SATELLITES ---
+@app.get("/audit")
+async def view_audit(request: Request): 
+    return templates.TemplateResponse("audit.html", {"request": request})
+
+@app.get("/solar")
+async def view_solar(request: Request): 
+    return templates.TemplateResponse("solar.html", {"request": request})
+
+@app.get("/climate")
+async def view_climate(request: Request): 
+    return templates.TemplateResponse("climate.html", {"request": request})
 
 @app.get("/partner/settings")
 async def view_settings(request: Request): 
