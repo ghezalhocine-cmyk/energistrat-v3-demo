@@ -366,7 +366,7 @@ async def api_audit(invoice: UploadFile = File(...), contract: UploadFile = File
     except Exception as e: 
         return JSONResponse({"score": 0, "checks": [], "error": str(e)})
 
-# --- API SIMULATEUR OFFRE (SPRINT C) ---
+# --- SPRINT C : SIMULATEUR D'OFFRE ---
 @app.post("/api/ops/simulate_offer")
 async def api_simulate_offer(file: UploadFile = File(...)):
     """
@@ -506,26 +506,56 @@ async def get_tickets():
     tickets = storage.list_tickets()
     return JSONResponse({"tickets": tickets})
 
-# --- TEMPLATES CSV ---
+# --- TEMPLATES CSV (EVOLUTION V42.2 : SURFACE) ---
 @app.get("/api/settings/template_csv")
 async def get_import_template():
-    # Template Elec Expert V7 (Multi-Prix)
+    # Template Elec Expert V8
     headers = [ 
-        "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", 
-        "SIRET_SITE", "NAF", "CEE_ELIGIBLE", "GO_PERCENT", "COMPTEUR_PRODUCTEUR",
-        "PDL", "SEGMENT", "FTA", "GRD", "TYPOLOGIE",
-        "PUISSANCE_SOUSCRITE_MAX", "POINTE_MAX", 
-        "PS_HPH", "PS_HCH", "PS_HPE", "PS_HCE", 
-        "CONSO_HPH", "CONSO_HCH", "CONSO_HPE", "CONSO_HCE", 
-        "VOLUME_ANNUEL_TOTAL", "COMMENTAIRES", "DATE_DEBUT", "DATE_FIN",
+        "ENTITE", 
+        "NOM_SITE", 
+        "ADRESSE_SITE", 
+        "CP", 
+        "VILLE", 
+        "CODE_INSEE",
+        "SURFACE_M2",
+        "SIRET_SITE", 
+        "NAF", 
+        "CEE_ELIGIBLE", 
+        "GO_PERCENT", 
+        "COMPTEUR_PRODUCTEUR",
+        "PDL", 
+        "SEGMENT", 
+        "FTA", 
+        "GRD", 
+        "TYPOLOGIE",
+        "PUISSANCE_SOUSCRITE_MAX", 
+        "POINTE_MAX", 
+        "PS_HPH", 
+        "PS_HCH", 
+        "PS_HPE", 
+        "PS_HCE", 
+        "CONSO_HPH", 
+        "CONSO_HCH", 
+        "CONSO_HPE", 
+        "CONSO_HCE", 
+        "VOLUME_ANNUEL_TOTAL", 
+        "COMMENTAIRES", 
+        "DATE_DEBUT", 
+        "DATE_FIN",
         "FOURNISSEUR", 
-        "ABONNEMENT", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES"
+        "ABONNEMENT", 
+        "PRIX_HPH", 
+        "PRIX_HCH", 
+        "PRIX_HPE", 
+        "PRIX_HCE", 
+        "TAXES"
     ]
     stream = io.StringIO()
     writer = csv.writer(stream, delimiter=';')
     writer.writerow(headers)
     writer.writerow([ 
-        "Mairie de Lyon", "Ecole J.Ferry", "10 Rue de la Paix", "69002", "Lyon",
+        "Mairie de Lyon", "Ecole J.Ferry", "10 Rue de la Paix", "69002", "Lyon", "69123",
+        "1500", # Surface
         "12345678900012", "8411Z", "OUI", "100", "NON",
         "30000000000000", "C4", "CU", "Enedis", "Bâtiment",
         "60", "45", 
@@ -539,25 +569,44 @@ async def get_import_template():
     return StreamingResponse(
         iter([stream.getvalue()]), 
         media_type="text/csv", 
-        headers={"Content-Disposition": "attachment; filename=template_dqe_expert_v2.csv"}
+        headers={"Content-Disposition": "attachment; filename=template_dqe_expert_v3.csv"}
     )
 
 @app.get("/api/settings/template_csv_gaz")
 async def get_import_template_gaz():
-    # Template Gaz Expert V3
+    # Template Gaz Expert V4
     headers = [ 
-        "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "CODE_INSEE", 
-        "SIRET_SITE", "NAF", "CEE_ELIGIBLE",
-        "PCE", "CAR_MWH", "CJA_MWH_J", "SEGMENT_GAZ", "PROFIL", "TARIF_ACHEMINEMENT", "GRD",
-        "DATE_DEBUT", "DATE_FIN",
+        "ENTITE", 
+        "NOM_SITE", 
+        "ADRESSE_SITE", 
+        "CP", 
+        "VILLE", 
+        "CODE_INSEE", 
+        "SURFACE_M2",
+        "SIRET_SITE", 
+        "NAF", 
+        "CEE_ELIGIBLE",
+        "PCE", 
+        "CAR_MWH", 
+        "CJA_MWH_J", 
+        "SEGMENT_GAZ", 
+        "PROFIL", 
+        "TARIF_ACHEMINEMENT", 
+        "GRD",
+        "DATE_DEBUT", 
+        "DATE_FIN",
         "FOURNISSEUR", 
-        "ABONNEMENT", "PRIX_MOLECULE_MWH", "TERME_STOCKAGE_CPB", "TAXES" 
+        "ABONNEMENT", 
+        "PRIX_MOLECULE_MWH", 
+        "TERME_STOCKAGE_CPB", 
+        "TAXES" 
     ]
     stream = io.StringIO()
     writer = csv.writer(stream, delimiter=';')
     writer.writerow(headers)
     writer.writerow([ 
         "Mairie de Lyon", "Chaufferie Bât A", "10 Rue de la Paix", "69002", "Lyon", "69123",
+        "850", # Surface
         "12345678900012", "8411Z", "OUI",
         "04500000000000", "150", "0.5", "T2", "P012", "T2", "GRDF",
         "01/01/2025", "31/12/2026",
@@ -568,7 +617,7 @@ async def get_import_template_gaz():
     return StreamingResponse(
         iter([stream.getvalue()]), 
         media_type="text/csv", 
-        headers={"Content-Disposition": "attachment; filename=template_import_gaz_expert_v2.csv"}
+        headers={"Content-Disposition": "attachment; filename=template_import_gaz_expert_v3.csv"}
     )
 
 # --- ROUTES HTML (VUES) ---
