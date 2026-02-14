@@ -12,7 +12,7 @@ VERTEX_REGION = "europe-west9"
 VERTEX_MODEL = "gemini-1.5-flash-001"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V49_1_FUSION")
+logger = logging.getLogger("CORTEX_MASTER_V49_2_SURFACE")
 
 # CHARGEMENT DES LIBRAIRIES OPTIONNELLES
 try:
@@ -32,7 +32,7 @@ except:
 
 class CortexEngine:
     def __init__(self):
-        self.version = "49.1 (Integral Fusion: Import V6.4 + Simulator)"
+        self.version = "49.2 (Surface Import Ready)"
         # Base de connaissance Métier (NAF)
         self.NAF_DB = {
             "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
@@ -82,7 +82,7 @@ class CortexEngine:
         return n.title() 
 
     # =========================================================
-    # MODULE 1 : TENDER FACTORY V2 (DQE & BPU MIROIR + SIRET)
+    # MODULE 1 : TENDER FACTORY V2
     # =========================================================
     def generate_advanced_tender_excel(self, sites_data):
         if not sites_data: return b""
@@ -114,6 +114,7 @@ class CortexEngine:
                             "Ville": loc.get('city', ''),
                             "INSEE": loc.get('insee', ''), 
                             "SIRET": siret_val,
+                            "Surface": loc.get('surface', ''), # V49.2
                             "PDL": c.get('pdl', ''),
                             "Segment": c.get('segment', ''),
                             "FTA": c.get('fta', ''),
@@ -129,7 +130,7 @@ class CortexEngine:
                             "Vol. Annuel": s.get('kpis', {}).get('volume_mwh', 0) * 1000
                         })
                         
-                        # BPU ROW (Cadre de réponse)
+                        # BPU ROW
                         rows_bpu.append({
                             "PDL (Clé)": c.get('pdl', ''),
                             "Nom Site": i.get('site_name', ''),
@@ -168,6 +169,7 @@ class CortexEngine:
                             "Ville": loc.get('city', ''),
                             "INSEE": loc.get('insee', ''),
                             "SIRET": siret_val,
+                            "Surface": loc.get('surface', ''), # V49.2
                             "PCE": c.get('pdl', ''),
                             "CAR (MWh)": self._safe_float(c.get('power', 0)),
                             "CJA": c.get('cja', 0),
@@ -175,7 +177,7 @@ class CortexEngine:
                             "Tarif Ach.": c.get('tarif_acheminement', '')
                         })
                         
-                        # BPU GAZ (Cadre de réponse)
+                        # BPU GAZ
                         rows_bpu_gaz.append({
                             "PCE (Clé)": c.get('pdl', ''),
                             "Nom Site": i.get('site_name', ''),
@@ -183,7 +185,7 @@ class CortexEngine:
                             "CAR (Ref)": self._safe_float(c.get('power', 0)),
                             "OFFRE_ABO_AN (€)": "",
                             "OFFRE_PRIX_MOLECULE (€/MWh)": "",
-                            "OFFRE_TERME_STOCKAGE (€/MWh)": "", # CPB
+                            "OFFRE_TERME_STOCKAGE (€/MWh)": "",
                             "OFFRE_CEE (€/MWh)": ""
                         })
                         
@@ -197,7 +199,7 @@ class CortexEngine:
             return b""
 
     # =========================================================
-    # MODULE 2 : MARKET WATCH (V46.1)
+    # MODULE 2 : MARKET WATCH
     # =========================================================
     def analyze_market_position(self, client_price, market_price, energy_type, segment="C5"):
         if not client_price or math.isnan(client_price) or client_price <= 0: 
@@ -233,7 +235,7 @@ class CortexEngine:
             return {"status": "ALIGNE", "color": "blue", "message": f"Prix cohérent avec le {ref_label}.", "action": "Pas d'action requise."}
 
     # =========================================================
-    # MODULE 3 : ROI & KPI (V46.5 - Gaz CPB + Fixes)
+    # MODULE 3 : ROI & KPI
     # =========================================================
     def enrich_fleet_kpis(self, site_data):
         contract = site_data.get('contract', {}) or {}
@@ -263,7 +265,7 @@ class CortexEngine:
         # 2. CALCUL BUDGET
         price = self._safe_float(pricing.get('hph')) + self._safe_float(pricing.get('tax'))
         fix = self._safe_float(pricing.get('fix'))
-        storage_cost = self._safe_float(pricing.get('storage')) # CPB
+        storage_cost = self._safe_float(pricing.get('storage'))
         
         calc_price = price
         if price < 2.0: calc_price = price * 1000
@@ -282,7 +284,7 @@ class CortexEngine:
         }
 
     # =========================================================
-    # MODULE 4 : IMPORT MASSE V6.4 (GAZ EXPERT + INSEE - RESTAURÉ)
+    # MODULE 4 : IMPORT MASSE V6.5 (SURFACE + INSEE + GAZ EXPERT)
     # =========================================================
     def parse_mass_import_v5(self, file_content):
         try:
@@ -304,15 +306,14 @@ class CortexEngine:
                     col_adresse = next((c for c in df.columns if "ADRESSE" in str(c).upper()), None)
                     col_cp = next((c for c in df.columns if "CP" == str(c).upper() or "CODE" in str(c).upper()), None)
                     col_ville = next((c for c in df.columns if "COMMUNE" in str(c).upper() or "VILLE" in str(c).upper()), None)
-                    
-                    # RESTAURATION INSEE
                     col_insee = next((c for c in df.columns if "INSEE" in str(c).upper()), None)
+                    
+                    # NOUVEAU V49.2 : SURFACE
+                    col_surf = next((c for c in df.columns if "SURFACE" in str(c).upper() or "M2" in str(c).upper()), None)
 
                     col_siret_site = next((c for c in df.columns if "SIRET" in str(c).upper()), None)
                     col_naf = next((c for c in df.columns if "NAF" in str(c).upper()), None)
                     col_cee = next((c for c in df.columns if "CEE" in str(c).upper()), None)
-
-                    # DÉTECTION GAZ SPÉCIFIQUE (RESTAURATION CPB)
                     col_cpb = next((c for c in df.columns if "STOCKAGE" in str(c).upper() or "CPB" in str(c).upper()), None)
 
                     if is_gaz:
@@ -328,7 +329,6 @@ class CortexEngine:
                         col_prov = next((c for c in df.columns if "FOURNISSEUR" in str(c).upper()), None)
                         col_abo = next((c for c in df.columns if "ABO" in str(c).upper()), None)
                         col_tax = next((c for c in df.columns if "TAXES" in str(c).upper()), None)
-                        
                         col_start = next((c for c in df.columns if "DEBUT" in str(c).upper()), None)
                         col_end = next((c for c in df.columns if "FIN" in str(c).upper()), None)
 
@@ -349,7 +349,8 @@ class CortexEngine:
                                 "address": str(row.get(col_adresse)), 
                                 "zip_code": str(row.get(col_cp)), 
                                 "city": str(row.get(col_ville)),
-                                "insee": str(row.get(col_insee, '')) 
+                                "insee": str(row.get(col_insee, '')),
+                                "surface": self._safe_float(row.get(col_surf, 0)) # V49.2
                             },
                             "contract": { 
                                 "pdl": ref_id, 
@@ -363,9 +364,7 @@ class CortexEngine:
                                 "start_date": str(row.get(col_start, '')),
                                 "end_date": str(row.get(col_end, ''))
                             },
-                            "technical": {
-                                "cee_eligible": str(row.get(col_cee, 'NON'))
-                            },
+                            "technical": { "cee_eligible": str(row.get(col_cee, 'NON')) },
                             "pricing": {
                                 "fix": str(row.get(col_abo, '0')),
                                 "hph": str(row.get(col_prix, '0')),
@@ -376,7 +375,6 @@ class CortexEngine:
                         }
                         sites.append(site)
                     else:
-                        # LOGIQUE ELEC V6.2
                         col_pdl = next((c for c in df.columns if "PDL" in str(c).upper() or "PRM" in str(c).upper()), None)
                         if not col_pdl: continue
                         pdl = str(row.get(col_pdl, '')).strip()
@@ -418,8 +416,9 @@ class CortexEngine:
                             "location": { 
                                 "address": str(row.get(col_adresse)), 
                                 "zip_code": str(row.get(col_cp)), 
-                                "city": str(row.get(col_ville)),
-                                "insee": str(row.get(col_insee, '')) 
+                                "city": str(row.get(col_ville)), 
+                                "insee": str(row.get(col_insee, '')),
+                                "surface": self._safe_float(row.get(col_surf, 0)) # V49.2
                             },
                             "contract": { 
                                 "pdl": pdl, 
