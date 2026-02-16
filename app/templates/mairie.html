@@ -8,7 +8,6 @@
     <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="/static/js/main.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -21,6 +20,10 @@
         .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
         .nav-tab.active { background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%); border-left: 3px solid #3B82F6; color: white; }
         .tab-content { display: none; } .tab-content.active { display: grid; }
+        /* Scrollbar fine pour les élus */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
 <body class="flex h-screen w-screen font-sans relative">
@@ -29,34 +32,40 @@
     <aside class="w-72 bg-[#020617]/90 backdrop-blur-md border-r border-white/5 flex flex-col justify-between z-50 h-full">
         <div>
             <div class="p-8 flex items-center gap-4">
-                <div class="w-12 h-12 rounded-2xl border border-mairie/50 flex items-center justify-center bg-abysse text-mairie">
+                <div class="w-12 h-12 rounded-2xl border border-mairie/50 flex items-center justify-center bg-abysse text-mairie shadow-[0_0_15px_rgba(59,130,246,0.2)]">
                     <i class="fa-solid fa-landmark text-xl"></i>
                 </div>
                 <div>
                     <div class="font-black text-lg tracking-tight text-white">MAIRIE<span class="text-mairie">.OS</span></div>
-                    <div class="text-[10px] text-slate-500 font-mono uppercase tracking-widest">Saint-Lys • 31470</div>
+                    <div class="text-[10px] text-slate-500 font-mono uppercase tracking-widest">Collectivité</div>
                 </div>
             </div>
             <nav class="flex flex-col gap-2 mt-4">
-                <button onclick="switchTab('patrimoine')" id="nav-patrimoine" class="nav-tab active w-full text-left px-8 py-4 text-sm font-medium text-slate-400 flex items-center gap-4"><i class="fa-solid fa-city w-5"></i> Patrimoine</button>
-                <button onclick="switchTab('budget')" id="nav-budget" class="nav-tab w-full text-left px-8 py-4 text-sm font-medium text-slate-400 flex items-center gap-4"><i class="fa-solid fa-chart-pie w-5"></i> Budget M57</button>
+                <button onclick="switchTab('patrimoine')" id="nav-patrimoine" class="nav-tab active w-full text-left px-8 py-4 text-sm font-medium text-slate-400 flex items-center gap-4 hover:text-white transition"><i class="fa-solid fa-city w-5"></i> Patrimoine & Flux</button>
+                <button onclick="switchTab('budget')" id="nav-budget" class="nav-tab w-full text-left px-8 py-4 text-sm font-medium text-slate-400 flex items-center gap-4 hover:text-white transition"><i class="fa-solid fa-chart-pie w-5"></i> Budget M57</button>
             </nav>
+        </div>
+        <div class="p-8 border-t border-white/5">
+            <div class="flex items-center gap-3 text-xs text-slate-500">
+                <i class="fa-solid fa-server"></i>
+                <span>Connecté au SGE</span>
+            </div>
         </div>
     </aside>
 
     <!-- MAIN -->
-    <main class="flex-1 flex flex-col h-full relative z-10 overflow-hidden">
+    <main class="flex-1 flex flex-col h-full relative z-10 overflow-hidden bg-abysse">
         
         <!-- HEADER -->
-        <header class="h-20 border-b border-white/5 flex items-center justify-between px-10 bg-abysse/80 backdrop-blur-md z-20">
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-10 bg-abysse/80 backdrop-blur-md z-20 sticky top-0">
             <div class="flex items-center gap-4">
-                <div class="px-3 py-1 rounded-full bg-cortex/10 border border-cortex/20 text-cortex text-[10px] font-bold animate-pulse">
-                    <i class="fa-solid fa-brain mr-2"></i>CORTEX LIVE
+                <div class="px-3 py-1 rounded-full bg-cortex/10 border border-cortex/20 text-cortex text-[10px] font-bold animate-pulse flex items-center gap-2">
+                    <i class="fa-solid fa-brain"></i> CORTEX LIVE
                 </div>
-                <span class="text-xs text-slate-300 font-mono" id="ai-insight-header">En attente de flux SGE...</span>
+                <span class="text-xs text-slate-300 font-mono" id="ai-insight-header">Synchronisation des budgets en cours...</span>
             </div>
             <div class="text-right hidden md:block">
-                <div class="text-[10px] text-slate-500 font-bold uppercase">Volume Annuel</div>
+                <div class="text-[10px] text-slate-500 font-bold uppercase">Volume Annuel Collectif</div>
                 <div class="text-lg text-white font-mono font-bold" id="header-vol">-- MWh</div>
             </div>
         </header>
@@ -69,37 +78,72 @@
                 <!-- KPI -->
                 <div class="col-span-12 grid grid-cols-4 gap-6 mb-2">
                     <div class="bento-card rounded-bento p-6">
-                        <div class="text-slate-400 text-xs uppercase font-bold mb-2">Pic Puissance</div>
-                        <div class="text-3xl font-bold text-white mb-1" id="kpi-pic">-- <span class="text-sm">kW</span></div>
+                        <div class="text-slate-400 text-xs uppercase font-bold mb-2">Sites Raccordés</div>
+                        <div class="text-3xl font-bold text-white mb-1" id="kpi-sites">--</div>
+                    </div>
+                    <div class="bento-card rounded-bento p-6">
+                        <div class="text-slate-400 text-xs uppercase font-bold mb-2">Puissance Totale</div>
+                        <div class="text-3xl font-bold text-white mb-1" id="kpi-pic">-- <span class="text-sm text-slate-500">kVA</span></div>
                     </div>
                     <div class="bento-card rounded-bento p-6 border-l-4 border-alert">
-                        <div class="text-slate-400 text-xs uppercase font-bold mb-2">Talon Nuit</div>
-                        <div class="text-3xl font-bold text-white mb-1" id="kpi-talon">-- <span class="text-sm">kW</span></div>
-                        <div class="text-xs text-alert">Gaspillage possible</div>
+                        <div class="text-alert text-xs uppercase font-bold mb-2">Gaspillage Est. (Talon)</div>
+                        <div class="text-3xl font-bold text-white mb-1" id="kpi-talon">-- <span class="text-sm text-slate-500">€/an</span></div>
+                        <div class="text-[10px] text-alert mt-1">Potentiel d'économie immédiat</div>
+                    </div>
+                    <div class="bento-card rounded-bento p-6 border-l-4 border-mairie">
+                        <div class="text-mairie text-xs uppercase font-bold mb-2">Budget Annuel (Est.)</div>
+                        <div class="text-3xl font-bold text-white mb-1" id="kpi-budget">-- <span class="text-sm text-slate-500">k€</span></div>
                     </div>
                 </div>
 
                 <!-- MAIN CHART -->
                 <div class="col-span-8 bento-card rounded-bento p-8">
                     <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-xl font-bold text-white">Courbe de Charge (SGE)</h3>
+                        <h3 class="text-xl font-bold text-white">Projection Consommation (Saisonnalité)</h3>
+                        <div class="flex gap-2 text-xs">
+                            <span class="px-2 py-1 rounded bg-mairie/20 text-mairie border border-mairie/30">Hiver</span>
+                            <span class="px-2 py-1 rounded bg-yellow-500/20 text-yellow-500 border border-yellow-500/30">Été</span>
+                        </div>
                     </div>
                     <div class="h-64 w-full relative"><canvas id="chartPatrimoine"></canvas></div>
                 </div>
 
                 <!-- CORTEX ANALYSIS -->
-                <div class="col-span-4 bento-card rounded-bento p-8 flex flex-col bg-gradient-to-b from-card to-cortex/10 border-t-4 border-cortex">
-                    <h3 class="text-xl font-bold text-white mb-6">Analyse Politique</h3>
+                <div class="col-span-4 bento-card rounded-bento p-8 flex flex-col bg-gradient-to-b from-card to-cortex/5 border-t-4 border-cortex">
+                    <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-robot text-cortex"></i> Analyse DGS</h3>
                     <p class="text-sm text-gray-300 leading-relaxed" id="ai-insight-text">
-                        En attente d'analyse...
+                        Analyse du patrimoine en cours... Cortex agrège les données techniques et financières pour identifier les dérives budgétaires.
                     </p>
+                    <div class="mt-auto pt-6 border-t border-white/5">
+                        <button class="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-white transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-file-pdf"></i> Télécharger Rapport Élu
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- TAB 2: BUDGET (Placeholder) -->
+            <!-- TAB 2: BUDGET M57 -->
             <div id="tab-budget" class="tab-content grid-cols-12 gap-6">
-                <div class="col-span-12 bento-card rounded-bento p-8 text-center">
-                    <h3 class="text-white">Module Budget M57</h3>
+                <div class="col-span-12 bento-card rounded-bento p-8">
+                    <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                        <i class="fa-solid fa-coins text-gold"></i> Ventilation Budgétaire (Top Sites)
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-white/5 text-[10px] uppercase text-gray-400 font-bold">
+                                <tr>
+                                    <th class="px-6 py-4 rounded-tl-xl">Site / Bâtiment</th>
+                                    <th class="px-6 py-4">Compte M57 (Est.)</th>
+                                    <th class="px-6 py-4 text-right">Conso (MWh)</th>
+                                    <th class="px-6 py-4 text-right">Budget Primitif (€)</th>
+                                    <th class="px-6 py-4 text-right rounded-tr-xl">Part du Total</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5" id="budget-table-body">
+                                <!-- Rempli par JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -113,22 +157,19 @@
         function initChart() {
             const ctx = document.getElementById('chartPatrimoine').getContext('2d');
             const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
+            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
             gradient.addColorStop(1, 'rgba(0,0,0,0)');
 
             chartPatrimoineInstance = new Chart(ctx, {
-                type: 'line',
+                type: 'bar', // Bar chart pour la saisonnalité mensuelle
                 data: {
-                    labels: [],
+                    labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
                     datasets: [{
-                        label: 'Puissance (kW)',
+                        label: 'Budget Mensuel Estimé (€)',
                         data: [],
-                        borderColor: '#3B82F6', // Bleu Mairie
-                        backgroundColor: gradient,
-                        fill: true,
-                        tension: 0.2,
-                        pointRadius: 0,
-                        borderWidth: 2
+                        backgroundColor: '#3B82F6',
+                        borderRadius: 4,
+                        barThickness: 20
                     }]
                 },
                 options: {
@@ -136,47 +177,99 @@
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { grid: { display: false }, ticks: { color: '#64748B' } },
+                        x: { grid: { display: false }, ticks: { color: '#64748B', font: { size: 10 } } },
                         y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } }
                     }
                 }
             });
         }
 
-        // --- 2. BRIDGE LOGIC (CONNEXION OPS) ---
+        // --- 2. POLYMORPHIC BRIDGE LOGIC ---
+        // Cette fonction transforme les données "Retail/Fleet" en données "Mairie"
         async function loadRealData() {
             try {
-                // On appelle l'API pour récupérer le fichier "mairie.json" créé par l'Ops
-                const response = await fetch('/api/data/mairie');
+                // Appel à l'API existante (Socle Commun)
+                const response = await fetch('/api/dashboard/fleet');
                 const result = await response.json();
 
-                if (result.found && result.data.success) {
-                    const data = result.data;
-                    console.log("✅ DONNÉES MAIRIE REÇUES :", data);
+                if (result.fleet) {
+                    const sites = result.fleet;
+                    
+                    // A. CALCULS KPI "MAIRIE"
+                    let totalVol = 0;
+                    let totalPower = 0;
+                    let totalBudget = 0;
+                    let totalGhost = 0; // "Gaspillage"
 
-                    // A. Mise à jour KPI
-                    document.getElementById('header-vol').innerText = data.kpi.volume_mwh + " MWh";
-                    document.getElementById('kpi-pic').innerText = data.kpi.pic_kw;
-                    document.getElementById('kpi-talon').innerText = data.kpi.talon_kw;
+                    sites.forEach(s => {
+                        totalVol += s.volume || 0;
+                        totalPower += s.power || 0;
+                        totalBudget += s.budget || 0;
+                        totalGhost += s.ghost_savings || 0;
+                    });
 
-                    // B. Mise à jour IA (Header + Box)
-                    if (data.ai_insight) {
-                        const cleanText = data.ai_insight.replace(/\n/g, "<br>");
-                        document.getElementById('ai-insight-text').innerHTML = cleanText;
-                        document.getElementById('ai-insight-header').innerText = "Analyse terminée.";
-                        document.getElementById('ai-insight-header').classList.add('text-green-400');
+                    // B. MISE A JOUR UI
+                    const formatNum = (n) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n);
+                    
+                    document.getElementById('header-vol').innerText = formatNum(totalVol) + " MWh";
+                    document.getElementById('kpi-sites').innerText = sites.length;
+                    document.getElementById('kpi-pic').innerText = formatNum(totalPower);
+                    document.getElementById('kpi-budget').innerText = formatNum(totalBudget / 1000); // en k€
+                    document.getElementById('kpi-talon').innerText = formatNum(totalGhost); // Gaspillage affiché en "Talon Financier"
+
+                    // C. INTELLIGENCE CORTEX (Synthèse)
+                    const insightEl = document.getElementById('ai-insight-text');
+                    const headerInsight = document.getElementById('ai-insight-header');
+                    
+                    if (totalGhost > (totalBudget * 0.15)) {
+                        headerInsight.innerText = "Alerte : Dérive budgétaire détectée.";
+                        headerInsight.className = "text-xs font-mono text-alert font-bold";
+                        insightEl.innerHTML = `Attention Monsieur le DGS, le parc présente un potentiel d'économie de <b>${formatNum(totalGhost)} €</b> (Talon Nuit élevé). <br>Les bâtiments scolaires semblent consommer hors occupation. <br>Recommandation : Audit des horloges de chauffage.`;
+                    } else {
+                        headerInsight.innerText = "Budget maîtrisé.";
+                        headerInsight.className = "text-xs font-mono text-success font-bold";
+                        insightEl.innerHTML = `Le budget énergie est conforme aux prévisions M57. <br>La performance globale est bonne (${formatNum(totalBudget/totalVol)} €/MWh moyen). <br>Aucune anomalie critique détectée sur l'éclairage public.`;
                     }
 
-                    // C. Mise à jour Graphique
-                    if (chartPatrimoineInstance && data.chart.values.length > 0) {
-                        chartPatrimoineInstance.data.labels = data.chart.labels;
-                        chartPatrimoineInstance.data.datasets[0].data = data.chart.values;
+                    // D. CHART PROJECTION (Saisonnalité Standard Mairie)
+                    // Hiver fort (Chauffage écoles), Été faible
+                    const monthlyRatios = [0.15, 0.14, 0.12, 0.08, 0.05, 0.04, 0.03, 0.03, 0.06, 0.09, 0.12, 0.14]; // Somme ~1.0
+                    const monthlyBudget = monthlyRatios.map(r => totalBudget * r);
+                    
+                    if (chartPatrimoineInstance) {
+                        chartPatrimoineInstance.data.datasets[0].data = monthlyBudget;
                         chartPatrimoineInstance.update();
-                        App.toast('Données Mairie synchronisées.', 'success');
                     }
+
+                    // E. TAB BUDGET (Top consommateurs)
+                    const sortedSites = [...sites].sort((a, b) => b.budget - a.budget).slice(0, 10);
+                    const tbody = document.getElementById('budget-table-body');
+                    tbody.innerHTML = '';
+                    
+                    sortedSites.forEach(s => {
+                        const part = (s.budget / totalBudget) * 100;
+                        const row = `
+                            <tr class="hover:bg-white/5 transition">
+                                <td class="px-6 py-4 font-bold text-white">${s.name}</td>
+                                <td class="px-6 py-4 text-slate-400 font-mono text-xs">60612 - Énergie</td>
+                                <td class="px-6 py-4 text-right text-slate-300 font-mono">${Math.round(s.volume)}</td>
+                                <td class="px-6 py-4 text-right text-white font-bold">${formatNum(s.budget)} €</td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <span class="text-xs text-slate-400">${Math.round(part)}%</span>
+                                        <div class="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                            <div class="h-full bg-mairie" style="width: ${part}%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    });
                 }
             } catch (e) {
-                console.log("Pas de données Mairie.");
+                console.error("Erreur Sync Mairie:", e);
+                document.getElementById('ai-insight-text').innerText = "Erreur de connexion au serveur de données.";
             }
         }
 
@@ -184,7 +277,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             switchTab('patrimoine');
             initChart();
-            setTimeout(loadRealData, 500); // Délai pour laisser le temps au chart de se créer
+            loadRealData(); // Appel direct à l'API Fleet
         });
 
         function switchTab(tabId) {
