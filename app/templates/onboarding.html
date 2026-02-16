@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ENERGISTRAT V3 - Onboarding (Full Patch)</title>
+  <title>ENERGISTRAT V3 - Onboarding</title>
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -427,7 +427,6 @@
           window.showStep(1);
       } catch(e) {
           console.error("Erreur SelectRole", e);
-          // Fallback : On passe quand même à l'étape suivante
           window.showStep(1);
       }
     }
@@ -554,7 +553,18 @@
             
             if(res.ok) {
                 const data = await res.json();
-                window.location.href = `/dashboard/retail?client=${data.id}`;
+                
+                // --- PATCH ROUTAGE INTELLIGENT ---
+                let targetDashboard = 'retail'; // Default (B2B)
+                
+                if (currentRole === 'mairie') targetDashboard = 'mairie';
+                if (currentRole === 'citoyen') targetDashboard = 'citoyen';
+                
+                // Pour les autres (industry, retail, pme, etc.), on reste sur 'retail'
+                // qui est le dashboard B2B générique pour l'instant.
+                
+                window.location.href = `/dashboard/${targetDashboard}?client=${data.id}`;
+                
             } else {
                 alert("Erreur création compte");
                 btn.innerHTML = "RÉESSAYER";
