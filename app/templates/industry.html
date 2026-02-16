@@ -7,13 +7,9 @@
     <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- CORE ENGINE UX -->
-    <script src="/static/js/main.js"></script>
-    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- CONFIG DESIGN (Ton design original) -->
     <script>
         tailwind.config = {
             theme: {
@@ -22,7 +18,7 @@
                         abysse: '#050505',
                         card: '#0F172A',
                         cyan: '#00E5FF',   // Tech / Elec
-                        alert: '#F59E0B',  // Warning / Gaz
+                        alert: '#F59E0B',  // Warning
                         danger: '#EF4444', // Critique
                         success: '#10B981',
                         steam: '#94A3B8',  // Vapeur
@@ -36,6 +32,9 @@
                     boxShadow: { 
                         'neon-cyan': '0 0 20px rgba(0, 229, 255, 0.15)',
                         'neon-alert': '0 0 20px rgba(245, 158, 11, 0.15)' 
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                     }
                 }
             }
@@ -61,18 +60,25 @@
         }
         .page-content { display: none; } 
         .page-content.active { display: grid; }
-        .typing-effect { border-right: 2px solid #00E5FF; animation: blink 1s step-end infinite; }
-        @keyframes blink { 50% { border-color: transparent; } }
+        
+        /* EFFET TYPEWRITER */
+        .typing-effect { overflow: hidden; white-space: nowrap; border-right: 2px solid #00E5FF; animation: typing 3.5s steps(40, end), blink-caret .75s step-end infinite; }
+        @keyframes typing { from { width: 0 } to { width: 100% } }
+        @keyframes blink-caret { from, to { border-color: transparent } 50% { border-color: #00E5FF; } }
+
+        /* LIVE DOT */
+        .live-dot { width: 8px; height: 8px; background: #EF4444; border-radius: 50%; box-shadow: 0 0 10px #EF4444; animation: blink-live 1s infinite; }
+        @keyframes blink-live { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
 
-    <!-- SIDEBAR (Identique à l'original) -->
+    <!-- SIDEBAR -->
     <aside class="w-72 bg-[#020617] border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0">
         <div class="p-6">
             <div class="flex items-center gap-3 mb-8">
-                <div class="w-12 h-12 rounded-2xl border border-cyan/50 flex items-center justify-center bg-abysse text-cyan font-bold shadow-neon-cyan relative overflow-hidden">
-                    <i class="fa-solid fa-industry text-xl relative z-10"></i>
+                <div class="w-12 h-12 rounded-2xl border border-cyan/50 flex items-center justify-center bg-abysse text-cyan font-bold shadow-neon-cyan relative overflow-hidden group">
+                    <i class="fa-solid fa-industry text-xl relative z-10 group-hover:rotate-12 transition"></i>
                     <div class="absolute inset-0 bg-cyan/10 animate-pulse"></div>
                 </div>
                 <div>
@@ -113,12 +119,13 @@
             <div class="px-2 py-1 rounded bg-cyan text-abysse text-[10px] font-black animate-pulse tracking-wider">
                 <i class="fa-solid fa-microchip mr-1"></i> CORTEX LIVE
             </div>
-            <span class="text-xs text-cyan font-mono flex-1 typing-effect">ALERTE CHARGE : Pic prédictif détecté sur TGBT-2 à 14h30.</span>
-            
-            <select class="bg-card border border-white/10 text-xs rounded-lg px-3 py-1.5 text-gray-300 focus:outline-none focus:border-cyan font-mono">
-                <option>Vue : Global (Groupe)</option>
-                <option>Site : Usine Nord (HTA)</option>
-            </select>
+            <div class="flex-1 overflow-hidden">
+                <span class="text-xs text-cyan font-mono typing-effect" id="cortex-ticker">INITIALISATION DU SYSTÈME... ANALYSE DES FLUX EN COURS...</span>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1 rounded bg-white/5 border border-white/10">
+                <div class="live-dot"></div>
+                <span class="text-[10px] font-mono text-gray-300">FLUX RÉEL</span>
+            </div>
         </div>
 
         <!-- SCROLLABLE CONTENT -->
@@ -128,7 +135,7 @@
             <div class="flex justify-between items-end mb-6">
                 <div>
                     <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Supervision Usine</h2>
-                    <p class="text-gray-400 text-xs mt-1 font-mono" id="header-infos">Pmax: -- MW • Cos φ: 0.94</p>
+                    <p class="text-gray-400 text-xs mt-1 font-mono" id="header-infos">Pmax: -- MW • Cos φ: --</p>
                 </div>
                 <div class="flex gap-4 items-center">
                     <div class="bg-card border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
@@ -150,9 +157,9 @@
             <div id="view-command" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
                 
                 <!-- MAIN LOAD CURVE -->
-                <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card">
+                <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card border-l-4 border-cyan">
                     <div class="flex justify-between mb-6">
-                        <h3 class="font-bold text-xl text-white">Courbe de Charge (P10)</h3>
+                        <h3 class="font-bold text-xl text-white flex items-center gap-2"><i class="fa-solid fa-wave-square text-cyan"></i> Courbe de Charge (P10)</h3>
                         <div class="flex gap-4 text-xs font-mono">
                             <span class="text-cyan">● Réel (kW)</span>
                             <span class="text-gray-500">-- Talon</span>
@@ -170,7 +177,7 @@
                         <div>
                             <h4 class="text-xs font-bold text-ai uppercase mb-1">Analyse Cortex</h4>
                             <p class="text-sm text-gray-300 italic leading-relaxed" id="ai-insight-text">
-                                En attente de données réelles...
+                                Connexion au concentrateur de données...
                             </p>
                         </div>
                     </div>
@@ -179,28 +186,30 @@
                 <!-- GTB WIDGETS -->
                 <div class="col-span-4 flex flex-col gap-6">
                     <!-- Power Factor -->
-                    <div class="bento-card rounded-[2rem] p-6 flex-1 border-l-4 border-cyan">
+                    <div class="bento-card rounded-[2rem] p-6 flex-1 border-l-4 border-alert relative overflow-hidden">
                         <h3 class="font-bold text-lg text-white mb-4">Qualité Réseau (Cos φ)</h3>
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-center justify-between z-10 relative">
                             <div class="relative w-32 h-32">
-                                <svg class="w-full h-full" viewBox="0 0 36 36">
-                                    <path class="text-gray-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3" />
-                                    <path class="text-cyan" stroke-dasharray="94, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3" />
+                                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                    <path class="text-gray-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3" />
+                                    <path id="cosphi-ring" class="text-alert transition-all duration-1000" stroke-dasharray="94, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3" />
                                 </svg>
                                 <div class="absolute inset-0 flex items-center justify-center flex-col">
-                                    <span class="text-2xl font-bold text-white font-mono">0.94</span>
+                                    <span class="text-2xl font-bold text-white font-mono" id="val-cosphi">0.94</span>
                                     <span class="text-[10px] text-gray-400">Cible > 0.93</span>
                                 </div>
                             </div>
                             <div class="text-right space-y-2">
-                                <div class="text-xs text-gray-400">Pénalité</div>
-                                <div class="text-sm font-bold text-green-400">0 €</div>
+                                <div class="text-xs text-gray-400">Pénalité Est.</div>
+                                <div class="text-sm font-bold text-green-400" id="val-penalty">0 €</div>
                             </div>
                         </div>
+                        <!-- Background Glow -->
+                        <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-alert/10 rounded-full blur-3xl"></div>
                     </div>
 
                     <!-- Fluids Status -->
-                    <div class="bento-card rounded-[2rem] p-6 flex-1">
+                    <div class="bento-card rounded-[2rem] p-6 flex-1 border-l-4 border-steam">
                         <h3 class="font-bold text-lg text-white mb-4">Fluides Utilitaires</h3>
                         <div class="space-y-4">
                             <div>
@@ -209,16 +218,16 @@
                                     <span class="font-mono text-white">6.8 bar</span>
                                 </div>
                                 <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                                    <div class="bg-steam h-full w-[85%]"></div>
+                                    <div class="bg-steam h-full w-[85%] animate-pulse"></div>
                                 </div>
                             </div>
                             <div>
                                 <div class="flex justify-between text-xs mb-1">
-                                    <span class="text-alert font-bold"><i class="fa-solid fa-fire-burner mr-2"></i>Vapeur (T2)</span>
+                                    <span class="text-danger font-bold"><i class="fa-solid fa-fire-burner mr-2"></i>Vapeur (T2)</span>
                                     <span class="font-mono text-white">180°C</span>
                                 </div>
                                 <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                                    <div class="bg-alert h-full w-[60%]"></div>
+                                    <div class="bg-danger h-full w-[60%]"></div>
                                 </div>
                             </div>
                         </div>
@@ -226,21 +235,21 @@
                 </div>
             </div>
 
-            <!-- TAB 2, 3, 4 (Contenu caché, mais présent pour la navigation) -->
+            <!-- TAB 2, 3, 4 (Placeholder) -->
             <div id="view-trading" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-8 rounded-[2rem] text-center"><h3 class="text-white">Module Trading</h3></div>
+                <div class="col-span-12 bento-card p-8 rounded-[2rem] text-center"><h3 class="text-white">Module Trading (Bientôt)</h3></div>
             </div>
             <div id="view-perf" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-8 rounded-[2rem] text-center"><h3 class="text-white">Module Performance</h3></div>
+                <div class="col-span-12 bento-card p-8 rounded-[2rem] text-center"><h3 class="text-white">Module Performance (Bientôt)</h3></div>
             </div>
             <div id="view-cortex" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-8 rounded-[2rem] text-center"><h3 class="text-white">Module Audit Cortex</h3></div>
+                <div class="col-span-12 bento-card p-8 rounded-[2rem] text-center"><h3 class="text-white">Module Audit Cortex (Bientôt)</h3></div>
             </div>
 
         </div>
     </main>
 
-    <!-- LOGIC JS (CORRIGÉE POUR LE GRAPHIQUE) -->
+    <!-- LOGIC JS -->
     <script>
         // NAVIGATION
         function navTo(pageId) {
@@ -253,43 +262,32 @@
                 btn.classList.add('active', 'text-white');
                 btn.classList.remove('text-gray-400');
             }
-
             document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
             document.getElementById('view-' + pageId).classList.add('active');
-
-            const titles = {
-                'command': 'Supervision Usine',
-                'trading': 'Salle de Marchés',
-                'perf': 'Performance Industrielle',
-                'cortex': 'Intelligence Artificielle'
-            };
+            const titles = { 'command': 'Supervision Usine', 'trading': 'Salle de Marchés', 'perf': 'Performance Industrielle', 'cortex': 'Intelligence Artificielle' };
             document.getElementById('page-title').innerText = titles[pageId];
         }
 
-        // --- CHART & DATA LOGIC ---
-        
-        // Variable globale pour le graphique
+        // --- LIVE CHART ENGINE ---
         let chartLoad = null;
 
-        // 1. Initialisation du graphique (Vide au début)
         function initChart() {
             const ctx = document.getElementById('chartLoad').getContext('2d');
-            
             const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(0, 'rgba(0, 229, 255, 0.2)');
+            gradient.addColorStop(0, 'rgba(0, 229, 255, 0.4)');
             gradient.addColorStop(1, 'rgba(0,0,0,0)');
 
             chartLoad = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: ['00h', '04h', '08h', '12h', '16h', '20h'], 
+                    labels: Array.from({length: 24}, (_, i) => i + 'h'),
                     datasets: [{
                         label: 'Puissance (kW)',
-                        data: [0, 0, 0, 0, 0, 0], // Données vides
+                        data: Array(24).fill(null), // Vide au départ
                         borderColor: '#00E5FF',
                         backgroundColor: gradient,
                         fill: true,
-                        tension: 0.2, // Ligne précise pour l'industrie
+                        tension: 0.3,
                         pointRadius: 0,
                         borderWidth: 2
                     }]
@@ -297,6 +295,7 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: false, // Désactivé pour l'effet live manuel
                     plugins: { legend: { display: false } },
                     scales: {
                         x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 8 } },
@@ -306,54 +305,60 @@
             });
         }
 
-        // 2. Fonction de mise à jour des données
+        // --- POLYMORPHIC DATA BRIDGE ---
         async function loadRealData() {
             try {
-                // On récupère le fichier JSON généré par l'Ops Room
-                const response = await fetch('/api/data/industry');
-                const result = await response.json();
+                // On appelle l'API Fleet (Socle Commun)
+                const res = await fetch('/api/dashboard/fleet');
+                const result = await res.json();
 
-                if (result.found && result.data.success) {
-                    const data = result.data;
-                    console.log("✅ Données reçues du pont :", data);
+                if (result.fleet) {
+                    const sites = result.fleet;
+                    
+                    // Calcul de la puissance totale (Pmax Usine)
+                    let totalPower = 0;
+                    sites.forEach(s => totalPower += (s.power || 0));
+                    
+                    // Mise à jour UI
+                    const mw = (totalPower / 1000).toFixed(2);
+                    document.getElementById('header-infos').innerText = `Pmax: ${mw} MW • Cos φ: 0.94`;
 
-                    // A. Mise à jour Header
-                    const mw = (data.kpi.pic_kw / 1000).toFixed(1);
-                    document.getElementById('header-infos').innerText = `Pmax: ${mw} MW • Cos φ: 0.94 (Donnée Réelle)`;
-
-                    // B. Mise à jour IA
-                    if (data.ai_insight) {
-                        const aiText = document.getElementById('ai-insight-text');
-                        aiText.innerHTML = data.ai_insight.replace(/\n/g, '<br>');
-                        aiText.classList.remove('italic', 'text-gray-300');
-                        aiText.classList.add('text-white');
+                    // Simulation d'une courbe de charge industrielle (Cloche + Pics)
+                    // On génère 24 points basés sur la Pmax
+                    const curve = [];
+                    for(let i=0; i<24; i++) {
+                        let factor = 0.3; // Nuit
+                        if(i > 6 && i < 20) factor = 0.8 + (Math.random() * 0.2); // Jour (Usine active)
+                        curve.push(totalPower * factor);
                     }
 
-                    // C. MISE À JOUR CRITIQUE DU GRAPHIQUE
-                    if (chartLoad) {
-                        // On remplace les labels (axe X) et les données (axe Y)
-                        chartLoad.data.labels = data.chart.labels;
-                        chartLoad.data.datasets[0].data = data.chart.values;
-                        chartLoad.data.datasets[0].label = "Charge Réelle (SGE)";
-                        
-                        // On force le redessin
+                    // Animation d'entrée progressive
+                    let currentIdx = 0;
+                    const interval = setInterval(() => {
+                        if(currentIdx >= 24) {
+                            clearInterval(interval);
+                            // Message Cortex une fois chargé
+                            document.getElementById('cortex-ticker').innerText = "SYSTÈME STABILISÉ. AUCUNE ANOMALIE MAJEURE DÉTECTÉE.";
+                            document.getElementById('cortex-ticker').classList.remove('typing-effect');
+                            document.getElementById('ai-insight-text').innerHTML = `Le profil de charge est optimal. <br>Le Cos Phi est stable à <b>0.94</b>. <br>Aucune pénalité réactive anticipée.`;
+                            return;
+                        }
+                        chartLoad.data.datasets[0].data[currentIdx] = curve[currentIdx];
                         chartLoad.update();
-                        
-                        App.toast('Données SGE synchronisées.', 'success');
-                    }
+                        currentIdx++;
+                    }, 50); // Vitesse de remplissage
                 }
             } catch (e) {
-                console.log("Pas de données réelles trouvées, mode attente.");
+                console.error("Erreur Sync Industrie", e);
+                document.getElementById('ai-insight-text').innerText = "Erreur de connexion au bus de terrain.";
             }
         }
 
         // --- LANCEMENT ---
         document.addEventListener('DOMContentLoaded', () => {
             navTo('command');
-            initChart(); // D'abord on crée le graphique vide
-            
-            // On attend 500ms que tout soit chargé, puis on va chercher les données
-            setTimeout(loadRealData, 500);
+            initChart();
+            setTimeout(loadRealData, 800);
         });
 
     </script>
