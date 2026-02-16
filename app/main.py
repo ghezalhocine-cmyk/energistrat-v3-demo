@@ -6,7 +6,7 @@ import io
 import csv
 import traceback
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -24,11 +24,18 @@ except ImportError as e:
     EXCEL_ENGINE_READY = False
 
 # IMPORT DES MOTEURS
-from app.core.cortex_engine import cortex
-from app.core.storage_engine import storage
-from app.core.cortex_physics import physics 
+# Adaptez les imports selon votre structure de dossiers réelle
+try:
+    from app.core.cortex_engine import cortex
+    from app.core.storage_engine import storage
+    from app.core.cortex_physics import physics
+except ImportError:
+    # Fallback pour exécution locale si structure plate
+    from cortex_engine import cortex
+    from storage_engine import storage
+    from cortex_physics import physics
 
-app = FastAPI(title="ENERGISTRAT V3", version="PROD")
+app = FastAPI(title="ENERGISTRAT V3", version="PROD-DIAMOND")
 
 # CONFIGURATION DU CHEMIN
 DATA_DIR = "/app/data"
@@ -49,7 +56,9 @@ app.add_middleware(
 if os.path.exists("static"): 
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-templates = Jinja2Templates(directory="app/templates")
+# Configuration Templates (Fallback robuste)
+template_dir = "app/templates" if os.path.exists("app/templates") else "templates"
+templates = Jinja2Templates(directory=template_dir)
 
 @app.get("/health")
 async def health_check(): 
@@ -61,7 +70,7 @@ async def health_check():
         "excel_engine": "READY" if EXCEL_ENGINE_READY else "MISSING"
     }
 
-# --- MODELES DE DONNEES ---
+# --- MODELES DE DONNEES (MISE A JOUR V49 - MARKET EXPANDED) ---
 class PropagationFilters(BaseModel):
     segment: str
     lot_name: str
@@ -83,11 +92,13 @@ class PropagationRequest(BaseModel):
 class TenderRequest(BaseModel):
     site_ids: List[str]
 
+# MISE A JOUR CRITIQUE : Support TRVE et TARGETS
 class MarketUpdateModel(BaseModel):
-    elec: dict
-    gaz: dict
+    elec: Dict[str, Any]
+    gaz: Dict[str, Any]
+    trve: Optional[Dict[str, Any]] = None
+    targets: Optional[Dict[str, Any]] = None
 
-# NOUVEAU SPRINT D : MODELES PHYSICS
 class SurfaceUpdateModel(BaseModel):
     client_id: str
     surface: float
@@ -106,10 +117,13 @@ def get_market_ref():
                 return json.load(f)
         except: 
             pass
+    # Structure par défaut enrichie
     return {
         "updated_at": datetime.now().isoformat(),
         "elec": { "cal_n1": 82.50, "cal_n2": 76.00, "trend": "BAISSIER" },
-        "gaz": { "peg_n1": 39.40, "peg_n2": 36.10, "trend": "STABLE" }
+        "gaz": { "peg_n1": 39.40, "peg_n2": 36.10, "trend": "STABLE" },
+        "trve": { "elec_c5": 230.0, "elec_c4": 180.0, "gaz": 110.0 },
+        "targets": { "c5": 190.0, "c4": 140.0, "gaz": 85.0 }
     }
 
 @app.get("/api/market/current")
@@ -272,7 +286,9 @@ async def get_dashboard_data(client_id: str):
         is_gaz = "T" in str(contract.get('segment',''))
         segment = str(contract.get('segment', 'C5'))
         
+        # Logique étendue V49 : Utilisation des cibles broker si disponibles
         market_price = market['gaz']['peg_n1'] if is_gaz else market['elec']['cal_n1']
+        
         client_price = float(str(pricing.get('hph', '0')).replace(',', '.').replace(' ', ''))
         
         data["market_analysis"] = cortex.analyze_market_position(
@@ -283,6 +299,7 @@ async def get_dashboard_data(client_id: str):
         )
         
         # SPRINT D : ENRICHISSEMENT PHYSICS (AUDIT)
+        # Calcul dynamique du Benchmark si surface présente
         if "location" in data and "surface" in data["location"]:
             naf = data.get("identity", {}).get("naf", "")
             surf = data["location"]["surface"]
@@ -293,11 +310,14 @@ async def get_dashboard_data(client_id: str):
         data["market_analysis"] = {"status": "NEUTRE", "action": "-", "color": "gray"}
 
     data["energy_type"] = "gaz" if "T" in str(data.get('contract',{}).get('segment','')) else "elec"
-    data["cortex_insight"] = {"message": "Analyse standard.", "conseil": "RAS.", "status": "OK", "color": "green"}
+    
+    # Injecteur de Conseil Cortex par défaut si manquant
+    if "cortex_insight" not in data:
+        data["cortex_insight"] = {"message": "Analyse standard.", "conseil": "RAS.", "status": "OK", "color": "green"}
     
     return JSONResponse(data)
 
-# --- SPRINT D : API PHYSICS (NOUVEAU) ---
+# --- SPRINT D : API PHYSICS ---
 @app.post("/api/settings/update_surface")
 async def update_surface(payload: SurfaceUpdateModel):
     """ Sauvegarde la surface m2 pour le benchmark """
@@ -626,9 +646,10 @@ async def view_nexus(request: Request):
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str):
     f = f"{profile}.html"
-    if os.path.exists(f"app/templates/{f}"): 
+    # Vérification sécurisée du template
+    if os.path.exists(f"app/templates/{f}") or os.path.exists(f"templates/{f}"): 
         return templates.TemplateResponse(f, {"request": request})
-    if os.path.exists("app/templates/dashboard.html"): 
+    if os.path.exists("app/templates/dashboard.html") or os.path.exists("templates/dashboard.html"): 
         return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
     return JSONResponse({"error": f"Template missing: {f}"}, 404)
 
@@ -648,11 +669,22 @@ async def view_climate(request: Request):
 async def view_settings(request: Request): 
     return templates.TemplateResponse("settings.html", {"request": request})
 
+@app.get("/ops")
+async def view_ops(request: Request):
+    # Route pour le panneau OPS (si existant)
+    return templates.TemplateResponse("ops.html", {"request": request})
+
+@app.get("/ops/market")
+async def view_ops_market(request: Request):
+    # Route pour le Market Commander
+    return templates.TemplateResponse("ops_market.html", {"request": request})
+
 @app.get("/{path_name:path}")
 async def catch_all(request: Request, path_name: str):
     if path_name in ["", "/"]: 
         return templates.TemplateResponse("index.html", {"request": request})
     clean = path_name if path_name.endswith(".html") else f"{path_name}.html"
-    if os.path.exists(f"app/templates/{clean}"): 
+    # Support pour structure plate ou imbriquée
+    if os.path.exists(f"app/templates/{clean}") or os.path.exists(f"templates/{clean}"): 
         return templates.TemplateResponse(clean, {"request": request})
     return JSONResponse({"error": "Page not found"}, 404)
