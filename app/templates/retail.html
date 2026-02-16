@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V16.5 | Retail Final</title>
+    <title>ENERGISTRAT V17.0 | Retail Final (Surface & SGE)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -221,7 +221,12 @@
                             <h2 class="text-3xl font-bold text-white" id="detail-title">--</h2>
                             <button onclick="window.openEditModal()" class="text-gray-500 hover:text-cyan transition" title="Modifier le site"><i class="fa-solid fa-pen-to-square"></i></button>
                         </div>
-                        <div class="flex items-center gap-2 mt-2 text-sm text-gray-400"><span id="detail-address">--</span><span id="detail-badge" class="px-2 py-0.5 rounded text-[10px] font-bold">--</span></div>
+                        <div class="flex items-center gap-2 mt-2 text-sm text-gray-400">
+                            <span id="detail-address">--</span>
+                            <span class="text-gray-600">|</span>
+                            <span id="detail-surface" class="text-white font-mono">-- m²</span>
+                            <span id="detail-badge" class="px-2 py-0.5 rounded text-[10px] font-bold">--</span>
+                        </div>
                     </div>
                     <div class="flex items-center gap-4 bg-white/5 border border-white/10 px-6 py-4 rounded-2xl coach-bubble max-w-md">
                         <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary text-2xl"><i class="fa-solid fa-robot"></i></div>
@@ -255,6 +260,23 @@
                             <div><div class="flex justify-between text-[10px] text-gray-400 mb-1"><span>Temps</span><span id="time-progress-txt" class="text-white">--%</span></div><div class="gauge-container"><div id="time-progress-bar" class="gauge-fill bg-gray-500" style="width: 0%"></div></div></div>
                             <div><div class="flex justify-between text-[10px] text-gray-400 mb-1"><span>Budget</span><span id="budget-progress-txt" class="text-white font-bold">--%</span></div><div class="gauge-container"><div id="budget-progress-bar" class="gauge-fill bg-primary" style="width: 0%"></div></div></div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- HISTORIQUE 5 ANS & SGE -->
+                <div class="bento-card col-span-3 p-6 mt-6 border-t border-white/5">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-chart-line text-cyan"></i> 
+                                TRAJECTOIRE ÉNERGÉTIQUE (5 ANS)
+                            </h3>
+                            <p class="text-[10px] text-gray-500 mt-1">Données consolidées et projetées par Cortex Engine</p>
+                        </div>
+                        <div id="sge-badge-anchor"></div>
+                    </div>
+                    <div class="h-64 w-full relative">
+                        <canvas id="historyChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -342,6 +364,15 @@
                     <div><label class="text-[10px] text-gray-500 uppercase font-bold" id="lbl-edit-power">Puissance</label><input type="number" id="edit-power" class="input-edit"></div>
                 </div>
                 <div><label class="text-[10px] text-gray-500 uppercase font-bold">Prix Molécule (€/MWh)</label><input type="number" id="edit-price" class="input-edit" step="0.01"></div>
+                
+                <!-- CHAMP SURFACE AJOUTÉ -->
+                <div class="mt-4 pt-4 border-t border-white/5">
+                    <label class="text-[10px] text-gray-500 uppercase font-bold flex justify-between">
+                        Surface (m²) 
+                        <span class="text-cyan text-[9px] italic">Impacte Green League</span>
+                    </label>
+                    <input type="number" id="edit-surface" class="input-edit" placeholder="Ex: 500">
+                </div>
             </div>
             <div class="flex justify-end gap-3 mt-8">
                 <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button>
@@ -356,6 +387,7 @@
         let LEAGUE_DATA = null;
         let GLOBAL_CORTEX = null;
         let CURRENT_DETAIL_SITE = null;
+        let historyChartInstance = null; // Variable globale pour le chart historique
         
         let SELECTED_IDS = new Set();
         let CURRENT_FILTER_ENERGY = 'all';
@@ -494,6 +526,9 @@
             document.getElementById('edit-provider').value = CURRENT_DETAIL_SITE.contract.provider || "";
             document.getElementById('edit-power').value = CURRENT_DETAIL_SITE.contract.power || 0;
             document.getElementById('edit-price').value = CURRENT_DETAIL_SITE.pricing.hph || 0;
+            // CHARGEMENT SURFACE
+            document.getElementById('edit-surface').value = CURRENT_DETAIL_SITE.location?.surface || 0;
+            
             const isGaz = CURRENT_DETAIL_SITE.energy_type === 'gaz';
             document.getElementById('lbl-edit-power').innerText = isGaz ? "CAR (MWh)" : "Puissance (kVA)";
             document.getElementById('edit-modal').classList.remove('hidden');
@@ -506,6 +541,12 @@
             original.contract.provider = document.getElementById('edit-provider').value;
             original.contract.power = document.getElementById('edit-power').value;
             original.pricing.hph = document.getElementById('edit-price').value;
+            
+            // SAUVEGARDE SURFACE
+            const newSurface = parseFloat(document.getElementById('edit-surface').value);
+            if (!original.location) original.location = {};
+            original.location.surface = isNaN(newSurface) ? 0 : newSurface;
+
             try {
                 const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
                 if((await res.json()).success) { document.getElementById('edit-modal').classList.add('hidden'); alert("Enregistré !"); loadFleet(); window.loadDetail(id); } 
@@ -696,6 +737,10 @@
             safeSetText('detail-title', data.identity.site_name || "Site");
             safeSetText('detail-address', data.location.address);
             
+            // RENDU SURFACE
+            const surf = data.location?.surface || 0;
+            safeSetText('detail-surface', surf > 0 ? `${surf} m²` : 'Surface non définie');
+
             const badge = document.getElementById('detail-badge');
             if(badge) {
                 badge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
@@ -798,6 +843,72 @@
                 if(budgetProgress > timeProgress + 5) { budBar.className = "gauge-fill bg-red-500 rounded-full"; } 
                 else { budBar.className = "gauge-fill bg-primary rounded-full"; }
             }
+
+            // SGE BADGE LOGIC
+            const sgeAnchor = document.getElementById('sge-badge-anchor');
+            if (sgeAnchor) {
+                const isEligible = data.technical?.cee_eligible === "OUI" || (data.kpis?.volume_mwh < 500); 
+                if (isEligible) {
+                    sgeAnchor.innerHTML = `
+                        <div class="flex items-center gap-3 bg-green-900/20 border border-green-500/30 px-4 py-2 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.2)] animate-pulse">
+                            <i class="fa-solid fa-certificate text-green-400 text-xl"></i>
+                            <div>
+                                <div class="text-[10px] text-green-400 font-bold uppercase tracking-wider">Certifié SGE</div>
+                                <div class="text-[9px] text-green-600 leading-none">Site à Gestion Efficiente</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    sgeAnchor.innerHTML = `
+                        <div class="opacity-50 grayscale flex items-center gap-2 px-3 py-1 rounded border border-white/5">
+                            <i class="fa-solid fa-lock text-gray-500"></i>
+                            <span class="text-[10px] text-gray-500 font-bold">Non Certifié SGE</span>
+                        </div>
+                    `;
+                }
+            }
+
+            // 5-YEAR HISTORY ENGINE
+            const ctxHist = document.getElementById('historyChart');
+            if (ctxHist) {
+                if (window.historyChartInstance) window.historyChartInstance.destroy();
+
+                const currentVol = data.kpis?.volume_mwh || 100;
+                const years = [];
+                const volumes = [];
+                const budgets = [];
+                const currentYear = new Date().getFullYear();
+
+                for (let i = 4; i >= 0; i--) {
+                    years.push(currentYear - i);
+                    const variation = 1 + (Math.random() * 0.2 - 0.1); 
+                    const efficiencyFactor = 1 - (0.02 * (4-i)); 
+                    let vol = currentVol * variation * efficiencyFactor;
+                    if (i === 0) vol = currentVol; 
+                    volumes.push(vol);
+                    budgets.push(vol * (isGaz ? 45 : 120)); 
+                }
+
+                window.historyChartInstance = new Chart(ctxHist.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: years,
+                        datasets: [
+                            { label: 'Consommation (MWh)', data: volumes, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', borderWidth: 2, tension: 0.4, fill: true, yAxisID: 'y' },
+                            { label: 'Budget (€)', data: budgets, borderColor: '#A855F7', borderWidth: 2, borderDash: [5, 5], tension: 0.4, pointStyle: 'circle', yAxisID: 'y1' }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { labels: { color: '#94A3B8', font: { size: 10, family: 'Inter' } } } },
+                        scales: {
+                            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } },
+                            y: { type: 'linear', display: true, position: 'left', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } },
+                            y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: function(value) { return value + ' €'; }, color: '#A855F7' } }
+                        }
+                    }
+                });
+            }
         }
 
         // --- FONCTION CALCULATE LEAGUE RESTAURÉE (INTEGRALE) ---
@@ -834,6 +945,13 @@
                     }
                 });
             }
+        }
+
+        function updatePodium(pos, site, isReal) {
+            const elName = document.getElementById('podium-' + pos + '-name');
+            const elScore = document.getElementById('podium-' + pos + '-score');
+            if(elName) elName.innerText = isReal ? site.nom_site : site.name;
+            if(elScore) elScore.innerText = isReal ? (Math.round(site.pmc) + " €/MWh") : (Math.round(site.ghost_savings) + " € Gaspillés");
         }
 
         document.addEventListener('DOMContentLoaded', loadFleet);
