@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>ENERGISTRAT | Optimisation Contrats</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', cyan: '#00E5FF', alert: '#F59E0B', danger: '#EF4444', success: '#10B981' }, fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } } }
+    </script>
+    <style>body { background-color: #050505; color: white; } .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); }</style>
+</head>
+<body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
+    <!-- SIDEBAR NAVIGATION RAPIDE -->
+    <aside class="w-16 bg-[#020617] border-r border-white/10 flex flex-col items-center py-6 z-50">
+        <a href="/dashboard/industry" class="mb-8 text-gray-500 hover:text-white transition" title="Retour Cockpit"><i class="fa-solid fa-arrow-left text-xl"></i></a>
+        <div class="w-10 h-10 rounded bg-cyan/20 text-cyan flex items-center justify-center mb-4"><i class="fa-solid fa-sliders"></i></div>
+    </aside>
+
+    <main class="flex-1 flex flex-col p-8 overflow-y-auto bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+        <header class="mb-8 flex justify-between items-end">
+            <div>
+                <h1 class="text-3xl font-black text-white">Optimisation Tarifaire</h1>
+                <p class="text-gray-400 text-xs mt-1">Simulation TURPE & Énergie Réactive</p>
+            </div>
+            <div class="text-right">
+                <div class="text-xs text-gray-500 uppercase">Gisement d'économie</div>
+                <div class="text-2xl font-mono font-bold text-success">+ 12 450 €/an</div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-2 gap-8">
+            <!-- MODULE TURPE -->
+            <div class="bento-card p-8 rounded-2xl">
+                <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3"><i class="fa-solid fa-bolt text-cyan"></i> Calibrage Puissance (TURPE)</h2>
+                <div class="h-64 relative mb-6"><canvas id="turpeChart"></canvas></div>
+                <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs text-gray-400">Puissance Souscrite Actuelle</span>
+                        <span class="font-mono font-bold text-white">2 400 kVA</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-cyan">Optimum Calculé</span>
+                        <span class="font-mono font-bold text-cyan">2 150 kVA</span>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-white/10 text-center">
+                        <button class="bg-cyan text-black px-6 py-2 rounded font-bold text-xs hover:bg-white transition">Appliquer l'optimum</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE COS PHI -->
+            <div class="bento-card p-8 rounded-2xl border-l-4 border-alert">
+                <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3"><i class="fa-solid fa-magnet text-alert"></i> Compensateur Réactif</h2>
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <div class="text-center p-4 bg-abysse rounded-xl">
+                        <div class="text-xs text-gray-500 uppercase">Cos Phi Actuel</div>
+                        <div class="text-3xl font-mono font-bold text-danger mt-2">0.89</div>
+                        <div class="text-[10px] text-danger mt-1">Pénalités Hiver</div>
+                    </div>
+                    <div class="text-center p-4 bg-abysse rounded-xl border border-success/30">
+                        <div class="text-xs text-gray-500 uppercase">Cible</div>
+                        <div class="text-3xl font-mono font-bold text-success mt-2">0.96</div>
+                        <div class="text-[10px] text-success mt-1">Zéro Pénalité</div>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between text-sm border-b border-white/5 pb-2">
+                        <span class="text-gray-400">Coût Pénalités (Est. Annuel)</span>
+                        <span class="text-white font-mono">8 500 €</span>
+                    </div>
+                    <div class="flex justify-between text-sm border-b border-white/5 pb-2">
+                        <span class="text-gray-400">Coût Batterie Condensateurs</span>
+                        <span class="text-white font-mono">12 000 €</span>
+                    </div>
+                    <div class="flex justify-between text-sm pt-2">
+                        <span class="text-gray-400 font-bold">Retour sur Investissement (ROI)</span>
+                        <span class="text-success font-mono font-bold">1.4 ans</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const ctx = document.getElementById('turpeChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['2000', '2100', '2200', '2300', '2400', '2500', '2600'],
+                datasets: [{
+                    label: 'Coût Total Annuel (€)',
+                    data: [55000, 52000, 51500, 52500, 54000, 56000, 58000], // Courbe en U
+                    borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, tension: 0.4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { color: 'rgba(255,255,255,0.1)' } } } }
+        });
+    </script>
+</body>
+</html>
