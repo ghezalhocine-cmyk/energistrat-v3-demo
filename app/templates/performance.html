@@ -22,77 +22,46 @@
         <header class="mb-8 flex justify-between items-end">
             <div>
                 <h1 class="text-3xl font-black text-white">Performance ISO 50001</h1>
-                <p class="text-gray-400 text-xs mt-1">Méthode CUSUM & Monotone de Charge</p>
-            </div>
-            <div class="flex gap-4">
-                <div class="px-4 py-2 bg-white/5 rounded border border-white/10 text-center">
-                    <div class="text-[10px] text-gray-500">IPE Global</div>
-                    <div class="font-mono font-bold text-white">142 kWh/t</div>
-                </div>
+                <p class="text-gray-400 text-xs mt-1">Méthode CUSUM (Données Réelles)</p>
             </div>
         </header>
 
         <div class="space-y-8">
-            <!-- CUSUM -->
             <div class="bento-card p-8 rounded-2xl">
                 <div class="flex justify-between mb-6">
                     <h2 class="text-xl font-bold text-white"><i class="fa-solid fa-scale-unbalanced text-success mr-2"></i> CUSUM (Cumul des Économies)</h2>
-                    <div class="text-xs text-gray-400">Ref: Année N-1 (Ajustée DJU/Prod)</div>
                 </div>
                 <div class="h-72 w-full"><canvas id="cusumChart"></canvas></div>
-                <p class="text-xs text-gray-500 mt-4 italic text-center">La courbe descendante indique une performance réelle supérieure à l'année de référence.</p>
-            </div>
-
-            <!-- MONOTONE -->
-            <div class="bento-card p-8 rounded-2xl border-t-4 border-cyan">
-                <h2 class="text-xl font-bold text-white mb-6"><i class="fa-solid fa-arrow-down-wide-short text-cyan mr-2"></i> Monotone de Charge</h2>
-                <div class="grid grid-cols-3 gap-8">
-                    <div class="col-span-2 h-64"><canvas id="monotoneChart"></canvas></div>
-                    <div class="space-y-4 flex flex-col justify-center">
-                        <div class="p-4 bg-abysse/50 rounded-xl">
-                            <div class="text-xs text-gray-500">Talon (100% du temps)</div>
-                            <div class="text-xl font-mono font-bold text-white">450 kW</div>
-                            <div class="text-[10px] text-alert">Gaspillage potentiel</div>
-                        </div>
-                        <div class="p-4 bg-abysse/50 rounded-xl">
-                            <div class="text-xs text-gray-500">Pointe (>90% Pmax)</div>
-                            <div class="text-xl font-mono font-bold text-white">32 h/an</div>
-                            <div class="text-[10px] text-cyan">Dimensionnement OK</div>
-                        </div>
-                    </div>
-                </div>
+                <p class="text-xs text-gray-500 mt-4 italic text-center">Courbe générée par Cortex Physics sur la base de vos factures.</p>
             </div>
         </div>
     </main>
 
     <script>
-        const ctxCusum = document.getElementById('cusumChart').getContext('2d');
-        new Chart(ctxCusum, {
-            type: 'line',
-            data: {
-                labels: ['J','F','M','A','M','J','J','A','S','O','N','D'],
-                datasets: [{
-                    label: 'Cumul Écarts (kWh)',
-                    data: [0, -500, -1200, -2500, -3000, -4500, -5000, -5200, -6000, -7500, -8200, -9500],
-                    borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-
-        const ctxMono = document.getElementById('monotoneChart').getContext('2d');
-        new Chart(ctxMono, {
-            type: 'line',
-            data: {
-                labels: ['0%', '25%', '50%', '75%', '100%'],
-                datasets: [{
-                    label: 'Puissance Appelée',
-                    data: [2500, 1800, 1200, 800, 450],
-                    borderColor: '#00E5FF', borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: 'rgba(0, 229, 255, 0.05)'
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
+        async function init() {
+            try {
+                const res = await fetch('/api/physics/industry/global');
+                const data = await res.json();
+                
+                if (data.cusum) {
+                    const c = data.cusum;
+                    const ctxCusum = document.getElementById('cusumChart').getContext('2d');
+                    new Chart(ctxCusum, {
+                        type: 'line',
+                        data: {
+                            labels: c.labels,
+                            datasets: [{
+                                label: 'Cumul Écarts (kWh)',
+                                data: c.values,
+                                borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+            } catch(e) { console.error(e); }
+        }
+        init();
     </script>
 </body>
 </html>
