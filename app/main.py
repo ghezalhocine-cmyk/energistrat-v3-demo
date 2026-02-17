@@ -24,18 +24,17 @@ except ImportError as e:
     EXCEL_ENGINE_READY = False
 
 # IMPORT DES MOTEURS
-# Adaptez les imports selon votre structure de dossiers réelle
 try:
     from app.core.cortex_engine import cortex
     from app.core.storage_engine import storage
     from app.core.cortex_physics import physics
 except ImportError:
-    # Fallback pour exécution locale si structure plate
+    # Fallback pour exécution locale
     from cortex_engine import cortex
     from storage_engine import storage
     from cortex_physics import physics
 
-app = FastAPI(title="ENERGISTRAT V3", version="PROD-DIAMOND")
+app = FastAPI(title="ENERGISTRAT V3", version="PROD-DIAMOND-FULL")
 
 # CONFIGURATION DU CHEMIN
 DATA_DIR = "/app/data"
@@ -70,7 +69,7 @@ async def health_check():
         "excel_engine": "READY" if EXCEL_ENGINE_READY else "MISSING"
     }
 
-# --- MODELES DE DONNEES (MISE A JOUR V49 - MARKET EXPANDED) ---
+# --- MODELES DE DONNEES ---
 class PropagationFilters(BaseModel):
     segment: str
     lot_name: str
@@ -92,7 +91,7 @@ class PropagationRequest(BaseModel):
 class TenderRequest(BaseModel):
     site_ids: List[str]
 
-# MISE A JOUR CRITIQUE : Support TRVE et TARGETS
+# MODELE MARKET ÉTENDU (TRVE + TARGETS)
 class MarketUpdateModel(BaseModel):
     elec: Dict[str, Any]
     gaz: Dict[str, Any]
@@ -117,7 +116,6 @@ def get_market_ref():
                 return json.load(f)
         except: 
             pass
-    # Structure par défaut enrichie
     return {
         "updated_at": datetime.now().isoformat(),
         "elec": { "cal_n1": 82.50, "cal_n2": 76.00, "trend": "BAISSIER" },
@@ -286,9 +284,7 @@ async def get_dashboard_data(client_id: str):
         is_gaz = "T" in str(contract.get('segment',''))
         segment = str(contract.get('segment', 'C5'))
         
-        # Logique étendue V49 : Utilisation des cibles broker si disponibles
         market_price = market['gaz']['peg_n1'] if is_gaz else market['elec']['cal_n1']
-        
         client_price = float(str(pricing.get('hph', '0')).replace(',', '.').replace(' ', ''))
         
         data["market_analysis"] = cortex.analyze_market_position(
@@ -299,7 +295,6 @@ async def get_dashboard_data(client_id: str):
         )
         
         # SPRINT D : ENRICHISSEMENT PHYSICS (AUDIT)
-        # Calcul dynamique du Benchmark si surface présente
         if "location" in data and "surface" in data["location"]:
             naf = data.get("identity", {}).get("naf", "")
             surf = data["location"]["surface"]
@@ -317,7 +312,65 @@ async def get_dashboard_data(client_id: str):
     
     return JSONResponse(data)
 
-# --- SPRINT D : API PHYSICS ---
+# --- SPRINT INDUSTRY : PHYSICS BRIDGE (LE CERVEAU INDUSTRIEL) ---
+@app.get("/api/physics/industry/global")
+async def api_industry_global():
+    """
+    Agrège les données de tout le parc pour alimenter les satellites Industrie.
+    """
+    raw_sites = []
+    files = glob.glob(f"{DATA_DIR}/*.json")
+    
+    total_power = 0.0
+    total_conso_elec = 0.0
+    total_conso_gaz = 0.0
+    
+    for p in files:
+        if "master_index" in p or "market_ref" in p or "market_history" in p: continue
+        try:
+            with open(p, 'r') as f: data = json.load(f)
+            
+            c = data.get('contract', {})
+            kpis = cortex.enrich_fleet_kpis(data)
+            
+            p_sous = cortex._safe_float(c.get('power', 0))
+            vol = kpis.get('volume_mwh', 0)
+            
+            is_gaz = "T" in str(c.get('segment', ''))
+            
+            if is_gaz:
+                total_conso_gaz += vol
+            else:
+                total_power += p_sous
+                total_conso_elec += vol
+                
+        except: continue
+
+    # 1. Calcul TURPE (Optimisation)
+    turpe_sim = physics.simulate_turpe_optimization(total_power * 0.9, total_power)
+    
+    # 2. Calcul Carbone (RSE)
+    carbon_sim = physics.calculate_carbon_footprint(total_conso_elec * 1000, total_conso_gaz * 1000)
+    
+    # 3. Calcul Performance (Mocké sur CUSUM car nécessite historique fin)
+    cusum_data = {
+        "labels": ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aout', 'Sep', 'Oct', 'Nov', 'Dec'],
+        "values": [0, -total_conso_elec*0.01, -total_conso_elec*0.03, -total_conso_elec*0.05, -total_conso_elec*0.04, -total_conso_elec*0.06, -total_conso_elec*0.08, -total_conso_elec*0.09, -total_conso_elec*0.1, -total_conso_elec*0.12, -total_conso_elec*0.13, -total_conso_elec*0.15]
+    }
+
+    return JSONResponse({
+        "success": True,
+        "kpi": {
+            "total_power_kva": round(total_power, 0),
+            "total_elec_mwh": round(total_conso_elec, 1),
+            "total_gaz_mwh": round(total_conso_gaz, 1)
+        },
+        "turpe": turpe_sim,
+        "carbon": carbon_sim,
+        "cusum": cusum_data
+    })
+
+# --- API SETTINGS & PHYSICS ---
 @app.post("/api/settings/update_surface")
 async def update_surface(payload: SurfaceUpdateModel):
     """ Sauvegarde la surface m2 pour le benchmark """
@@ -646,45 +699,39 @@ async def view_nexus(request: Request):
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str):
     f = f"{profile}.html"
-    # Vérification sécurisée du template
     if os.path.exists(f"app/templates/{f}") or os.path.exists(f"templates/{f}"): 
         return templates.TemplateResponse(f, {"request": request})
     if os.path.exists("app/templates/dashboard.html") or os.path.exists("templates/dashboard.html"): 
         return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
     return JSONResponse({"error": f"Template missing: {f}"}, 404)
 
+# Routes Satellites (Industry)
+@app.get("/optimization")
+async def view_opti(request: Request): return templates.TemplateResponse("optimization.html", {"request": request})
+@app.get("/performance")
+async def view_perf(request: Request): return templates.TemplateResponse("performance.html", {"request": request})
+@app.get("/carbon")
+async def view_carb(request: Request): return templates.TemplateResponse("carbon.html", {"request": request})
+
+# Routes Satellites (Retail/Mairie)
 @app.get("/audit")
-async def view_audit(request: Request): 
-    return templates.TemplateResponse("audit.html", {"request": request})
-
+async def view_audit(request: Request): return templates.TemplateResponse("audit.html", {"request": request})
 @app.get("/solar")
-async def view_solar(request: Request): 
-    return templates.TemplateResponse("solar.html", {"request": request})
-
+async def view_solar(request: Request): return templates.TemplateResponse("solar.html", {"request": request})
 @app.get("/climate")
-async def view_climate(request: Request): 
-    return templates.TemplateResponse("climate.html", {"request": request})
-
+async def view_climate(request: Request): return templates.TemplateResponse("climate.html", {"request": request})
 @app.get("/partner/settings")
-async def view_settings(request: Request): 
-    return templates.TemplateResponse("settings.html", {"request": request})
-
-@app.get("/ops")
-async def view_ops(request: Request):
-    # Route pour le panneau OPS (si existant)
-    return templates.TemplateResponse("ops.html", {"request": request})
-
+async def view_settings(request: Request): return templates.TemplateResponse("settings.html", {"request": request})
 @app.get("/ops/market")
-async def view_ops_market(request: Request):
-    # Route pour le Market Commander
-    return templates.TemplateResponse("ops_market.html", {"request": request})
+async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
+@app.get("/ops")
+async def view_ops(request: Request): return templates.TemplateResponse("ops.html", {"request": request})
 
 @app.get("/{path_name:path}")
 async def catch_all(request: Request, path_name: str):
     if path_name in ["", "/"]: 
         return templates.TemplateResponse("index.html", {"request": request})
     clean = path_name if path_name.endswith(".html") else f"{path_name}.html"
-    # Support pour structure plate ou imbriquée
     if os.path.exists(f"app/templates/{clean}") or os.path.exists(f"templates/{clean}"): 
         return templates.TemplateResponse(clean, {"request": request})
     return JSONResponse({"error": "Page not found"}, 404)
