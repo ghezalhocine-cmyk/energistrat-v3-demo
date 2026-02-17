@@ -22,32 +22,28 @@
         <header class="mb-8 flex justify-between items-end">
             <div>
                 <h1 class="text-3xl font-black text-white">Bilan Carbone (Scope 2)</h1>
-                <p class="text-gray-400 text-xs mt-1">Conformité CSRD • Base ADEME</p>
+                <p class="text-gray-400 text-xs mt-1">Données réelles • Base ADEME</p>
             </div>
             <button onclick="window.print()" class="bg-white text-black px-4 py-2 rounded font-bold text-xs hover:bg-gray-200 transition"><i class="fa-solid fa-download mr-2"></i>Export PDF</button>
         </header>
 
         <div class="grid grid-cols-3 gap-8">
-            <!-- TOTAL -->
             <div class="col-span-1 bento-card p-8 rounded-2xl flex flex-col justify-center items-center text-center border-t-4 border-co2">
-                <div class="text-xs text-gray-500 uppercase font-bold mb-4">Emissions Totales (YTD)</div>
-                <div class="text-6xl font-black text-white mb-2">428</div>
+                <div class="text-xs text-gray-500 uppercase font-bold mb-4">Emissions Totales</div>
+                <div class="text-6xl font-black text-white mb-2" id="total-co2">--</div>
                 <div class="text-xl font-bold text-gray-400">Tonnes CO2eq</div>
-                <div class="mt-6 text-xs text-tree bg-tree/10 px-3 py-1 rounded-full border border-tree/20">-5% vs N-1</div>
             </div>
 
-            <!-- MIX -->
             <div class="col-span-1 bento-card p-8 rounded-2xl">
                 <h3 class="text-sm font-bold text-white mb-4 text-center">Origine des Émissions</h3>
                 <div class="h-48 relative"><canvas id="co2Chart"></canvas></div>
             </div>
 
-            <!-- EQUIVALENCE -->
             <div class="col-span-1 bento-card p-8 rounded-2xl bg-gradient-to-br from-card to-tree/10 border-tree/20">
                 <h3 class="text-sm font-bold text-white mb-4">Compensation Équivalente</h3>
                 <div class="flex flex-col items-center justify-center h-full pb-8">
                     <i class="fa-solid fa-tree text-6xl text-tree mb-4"></i>
-                    <div class="text-4xl font-bold text-white">17 120</div>
+                    <div class="text-4xl font-bold text-white" id="trees-eq">--</div>
                     <div class="text-xs text-gray-400">Arbres nécessaires</div>
                 </div>
             </div>
@@ -55,19 +51,33 @@
     </main>
 
     <script>
-        const ctx = document.getElementById('co2Chart').getContext('2d');
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Électricité (Mix FR)', 'Gaz Naturel', 'Fioul'],
-                datasets: [{
-                    data: [15, 75, 10], // L'élec pèse peu en France, le Gaz pèse lourd
-                    backgroundColor: ['#00E5FF', '#F59E0B', '#64748B'],
-                    borderWidth: 0
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: 'white', font: { size: 10 } } } } }
-        });
+        async function init() {
+            try {
+                const res = await fetch('/api/physics/industry/global');
+                const data = await res.json();
+                
+                if (data.carbon) {
+                    const c = data.carbon;
+                    document.getElementById('total-co2').innerText = c.total_tco2;
+                    document.getElementById('trees-eq').innerText = c.trees_equivalent.toLocaleString();
+                    
+                    const ctx = document.getElementById('co2Chart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Électricité', 'Gaz'],
+                            datasets: [{
+                                data: [c.details.elec_tco2, c.details.gaz_tco2],
+                                backgroundColor: ['#00E5FF', '#F59E0B'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: 'white', font: { size: 10 } } } } }
+                    });
+                }
+            } catch(e) { console.error(e); }
+        }
+        init();
     </script>
 </body>
 </html>
