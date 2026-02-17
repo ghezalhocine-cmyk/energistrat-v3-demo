@@ -2,12 +2,12 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V3 | Industry Command</title>
+    <title>ENERGISTRAT V3 | Factory.OS</title>
     
     <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script>
@@ -17,350 +17,375 @@
                     colors: {
                         abysse: '#050505',
                         card: '#0F172A',
-                        cyan: '#00E5FF',   // Tech / Elec
-                        alert: '#F59E0B',  // Warning
-                        danger: '#EF4444', // Critique
+                        cyan: '#00E5FF',   
+                        alert: '#F59E0B',  
+                        danger: '#EF4444', 
                         success: '#10B981',
-                        steam: '#94A3B8',  // Vapeur
-                        ai: '#A855F7'      // Intelligence Artificielle
+                        steam: '#94A3B8',  
+                        ai: '#A855F7'      
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
                     },
-                    borderRadius: { 'bento': '2rem' },
-                    boxShadow: { 
-                        'neon-cyan': '0 0 20px rgba(0, 229, 255, 0.15)',
-                        'neon-alert': '0 0 20px rgba(245, 158, 11, 0.15)' 
-                    },
-                    animation: {
-                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                    }
+                    borderRadius: { 'bento': '0.5rem' } // Angles plus durs pour l'industrie
                 }
             }
         }
     </script>
     <style>
-        body { background-color: #050505; color: white; }
+        body { background-color: #050505; color: white; overflow: hidden; }
         .bento-card { 
-            background: rgba(15, 23, 42, 0.6); 
-            backdrop-filter: blur(20px); 
-            border: 1px solid rgba(255, 255, 255, 0.05); 
-            transition: all 0.3s ease; 
-        }
-        .bento-card:hover { 
-            border-color: rgba(0, 229, 255, 0.4); 
-            transform: translateY(-2px); 
-            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5);
+            background: rgba(15, 23, 42, 0.8); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            transition: all 0.2s ease; 
         }
         .nav-item.active { 
-            background: linear-gradient(90deg, rgba(0, 229, 255, 0.1) 0%, transparent 100%);
-            border-left: 3px solid #00E5FF; 
+            background: rgba(0, 229, 255, 0.1);
+            border-left: 4px solid #00E5FF; 
             color: white; 
         }
-        .page-content { display: none; } 
-        .page-content.active { display: grid; }
+        /* Grille technique dense */
+        .tech-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
+        .lcd-text { font-family: 'JetBrains Mono', monospace; letter-spacing: -0.5px; }
         
-        /* EFFET TYPEWRITER */
-        .typing-effect { overflow: hidden; white-space: nowrap; border-right: 2px solid #00E5FF; animation: typing 3.5s steps(40, end), blink-caret .75s step-end infinite; }
-        @keyframes typing { from { width: 0 } to { width: 100% } }
-        @keyframes blink-caret { from, to { border-color: transparent } 50% { border-color: #00E5FF; } }
-
-        /* LIVE DOT */
-        .live-dot { width: 8px; height: 8px; background: #EF4444; border-radius: 50%; box-shadow: 0 0 10px #EF4444; animation: blink-live 1s infinite; }
-        @keyframes blink-live { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        /* Ticker Animation */
+        .ticker-wrap { width: 100%; overflow: hidden; background: rgba(0,0,0,0.3); }
+        .ticker { display: inline-block; white-space: nowrap; animation: ticker 20s linear infinite; }
+        @keyframes ticker { 0% { transform: translate3d(100%, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
     </style>
 </head>
-<body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
+<body class="flex h-screen w-screen font-sans text-sm">
 
     <!-- SIDEBAR -->
-    <aside class="w-72 bg-[#020617] border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0">
-        <div class="p-6">
-            <div class="flex items-center gap-3 mb-8">
-                <div class="w-12 h-12 rounded-2xl border border-cyan/50 flex items-center justify-center bg-abysse text-cyan font-bold shadow-neon-cyan relative overflow-hidden group">
-                    <i class="fa-solid fa-industry text-xl relative z-10 group-hover:rotate-12 transition"></i>
-                    <div class="absolute inset-0 bg-cyan/10 animate-pulse"></div>
-                </div>
+    <aside class="w-64 bg-[#020617] border-r border-white/10 flex flex-col justify-between z-50 flex-shrink-0">
+        <div>
+            <div class="h-16 flex items-center px-6 border-b border-white/10 bg-abysse">
+                <i class="fa-solid fa-industry text-cyan text-xl mr-3"></i>
                 <div>
-                    <h1 class="font-black tracking-wider text-base text-white">FACTORY<span class="text-cyan">.OS</span></h1>
-                    <p class="text-[10px] text-gray-500 font-mono">Site Seveso • ISO 50001</p>
+                    <div class="font-black text-white tracking-wider">FACTORY<span class="text-cyan">.OS</span></div>
+                    <div class="text-[9px] text-gray-500 font-mono">SEVESO III • HIGH VOLTAGE</div>
                 </div>
             </div>
-            <nav class="space-y-1">
-                <button onclick="navTo('command')" id="btn-command" class="nav-item active w-full text-left px-6 py-4 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3 hover:bg-white/5">
-                    <i class="fa-solid fa-tower-broadcast w-5 text-center"></i> Command Center
+            
+            <div class="p-2 space-y-1 mt-2">
+                <div class="text-[10px] text-gray-600 font-bold uppercase px-4 py-2">Pilotage Usine</div>
+                <button onclick="switchView('command')" id="nav-command" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3">
+                    <i class="fa-solid fa-gauge-high w-5 text-center"></i> Supervision (GTB)
                 </button>
-                <button onclick="navTo('trading')" id="btn-trading" class="nav-item w-full text-left px-6 py-4 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3 hover:bg-white/5">
-                    <i class="fa-solid fa-chart-line w-5 text-center"></i> Trading & Budget
+                <button onclick="switchView('trading')" id="nav-trading" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3">
+                    <i class="fa-solid fa-chart-candlestick w-5 text-center text-alert"></i> Trading & Spot
                 </button>
-                <button onclick="navTo('perf')" id="btn-perf" class="nav-item w-full text-left px-6 py-4 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3 hover:bg-white/5">
-                    <i class="fa-solid fa-tachograph-digital w-5 text-center"></i> Performance IPE
+                <button onclick="switchView('perf')" id="nav-perf" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3">
+                    <i class="fa-solid fa-microscope w-5 text-center text-success"></i> Performance IPE
                 </button>
-                <button onclick="navTo('cortex')" id="btn-cortex" class="nav-item w-full text-left px-6 py-4 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3 hover:bg-white/5">
-                    <i class="fa-solid fa-robot w-5 text-center"></i> Cortex Audit
+                <button onclick="switchView('cortex')" id="nav-cortex" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3">
+                    <i class="fa-solid fa-file-medical-alt w-5 text-center text-ai"></i> Journal Cortex
                 </button>
-            </nav>
-        </div>
-        
-        <div class="p-6 border-t border-white/5">
-            <div class="bg-gradient-to-br from-card to-abysse border border-white/10 rounded-xl p-4">
-                <div class="text-xs font-bold text-white mb-1"><i class="fa-solid fa-network-wired mr-2"></i>Cluster Industriel</div>
-                <p class="text-[10px] text-gray-400 mb-2">Invitez un site partenaire.</p>
-                <div class="text-center bg-black/30 rounded py-1 font-mono text-cyan text-xs cursor-pointer border border-cyan/30 hover:text-white transition">CODE: IND-88X</div>
             </div>
+        </div>
+
+        <div class="p-4 border-t border-white/10 bg-white/5">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] text-gray-400 uppercase">État Système</span>
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            </div>
+            <div class="text-xs font-mono text-cyan">CONNEXION MODBUS OK</div>
+            <div class="text-[10px] text-gray-500">Latence: 12ms</div>
         </div>
     </aside>
 
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         
-        <!-- CORTEX SENTINEL -->
-        <div class="h-14 border-b border-white/5 flex items-center px-8 gap-4 bg-abysse/95 backdrop-blur z-20">
-            <div class="px-2 py-1 rounded bg-cyan text-abysse text-[10px] font-black animate-pulse tracking-wider">
-                <i class="fa-solid fa-microchip mr-1"></i> CORTEX LIVE
+        <!-- TOP BAR (TICKER) -->
+        <div class="h-10 bg-black border-b border-white/10 flex items-center z-40">
+            <div class="bg-cyan text-black font-bold px-3 h-full flex items-center text-xs">LIVE</div>
+            <div class="ticker-wrap flex-1">
+                <div class="ticker text-xs font-mono py-2">
+                    <span class="text-cyan mr-8">EEX SPOT FR: 42.50 €/MWh ▼</span>
+                    <span class="text-alert mr-8">GAZ TTF: 34.20 €/MWh ▲</span>
+                    <span class="text-white mr-8">CO2 EUA: 65.10 €/t ▶</span>
+                    <span class="text-danger mr-8">ALERTE EFFACEMENT J-1: NON</span>
+                </div>
             </div>
-            <div class="flex-1 overflow-hidden">
-                <span class="text-xs text-cyan font-mono typing-effect" id="cortex-ticker">INITIALISATION DU SYSTÈME... ANALYSE DES FLUX EN COURS...</span>
-            </div>
-            <div class="flex items-center gap-2 px-3 py-1 rounded bg-white/5 border border-white/10">
-                <div class="live-dot"></div>
-                <span class="text-[10px] font-mono text-gray-300">FLUX RÉEL</span>
+            <div class="px-4 flex items-center gap-4 text-xs">
+                <span class="text-gray-400">Site: <b class="text-white">Usine Nord</b></span>
+                <a href="/settings.html" class="text-gray-400 hover:text-white"><i class="fa-solid fa-gear"></i></a>
             </div>
         </div>
 
-        <!-- SCROLLABLE CONTENT -->
-        <div class="p-8 overflow-y-auto h-full pb-20 scroll-smooth">
+        <!-- CONTENT -->
+        <div class="flex-1 overflow-y-auto p-6 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
             
-            <!-- HEADER -->
-            <div class="flex justify-between items-end mb-6">
-                <div>
-                    <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Supervision Usine</h2>
-                    <p class="text-gray-400 text-xs mt-1 font-mono" id="header-infos">Pmax: -- MW • Cos φ: --</p>
-                </div>
-                <div class="flex gap-4 items-center">
-                    <div class="bg-card border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
-                        <div class="text-right">
-                            <div class="text-[10px] text-gray-400 uppercase font-bold">Prix Spot</div>
-                            <div class="text-sm font-mono font-bold text-white">42.5 €/MWh</div>
-                        </div>
-                        <span class="text-xs text-green-400"><i class="fa-solid fa-arrow-trend-down"></i></span>
-                    </div>
-                    <a href="/settings.html" class="h-10 w-10 rounded-full bg-gradient-to-br from-cyan to-blue-600 p-[2px] cursor-pointer hover:scale-105 transition block">
-                        <div class="h-full w-full rounded-full bg-abysse flex items-center justify-center overflow-hidden">
-                            <img src="https://ui-avatars.com/api/?name=Indus+Admin&background=050505&color=fff" alt="Admin">
-                        </div>
-                    </a>
-                </div>
-            </div>
-
-            <!-- TAB 1: COMMAND CENTER (GTB) -->
-            <div id="view-command" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
-                
-                <!-- MAIN LOAD CURVE -->
-                <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card border-l-4 border-cyan">
-                    <div class="flex justify-between mb-6">
-                        <h3 class="font-bold text-xl text-white flex items-center gap-2"><i class="fa-solid fa-wave-square text-cyan"></i> Courbe de Charge (P10)</h3>
-                        <div class="flex gap-4 text-xs font-mono">
-                            <span class="text-cyan">● Réel (kW)</span>
-                            <span class="text-gray-500">-- Talon</span>
-                        </div>
-                    </div>
-                    <div class="h-72 w-full relative">
-                        <canvas id="chartLoad"></canvas>
-                    </div>
-
-                    <!-- BLOC INTELLIGENCE ARTIFICIELLE -->
-                    <div class="mt-6 p-4 bg-abysse/50 border border-ai/30 rounded-xl flex items-start gap-4 shadow-[0_0_20px_rgba(168,85,247,0.1)]">
-                        <div class="w-10 h-10 rounded-full bg-ai/10 flex items-center justify-center flex-shrink-0">
-                            <i class="fa-solid fa-robot text-ai animate-pulse"></i>
-                        </div>
-                        <div>
-                            <h4 class="text-xs font-bold text-ai uppercase mb-1">Analyse Cortex</h4>
-                            <p class="text-sm text-gray-300 italic leading-relaxed" id="ai-insight-text">
-                                Connexion au concentrateur de données...
-                            </p>
-                        </div>
-                    </div>
+            <!-- VUE 1 : SUPERVISION (GTB) -->
+            <div id="view-command" class="view-section space-y-6">
+                <div class="flex justify-between items-end">
+                    <h2 class="text-2xl font-bold text-white">Supervision Temps Réel</h2>
+                    <div class="text-right font-mono text-cyan text-xl font-bold">Pinst: 4.2 MW</div>
                 </div>
 
-                <!-- GTB WIDGETS -->
-                <div class="col-span-4 flex flex-col gap-6">
-                    <!-- Power Factor -->
-                    <div class="bento-card rounded-[2rem] p-6 flex-1 border-l-4 border-alert relative overflow-hidden">
-                        <h3 class="font-bold text-lg text-white mb-4">Qualité Réseau (Cos φ)</h3>
-                        <div class="flex items-center justify-between z-10 relative">
-                            <div class="relative w-32 h-32">
-                                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                                    <path class="text-gray-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3" />
-                                    <path id="cosphi-ring" class="text-alert transition-all duration-1000" stroke-dasharray="94, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3" />
-                                </svg>
-                                <div class="absolute inset-0 flex items-center justify-center flex-col">
-                                    <span class="text-2xl font-bold text-white font-mono" id="val-cosphi">0.94</span>
-                                    <span class="text-[10px] text-gray-400">Cible > 0.93</span>
-                                </div>
-                            </div>
-                            <div class="text-right space-y-2">
-                                <div class="text-xs text-gray-400">Pénalité Est.</div>
-                                <div class="text-sm font-bold text-green-400" id="val-penalty">0 €</div>
-                            </div>
+                <!-- MAIN CHART -->
+                <div class="bento-card p-6 bg-card">
+                    <div class="flex justify-between mb-4">
+                        <h3 class="text-sm font-bold text-gray-400 uppercase">Appel de Puissance (10 min)</h3>
+                        <div class="flex gap-4 text-xs">
+                            <span class="text-cyan">● Réel</span>
+                            <span class="text-danger dashed">-- Seuil Dépassement</span>
                         </div>
-                        <!-- Background Glow -->
-                        <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-alert/10 rounded-full blur-3xl"></div>
                     </div>
+                    <div class="h-64 w-full relative"><canvas id="chartLoad"></canvas></div>
+                </div>
 
-                    <!-- Fluids Status -->
-                    <div class="bento-card rounded-[2rem] p-6 flex-1 border-l-4 border-steam">
-                        <h3 class="font-bold text-lg text-white mb-4">Fluides Utilitaires</h3>
-                        <div class="space-y-4">
-                            <div>
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span class="text-steam font-bold"><i class="fa-solid fa-wind mr-2"></i>Air Comprimé</span>
-                                    <span class="font-mono text-white">6.8 bar</span>
-                                </div>
-                                <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                                    <div class="bg-steam h-full w-[85%] animate-pulse"></div>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span class="text-danger font-bold"><i class="fa-solid fa-fire-burner mr-2"></i>Vapeur (T2)</span>
-                                    <span class="font-mono text-white">180°C</span>
-                                </div>
-                                <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                                    <div class="bg-danger h-full w-[60%]"></div>
-                                </div>
-                            </div>
+                <!-- TECH WIDGETS -->
+                <div class="grid grid-cols-4 gap-6">
+                    <div class="bento-card p-4 border-l-4 border-cyan bg-card">
+                        <div class="text-[10px] text-gray-500 uppercase font-bold">Qualité Réseau</div>
+                        <div class="flex justify-between items-end mt-2">
+                            <div class="text-2xl font-mono font-bold text-white">0.94</div>
+                            <div class="text-xs text-green-400">Cos φ</div>
                         </div>
+                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-cyan h-full" style="width: 94%"></div></div>
+                    </div>
+                    <div class="bento-card p-4 border-l-4 border-steam bg-card">
+                        <div class="text-[10px] text-gray-500 uppercase font-bold">Air Comprimé</div>
+                        <div class="flex justify-between items-end mt-2">
+                            <div class="text-2xl font-mono font-bold text-white">6.8</div>
+                            <div class="text-xs text-steam">Bar</div>
+                        </div>
+                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-steam h-full" style="width: 85%"></div></div>
+                    </div>
+                    <div class="bento-card p-4 border-l-4 border-alert bg-card">
+                        <div class="text-[10px] text-gray-500 uppercase font-bold">Vapeur Process</div>
+                        <div class="flex justify-between items-end mt-2">
+                            <div class="text-2xl font-mono font-bold text-white">185</div>
+                            <div class="text-xs text-alert">°C</div>
+                        </div>
+                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-alert h-full" style="width: 92%"></div></div>
+                    </div>
+                    <div class="bento-card p-4 border-l-4 border-danger bg-card">
+                        <div class="text-[10px] text-gray-500 uppercase font-bold">Pénalités Mois</div>
+                        <div class="flex justify-between items-end mt-2">
+                            <div class="text-2xl font-mono font-bold text-white">0 €</div>
+                            <div class="text-xs text-gray-400">Est.</div>
+                        </div>
+                        <div class="text-[10px] text-green-400 mt-2">Optimisation active</div>
                     </div>
                 </div>
             </div>
 
-            <!-- TAB 2, 3, 4 (Placeholder) -->
-            <div id="view-trading" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-8 rounded-[2rem] text-center"><h3 class="text-white">Module Trading (Bientôt)</h3></div>
+            <!-- VUE 2 : TRADING ROOM -->
+            <div id="view-trading" class="view-section hidden space-y-6">
+                <div class="flex justify-between items-end">
+                    <h2 class="text-2xl font-bold text-white">Salle de Marchés <span class="text-alert text-sm ml-2">SPOT & FUTURES</span></h2>
+                    <button class="bg-cyan text-black px-4 py-2 rounded font-bold text-xs hover:bg-white transition"><i class="fa-solid fa-bolt mr-2"></i>Ordre Achat</button>
+                </div>
+
+                <div class="grid grid-cols-3 gap-6">
+                    <!-- SPOT -->
+                    <div class="bento-card p-6 bg-card relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 text-6xl text-cyan"><i class="fa-solid fa-chart-line"></i></div>
+                        <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Prix Spot (EPEX)</h3>
+                        <div class="text-4xl font-mono font-bold text-white mb-2">42.50 <span class="text-sm text-gray-500">€/MWh</span></div>
+                        <div class="text-xs text-green-400 font-bold mb-6">▼ -5.2% vs Hier</div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-xs border-b border-white/5 pb-1"><span>HPH (08-20h)</span><span class="text-white">58.00 €</span></div>
+                            <div class="flex justify-between text-xs border-b border-white/5 pb-1"><span>HCH (20-08h)</span><span class="text-white">32.10 €</span></div>
+                        </div>
+                    </div>
+
+                    <!-- HEDGE -->
+                    <div class="bento-card p-6 bg-card">
+                        <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Positions (Couverture)</h3>
+                        <div class="h-32 relative"><canvas id="hedgeChart"></canvas></div>
+                        <div class="flex justify-between mt-4 text-xs">
+                            <div class="text-center"><div class="text-gray-500">Q1 2026</div><div class="text-success font-bold">100% Fixe</div></div>
+                            <div class="text-center"><div class="text-gray-500">Q2 2026</div><div class="text-alert font-bold">50% Spot</div></div>
+                            <div class="text-center"><div class="text-gray-500">Q3 2026</div><div class="text-danger font-bold">100% Spot</div></div>
+                        </div>
+                    </div>
+
+                    <!-- ALERTS -->
+                    <div class="bento-card p-6 bg-card border border-alert/30">
+                        <h3 class="text-sm font-bold text-alert uppercase mb-4">Signaux de Marché</h3>
+                        <div class="space-y-3">
+                            <div class="flex gap-3 items-start">
+                                <i class="fa-solid fa-bell text-alert mt-1"></i>
+                                <div>
+                                    <div class="text-xs font-bold text-white">Seuil Bas Atteint (CAL+1)</div>
+                                    <div class="text-[10px] text-gray-400">Le prix CAL 2027 est passé sous 75€. Opportunité de fixage.</div>
+                                </div>
+                            </div>
+                            <div class="flex gap-3 items-start opacity-50">
+                                <i class="fa-solid fa-check text-gray-500 mt-1"></i>
+                                <div>
+                                    <div class="text-xs font-bold text-white">Ordre Exécuté</div>
+                                    <div class="text-[10px] text-gray-400">Achat bloc 1MW Baseload Q1.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="w-full mt-6 border border-white/10 hover:bg-white/5 text-xs text-white py-2 rounded">Configurer Alertes</button>
+                    </div>
+                </div>
             </div>
-            <div id="view-perf" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-8 rounded-[2rem] text-center"><h3 class="text-white">Module Performance (Bientôt)</h3></div>
+
+            <!-- VUE 3 : PERFORMANCE (IPE) -->
+            <div id="view-perf" class="view-section hidden space-y-6">
+                <div class="flex justify-between items-end">
+                    <h2 class="text-2xl font-bold text-white">Performance Industrielle</h2>
+                    <div class="text-right text-xs text-gray-400">Référence: <span class="text-white font-bold">ISO 50001 (2025)</span></div>
+                </div>
+
+                <div class="grid grid-cols-4 gap-6">
+                    <div class="col-span-1 bento-card p-6 bg-card">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Ratio Specifique</h3>
+                        <div class="text-3xl font-mono font-bold text-white">142 <span class="text-sm text-gray-500">kWh/t</span></div>
+                        <div class="text-[10px] text-success mt-1">▼ -2% vs Objectif</div>
+                    </div>
+                    <div class="col-span-1 bento-card p-6 bg-card">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Coût Énergie / Unité</h3>
+                        <div class="text-3xl font-mono font-bold text-white">0.85 <span class="text-sm text-gray-500">€/u</span></div>
+                        <div class="text-[10px] text-alert mt-1">▲ +1% (Hausse Gaz)</div>
+                    </div>
+                    <div class="col-span-2 bento-card p-6 bg-card">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Répartition Utilités</h3>
+                        <div class="h-4 bg-gray-800 rounded-full flex overflow-hidden">
+                            <div class="bg-cyan h-full" style="width: 45%" title="Process: 45%"></div>
+                            <div class="bg-steam h-full" style="width: 30%" title="Air Comprimé: 30%"></div>
+                            <div class="bg-alert h-full" style="width: 15%" title="Chauffage: 15%"></div>
+                            <div class="bg-gray-500 h-full" style="width: 10%" title="Eclairage: 10%"></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] text-gray-400 mt-2">
+                            <span class="flex items-center gap-1"><div class="w-2 h-2 rounded bg-cyan"></div> Process</span>
+                            <span class="flex items-center gap-1"><div class="w-2 h-2 rounded bg-steam"></div> Air Comp.</span>
+                            <span class="flex items-center gap-1"><div class="w-2 h-2 rounded bg-alert"></div> CVC</span>
+                            <span class="flex items-center gap-1"><div class="w-2 h-2 rounded bg-gray-500"></div> Autres</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div id="view-cortex" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-8 rounded-[2rem] text-center"><h3 class="text-white">Module Audit Cortex (Bientôt)</h3></div>
+
+            <!-- VUE 4 : CORTEX LOG -->
+            <div id="view-cortex" class="view-section hidden space-y-6">
+                <div class="bento-card p-8 bg-card border-t-4 border-ai">
+                    <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3"><i class="fa-solid fa-robot text-ai"></i> Journal des Événements Cortex</h2>
+                    
+                    <div class="space-y-0">
+                        <!-- LOG ITEM -->
+                        <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
+                            <div class="text-xs font-mono text-gray-500 w-24">14:02:55</div>
+                            <div class="w-20"><span class="bg-red-500/20 text-red-400 px-2 py-1 rounded text-[10px] font-bold">CRITIQUE</span></div>
+                            <div class="flex-1 text-sm text-white">Pic de puissance prédictif détecté sur TGBT-2. Risque dépassement contrat (P > 2500 kVA).</div>
+                            <button class="text-cyan text-xs hover:underline">Détails</button>
+                        </div>
+                        <!-- LOG ITEM -->
+                        <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
+                            <div class="text-xs font-mono text-gray-500 w-24">10:15:00</div>
+                            <div class="w-20"><span class="bg-alert/20 text-alert px-2 py-1 rounded text-[10px] font-bold">WARNING</span></div>
+                            <div class="flex-1 text-sm text-white">Dérive Cos Phi (0.89) sur départ Compresseurs. Vérifier batteries de condensateurs.</div>
+                            <button class="text-cyan text-xs hover:underline">Détails</button>
+                        </div>
+                        <!-- LOG ITEM -->
+                        <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
+                            <div class="text-xs font-mono text-gray-500 w-24">08:00:00</div>
+                            <div class="w-20"><span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-[10px] font-bold">INFO</span></div>
+                            <div class="flex-1 text-sm text-white">Rapport quotidien généré. Performance globale: 98%.</div>
+                            <button class="text-cyan text-xs hover:underline">Voir PDF</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
         </div>
     </main>
 
-    <!-- LOGIC JS -->
     <script>
-        // NAVIGATION
-        function navTo(pageId) {
+        // --- NAVIGATION ROBUSTE ---
+        window.switchView = function(viewName) {
+            // 1. Reset Sidebar
             document.querySelectorAll('.nav-item').forEach(el => {
                 el.classList.remove('active', 'text-white');
                 el.classList.add('text-gray-400');
             });
-            const btn = document.getElementById('btn-' + pageId);
+            const btn = document.getElementById('nav-' + viewName);
             if(btn) {
                 btn.classList.add('active', 'text-white');
                 btn.classList.remove('text-gray-400');
             }
-            document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
-            document.getElementById('view-' + pageId).classList.add('active');
-            const titles = { 'command': 'Supervision Usine', 'trading': 'Salle de Marchés', 'perf': 'Performance Industrielle', 'cortex': 'Intelligence Artificielle' };
-            document.getElementById('page-title').innerText = titles[pageId];
+
+            // 2. Hide all views
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            
+            // 3. Show target view
+            const target = document.getElementById('view-' + viewName);
+            if(target) target.classList.remove('hidden');
+
+            // 4. Init Charts if needed
+            if(viewName === 'command') initLoadChart();
+            if(viewName === 'trading') initHedgeChart();
         }
 
-        // --- LIVE CHART ENGINE ---
-        let chartLoad = null;
+        // --- CHART ENGINES ---
+        let loadChartInstance = null;
+        let hedgeChartInstance = null;
 
-        function initChart() {
+        function initLoadChart() {
+            if(loadChartInstance) return;
             const ctx = document.getElementById('chartLoad').getContext('2d');
             const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(0, 'rgba(0, 229, 255, 0.4)');
+            gradient.addColorStop(0, 'rgba(0, 229, 255, 0.2)');
             gradient.addColorStop(1, 'rgba(0,0,0,0)');
 
-            chartLoad = new Chart(ctx, {
+            loadChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: Array.from({length: 24}, (_, i) => i + 'h'),
                     datasets: [{
                         label: 'Puissance (kW)',
-                        data: Array(24).fill(null), // Vide au départ
+                        data: [1200, 1150, 1100, 1200, 1800, 2500, 3200, 3100, 3000, 2800, 3200, 3400, 3100, 2900, 3000, 3200, 2800, 2400, 2000, 1800, 1500, 1300, 1250, 1200],
                         borderColor: '#00E5FF',
                         backgroundColor: gradient,
                         fill: true,
-                        tension: 0.3,
+                        tension: 0.2,
                         pointRadius: 0,
                         borderWidth: 2
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: false, // Désactivé pour l'effet live manuel
+                    responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 8 } },
+                        x: { grid: { display: false }, ticks: { color: '#64748B' } },
                         y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } }
                     }
                 }
             });
         }
 
-        // --- POLYMORPHIC DATA BRIDGE ---
-        async function loadRealData() {
-            try {
-                // On appelle l'API Fleet (Socle Commun)
-                const res = await fetch('/api/dashboard/fleet');
-                const result = await res.json();
-
-                if (result.fleet) {
-                    const sites = result.fleet;
-                    
-                    // Calcul de la puissance totale (Pmax Usine)
-                    let totalPower = 0;
-                    sites.forEach(s => totalPower += (s.power || 0));
-                    
-                    // Mise à jour UI
-                    const mw = (totalPower / 1000).toFixed(2);
-                    document.getElementById('header-infos').innerText = `Pmax: ${mw} MW • Cos φ: 0.94`;
-
-                    // Simulation d'une courbe de charge industrielle (Cloche + Pics)
-                    // On génère 24 points basés sur la Pmax
-                    const curve = [];
-                    for(let i=0; i<24; i++) {
-                        let factor = 0.3; // Nuit
-                        if(i > 6 && i < 20) factor = 0.8 + (Math.random() * 0.2); // Jour (Usine active)
-                        curve.push(totalPower * factor);
-                    }
-
-                    // Animation d'entrée progressive
-                    let currentIdx = 0;
-                    const interval = setInterval(() => {
-                        if(currentIdx >= 24) {
-                            clearInterval(interval);
-                            // Message Cortex une fois chargé
-                            document.getElementById('cortex-ticker').innerText = "SYSTÈME STABILISÉ. AUCUNE ANOMALIE MAJEURE DÉTECTÉE.";
-                            document.getElementById('cortex-ticker').classList.remove('typing-effect');
-                            document.getElementById('ai-insight-text').innerHTML = `Le profil de charge est optimal. <br>Le Cos Phi est stable à <b>0.94</b>. <br>Aucune pénalité réactive anticipée.`;
-                            return;
-                        }
-                        chartLoad.data.datasets[0].data[currentIdx] = curve[currentIdx];
-                        chartLoad.update();
-                        currentIdx++;
-                    }, 50); // Vitesse de remplissage
+        function initHedgeChart() {
+            if(hedgeChartInstance) return;
+            const ctx = document.getElementById('hedgeChart').getContext('2d');
+            hedgeChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Q1 26', 'Q2 26', 'Q3 26', 'Q4 26'],
+                    datasets: [
+                        { label: 'Fixe', data: [100, 50, 0, 0], backgroundColor: '#10B981' },
+                        { label: 'Spot', data: [0, 50, 100, 100], backgroundColor: '#EF4444' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { x: { stacked: true, grid: {display:false} }, y: { stacked: true, display:false } },
+                    plugins: { legend: { display: false } }
                 }
-            } catch (e) {
-                console.error("Erreur Sync Industrie", e);
-                document.getElementById('ai-insight-text').innerText = "Erreur de connexion au bus de terrain.";
-            }
+            });
         }
 
-        // --- LANCEMENT ---
+        // --- INIT ---
         document.addEventListener('DOMContentLoaded', () => {
-            navTo('command');
-            initChart();
-            setTimeout(loadRealData, 800);
+            switchView('command');
         });
-
     </script>
 </body>
 </html>
