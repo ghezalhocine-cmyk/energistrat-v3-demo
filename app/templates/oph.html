@@ -3,12 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <title>ENERGISTRAT V3 | OPH Social</title>
+    
+    <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- CORE ENGINE UX -->
-    <script src="/static/js/main.js"></script>
+    <!-- LEAFLET (MAPS) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script>
         tailwind.config = { 
             theme: { 
@@ -16,11 +21,13 @@
                     colors: { 
                         abysse: '#050505', 
                         card: '#0F172A', 
-                        oph: '#F97316', // Orange Social
+                        oph: '#F97316', // Orange Brique
                         cyan: '#00E5FF', 
-                        alert: '#EF4444' 
+                        alert: '#EF4444',
+                        success: '#10B981',
+                        gold: '#F59E0B'
                     }, 
-                    borderRadius: { 'bento': '2rem' },
+                    borderRadius: { 'bento': '1.5rem' },
                     boxShadow: { 'neon-oph': '0 0 20px rgba(249, 115, 22, 0.25)' }
                 } 
             } 
@@ -28,10 +35,17 @@
     </script>
     <style>
         body { background-color: #050505; color: white; }
-        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
+        .bento-card { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
         .bento-card:hover { border-color: rgba(249, 115, 22, 0.5); transform: translateY(-2px); }
-        .nav-item.active { background: rgba(249, 115, 22, 0.1); border-left: 3px solid #F97316; color: white; }
-        .page-content { display: none; } .page-content.active { display: grid; }
+        .nav-item.active { background: rgba(249, 115, 22, 0.1); border-left: 4px solid #F97316; color: white; }
+        .page-content { display: none; opacity: 0; animation: fadeIn 0.3s forwards; } 
+        .page-content.active { display: grid; }
+        @keyframes fadeIn { to { opacity: 1; } }
+        
+        /* Map Styles */
+        #map { height: 100%; width: 100%; border-radius: 1.5rem; z-index: 1; }
+        .leaflet-popup-content-wrapper { background: #0F172A; color: white; border: 1px solid #F97316; border-radius: 10px; }
+        .leaflet-popup-tip { background: #F97316; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
@@ -43,109 +57,223 @@
                 <div class="w-10 h-10 rounded-full border border-oph bg-oph/10 flex items-center justify-center text-oph font-bold shadow-neon-oph">🏢</div>
                 <div><h1 class="font-bold tracking-wider text-base">CORTEX<span class="text-oph">.OPH</span></h1><p class="text-[10px] text-gray-500">Habitat Social</p></div>
             </div>
-            <nav class="space-y-2">
-                <button onclick="navTo('charges')" id="btn-charges" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
-                    <span>1.</span> Charges Locatives
+            
+            <div class="space-y-1">
+                <div class="text-[10px] text-gray-500 uppercase font-bold px-4 mb-2">Pilotage</div>
+                <button onclick="navTo('charges')" id="btn-charges" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-file-invoice-dollar w-5 text-center"></i> Charges & P1
                 </button>
-                <button onclick="navTo('psp')" id="btn-psp" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
-                    <span>2.</span> PSP & DPE
+                <button onclick="navTo('map')" id="btn-map" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-map-location-dot w-5 text-center text-cyan"></i> Territoire & DPE
                 </button>
-                <button onclick="navTo('precarite')" id="btn-precarite" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
-                    <span>3.</span> Précarité
+                
+                <div class="text-[10px] text-gray-500 uppercase font-bold px-4 mt-4 mb-2">Stratégie</div>
+                <button onclick="navTo('achat')" id="btn-achat" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-basket-shopping w-5 text-center text-gold"></i> Centrale Achat
                 </button>
-            </nav>
-        </div>
-        <div class="p-6 border-t border-white/5">
-            <div class="bg-gradient-to-br from-card to-abysse border border-white/10 rounded-xl p-4 cursor-pointer group" onclick="App.toast('Code mutualisation copié !', 'success')">
-                <div class="text-xs font-bold text-white mb-1">🤝 Inter-Bailleurs</div>
-                <p class="text-[10px] text-gray-400 mb-2">Mutualisez vos achats gaz.</p>
-                <div class="text-center bg-black/30 rounded py-1 font-mono text-oph text-xs border border-dashed border-oph/30 group-hover:bg-oph group-hover:text-black transition">CODE: OPH-GROUP</div>
+                <button onclick="navTo('social')" id="btn-social" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-hand-holding-heart w-5 text-center text-success"></i> Veille Sociale
+                </button>
             </div>
+        </div>
+        
+        <div class="p-6 border-t border-white/5">
+            <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
+                <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs text-white font-bold group-hover:bg-oph transition"><i class="fa-solid fa-gear"></i></div>
+                <div class="flex-1 min-w-0"><div class="text-xs font-bold text-white">Administration</div><div class="text-[10px] text-gray-500">Patrimoine & Users</div></div>
+            </a>
         </div>
     </aside>
 
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
+        
         <!-- CORTEX SENTINEL -->
         <div class="h-14 border-b border-white/5 flex items-center px-8 gap-4 bg-abysse/95 backdrop-blur z-20">
             <div class="px-2 py-1 rounded bg-oph text-abysse text-[10px] font-black animate-pulse tracking-wider">CORTEX SOCIAL</div>
-            <span class="text-xs text-oph font-mono flex-1">ALERTE DPE : La résidence "Les Lilas" passe en G au 1er Janvier. Plan de travaux prioritaire généré.</span>
-            
-            <!-- LIEN SETTINGS -->
-            <a href="/settings.html" class="h-10 w-10 rounded-full bg-gradient-to-br from-oph to-cyan p-[2px] cursor-pointer hover:scale-105 transition block" title="Paramètres">
-                <div class="h-full w-full rounded-full bg-abysse flex items-center justify-center font-bold text-oph">
-                    OP
-                </div>
-            </a>
-
+            <span class="text-xs text-oph font-mono flex-1" id="cortex-msg">Analyse du patrimoine en cours...</span>
+            <div class="text-xs text-gray-400">Parc : <b class="text-white" id="total-sites">--</b> Résidences</div>
         </div>
 
         <div class="p-8 overflow-y-auto h-full pb-20">
             
             <!-- HEADER -->
             <div class="flex justify-between items-end mb-6">
-                <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Pilotage des Charges</h2>
-                <div class="bg-card border border-white/10 px-4 py-2 rounded-full">
-                    <span class="text-xs font-bold text-gray-300 uppercase">Régularisation N-1</span>
-                    <span class="text-sm font-bold text-green-400 ml-2">-2.4% (Gain)</span>
+                <div>
+                    <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Pilotage des Charges</h2>
+                    <p class="text-xs text-gray-400 mt-1">Données temps réel consolidées</p>
+                </div>
+                <div class="bg-card border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
+                    <span class="text-xs font-bold text-gray-300 uppercase">Coût Moyen</span>
+                    <span class="text-xl font-mono font-bold text-white" id="avg-cost">-- €<span class="text-xs text-gray-500">/m²</span></span>
                 </div>
             </div>
 
-            <!-- VIEW 1: CHARGES -->
+            <!-- VIEW 1: CHARGES (P1/P2/P3) -->
             <div id="view-charges" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
-                <!-- CHART CHARGES -->
+                
+                <!-- KPI CARDS -->
+                <div class="col-span-12 grid grid-cols-4 gap-6">
+                    <div class="bento-card p-6 border-l-4 border-oph">
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Total P1 (Énergie)</div>
+                        <div class="text-2xl font-bold text-white" id="total-p1">-- €</div>
+                        <div class="text-xs text-green-400">Gaz + Élec + Réseau</div>
+                    </div>
+                    <div class="bento-card p-6 border-l-4 border-cyan">
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Total P2 (Maint.)</div>
+                        <div class="text-2xl font-bold text-white" id="total-p2">-- €</div>
+                        <div class="text-xs text-gray-500">Forfaitaire</div>
+                    </div>
+                    <div class="bento-card p-6 border-l-4 border-alert">
+                        <div class="text-[10px] font-bold text-alert uppercase mb-1">Pénalités Exploitant</div>
+                        <div class="text-2xl font-bold text-white">12 500 €</div>
+                        <div class="text-xs text-gray-400">Rendement < Cible</div>
+                    </div>
+                    <div class="bento-card p-6 bg-gradient-to-br from-card to-oph/10 flex flex-col justify-center items-center cursor-pointer hover:border-oph transition" onclick="window.print()">
+                        <i class="fa-solid fa-file-pdf text-2xl text-oph mb-2"></i>
+                        <span class="text-xs font-bold text-white">Export Régularisation</span>
+                    </div>
+                </div>
+
+                <!-- MAIN CHART -->
                 <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card">
                     <div class="flex justify-between mb-6">
-                        <h3 class="font-bold text-xl text-white">Projection Quittance (€/m²)</h3>
-                        <span class="text-xs text-gray-500 font-mono">Chauffage + ECS</span>
+                        <h3 class="font-bold text-xl text-white">Suivi Mensuel des Charges (€)</h3>
+                        <div class="flex gap-4 text-xs">
+                            <span class="text-oph">● Réalisé</span>
+                            <span class="text-gray-500 dashed">-- Budget Primitif</span>
+                        </div>
                     </div>
-                    <div class="h-72 w-full"><canvas id="chartOph"></canvas></div>
+                    <div class="h-64 w-full"><canvas id="chartCharges"></canvas></div>
                 </div>
 
-                <!-- MODULES PSP & RISQUES -->
-                <div class="col-span-4 flex flex-col gap-6">
-                    <!-- DPE RADAR -->
-                    <div class="flex-1 bg-card rounded-[2rem] p-6 bento-card border-l-4 border-alert">
-                        <h3 class="font-bold text-lg mb-2 text-white">Risque Interdiction</h3>
-                        <div class="text-3xl font-black text-white mb-1">12 Logements</div>
-                        <div class="text-xs text-alert font-bold mb-4 uppercase tracking-wide">Classés G (Indécent)</div>
-                        <div class="w-full bg-gray-800 h-2 rounded-full mb-2 overflow-hidden cursor-help" title="Répartition DPE" onclick="App.toast('Détail: 12 G, 45 F, 120 E', 'info')">
-                            <div class="bg-green-500 h-full w-[40%] float-left"></div>
-                            <div class="bg-yellow-500 h-full w-[30%] float-left"></div>
-                            <div class="bg-red-500 h-full w-[30%] float-left animate-pulse"></div>
+                <!-- REPARTITION -->
+                <div class="col-span-4 bg-card rounded-[2rem] p-8 bento-card">
+                    <h3 class="font-bold text-lg text-white mb-6">Structure du Coût</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1"><span class="text-gray-400">Récupérable (Locataires)</span><span class="text-white font-bold">78%</span></div>
+                            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden"><div class="bg-success h-full" style="width: 78%"></div></div>
                         </div>
-                        <div class="flex justify-between text-[10px] text-gray-400"><span>A-C</span><span>D-E</span><span class="text-alert font-bold">F-G</span></div>
-                        <button onclick="App.toast('Génération du Plan Stratégique de Patrimoine (PSP) en cours...', 'info')" class="w-full mt-4 py-3 bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-xl transition text-xs font-bold">VOIR PSP DÉTAILLÉ</button>
-                    </div>
-
-                    <!-- PRECARITE -->
-                    <div class="flex-1 bg-gradient-to-br from-oph/10 to-card rounded-[2rem] p-6 bento-card border border-oph/20">
-                        <h3 class="font-bold text-lg mb-2 text-white">Bouclier Tarifaire</h3>
-                        <p class="text-xs text-gray-400 mb-4">CORTEX a vérifié l'application du bouclier gaz sur 100% des chaufferies collectives.</p>
-                        <div class="flex items-center gap-2 text-green-400 text-xs font-bold">
-                            <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span> 100% Conforme
+                        <div>
+                            <div class="flex justify-between text-xs mb-1"><span class="text-gray-400">Non-Récupérable (Bailleur)</span><span class="text-white font-bold">22%</span></div>
+                            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden"><div class="bg-alert h-full" style="width: 22%"></div></div>
+                        </div>
+                        <div class="mt-6 p-4 bg-white/5 rounded-xl border border-white/10 text-xs text-gray-300">
+                            <i class="fa-solid fa-info-circle mr-2 text-cyan"></i> Le poste "P3 Gros Entretien" représente 60% de la part bailleur cette année.
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- VIEW 2: PSP (Placeholder pour l'interaction) -->
-            <div id="view-psp" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bg-card rounded-[2rem] p-10 bento-card text-center border border-oph/20">
-                    <div class="text-4xl mb-4">🏗️</div>
-                    <h3 class="text-xl font-bold text-white mb-2">Plan Stratégique de Patrimoine</h3>
-                    <p class="text-gray-400 text-sm">Module en cours de chargement...</p>
-                    <button onclick="navTo('charges')" class="mt-6 px-6 py-2 bg-oph text-abysse font-bold rounded-lg hover:bg-white transition">Retour Synthèse</button>
+            <!-- VIEW 2: TERRITOIRE & MAPS (EXTRAORDINAIRE) -->
+            <div id="view-map" class="page-content grid grid-cols-12 gap-6 h-[600px]">
+                <!-- LA CARTE -->
+                <div class="col-span-9 bento-card p-1 rounded-[2rem] relative">
+                    <div id="map"></div>
+                    <!-- Légende Flottante -->
+                    <div class="absolute bottom-4 left-4 bg-abysse/90 p-3 rounded-xl border border-white/10 z-[1000] text-xs">
+                        <div class="font-bold text-white mb-2">Performance DPE</div>
+                        <div class="flex items-center gap-2 mb-1"><div class="w-3 h-3 rounded-full bg-green-500"></div> A-C (Performant)</div>
+                        <div class="flex items-center gap-2 mb-1"><div class="w-3 h-3 rounded-full bg-orange-500"></div> D-E (Moyen)</div>
+                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-red-600 animate-pulse"></div> F-G (Critique)</div>
+                    </div>
+                </div>
+
+                <!-- FICHE IMMEUBLE (SIDE) -->
+                <div class="col-span-3 bento-card p-6 rounded-[2rem] flex flex-col">
+                    <h3 class="text-lg font-bold text-white mb-4">Fiche Résidence</h3>
+                    <div id="building-info" class="flex-1 space-y-4 text-center flex flex-col justify-center">
+                        <i class="fa-solid fa-city text-4xl text-gray-600 mb-2"></i>
+                        <p class="text-gray-500 text-xs">Sélectionnez un immeuble sur la carte pour voir son carnet de santé (API ADEME).</p>
+                    </div>
+                    <div id="building-data" class="hidden space-y-4">
+                        <div class="text-xl font-bold text-white" id="b-name">--</div>
+                        <div class="text-xs text-gray-400" id="b-addr">--</div>
+                        <div class="grid grid-cols-2 gap-2 text-center mt-4">
+                            <div class="bg-white/5 p-2 rounded"><div class="text-[10px] text-gray-500">Construction</div><div class="font-bold text-white" id="b-year">--</div></div>
+                            <div class="bg-white/5 p-2 rounded"><div class="text-[10px] text-gray-500">DPE</div><div class="font-black text-xl" id="b-dpe">--</div></div>
+                        </div>
+                        <div class="border-t border-white/5 pt-4">
+                            <div class="flex justify-between text-xs mb-1"><span class="text-gray-500">Chauffage</span><span class="text-white font-bold" id="b-heat">--</span></div>
+                            <div class="flex justify-between text-xs"><span class="text-gray-500">Isolation</span><span class="text-white" id="b-iso">--</span></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- VIEW 3: PRECARITE (Placeholder pour l'interaction) -->
-            <div id="view-precarite" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bg-card rounded-[2rem] p-10 bento-card text-center border border-oph/20">
-                    <div class="text-4xl mb-4">❤️</div>
-                    <h3 class="text-xl font-bold text-white mb-2">Lutte contre la Précarité</h3>
-                    <p class="text-gray-400 text-sm">Analyse des impayés et surconsommations.</p>
-                    <button onclick="navTo('charges')" class="mt-6 px-6 py-2 bg-oph text-abysse font-bold rounded-lg hover:bg-white transition">Retour Synthèse</button>
+            <!-- VIEW 3: ACHATS (STRATÉGIE) -->
+            <div id="view-achat" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-12 bento-card p-8 rounded-[2rem]">
+                    <div class="flex justify-between mb-6">
+                        <h3 class="font-bold text-xl text-white">Centrale d'Achat & Contrats</h3>
+                        <button class="bg-gold text-black px-4 py-2 rounded font-bold text-xs hover:bg-white transition"><i class="fa-solid fa-cart-plus mr-2"></i>Lancer Appel d'Offres</button>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-white/5 text-[10px] uppercase text-gray-400 font-bold">
+                                <tr>
+                                    <th class="px-6 py-4">Lot / Résidence</th>
+                                    <th class="px-6 py-4">Énergie</th>
+                                    <th class="px-6 py-4">Fournisseur</th>
+                                    <th class="px-6 py-4">Échéance</th>
+                                    <th class="px-6 py-4 text-right">Prix Actuel</th>
+                                    <th class="px-6 py-4 text-right">Opportunité Marché</th>
+                                    <th class="px-6 py-4 text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                <tr class="hover:bg-white/5 transition">
+                                    <td class="px-6 py-4 font-bold text-white">Lot Nord (Chaufferies)</td>
+                                    <td class="px-6 py-4"><span class="text-[10px] bg-gas/20 text-gas px-2 py-1 rounded font-bold">GAZ</span></td>
+                                    <td class="px-6 py-4">Engie</td>
+                                    <td class="px-6 py-4 text-alert font-bold">31/12/2026</td>
+                                    <td class="px-6 py-4 text-right">45 €/MWh</td>
+                                    <td class="px-6 py-4 text-right text-success font-bold">38 €/MWh (-15%)</td>
+                                    <td class="px-6 py-4 text-center"><button class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-white">Renégocier</button></td>
+                                </tr>
+                                <tr class="hover:bg-white/5 transition">
+                                    <td class="px-6 py-4 font-bold text-white">Services Généraux</td>
+                                    <td class="px-6 py-4"><span class="text-[10px] bg-cyan/20 text-cyan px-2 py-1 rounded font-bold">ELEC</span></td>
+                                    <td class="px-6 py-4">EDF (TRV)</td>
+                                    <td class="px-6 py-4 text-green-500">Sans engagement</td>
+                                    <td class="px-6 py-4 text-right">230 €/MWh</td>
+                                    <td class="px-6 py-4 text-right text-gray-500">225 €/MWh (-2%)</td>
+                                    <td class="px-6 py-4 text-center"><button class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-white">Comparer</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 4: SOCIAL (PRECARITE) -->
+            <div id="view-social" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-12 bento-card p-8 rounded-[2rem] border-t-4 border-cyan">
+                    <h3 class="font-bold text-xl text-white mb-6 flex items-center gap-3"><i class="fa-solid fa-temperature-low text-cyan"></i> Détection Sous-Chauffe (Précarité)</h3>
+                    <p class="text-sm text-gray-400 mb-6">Analyse croisée DJU / Conso pour identifier les logements non chauffés en hiver.</p>
+                    
+                    <table class="w-full text-left text-sm text-gray-300">
+                        <thead class="bg-white/5 text-[10px] uppercase text-gray-400 font-bold">
+                            <tr>
+                                <th class="px-6 py-4">Résidence</th>
+                                <th class="px-6 py-4">Logement</th>
+                                <th class="px-6 py-4 text-center">Temp. Ext. Moy</th>
+                                <th class="px-6 py-4 text-center">Conso Chauffage</th>
+                                <th class="px-6 py-4 text-right">Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            <tr class="hover:bg-white/5 transition cursor-pointer">
+                                <td class="px-6 py-4 font-bold text-white">Les Mimosas</td>
+                                <td class="px-6 py-4">Bât C - Apt 402</td>
+                                <td class="px-6 py-4 text-center">4°C</td>
+                                <td class="px-6 py-4 text-center font-mono text-cyan">0 kWh</td>
+                                <td class="px-6 py-4 text-right"><span class="bg-alert/20 text-alert px-2 py-1 rounded text-[10px] font-bold">ALERTE FROID</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -155,35 +283,112 @@
     <script>
         // NAVIGATION
         function navTo(pageId) {
-            // UI Update
-            document.querySelectorAll('.nav-item').forEach(el => {
-                el.classList.remove('active');
-                el.classList.add('text-gray-400');
-            });
+            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active'); el.classList.add('text-gray-400'); });
             document.getElementById('btn-' + pageId).classList.add('active');
             document.getElementById('btn-' + pageId).classList.remove('text-gray-400');
 
-            // Page Switch
             document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
             document.getElementById('view-' + pageId).classList.add('active');
 
-            // Title Update
-            const titles = {
-                'charges': 'Pilotage des Charges',
-                'psp': 'Plan Stratégique Patrimoine',
-                'precarite': 'Précarité Énergétique'
-            };
+            const titles = { 'charges': 'Pilotage des Charges', 'map': 'Cartographie Patrimoine', 'achat': 'Stratégie Achat', 'social': 'Veille Sociale' };
             document.getElementById('page-title').innerText = titles[pageId];
 
-            // Render Chart if needed
             if (pageId === 'charges') setTimeout(renderChart, 100);
+            if (pageId === 'map') setTimeout(initMap, 200); // Delay for div render
         }
 
-        // CHART
-        let ophChart = null;
+        // --- MAP ENGINE (LEAFLET) ---
+        let map = null;
+        async function initMap() {
+            if(map) return; // Already init
+            
+            // 1. Create Map
+            map = L.map('map').setView([48.8566, 2.3522], 12); // Default Paris
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
 
+            // 2. Fetch Sites (Real Data)
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                
+                if(data.fleet && data.fleet.length > 0) {
+                    const bounds = [];
+                    
+                    data.fleet.forEach((site, index) => {
+                        // Mock Lat/Lon si manquant (Pour la démo)
+                        // Dans la réalité, on utiliserait site.lat / site.lon stockés
+                        const baseLat = 48.8566 + (Math.random() - 0.5) * 0.1;
+                        const baseLon = 2.3522 + (Math.random() - 0.5) * 0.1;
+                        
+                        // Couleur selon DPE (Simulé sur l'index pour la démo)
+                        const color = index % 5 === 0 ? '#EF4444' : (index % 3 === 0 ? '#F59E0B' : '#10B981');
+                        const dpe = index % 5 === 0 ? 'G' : (index % 3 === 0 ? 'D' : 'B');
+                        
+                        const marker = L.circleMarker([baseLat, baseLon], {
+                            color: color, fillColor: color, fillOpacity: 0.8, radius: 8
+                        }).addTo(map);
+                        
+                        marker.on('click', () => showBuildingInfo(site, dpe, color));
+                        bounds.push([baseLat, baseLon]);
+                    });
+                    
+                    if(bounds.length > 0) map.fitBounds(bounds);
+                }
+            } catch(e) { console.error("Map Error", e); }
+        }
+
+        function showBuildingInfo(site, dpe, color) {
+            document.getElementById('building-info').classList.add('hidden');
+            document.getElementById('building-data').classList.remove('hidden');
+            
+            document.getElementById('b-name').innerText = site.name;
+            document.getElementById('b-addr').innerText = site.city; // Ou adresse complète
+            document.getElementById('b-year').innerText = "19" + Math.floor(60 + Math.random()*40); // Mock
+            
+            const dpeEl = document.getElementById('b-dpe');
+            dpeEl.innerText = dpe;
+            dpeEl.style.color = color;
+            
+            document.getElementById('b-heat').innerText = site.energy === 'gaz' ? 'Chaufferie Gaz' : 'Élec Direct';
+            document.getElementById('b-iso').innerText = dpe === 'G' ? 'Non Isolé' : 'Double Vitrage';
+        }
+
+        // --- REAL DATA BRIDGE ---
+        async function loadRealData() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                if(data.fleet) {
+                    const sites = data.fleet;
+                    let totalP1 = 0;
+                    let totalSurf = 0;
+                    
+                    sites.forEach(s => {
+                        totalP1 += s.budget || 0;
+                        // On assume une surface moyenne de 1000m2 si manquante pour la démo
+                        totalSurf += 1000; 
+                    });
+                    
+                    document.getElementById('total-sites').innerText = sites.length;
+                    document.getElementById('total-p1').innerText = (totalP1/1000000).toFixed(1) + " M€";
+                    
+                    const ratio = totalSurf > 0 ? (totalP1 / totalSurf).toFixed(1) : 0;
+                    document.getElementById('avg-cost').innerHTML = `${ratio} €<span class="text-xs text-gray-500">/m²</span>`;
+                    
+                    // Update P2 estimé (20% du P1)
+                    document.getElementById('total-p2').innerText = (totalP1 * 0.2 / 1000).toFixed(0) + " k€";
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        // CHART ENGINE
+        let ophChart = null;
         function renderChart() {
-            const ctxOph = document.getElementById('chartOph').getContext('2d');
+            const ctxOph = document.getElementById('chartCharges').getContext('2d');
             if (ophChart) ophChart.destroy();
 
             const gradientOph = ctxOph.createLinearGradient(0, 0, 0, 300);
@@ -193,10 +398,10 @@
             ophChart = new Chart(ctxOph, {
                 type: 'line',
                 data: {
-                    labels: ['Jan','Fev','Mar','Avr','Mai','Juin','Juil'],
+                    labels: ['Jan','Fev','Mar','Avr','Mai','Juin','Juil','Aou','Sep','Oct','Nov','Dec'],
                     datasets: [
-                        { label: 'Réel 2026', data: [18,17,15,10,8,6,5], borderColor: '#F97316', backgroundColor: gradientOph, borderWidth: 2, fill: true, tension:0.4, pointRadius:0 },
-                        { label: 'Budget', data: [20,18,16,12,10,8,8], borderColor: '#94A3B8', borderDash:[5,5], borderWidth: 2, tension:0.4, pointRadius:0 }
+                        { label: 'Réel (P1+P2)', data: [240, 220, 180, 120, 80, 50, 40, 40, 60, 110, 190, 230], borderColor: '#F97316', backgroundColor: gradientOph, borderWidth: 2, fill: true, tension:0.4, pointRadius:0 },
+                        { label: 'Budget', data: [250, 230, 190, 130, 90, 60, 50, 50, 70, 120, 200, 240], borderColor: '#94A3B8', borderDash:[5,5], borderWidth: 2, tension:0.4, pointRadius:0 }
                     ]
                 },
                 options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{labels:{color:'#94A3B8', font:{family:'Inter'}}}}, scales:{x:{grid:{display:false}, ticks:{color:'#64748B'}},y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748B'}}} }
@@ -205,10 +410,8 @@
 
         // Init
         document.addEventListener('DOMContentLoaded', () => {
-            renderChart();
-            setTimeout(() => {
-                App.toast('Données locatives synchronisées (ULIS)', 'success');
-            }, 800);
+            navTo('charges');
+            loadRealData();
         });
     </script>
 </body>
