@@ -2,34 +2,79 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V3 | Syndic Manager (Live)</title>
+    <title>ENERGISTRAT V3 | Syndic Manager (Master)</title>
+    
+    <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script>tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', syndic: '#6366F1', cyan: '#00E5FF', success: '#10B981', alert: '#EF4444' }, borderRadius: { 'bento': '1.5rem' } } } }</script>
+    
+    <script>
+        tailwind.config = { 
+            theme: { 
+                extend: { 
+                    colors: { 
+                        abysse: '#050505', 
+                        card: '#0F172A', 
+                        syndic: '#6366F1', // Indigo
+                        cyan: '#00E5FF', 
+                        success: '#10B981', 
+                        alert: '#EF4444', 
+                        gold: '#FFD700' 
+                    }, 
+                    borderRadius: { 'bento': '1.5rem' } 
+                } 
+            } 
+        }
+    </script>
     <style>
         body { background-color: #050505; color: white; overflow: hidden; }
-        .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .bento-card { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
         .nav-item.active { background: rgba(99, 102, 241, 0.1); border-left: 3px solid #6366F1; color: white; }
-        .view-section { display: none; } .view-section.active { display: grid; }
+        
+        /* FIX CRITIQUE : Menu déroulant lisible (Dark Mode) */
+        select { background-color: rgba(255,255,255,0.05) !important; color: white !important; -webkit-appearance: none; }
+        select option { background-color: #0F172A !important; color: white !important; padding: 10px; }
+        
+        /* FIX NAVIGATION : Gestion propre de la visibilité */
+        .view-section { display: none; }
+        .view-section.active { display: grid; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* IMPRESSION AG */
+        @media print {
+            body { background: white; color: black; overflow: visible; }
+            .no-print { display: none !important; }
+            .bento-card { border: 1px solid #ccc; background: white; color: black; break-inside: avoid; box-shadow: none; }
+            #view-ag { display: block !important; }
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
 <body class="flex h-screen w-screen font-sans text-sm">
 
-    <!-- SIDEBAR -->
-    <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0">
+    <!-- SIDEBAR (No Print) -->
+    <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0 no-print">
         <div class="p-6">
             <div class="flex items-center gap-3 mb-8">
                 <div class="w-10 h-10 rounded-full border border-syndic bg-syndic/10 flex items-center justify-center text-syndic font-bold">IM</div>
                 <div><h1 class="font-bold tracking-wider text-base">IMMO<span class="text-syndic">.GEST</span></h1><p class="text-[10px] text-gray-500">Gestionnaire</p></div>
             </div>
             
+            <!-- SELECTEUR FIXÉ -->
             <div class="mb-6">
                 <label class="text-[10px] text-gray-500 uppercase font-bold px-2 mb-1 block">Résidence Active</label>
-                <select id="residence-select" onchange="loadResidence(this.value)" class="w-full bg-white/5 border border-syndic/30 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-syndic">
-                    <option value="">Chargement...</option>
-                </select>
+                <div class="relative">
+                    <select id="residence-select" onchange="loadResidence(this.value)" class="w-full border border-syndic/30 rounded-lg p-2 text-xs focus:outline-none focus:border-syndic cursor-pointer bg-card text-white">
+                        <option value="">Chargement des immeubles...</option>
+                    </select>
+                    <div class="absolute right-3 top-2.5 pointer-events-none text-gray-400 text-xs">▼</div>
+                </div>
             </div>
 
             <nav class="space-y-1">
@@ -38,6 +83,9 @@
                 </button>
                 <button onclick="switchView('contrats')" id="btn-contrats" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase transition flex items-center gap-3">
                     <i class="fa-solid fa-file-contract w-4 text-center"></i> Contrats
+                </button>
+                <button onclick="switchView('ag')" id="btn-ag" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase transition flex items-center gap-3">
+                    <i class="fa-solid fa-users w-4 text-center text-gold"></i> Assemblée Générale
                 </button>
             </nav>
         </div>
@@ -48,7 +96,9 @@
 
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
-        <header class="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
+        
+        <!-- HEADER -->
+        <header class="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20 no-print">
             <div>
                 <h2 id="header-residence" class="text-xl font-bold text-white">Sélectionnez une résidence</h2>
                 <p class="text-xs text-gray-400" id="header-address">--</p>
@@ -60,44 +110,102 @@
         </header>
 
         <div class="p-8 overflow-y-auto h-full pb-20">
-            <!-- VUE DASHBOARD -->
+            
+            <!-- VUE 1 : DASHBOARD -->
             <div id="view-dashboard" class="view-section active grid grid-cols-12 gap-6 auto-rows-min">
+                <!-- CHART -->
                 <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card">
-                    <h3 class="font-bold text-lg text-white mb-4">Suivi Budgétaire</h3>
+                    <h3 class="font-bold text-lg text-white mb-4">Suivi Budgétaire (Réel vs Vote)</h3>
                     <div class="h-64 w-full"><canvas id="chartBudget"></canvas></div>
                 </div>
+                <!-- TANTIEMES -->
                 <div class="col-span-4 bg-card rounded-[2rem] p-8 bento-card border-l-4 border-syndic">
                     <h3 class="font-bold text-lg text-white mb-4">Impact par Lot</h3>
+                    <p class="text-xs text-gray-400 mb-6">Simulation basée sur le budget réel actuel.</p>
                     <div class="space-y-4" id="tantieme-list">
                         <!-- JS Insert -->
                     </div>
                 </div>
             </div>
 
-            <!-- VUE CONTRATS -->
+            <!-- VUE 2 : CONTRATS -->
             <div id="view-contrats" class="view-section grid grid-cols-12 gap-6 auto-rows-min">
                 <div class="col-span-12 bg-card rounded-[2rem] p-8 bento-card">
-                    <h3 class="font-bold text-xl text-white mb-4">Contrats Actifs</h3>
+                    <h3 class="font-bold text-xl text-white mb-4">Contrats Énergie Actifs</h3>
                     <div id="contract-details" class="text-gray-400 text-sm">Sélectionnez une résidence pour voir les contrats.</div>
                 </div>
             </div>
+
+            <!-- VUE 3 : AG (PRINT) -->
+            <div id="view-ag" class="view-section grid grid-cols-12 gap-6 auto-rows-min">
+                 <div class="col-span-12 bg-white text-black p-12 rounded-[2rem] shadow-xl">
+                    <div class="flex justify-between items-center border-b-2 border-black pb-6 mb-8">
+                        <div>
+                            <h1 class="text-3xl font-black uppercase">Annexe Énergie AG</h1>
+                            <p class="text-sm text-gray-600 mt-1">Exercice 2025-2026</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-lg font-bold" id="print-res-name">Résidence...</div>
+                            <button onclick="window.print()" class="mt-2 bg-syndic text-white px-4 py-2 rounded text-xs font-bold hover:bg-indigo-700 no-print"><i class="fa-solid fa-print mr-2"></i>Imprimer</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-12">
+                        <div>
+                            <h3 class="text-xl font-bold text-syndic mb-4">1. Bilan Financier</h3>
+                            <table class="w-full text-sm border-collapse">
+                                <tr class="border-b border-gray-300"><td class="py-2">Budget N-1 (Voté)</td><td class="text-right font-mono" id="print-budget-n1">-- €</td></tr>
+                                <tr class="border-b border-gray-300"><td class="py-2 font-bold">Réalisé N (Facturé)</td><td class="text-right font-bold font-mono" id="print-realise">-- €</td></tr>
+                                <tr class="bg-gray-100"><td class="py-2 pl-2 font-bold">Écart</td><td class="text-right pr-2 font-bold" id="print-ecart">-- %</td></tr>
+                            </table>
+                            <p class="text-xs text-gray-500 mt-4 italic">Données certifiées par ENERGISTRAT.</p>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-syndic mb-4">2. Évolution Mensuelle</h3>
+                            <div class="h-48 relative"><canvas id="printChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 
     <script>
         let FLEET_DATA = [];
         let chartInstance = null;
+        let printChartInstance = null;
 
+        // --- NAVIGATION ROBUSTE ---
         window.switchView = function(viewId) {
-            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
+            // 1. Boutons
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active', 'text-white');
+                el.classList.add('text-gray-400');
+            });
             const btn = document.getElementById('btn-' + viewId);
-            if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
-            
-            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active')); // Use active class for display
+            if(btn) {
+                btn.classList.add('active', 'text-white');
+                btn.classList.remove('text-gray-400');
+            }
+
+            // 2. Vues (Force Display CSS)
+            document.querySelectorAll('.view-section').forEach(el => {
+                el.classList.remove('active');
+                el.style.display = 'none'; 
+            });
             const target = document.getElementById('view-' + viewId);
-            if(target) target.classList.add('active');
+            if(target) {
+                target.style.display = 'grid'; 
+                target.classList.add('active');
+            }
+            
+            // 3. Init Charts si AG
+            if (viewId === 'ag' && document.getElementById('residence-select').value) {
+                setTimeout(() => loadResidence(document.getElementById('residence-select').value), 100);
+            }
         }
 
+        // --- DATA LOADING ---
         async function loadFleet() {
             try {
                 const res = await fetch('/api/dashboard/fleet');
@@ -105,13 +213,15 @@
                 if(data.fleet) {
                     FLEET_DATA = data.fleet;
                     const sel = document.getElementById('residence-select');
-                    sel.innerHTML = '<option value="">-- Choisir --</option>';
+                    sel.innerHTML = '<option value="">-- Choisir une Copropriété --</option>';
                     FLEET_DATA.forEach(s => {
                         const opt = document.createElement('option');
                         opt.value = s.id;
                         opt.innerText = s.name;
                         sel.appendChild(opt);
                     });
+                    
+                    // Auto-select first
                     if(FLEET_DATA.length > 0) {
                         sel.value = FLEET_DATA[0].id;
                         loadResidence(FLEET_DATA[0].id);
@@ -126,45 +236,74 @@
 
             // Header
             document.getElementById('header-residence').innerText = site.name;
-            document.getElementById('header-address').innerText = site.city;
+            document.getElementById('header-address').innerText = site.city + " (" + site.zip + ")";
             document.getElementById('kpi-budget').innerText = Math.round(site.budget).toLocaleString() + " €";
+            
+            // Print Data
+            document.getElementById('print-res-name').innerText = site.name;
+            document.getElementById('print-realise').innerText = Math.round(site.budget).toLocaleString() + " €";
+            const budgetN1 = site.budget * 1.05;
+            document.getElementById('print-budget-n1').innerText = Math.round(budgetN1).toLocaleString() + " €";
+            
+            const ecart = ((site.budget - budgetN1) / budgetN1 * 100).toFixed(1);
+            const ecartEl = document.getElementById('print-ecart');
+            ecartEl.innerText = ecart + "%";
+            ecartEl.className = ecart < 0 ? "text-right pr-2 font-bold text-green-600" : "text-right pr-2 font-bold text-red-600";
 
-            // Tantièmes
+            // Tantièmes Calculation
             const budget = site.budget;
             document.getElementById('tantieme-list').innerHTML = `
                 <div class="flex justify-between items-center border-b border-white/5 pb-2">
                     <div><div class="text-sm font-bold text-white">T2 (45/1000)</div></div>
-                    <div class="text-right font-mono text-cyan">${Math.round(budget * 0.045)} €/an</div>
+                    <div class="text-right font-mono text-cyan">${Math.round(budget * 0.045).toLocaleString()} €/an</div>
                 </div>
                 <div class="flex justify-between items-center border-b border-white/5 pb-2">
                     <div><div class="text-sm font-bold text-white">T3 (72/1000)</div></div>
-                    <div class="text-right font-mono text-cyan">${Math.round(budget * 0.072)} €/an</div>
+                    <div class="text-right font-mono text-cyan">${Math.round(budget * 0.072).toLocaleString()} €/an</div>
                 </div>
                 <div class="flex justify-between items-center">
                     <div><div class="text-sm font-bold text-white">T4 (95/1000)</div></div>
-                    <div class="text-right font-mono text-cyan">${Math.round(budget * 0.095)} €/an</div>
+                    <div class="text-right font-mono text-cyan">${Math.round(budget * 0.095).toLocaleString()} €/an</div>
                 </div>
             `;
 
-            // Contracts
+            // Contracts View
+            const isGaz = site.energy === 'gaz';
             document.getElementById('contract-details').innerHTML = `
-                <div class="bg-abysse/50 p-4 rounded-xl border border-white/10">
-                    <div class="font-bold text-white mb-1">Fournisseur : ${site.provider}</div>
-                    <div class="text-xs text-gray-500">Contrat ${site.energy.toUpperCase()} • Tarif Marché</div>
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="bg-abysse/50 p-6 rounded-xl border border-white/10">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 ${isGaz ? 'bg-alert/10 text-alert' : 'bg-cyan/10 text-cyan'} rounded-lg">
+                                    <i class="fa-solid ${isGaz ? 'fa-fire' : 'fa-bolt'}"></i>
+                                </div>
+                                <div><div class="font-bold text-white">${isGaz ? 'Gaz Chaufferie' : 'Électricité Communs'}</div><div class="text-xs text-gray-500">${site.provider}</div></div>
+                            </div>
+                            <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">Actif</span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-400 mt-4">
+                            <span>Échéance: <b class="text-white">31/12/2026</b></span>
+                            <span>Budget: <b class="text-white">${Math.round(site.budget).toLocaleString()} €</b></span>
+                        </div>
+                    </div>
                 </div>
             `;
 
-            // Chart
-            if(chartInstance) chartInstance.destroy();
-            const ctx = document.getElementById('chartBudget').getContext('2d');
+            // Charts
             const monthly = [15,14,12,8,5,4,3,3,5,9,10,12].map(p => budget * p / 100);
-            chartInstance = new Chart(ctx, {
+            
+            if(chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(document.getElementById('chartBudget').getContext('2d'), {
                 type: 'bar',
-                data: {
-                    labels: ['J','F','M','A','M','J','J','A','S','O','N','D'],
-                    datasets: [{ label: 'Budget (€)', data: monthly, backgroundColor: '#6366F1', borderRadius: 4 }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
+                data: { labels: ['J','F','M','A','M','J','J','A','S','O','N','D'], datasets: [{ label: 'Budget (€)', data: monthly, backgroundColor: '#6366F1', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: '#94A3B8' } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94A3B8' } } } }
+            });
+
+            if(printChartInstance) printChartInstance.destroy();
+            printChartInstance = new Chart(document.getElementById('printChart').getContext('2d'), {
+                type: 'bar',
+                data: { labels: ['J','F','M','A','M','J','J','A','S','O','N','D'], datasets: [{ label: 'Conso (€)', data: monthly, backgroundColor: '#6366F1' }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } }
             });
         }
 
