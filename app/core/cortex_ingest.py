@@ -4,318 +4,246 @@ import io
 import re
 import logging
 import csv
-import chardet # Bibliothèque de détection d'encodage (Robustesse)
+import chardet
 
-# CONFIGURATION LOGGING
+# CONFIGURATION
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_HEAVY")
+logger = logging.getLogger("CORTEX_INGEST_V54")
 
-# DEPENDANCES OPTIONNELLES
 try:
     import pdfplumber
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
-    logger.warning("PDFPlumber manquant : L'analyse des factures PDF sera désactivée.")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "52.0 (Heavy Duty Ingestion Engine)"
-        self.supported_formats = ['.csv', '.xlsx', '.xls', '.txt', '.pdf']
+        self.version = "54.0 (Universal: Elec Expert + Gaz Expert + OPH)"
         
-        # Dictionnaire de Mapping des Colonnes (Le "Dico Universel")
-        # Permet de reconnaître une colonne même si le client l'a mal nommée
+        # MAPPING INTELLIGENT (Dictionnaire de Synonymes)
         self.COLUMN_MAPPING = {
             # IDENTIFICATION
-            "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "ID_SITE", "REF_PDL", "RÉFÉRENCE", "PCE"],
-            "nom": ["NOM", "NOM_SITE", "RAISON_SOCIALE", "CLIENT", "ENTITE", "SITE"],
-            # ADRESSE
-            "adresse": ["ADRESSE", "RUE", "LIGNE_ADRESSE", "ADDRESS"],
-            "cp": ["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
-            "ville": ["VILLE", "COMMUNE", "CITY"],
-            # TECHNIQUE
-            "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "PS_MAX", "CAR", "CAPACITE"],
-            "conso": ["CONSO", "CONSOMMATION", "VOLUME", "ANNUEL", "ESTIMATION", "CJA"],
-            "surface": ["SURFACE", "M2", "SHAB", "SU", "S_UTILE"],
-            # OPH / HABITAT
-            "p1": ["P1", "BUDGET_P1", "ENERGIE_EURO", "COUT_ENERGIE"],
-            "p2": ["P2", "BUDGET_P2", "MAINTENANCE", "P2_FORFAIT"],
-            "p3": ["P3", "BUDGET_P3", "GROS_ENTRETIEN"],
-            "tantiemes": ["TANTIEMES", "PART", "MILLIEMES", "QUOTE_PART"],
-            "dpe": ["DPE", "ETIQUETTE", "CLASSE_ENERGIE", "DIAGNOSTIC"],
-            "chauffage": ["CHAUFFAGE", "TYPE_CHAUFFAGE", "SYSTEME_CHAUFFE"],
-            # PRIX
-            "prix_hph": ["PRIX_HPH", "PRIX_UNITAIRE", "HPH", "P_KWH"],
-            "abonnement": ["ABONNEMENT", "ABO", "PRIME_FIXE", "PART_FIXE"]
+            "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE"],
+            "nom": ["NOM_SITE", "NOM", "ENTITE", "RAISON_SOCIALE", "CLIENT"],
+            "siret": ["SIRET_SITE", "SIRET"],
+            "naf": ["NAF", "CODE_NAF"],
+            
+            # LOCALISATION
+            "adresse": ["ADRESSE_SITE", "ADRESSE", "RUE"],
+            "cp": ["CP", "CODE_POSTAL"],
+            "ville": ["VILLE", "COMMUNE"],
+            "surface": ["SURFACE_M2", "SURFACE", "M2", "SHAB"],
+            
+            # CONTRAT & TECH
+            "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF"],
+            "fournisseur": ["FOURNISSEUR", "PROVIDER"],
+            "date_fin": ["DATE_FIN", "ECHEANCE"],
+            "puissance": ["PUISSANCE_SOUSCRITE_MAX", "PUISSANCE", "PS_MAX", "CAR_MWH", "CAR"], # CAR est la ref puissance gaz
+            "conso": ["VOLUME_ANNUEL_TOTAL", "CONSO_ANNUELLE", "VOLUME", "CJA_MWH_J", "CAR_MWH"], # CAR aussi utilisé comme ref volume
+            
+            # DETAILS PUISSANCE ELEC (4 Postes)
+            "ps_hph": ["PS_HPH"], "ps_hch": ["PS_HCH"], "ps_hpe": ["PS_HPE"], "ps_hce": ["PS_HCE"],
+            
+            # DETAILS CONSO ELEC (4 Postes)
+            "conso_hph": ["CONSO_HPH"], "conso_hch": ["CONSO_HCH"], "conso_hpe": ["CONSO_HPE"], "conso_hce": ["CONSO_HCE"],
+            
+            # PRIX & BUDGET
+            "abonnement": ["ABONNEMENT", "ABO", "PRIME_FIXE"],
+            "prix_hph": ["PRIX_HPH", "PRIX_MOLECULE_MWH", "PRIX_MOLECULE"], # HPH sert de base unique pour le gaz
+            "prix_hch": ["PRIX_HCH"], "prix_hpe": ["PRIX_HPE"], "prix_hce": ["PRIX_HCE"],
+            "taxes": ["TAXES", "CSPE", "TICGN"],
+            "stockage": ["TERME_STOCKAGE", "TERME_STOCKAGE_CPB", "STOCKAGE"], # Specifique Gaz
+            
+            # OPH / HABITAT (Colonnes à ajouter manuellement dans l'Excel si besoin)
+            "p1": ["BUDGET_P1", "P1", "COUT_ENERGIE"], 
+            "p2": ["BUDGET_P2", "P2", "MAINTENANCE"],
+            "tantiemes": ["TANTIEMES", "PART_COPRO"], 
+            "dpe": ["DPE", "ETIQUETTE"]
         }
 
-    # =========================================================
-    # UTILITAIRES DE ROBUSTESSE (SAFETY FIRST)
-    # =========================================================
-
-    def _detect_encoding(self, buffer):
-        """ Détecte l'encodage du fichier pour éviter les crashs UTF-8/Latin-1 """
-        raw = buffer.read(10000)
-        buffer.seek(0)
-        result = chardet.detect(raw)
-        return result['encoding'] or 'utf-8'
-
-    def _detect_separator(self, line):
-        """ Devine si le CSV est séparé par ; ou , ou \t """
-        if line.count(';') > line.count(','): return ';'
-        if line.count('\t') > line.count(';'): return '\t'
-        return ','
-
+    # --- UTILITAIRES DE NETTOYAGE ---
     def _clean_header(self, header):
-        """ Nettoie les entêtes pour correspondre au mapping """
-        return str(header).upper().strip().replace(' ', '_').replace('.', '').replace('É', 'E').replace('È', 'E')
+        return str(header).upper().strip().replace(' ', '_').replace('.', '').replace('É', 'E')
 
     def _find_col(self, df_cols, key):
-        """ Cherche une colonne dans le DataFrame selon le mapping """
         candidates = self.COLUMN_MAPPING.get(key, [])
         for col in df_cols:
-            clean_col = self._clean_header(col)
-            # Match exact
-            if clean_col in candidates: return col
-            # Match partiel
+            clean = self._clean_header(col)
+            if clean in candidates: return col 
             for cand in candidates:
-                if cand in clean_col: return col
+                if cand in clean: return col 
         return None
 
     def _safe_float(self, val):
         if pd.isna(val) or val == '': return 0.0
-        s = str(val).replace(',', '.').replace(' ', '').replace('€', '').replace('%', '').replace('kVA', '')
+        # Gère 1 000,50 et 1.000,50
+        s = str(val).replace(' ', '').replace('\xa0', '').replace('€', '').replace('%', '').replace('kVA', '')
+        s = s.replace(',', '.')
         try: return float(s)
         except: return 0.0
 
-    def _safe_int(self, val):
-        return int(self._safe_float(val))
+    def _safe_str_clean(self, val):
+        """ Nettoie les notations scientifiques Excel (ex: 2,14E+13 -> 21400000000000) """
+        if pd.isna(val) or val == '': return ""
+        s = str(val).replace(',', '.')
+        try:
+            if 'E+' in s or ('e+' in s):
+                return str(int(float(s))) # Conversion scientifique -> entier -> string
+            if '.' in s and s.replace('.', '').isdigit():
+                return str(int(float(s))) # Enlève le .0 à la fin
+            return s.strip()
+        except:
+            return str(val).strip()
 
     # =========================================================
-    # 1. MOTEUR D'IMPORT DE MASSE (LE "BROYEUR")
+    # IMPORT UNIFIÉ (ELEC + GAZ + OPH)
     # =========================================================
     def parse_mass_import_unified(self, file_content):
-        """
-        Lit n'importe quel fichier plat (Excel/CSV) et tente d'en extraire
-        des objets 'Site' standardisés, quel que soit le format d'origine.
-        """
         sites = []
         df = None
         buffer = io.BytesIO(file_content)
 
-        # 1. TENTATIVE DE LECTURE (BRUTE FORCE)
+        # 1. Lecture Robuste
         try:
-            # Excel ?
-            df = pd.read_excel(buffer)
+            df = pd.read_excel(buffer) # Priorité Excel
         except:
-            # CSV ?
             buffer.seek(0)
-            enc = self._detect_encoding(buffer)
-            try:
-                # Lecture de la première ligne pour le séparateur
-                first_line = buffer.readline().decode(enc)
-                sep = self._detect_separator(first_line)
-                buffer.seek(0)
-                df = pd.read_csv(buffer, sep=sep, encoding=enc, dtype=str, on_bad_lines='skip')
-            except Exception as e:
-                logger.error(f"Echec lecture CSV: {e}")
-                return []
+            enc = chardet.detect(buffer.read())['encoding'] or 'utf-8'
+            buffer.seek(0)
+            try: df = pd.read_csv(buffer, sep=';', encoding=enc, dtype=str)
+            except: df = pd.read_csv(buffer, sep=',', encoding=enc, dtype=str)
 
-        if df is None or df.empty:
-            logger.warning("Fichier vide ou illisible")
-            return []
+        if df is None or df.empty: return []
 
-        # 2. MAPPING INTELLIGENT
         cols = df.columns
-        # On cherche les colonnes clés
+        
+        # 2. Mapping des Colonnes
         c_nom = self._find_col(cols, "nom")
         c_pdl = self._find_col(cols, "pdl")
         c_addr = self._find_col(cols, "adresse")
-        c_ville = self._find_col(cols, "ville")
         c_cp = self._find_col(cols, "cp")
-        c_puiss = self._find_col(cols, "puissance")
-        c_conso = self._find_col(cols, "conso")
+        c_ville = self._find_col(cols, "ville")
+        c_siret = self._find_col(cols, "siret")
+        c_naf = self._find_col(cols, "naf")
         c_surf = self._find_col(cols, "surface")
         
-        # Champs OPH
+        c_puiss = self._find_col(cols, "puissance")
+        c_conso = self._find_col(cols, "conso")
+        c_seg = self._find_col(cols, "segment")
+        c_prov = self._find_col(cols, "fournisseur")
+        c_end = self._find_col(cols, "date_fin")
+        
+        # Elec Détail
+        c_ps_hph = self._find_col(cols, "ps_hph")
+        c_ps_hch = self._find_col(cols, "ps_hch")
+        c_ps_hpe = self._find_col(cols, "ps_hpe")
+        c_ps_hce = self._find_col(cols, "ps_hce")
+        
+        c_c_hph = self._find_col(cols, "conso_hph")
+        c_c_hch = self._find_col(cols, "conso_hch")
+        c_c_hpe = self._find_col(cols, "conso_hpe")
+        c_c_hce = self._find_col(cols, "conso_hce")
+        
+        # Prix & OPH
+        c_p_hph = self._find_col(cols, "prix_hph")
+        c_p_hch = self._find_col(cols, "prix_hch")
+        c_p_hpe = self._find_col(cols, "prix_hpe")
+        c_p_hce = self._find_col(cols, "prix_hce")
+        c_abo = self._find_col(cols, "abonnement")
+        c_tax = self._find_col(cols, "taxes")
+        c_stock = self._find_col(cols, "stockage") # Gaz
+        
         c_p1 = self._find_col(cols, "p1")
         c_p2 = self._find_col(cols, "p2")
-        c_p3 = self._find_col(cols, "p3")
         c_dpe = self._find_col(cols, "dpe")
-        c_chauff = self._find_col(cols, "chauffage")
         c_tant = self._find_col(cols, "tantiemes")
 
-        # Champs Prix
-        c_hph = self._find_col(cols, "prix_hph")
-        c_abo = self._find_col(cols, "abonnement")
-
-        # 3. EXTRACTION LIGNE A LIGNE
-        for idx, row in df.iterrows():
+        # 3. Extraction
+        for _, row in df.iterrows():
             try:
-                # Données obligatoires (ou presque)
-                pdl_val = str(row[c_pdl]) if c_pdl else f"SITE_{idx}"
-                nom_val = str(row[c_nom]) if c_nom else "Site Inconnu"
-                
-                # Nettoyage PDL (Garder que les chiffres)
-                pdl_clean = re.sub(r'[^0-9]', '', pdl_val)
-                if not pdl_clean: pdl_clean = f"TEMP_{idx}"
+                # Identification
+                nom = str(row.get(c_nom, 'Site Inconnu'))
+                pdl = self._safe_str_clean(row.get(c_pdl, '000'))
+                siret = self._safe_str_clean(row.get(c_siret, ''))
 
-                # Construction de l'objet Site Standardisé
+                # Objet Site Standardisé
                 site = {
-                    "client_name": nom_val,
-                    "identity": {
-                        "id": pdl_clean,
-                        "site_name": nom_val,
-                        "siret": "", 
-                        "naf": "6820A" # Par défaut OPH/Immo si import masse
+                    "client_name": nom,
+                    "identity": { 
+                        "id": pdl, "site_name": nom, "siret": siret, 
+                        "naf": str(row.get(c_naf, '')) 
                     },
                     "location": {
-                        "address": str(row[c_addr]) if c_addr else "",
-                        "zip_code": str(row[c_cp]) if c_cp else "",
-                        "city": str(row[c_ville]) if c_ville else "",
+                        "address": str(row.get(c_addr, '')),
+                        "zip_code": self._safe_str_clean(row.get(c_cp, '')),
+                        "city": str(row.get(c_ville, '')),
                         "surface": self._safe_float(row.get(c_surf))
                     },
                     "contract": {
-                        "pdl": pdl_clean,
+                        "pdl": pdl,
                         "power": self._safe_float(row.get(c_puiss)),
-                        "segment": "C5", # Sera recalculé par Cortex
-                        "provider": "Inconnu", # A détecter
-                        "annual_volume_estimated": self._safe_float(row.get(c_conso))
+                        "segment": str(row.get(c_seg, 'C5')),
+                        "provider": str(row.get(c_prov, 'Inconnu')),
+                        "annual_volume_estimated": self._safe_float(row.get(c_conso)),
+                        "end_date": str(row.get(c_end, '')),
+                        "power_details": {
+                            "hph": self._safe_float(row.get(c_ps_hph)),
+                            "hch": self._safe_float(row.get(c_ps_hch)),
+                            "hpe": self._safe_float(row.get(c_ps_hpe)),
+                            "hce": self._safe_float(row.get(c_ps_hce))
+                        }
                     },
-                    "technical": {
-                        "chauffage": str(row[c_chauff]) if c_chauff else "Inconnu",
-                        "dpe": str(row[c_dpe]) if c_dpe else "D",
-                        "tantiemes": self._safe_int(row.get(c_tant))
+                    "consumption_details": {
+                        "hph": self._safe_float(row.get(c_c_hph)),
+                        "hch": self._safe_float(row.get(c_c_hch)),
+                        "hpe": self._safe_float(row.get(c_c_hpe)),
+                        "hce": self._safe_float(row.get(c_c_hce))
                     },
                     "pricing": {
+                        "fix": str(self._safe_float(row.get(c_abo))),
+                        "hph": str(self._safe_float(row.get(c_p_hph))),
+                        "hch": str(self._safe_float(row.get(c_p_hch))),
+                        "hpe": str(self._safe_float(row.get(c_p_hpe))),
+                        "hce": str(self._safe_float(row.get(c_p_hce))),
+                        "tax": str(self._safe_float(row.get(c_tax))),
+                        "storage": str(self._safe_float(row.get(c_stock))), # Gaz Specific
                         "p1_budget": self._safe_float(row.get(c_p1)),
-                        "p2_budget": self._safe_float(row.get(c_p2)),
-                        "p3_budget": self._safe_float(row.get(c_p3)),
-                        "hph": str(self._safe_float(row.get(c_hph))),
-                        "fix": str(self._safe_float(row.get(c_abo)))
+                        "p2_budget": self._safe_float(row.get(c_p2))
+                    },
+                    "technical": {
+                        "dpe": str(row.get(c_dpe, 'D')),
+                        "tantiemes": self._safe_float(row.get(c_tant, 0))
                     }
                 }
                 sites.append(site)
-
             except Exception as e:
-                logger.error(f"Erreur ligne {idx}: {e}")
-                continue # On ne plante pas l'import pour une ligne pourrie
+                continue
 
-        logger.info(f"Import terminé : {len(sites)} sites extraits.")
+        logger.info(f"Import {len(sites)} sites OK")
         return sites
 
-    # =========================================================
-    # 2. PARSING COURBE DE CHARGE (ENEDIS P10 / GRDF)
-    # =========================================================
-    def parse_load_curve(self, file_content, filename):
-        """
-        Analyseur spécifique pour les fichiers de courbes de charge.
-        Gère le format P10 Enedis (Point 10 minutes) et les CSV GRDF.
-        """
+    # --- LOAD CURVE (Legacy) ---
+    def parse_load_curve(self, content, filename):
         try:
-            buffer = io.BytesIO(file_content)
-            enc = self._detect_encoding(buffer)
-            content_str = file_content.decode(enc, errors='ignore')
-            
-            # RECHERCHE DU PDL (REGEX)
-            # Cherche une suite de 14 chiffres isolée
-            pdl_match = re.search(r'(?<!\d)(\d{14})(?!\d)', content_str)
+            content_str = content.decode('latin-1', errors='ignore')
+            pdl_match = re.search(r'\b(\d{14})\b', content_str)
             pdl = pdl_match.group(1) if pdl_match else "Inconnu"
-            
-            # LECTURE DU DATA FRAME
-            buffer.seek(0)
-            # On saute les lignes de métadonnées souvent présentes chez Enedis
-            # On cherche la ligne d'entête
-            lines = content_str.split('\n')
-            header_row = 0
-            for i, line in enumerate(lines[:50]): # Scan des 50 premières lignes
-                if "DATE" in line.upper() or "HORODATAGE" in line.upper():
-                    header_row = i
-                    break
-            
-            buffer.seek(0)
-            df = pd.read_csv(buffer, sep=';', encoding=enc, skiprows=header_row, on_bad_lines='skip', low_memory=False)
-            
-            # NETTOYAGE COLONNES
-            df.columns = [self._clean_header(c) for c in df.columns]
-            
-            # IDENTIFICATION DES COLONNES CLEFS
-            col_date = next((c for c in df.columns if "DATE" in c or "HORODATAGE" in c), None)
-            col_val = next((c for c in df.columns if "PUISSANCE" in c or "VALEUR" in c or "KWH" in c), None)
-            
-            if not col_date or not col_val:
-                logger.error("Colonnes Date/Valeur introuvables dans la courbe")
-                return None, 0, {}
-            
-            # FORMATAGE DES DONNÉES
+            df = pd.read_csv(io.StringIO(content_str), sep=';', on_bad_lines='skip', low_memory=False)
+            df.columns = [str(c).upper().strip() for c in df.columns]
+            col_date = next((c for c in df.columns if "DATE" in c), None)
+            col_val = next((c for c in df.columns if "PUISSANCE" in c), None)
+            if not col_date or not col_val: return None, 0, {}
             df = df.rename(columns={col_date: 'date', col_val: 'val'})
-            
-            # Conversion Date (Robuste)
             df['date'] = pd.to_datetime(df['date'], dayfirst=True, errors='coerce')
-            df = df.dropna(subset=['date']).sort_values('date')
-            
-            # Conversion Valeur
-            df['val'] = pd.to_numeric(df['val'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-            
-            if df.empty: return None, 0, {}
-            
-            # CALCUL DU PAS DE TEMPS (10min, 30min, 60min ?)
-            if len(df) > 1:
-                delta = (df['date'].iloc[1] - df['date'].iloc[0]).total_seconds() / 60
-                time_step = int(delta)
-            else:
-                time_step = 10 # Par défaut
-                
-            # Stringification pour JSON
+            df = df.dropna().sort_values('date')
             df['date_str'] = df['date'].dt.strftime('%d/%m %H:%M')
-            
-            meta = {
-                "pdl": pdl,
-                "start_date": df['date'].min().isoformat(),
-                "end_date": df['date'].max().isoformat(),
-                "points": len(df),
-                "step_min": time_step
-            }
-            
-            return df, time_step, meta
+            return df, 10, {"pdl": pdl}
+        except: return None, 0, {}
 
-        except Exception as e:
-            logger.error(f"Load Curve Parsing Error: {e}")
-            return None, 0, {}
-
-    # =========================================================
-    # 3. PARSING BPU (OFFRE LAB)
-    # =========================================================
-    def parse_bpu_excel(self, file_content):
-        """
-        Lit les fichiers de réponse aux appels d'offres (BPU).
-        """
+    # --- BPU (Legacy) ---
+    def parse_bpu_excel(self, content):
         try:
-            buffer = io.BytesIO(file_content)
-            xls = pd.ExcelFile(buffer)
-            
-            # Détection de l'onglet
-            sheet_elec = next((s for s in xls.sheet_names if "ELEC" in s.upper()), None)
-            sheet_gaz = next((s for s in xls.sheet_names if "GAZ" in s.upper()), None)
-            
-            is_gaz = False
-            df = None
-            
-            if sheet_gaz:
-                df = pd.read_excel(xls, sheet_name=sheet_gaz)
-                is_gaz = True
-            elif sheet_elec:
-                df = pd.read_excel(xls, sheet_name=sheet_elec)
-                is_gaz = False
-            else:
-                # Fallback : prend la première feuille
-                df = pd.read_excel(xls, sheet_name=0)
-                
-            return df, is_gaz
-            
-        except Exception as e:
-            logger.error(f"BPU Parsing Error: {e}")
-            return None, False
+            return pd.read_excel(io.BytesIO(content), sheet_name=0), False
+        except: return None, False
 
-# INSTANCE EXPORTÉE
 ingest = CortexIngest()
