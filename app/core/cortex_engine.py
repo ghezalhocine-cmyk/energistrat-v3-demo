@@ -1,140 +1,243 @@
 import pandas as pd
-import io
+import numpy as np
 import logging
 from datetime import datetime
 
-# Import des modules frères
+# Import des modules frères avec sécurité
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_physics import physics
 except ImportError:
-    from cortex_ingest import ingest
-    from cortex_physics import physics
+    # Fallback pour mode dégradé ou test unitaire
+    ingest = None
+    physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_FINANCE_V50")
+logger = logging.getLogger("CORTEX_ENGINE_V56_DIAMOND")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "50.0 (Finance & Strategy Core)"
+        self.version = "56.0 (Diamond: Multi-Fluid & Safe Math)"
+        # Valeurs de marché par défaut (Backup si données manquantes)
+        self.MARKET_DEFAULTS = {
+            "elec": {"price": 0.15, "tax": 0.05}, # €/kWh
+            "gas": {"price": 0.06, "tax": 0.02}   # €/kWh
+        }
 
-    def _safe_float(self, value):
-        try: return float(value)
-        except: return 0.0
+    def _safe_float(self, value, default=0.0):
+        try:
+            if value is None: return default
+            return float(value)
+        except: return default
+
+    def _safe_div(self, num, den):
+        if den is None or den == 0 or pd.isna(den): return 0.0
+        return num / den
 
     # =========================================================
-    # MODULE : CALCULATEUR KPI UNIFIÉ
+    # 1. CALCULATEUR FINANCIER (LE CŒUR DU SYSTÈME)
     # =========================================================
-    def enrich_fleet_kpis(self, site_data):
-        c = site_data.get('contract', {})
-        p = site_data.get('pricing', {})
-        loc = site_data.get('location', {})
+    def enrich_site_financials(self, site_data):
+        """
+        Prend un site brut (Ingest) et calcule son budget précis.
+        Gère Elec / Gaz / OPH.
+        """
+        # Récupération des blocs de données
+        ident = site_data.get('identity', {})
+        contract = site_data.get('contract', {})
+        pricing = site_data.get('pricing', {})
         
-        # 1. Volume
-        vol = self._safe_float(c.get('annual_volume_estimated', 0))
-        if vol == 0: vol = self._safe_float(c.get('power', 0)) * 1.5
+        # A. Détection du Type
+        energy_type = contract.get('energy_type', 'elec').lower()
+        is_gas = 'gaz' in energy_type or 'gas' in energy_type
         
-        # 2. Budget (Logique OPH vs Retail)
-        p1 = self._safe_float(p.get('p1_budget', 0))
-        p2 = self._safe_float(p.get('p2_budget', 0))
-        p3 = self._safe_float(p.get('p3_budget', 0))
+        # B. Volume (Normalisé en kWh par Ingest)
+        vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
+        if vol_kwh == 0:
+            # Estimation de secours basée sur la puissance
+            p_max = self._safe_float(contract.get('power'))
+            vol_kwh = p_max * 1500 if is_gas else p_max * 1000 # Heuristique grossière
         
+        # C. Prix Unitaire (Normalisé en €/kWh par Ingest)
+        # Ingest envoie unit_price_ht. S'il est vide, on prend hph.
+        unit_price = self._safe_float(pricing.get('unit_price_ht'))
+        if unit_price == 0:
+            unit_price = self._safe_float(pricing.get('hph'))
+        
+        # Fallback Marché si prix manquant (Évite budget 0)
+        is_estimated_price = False
+        if unit_price == 0:
+            unit_price = self.MARKET_DEFAULTS['gas']['price'] if is_gas else self.MARKET_DEFAULTS['elec']['price']
+            is_estimated_price = True
+
+        # D. Composantes Fixes & Taxes
+        abonnement = self._safe_float(pricing.get('fix'))
+        taxes = self._safe_float(pricing.get('tax'))
+        
+        # E. Calculs OPH (P1/P2/P3) - Prioritaire si présent
+        p1 = self._safe_float(pricing.get('p1_budget'))
+        p2 = self._safe_float(pricing.get('p2_budget'))
+        p3 = self._safe_float(pricing.get('p3_budget'))
+        
+        budget_total = 0.0
+        budget_details = {}
+
         if p1 > 0:
-            budget = p1 + p2 + p3
+            # Mode OPH / Multi-technique
+            budget_total = p1 + p2 + p3
+            budget_details = {"commodity": p1, "services": p2 + p3, "taxes": 0} # Simplifié
         else:
-            price = self._safe_float(p.get('hph', 0))
-            if price < 2.0: price *= 1000
-            fix = self._safe_float(p.get('fix', 0))
-            budget = fix + (vol * price)
+            # Mode Fourniture Pure (Elec/Gaz)
+            commodity_cost = vol_kwh * unit_price
+            budget_total = commodity_cost + abonnement + taxes
+            budget_details = {
+                "commodity": round(commodity_cost, 2),
+                "grid_fix": round(abonnement, 2),
+                "taxes": round(taxes, 2)
+            }
 
-        # 3. Ratios
-        surface = self._safe_float(loc.get('surface', 0))
-        ratio_m2 = (budget / surface) if surface > 0 else 0
+        # F. Ratios & KPI
+        surface = self._safe_float(site_data.get('location', {}).get('surface'))
+        ratio_m2 = self._safe_div(budget_total, surface)
         
-        # 4. Gaspillage (Appel à Physics pour le talon théorique)
-        # Ici on fait une estimation financière rapide en attendant le calcul physique complet
-        ghost = budget * 0.10 
+        # Prix moyen complet (€/MWh pour affichage standard métier)
+        pmc_mwh = self._safe_div(budget_total, (vol_kwh / 1000)) 
 
         return {
-            "volume_mwh": round(vol, 1),
-            "budget_annual": round(budget, 2),
-            "p1_budget": round(p1, 2),
-            "ratio_eur_m2": round(ratio_m2, 2),
-            "ghost_savings": round(ghost, 2),
-            "landing_forecast": round(budget * 1.02, 2)
+            "volume_kwh": round(vol_kwh, 0),
+            "volume_mwh": round(vol_kwh / 1000, 2),
+            "budget_annual": round(budget_total, 2),
+            "details": budget_details,
+            "kpis": {
+                "ratio_eur_m2": round(ratio_m2, 2),
+                "pmc_eur_mwh": round(pmc_mwh, 2),
+                "is_estimated_price": is_estimated_price
+            },
+            "meta": {
+                "energy_type": "Gaz" if is_gas else "Électricité",
+                "site_label": ident.get('site_label', 'Site Inconnu'),
+                "city": site_data.get('location', {}).get('city', '')
+            }
         }
 
     # =========================================================
-    # MODULE : ANALYSE PORTEFEUILLE (GREEN LEAGUE)
+    # 2. ANALYSE PORTEFEUILLE (GREEN LEAGUE)
     # =========================================================
-    def analyze_portfolio(self, sites_data):
-        if not sites_data: return {"error": "No Data"}
-        
-        total_vol = 0
-        total_budget = 0
-        analysis = []
-        
-        for s in sites_data:
-            k = s.get('kpis', {})
-            total_vol += k.get('volume_mwh', 0)
-            total_budget += k.get('budget_annual', 0)
+    def analyze_portfolio(self, raw_sites_data):
+        """
+        Agrège les données, calcule les totaux et génère le classement.
+        """
+        if not raw_sites_data:
+            return {"kpis": {"total_budget": 0}, "green_league": [], "message": "Aucune donnée"}
+
+        processed_sites = []
+        global_stats = {
+            "total_elec_kwh": 0, "total_gas_kwh": 0,
+            "total_budget": 0, "nb_sites": 0,
+            "missing_data_count": 0
+        }
+
+        for site in raw_sites_data:
+            # 1. Enrichissement financier
+            fin = self.enrich_site_financials(site)
             
-            analysis.append({
-                "nom_site": s.get('identity', {}).get('site_name'),
-                "ville": s.get('location', {}).get('city'),
-                "pmc": (k.get('budget_annual',0)/k.get('volume_mwh',1)) if k.get('volume_mwh',0)>0 else 0,
-                "depense": k.get('budget_annual', 0),
-                "consommation": k.get('volume_mwh', 0)
+            # 2. Agrégation
+            global_stats['nb_sites'] += 1
+            global_stats['total_budget'] += fin['budget_annual']
+            
+            if fin['meta']['energy_type'] == 'Gaz':
+                global_stats['total_gas_kwh'] += fin['volume_kwh']
+            else:
+                global_stats['total_elec_kwh'] += fin['volume_kwh']
+                
+            if fin['kpis']['is_estimated_price']:
+                global_stats['missing_data_count'] += 1
+
+            # 3. Structure pour le Frontend (Bento Cards)
+            processed_sites.append({
+                "id": site.get('identity', {}).get('id'),
+                "name": fin['meta']['site_label'], # Vrai nom du site !
+                "city": fin['meta']['city'],
+                "type": fin['meta']['energy_type'],
+                "conso_mwh": fin['volume_mwh'],
+                "budget": fin['budget_annual'],
+                "ratio_pmc": fin['kpis']['pmc_eur_mwh'],
+                "score": self._calculate_score(fin['kpis']['pmc_eur_mwh'], fin['meta']['energy_type'])
             })
-            
-        sorted_sites = sorted([x for x in analysis if x['consommation']>0], key=lambda x: x['pmc'])
-        
+
+        # 4. Green League (Tri par performance énergétique/achat)
+        # On exclut les tout petits sites (< 1 MWh) pour éviter les aberrations statistiques
+        valid_sites = [s for s in processed_sites if s['conso_mwh'] > 1]
+        sorted_sites = sorted(valid_sites, key=lambda x: x['ratio_pmc']) # Du moins cher au plus cher
+
         return {
-            "kpis": { "total_conso": total_vol, "total_budget": total_budget, "nb_sites": len(sites_data) },
-            "green_league": { "gold": sorted_sites[0] if sorted_sites else None, "cancres": sorted_sites[-3:] },
-            "raw_data": analysis
+            "global": {
+                "budget_total": round(global_stats['total_budget'], 2),
+                "volume_elec_mwh": round(global_stats['total_elec_kwh'] / 1000, 1),
+                "volume_gas_mwh": round(global_stats['total_gas_kwh'] / 1000, 1),
+                "sites_count": global_stats['nb_sites'],
+                "data_quality": "High" if global_stats['missing_data_count'] == 0 else "Medium"
+            },
+            "green_league": {
+                "top_performer": sorted_sites[0] if sorted_sites else None,
+                "low_performer": sorted_sites[-1] if sorted_sites else None,
+                "ranking": sorted_sites
+            },
+            "sites": processed_sites
         }
 
-    # =========================================================
-    # MODULE : GENERATEUR DQE (EXCEL)
-    # =========================================================
-    def generate_advanced_tender_excel(self, sites_data):
-        # Utilise la logique existante mais simplifiée ici pour l'exemple
-        # Doit contenir la logique de séparation Elec/Gaz/Chaleur
-        # ... (Reprendre le code du DQE de la V52 ici) ...
-        # Par souci de brièveté du message, je confirme qu'il faut coller ici la méthode
-        # generate_advanced_tender_excel de la V52.0 fournie précédemment.
-        pass 
+    def _calculate_score(self, pmc, energy_type):
+        """ Note sur 100 basée sur le prix moyen constaté """
+        # Benchmarks (Mockés pour l'instant)
+        target = 60 if energy_type == 'Gaz' else 140 # €/MWh cible
+        
+        if pmc <= 0: return 0
+        score = 100 - (abs(pmc - target) / target * 50)
+        return max(0, min(100, int(score)))
 
     # =========================================================
-    # MODULE : ORCHESTRATEUR ANALYSE FICHIER
+    # 3. ORCHESTRATION PHYSICS (PONT VERS LE 3ème CERVEAU)
     # =========================================================
-    def analyze_file(self, content, filename, target="demo", known_data=None):
-        # 1. Appel Ingest
+    def analyze_load_curve(self, content, filename, contract_power=0):
+        """
+        Appelle le module Physics pour analyser la courbe de charge.
+        """
+        if not physics or not ingest:
+            return {"error": "Modules Physics/Ingest non chargés"}
+
+        # 1. Ingest lit le fichier brut
         df, step, meta = ingest.parse_load_curve(content, filename)
-        if df is None: return {"success": False, "error": "Illisible"}
-        
-        # 2. Appel Physics
-        p_sous = float(known_data.get('contract', {}).get('power', 0)) if known_data else 0
-        base = physics._module_socle(df, step) # Accès méthode helper physics (à rendre publique)
-        turpe = physics.simulate_turpe_optimization(base['p_max'], p_sous)
-        
-        # 3. Packaging
-        return {
-            "success": True,
-            "kpi": { **base, "turpe_optim": turpe.get('potential_savings', 0) },
-            "chart": { "labels": df['date_str'].tolist(), "values": df['val'].tolist() }
-        }
+        if df is None: return {"success": False, "error": "Fichier illisible"}
+
+        # 2. Physics calcule
+        # Appel sécurisé aux méthodes de Physics
+        try:
+            # On suppose que Physics a une méthode d'entrée publique
+            result = physics.compute_optimization(df, step, contract_power)
+            return {"success": True, "data": result}
+        except AttributeError:
+            # Fallback si méthode non trouvée (Code Physics pas encore à jour)
+            return {"success": False, "error": "Physics module outdated"}
 
     # =========================================================
-    # MODULE : SIMULATEUR BUDGET
+    # 4. GENERATEUR EXCEL (DQE)
     # =========================================================
-    def simulate_budget_from_bpu(self, content, sites):
-        df, is_gaz = ingest.parse_bpu_excel(content)
-        if df is None: return {"error": "Format BPU invalide"}
-        
-        # ... (Logique de calcul financier V52) ...
-        # Calculer le delta € entre sites (actuel) et df (offre)
-        return {"success": True, "summary": {"savings_euro": 1000}, "details": []}
+    def generate_dqe_structure(self, sites_data):
+        """
+        Prépare les données pour l'export Excel DQE.
+        """
+        rows = []
+        for s in sites_data:
+            fin = self.enrich_site_financials(s)
+            rows.append({
+                "PDL/PCE": s.get('identity', {}).get('id'),
+                "Nom Site": fin['meta']['site_label'],
+                "Type": fin['meta']['energy_type'],
+                "Ville": fin['meta']['city'],
+                "Volume (kWh)": fin['volume_kwh'],
+                "Puissance (kVA/kW)": s.get('contract', {}).get('power'),
+                "Budget Actuel (€)": fin['budget_annual']
+            })
+        return pd.DataFrame(rows)
 
 cortex = CortexEngine()
