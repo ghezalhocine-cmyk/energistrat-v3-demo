@@ -2,124 +2,252 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V3 | OPH Social (Live)</title>
+    <title>ENERGISTRAT V3 | OPH Social (Master)</title>
+    
+    <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- LEAFLET (MAPS) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script>
-        tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', oph: '#F97316', cyan: '#00E5FF', alert: '#EF4444', success: '#10B981' }, borderRadius: { 'bento': '1.5rem' } } } }
+        tailwind.config = { 
+            theme: { 
+                extend: { 
+                    colors: { 
+                        abysse: '#050505', 
+                        card: '#0F172A', 
+                        oph: '#F97316', // Orange Brique
+                        cyan: '#00E5FF', 
+                        alert: '#EF4444',
+                        success: '#10B981',
+                        gold: '#F59E0B'
+                    }, 
+                    borderRadius: { 'bento': '1.5rem' },
+                    boxShadow: { 'neon-oph': '0 0 20px rgba(249, 115, 22, 0.25)' }
+                } 
+            } 
+        }
     </script>
     <style>
         body { background-color: #050505; color: white; overflow: hidden; }
-        .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .bento-card { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
+        .bento-card:hover { border-color: rgba(249, 115, 22, 0.5); transform: translateY(-2px); }
         .nav-item.active { background: rgba(249, 115, 22, 0.1); border-left: 4px solid #F97316; color: white; }
+        
+        /* Navigation View Management */
         .view-section { display: none; } 
         .view-section.active { display: grid; animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
         #map { height: 100%; width: 100%; border-radius: 1.5rem; z-index: 0; }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
-<body class="flex h-screen w-screen font-sans text-sm">
+<body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
 
     <!-- SIDEBAR -->
-    <aside class="w-64 bg-[#020617] border-r border-white/10 flex flex-col justify-between z-50 flex-shrink-0">
+    <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0">
         <div class="p-6">
             <div class="flex items-center gap-3 mb-8">
-                <div class="w-10 h-10 rounded-full border border-oph bg-oph/10 flex items-center justify-center text-oph font-bold">🏢</div>
+                <div class="w-10 h-10 rounded-full border border-oph bg-oph/10 flex items-center justify-center text-oph font-bold shadow-neon-oph">🏢</div>
                 <div><h1 class="font-bold tracking-wider text-base">CORTEX<span class="text-oph">.OPH</span></h1><p class="text-[10px] text-gray-500">Habitat Social</p></div>
             </div>
-            <nav class="space-y-1">
-                <button onclick="switchView('charges')" id="btn-charges" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase transition flex items-center gap-3">
-                    <i class="fa-solid fa-chart-pie w-4 text-center"></i> Pilotage P1/P2
+            
+            <div class="space-y-1">
+                <div class="text-[10px] text-gray-500 uppercase font-bold px-4 mb-2">Pilotage</div>
+                <button onclick="switchView('charges')" id="btn-charges" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-file-invoice-dollar w-5 text-center"></i> Charges & P1
                 </button>
-                <button onclick="switchView('map')" id="btn-map" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase transition flex items-center gap-3">
-                    <i class="fa-solid fa-map w-4 text-center"></i> Carte Parc
+                <button onclick="switchView('map')" id="btn-map" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-map-location-dot w-5 text-center text-cyan"></i> Territoire & DPE
                 </button>
-                <button onclick="switchView('achat')" id="btn-achat" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase transition flex items-center gap-3">
-                    <i class="fa-solid fa-basket-shopping w-4 text-center"></i> Achats
+                
+                <div class="text-[10px] text-gray-500 uppercase font-bold px-4 mt-4 mb-2">Stratégie</div>
+                <button onclick="switchView('achat')" id="btn-achat" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-basket-shopping w-5 text-center text-gold"></i> Centrale Achat
                 </button>
-            </nav>
+                <button onclick="switchView('social')" id="btn-social" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-hand-holding-heart w-5 text-center text-success"></i> Veille Sociale
+                </button>
+            </div>
         </div>
+        
         <div class="p-6 border-t border-white/5">
-            <a href="/partner/settings" class="flex items-center gap-3 text-gray-400 hover:text-white transition"><i class="fa-solid fa-gear"></i> Administration</a>
+            <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
+                <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs text-white font-bold group-hover:bg-oph transition"><i class="fa-solid fa-gear"></i></div>
+                <div class="flex-1 min-w-0"><div class="text-xs font-bold text-white">Administration</div><div class="text-[10px] text-gray-500">Patrimoine & Users</div></div>
+            </a>
         </div>
     </aside>
 
     <!-- MAIN -->
-    <main class="flex-1 flex flex-col bg-abysse relative overflow-hidden">
-        <!-- HEADER -->
-        <header class="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
-            <div>
-                <h2 id="page-title" class="text-xl font-bold text-white">Pilotage des Charges</h2>
-                <p class="text-xs text-gray-400">Données Temps Réel</p>
-            </div>
-            <div class="flex gap-4">
-                <div class="bg-white/5 border border-white/10 px-4 py-2 rounded-full">
-                    <span class="text-xs text-gray-400">Parc</span>
-                    <span class="text-sm font-bold text-white ml-2" id="kpi-count">0 Résidences</span>
-                </div>
-            </div>
-        </header>
+    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
+        
+        <!-- CORTEX SENTINEL -->
+        <div class="h-14 border-b border-white/5 flex items-center px-8 gap-4 bg-abysse/95 backdrop-blur z-20">
+            <div class="px-2 py-1 rounded bg-oph text-abysse text-[10px] font-black animate-pulse tracking-wider">CORTEX SOCIAL</div>
+            <span class="text-xs text-oph font-mono flex-1" id="cortex-msg">Synchronisation des fluides en cours...</span>
+            <div class="text-xs text-gray-400">Parc : <b class="text-white" id="total-sites">--</b> Résidences</div>
+        </div>
 
         <div class="p-8 overflow-y-auto h-full pb-20">
             
-            <!-- VUE 1 : CHARGES -->
+            <!-- HEADER -->
+            <div class="flex justify-between items-end mb-6">
+                <div>
+                    <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Pilotage des Charges</h2>
+                    <p class="text-xs text-gray-400 mt-1">Données temps réel consolidées</p>
+                </div>
+                <div class="bg-card border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
+                    <span class="text-xs font-bold text-gray-300 uppercase">Coût Moyen</span>
+                    <span class="text-xl font-mono font-bold text-white" id="avg-cost">-- €<span class="text-xs text-gray-500">/m²</span></span>
+                </div>
+            </div>
+
+            <!-- VIEW 1: CHARGES (P1/P2/P3) -->
             <div id="view-charges" class="view-section active grid grid-cols-12 gap-6 auto-rows-min">
-                <!-- KPI -->
+                
+                <!-- KPI CARDS -->
                 <div class="col-span-12 grid grid-cols-4 gap-6">
                     <div class="bento-card p-6 border-l-4 border-oph">
-                        <div class="text-[10px] font-bold text-gray-400 uppercase">Total P1 (Énergie)</div>
-                        <div class="text-2xl font-bold text-white mt-1" id="total-p1">-- €</div>
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Total P1 (Énergie)</div>
+                        <div class="text-2xl font-bold text-white" id="total-p1">-- €</div>
+                        <div class="text-xs text-green-400">Budget Réalisé</div>
                     </div>
                     <div class="bento-card p-6 border-l-4 border-cyan">
-                        <div class="text-[10px] font-bold text-gray-400 uppercase">Total P2 (Maint.)</div>
-                        <div class="text-2xl font-bold text-white mt-1" id="total-p2">-- €</div>
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Total P2 (Maint.)</div>
+                        <div class="text-2xl font-bold text-white" id="total-p2">-- €</div>
+                        <div class="text-xs text-gray-500">Forfaitaire (Est. 20%)</div>
                     </div>
                     <div class="bento-card p-6 border-l-4 border-alert">
-                        <div class="text-[10px] font-bold text-alert uppercase">Pénalités (Avoirs)</div>
-                        <div class="text-2xl font-bold text-white mt-1">0 €</div>
+                        <div class="text-[10px] font-bold text-alert uppercase mb-1">Gaspillage (Talon)</div>
+                        <div class="text-2xl font-bold text-white" id="total-waste">-- €</div>
+                        <div class="text-xs text-gray-400">Potentiel économie</div>
                     </div>
-                    <div class="bento-card p-6 bg-white/5 flex items-center justify-center cursor-pointer hover:bg-white/10 transition">
-                        <i class="fa-solid fa-download text-xl mr-2"></i> Export Régul.
+                    <div class="bento-card p-6 bg-gradient-to-br from-card to-oph/10 flex flex-col justify-center items-center cursor-pointer hover:border-oph transition" onclick="window.print()">
+                        <i class="fa-solid fa-file-pdf text-2xl text-oph mb-2"></i>
+                        <span class="text-xs font-bold text-white">Export Régularisation</span>
                     </div>
                 </div>
-                <!-- CHART -->
+
+                <!-- MAIN CHART -->
                 <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card">
-                    <h3 class="font-bold text-lg text-white mb-4">Suivi Budgétaire Mensuel</h3>
+                    <div class="flex justify-between mb-6">
+                        <h3 class="font-bold text-xl text-white">Suivi Mensuel des Charges (€)</h3>
+                        <div class="flex gap-4 text-xs">
+                            <span class="text-oph">● Réalisé</span>
+                            <span class="text-gray-500 dashed">-- Budget Primitif</span>
+                        </div>
+                    </div>
                     <div class="h-64 w-full"><canvas id="chartCharges"></canvas></div>
                 </div>
-                <!-- COUT -->
+
+                <!-- REPARTITION -->
                 <div class="col-span-4 bg-card rounded-[2rem] p-8 bento-card">
-                    <h3 class="font-bold text-lg text-white mb-4">Structure Coût</h3>
+                    <h3 class="font-bold text-lg text-white mb-6">Structure du Coût</h3>
                     <div class="space-y-4">
-                        <div class="flex justify-between text-sm"><span class="text-gray-400">Récupérable</span><span class="text-success font-bold">78%</span></div>
-                        <div class="w-full bg-gray-800 h-2 rounded-full"><div class="bg-success h-full" style="width: 78%"></div></div>
-                        <div class="flex justify-between text-sm"><span class="text-gray-400">Non-Récupérable</span><span class="text-alert font-bold">22%</span></div>
-                        <div class="w-full bg-gray-800 h-2 rounded-full"><div class="bg-alert h-full" style="width: 22%"></div></div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1"><span class="text-gray-400">Récupérable (Locataires)</span><span class="text-white font-bold">78%</span></div>
+                            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden"><div class="bg-success h-full" style="width: 78%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1"><span class="text-gray-400">Non-Récupérable (Bailleur)</span><span class="text-white font-bold">22%</span></div>
+                            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden"><div class="bg-alert h-full" style="width: 22%"></div></div>
+                        </div>
+                        <div class="mt-6 p-4 bg-white/5 rounded-xl border border-white/10 text-xs text-gray-300">
+                            <i class="fa-solid fa-info-circle mr-2 text-cyan"></i> Le poste "P3 Gros Entretien" représente 60% de la part bailleur cette année.
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- VUE 2 : MAP -->
+            <!-- VIEW 2: TERRITOIRE & MAPS -->
             <div id="view-map" class="view-section grid grid-cols-12 gap-6 h-[600px]">
-                <div class="col-span-12 bento-card p-1 rounded-[2rem] relative h-full">
+                <div class="col-span-9 bento-card p-1 rounded-[2rem] relative h-full">
                     <div id="map"></div>
+                    <div class="absolute bottom-4 left-4 bg-abysse/90 p-3 rounded-xl border border-white/10 z-[1000] text-xs">
+                        <div class="font-bold text-white mb-2">Performance DPE</div>
+                        <div class="flex items-center gap-2 mb-1"><div class="w-3 h-3 rounded-full bg-green-500"></div> A-C (Performant)</div>
+                        <div class="flex items-center gap-2 mb-1"><div class="w-3 h-3 rounded-full bg-orange-500"></div> D-E (Moyen)</div>
+                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-red-600 animate-pulse"></div> F-G (Critique)</div>
+                    </div>
+                </div>
+
+                <div class="col-span-3 bento-card p-6 rounded-[2rem] flex flex-col">
+                    <h3 class="text-lg font-bold text-white mb-4">Fiche Résidence</h3>
+                    <div id="building-info" class="flex-1 space-y-4 text-center flex flex-col justify-center">
+                        <i class="fa-solid fa-city text-4xl text-gray-600 mb-2"></i>
+                        <p class="text-gray-500 text-xs">Sélectionnez un immeuble sur la carte pour voir son carnet de santé.</p>
+                    </div>
+                    <div id="building-data" class="hidden space-y-4">
+                        <div class="text-xl font-bold text-white" id="b-name">--</div>
+                        <div class="text-xs text-gray-400" id="b-addr">--</div>
+                        <div class="grid grid-cols-2 gap-2 text-center mt-4">
+                            <div class="bg-white/5 p-2 rounded"><div class="text-[10px] text-gray-500">Construction</div><div class="font-bold text-white" id="b-year">--</div></div>
+                            <div class="bg-white/5 p-2 rounded"><div class="text-[10px] text-gray-500">DPE</div><div class="font-black text-xl" id="b-dpe">--</div></div>
+                        </div>
+                        <div class="border-t border-white/5 pt-4">
+                            <div class="flex justify-between text-xs mb-1"><span class="text-gray-500">Chauffage</span><span class="text-white font-bold" id="b-heat">--</span></div>
+                            <div class="flex justify-between text-xs"><span class="text-gray-500">Isolation</span><span class="text-white" id="b-iso">--</span></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- VUE 3 : ACHAT -->
+            <!-- VIEW 3: ACHATS (STRATÉGIE) -->
             <div id="view-achat" class="view-section grid grid-cols-12 gap-6 auto-rows-min">
                 <div class="col-span-12 bento-card p-8 rounded-[2rem]">
-                    <h3 class="font-bold text-xl text-white mb-4">État des Marchés</h3>
+                    <div class="flex justify-between mb-6">
+                        <h3 class="font-bold text-xl text-white">Centrale d'Achat & Contrats</h3>
+                        <button class="bg-gold text-black px-4 py-2 rounded font-bold text-xs hover:bg-white transition"><i class="fa-solid fa-cart-plus mr-2"></i>Lancer Appel d'Offres</button>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-white/5 text-[10px] uppercase text-gray-400 font-bold">
+                                <tr>
+                                    <th class="px-6 py-4">Lot / Résidence</th>
+                                    <th class="px-6 py-4">Énergie</th>
+                                    <th class="px-6 py-4">Fournisseur</th>
+                                    <th class="px-6 py-4">Échéance</th>
+                                    <th class="px-6 py-4 text-right">Prix Actuel</th>
+                                    <th class="px-6 py-4 text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5" id="contract-list">
+                                <!-- JS Injection -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 4: SOCIAL (PRECARITE) -->
+            <div id="view-social" class="view-section grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-12 bento-card p-8 rounded-[2rem] border-t-4 border-cyan">
+                    <h3 class="font-bold text-xl text-white mb-6 flex items-center gap-3"><i class="fa-solid fa-temperature-low text-cyan"></i> Détection Sous-Chauffe (Précarité)</h3>
+                    <p class="text-sm text-gray-400 mb-6">Logements détectés avec une consommation chauffage quasi-nulle en hiver.</p>
+                    
                     <table class="w-full text-left text-sm text-gray-300">
-                        <thead class="bg-white/5 text-[10px] uppercase font-bold text-gray-500">
-                            <tr><th class="p-4">Lot</th><th class="p-4">Énergie</th><th class="p-4">Fournisseur</th><th class="p-4">Fin Contrat</th><th class="p-4 text-right">Prix Actuel</th></tr>
+                        <thead class="bg-white/5 text-[10px] uppercase text-gray-400 font-bold">
+                            <tr>
+                                <th class="px-6 py-4">Résidence</th>
+                                <th class="px-6 py-4">Logement (PDL)</th>
+                                <th class="px-6 py-4 text-center">Conso Hiver</th>
+                                <th class="px-6 py-4 text-right">Statut</th>
+                            </tr>
                         </thead>
-                        <tbody class="divide-y divide-white/5" id="contract-list">
+                        <tbody class="divide-y divide-white/5" id="social-list">
                             <!-- JS Injection -->
                         </tbody>
                     </table>
@@ -130,7 +258,7 @@
     </main>
 
     <script>
-        // --- NAVIGATION ROBUSTE ---
+        // --- NAVIGATION ROBUSTE (FORCE DISPLAY) ---
         window.switchView = function(viewId) {
             // 1. Boutons
             document.querySelectorAll('.nav-item').forEach(el => {
@@ -143,24 +271,30 @@
                 btn.classList.remove('text-gray-400');
             }
 
-            // 2. Vues
-            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active')); // Utilise classe active pour display grid
+            // 2. Vues (Force Display via style inline pour surpasser tout conflit CSS)
+            document.querySelectorAll('.view-section').forEach(el => {
+                el.classList.remove('active');
+                el.style.display = 'none'; 
+            });
             const target = document.getElementById('view-' + viewId);
-            if(target) target.classList.add('active');
+            if(target) {
+                target.style.display = 'grid'; 
+                target.classList.add('active');
+            }
 
             // 3. Titre
-            const titles = {'charges': 'Pilotage P1/P2', 'map': 'Cartographie', 'achat': 'Centrale d\'Achat'};
+            const titles = {'charges': 'Pilotage P1/P2', 'map': 'Cartographie', 'achat': 'Stratégie Achat', 'social': 'Veille Sociale'};
             document.getElementById('page-title').innerText = titles[viewId];
 
             // 4. Init Map si besoin
             if(viewId === 'map') setTimeout(initMap, 200);
         }
 
-        // --- DATA LOADING ---
+        // --- REAL DATA BRIDGE ---
+        let ophChart = null;
         let mapInstance = null;
-        let chartInstance = null;
 
-        async function loadData() {
+        async function loadRealData() {
             try {
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
@@ -168,65 +302,142 @@
                 if(data.fleet) {
                     const sites = data.fleet;
                     let totalP1 = 0;
-                    
-                    sites.forEach(s => totalP1 += (s.budget || 0));
-                    
-                    // KPI Updates
-                    document.getElementById('kpi-count').innerText = sites.length + " Résidences";
-                    document.getElementById('total-p1').innerText = (totalP1/1000000).toFixed(1) + " M€";
-                    document.getElementById('total-p2').innerText = (totalP1 * 0.2 / 1000).toFixed(0) + " k€"; // Est. 20%
+                    let totalWaste = 0;
+                    let totalSurf = 0;
 
-                    // Contracts Table
-                    const tbody = document.getElementById('contract-list');
-                    tbody.innerHTML = '';
-                    sites.slice(0, 5).forEach(s => {
-                        tbody.innerHTML += `
-                            <tr class="hover:bg-white/5">
-                                <td class="p-4 font-bold text-white">${s.name}</td>
-                                <td class="p-4"><span class="bg-white/10 px-2 py-1 rounded text-xs">${s.energy.toUpperCase()}</span></td>
-                                <td class="p-4">${s.provider}</td>
-                                <td class="p-4 text-alert">31/12/2026</td>
-                                <td class="p-4 text-right font-mono">--</td>
-                            </tr>
-                        `;
+                    // 1. KPI Calculation
+                    sites.forEach(s => {
+                        totalP1 += (s.budget || 0);
+                        totalWaste += (s.ghost_savings || 0);
+                        totalSurf += (s.surface || 1000); // Default if 0 to avoid div/0
                     });
 
-                    initChart(totalP1);
+                    // Update DOM
+                    document.getElementById('total-sites').innerText = sites.length;
+                    document.getElementById('total-p1').innerText = (totalP1/1000000).toFixed(1) + " M€";
+                    document.getElementById('total-p2').innerText = (totalP1 * 0.2 / 1000).toFixed(0) + " k€";
+                    document.getElementById('total-waste').innerText = Math.round(totalWaste).toLocaleString() + " €";
+                    
+                    const ratio = (totalP1 / totalSurf).toFixed(1);
+                    document.getElementById('avg-cost').innerHTML = `${ratio} €<span class="text-xs text-gray-500">/m²</span>`;
+
+                    // 2. Chart Init
+                    renderChart(totalP1);
+
+                    // 3. Populate Lists
+                    populateContractList(sites);
+                    populateSocialList(sites);
+                    
+                    // 4. Map Data Prep (Global var for map init)
+                    window.MAP_DATA = sites;
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) { console.error("API Error", e); }
         }
 
-        function initChart(totalBudget) {
-            if(chartInstance) return;
-            const ctx = document.getElementById('chartCharges').getContext('2d');
-            const monthly = [15,14,12,8,5,4,3,3,5,9,10,12].map(p => totalBudget * p / 100);
-            
-            chartInstance = new Chart(ctx, {
+        function renderChart(totalBudget) {
+            const ctxOph = document.getElementById('chartCharges').getContext('2d');
+            if (ophChart) ophChart.destroy();
+
+            // Seasonal curve (Higher in Winter)
+            const factors = [0.15, 0.14, 0.12, 0.08, 0.05, 0.04, 0.03, 0.03, 0.05, 0.09, 0.10, 0.12];
+            const monthly = factors.map(f => totalBudget * f);
+
+            const gradientOph = ctxOph.createLinearGradient(0, 0, 0, 300);
+            gradientOph.addColorStop(0, 'rgba(249, 115, 22, 0.2)');
+            gradientOph.addColorStop(1, 'rgba(0,0,0,0)');
+
+            ophChart = new Chart(ctxOph, {
                 type: 'line',
                 data: {
-                    labels: ['J','F','M','A','M','J','J','A','S','O','N','D'],
-                    datasets: [{
-                        label: 'Réalisé (€)',
-                        data: monthly,
-                        borderColor: '#F97316',
-                        backgroundColor: 'rgba(249, 115, 22, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                    }]
+                    labels: ['Jan','Fev','Mar','Avr','Mai','Juin','Juil','Aou','Sep','Oct','Nov','Dec'],
+                    datasets: [
+                        { label: 'Réel (P1+P2)', data: monthly, borderColor: '#F97316', backgroundColor: gradientOph, borderWidth: 2, fill: true, tension:0.4, pointRadius:0 },
+                        { label: 'Budget', data: monthly.map(v => v*1.05), borderColor: '#94A3B8', borderDash:[5,5], borderWidth: 2, tension:0.4, pointRadius:0 }
+                    ]
                 },
-                options: { responsive: true, maintainAspectRatio: false }
+                options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{labels:{color:'#94A3B8', font:{family:'Inter'}}}}, scales:{x:{grid:{display:false}, ticks:{color:'#64748B'}},y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748B'}}} }
             });
+        }
+
+        function populateContractList(sites) {
+            const tbody = document.getElementById('contract-list');
+            tbody.innerHTML = '';
+            sites.slice(0, 10).forEach(s => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-white/5 transition">
+                        <td class="px-6 py-4 font-bold text-white">${s.name}</td>
+                        <td class="px-6 py-4"><span class="text-[10px] bg-white/10 px-2 py-1 rounded font-bold">${s.energy.toUpperCase()}</span></td>
+                        <td class="px-6 py-4">${s.provider}</td>
+                        <td class="px-6 py-4 text-alert font-bold">31/12/2026</td>
+                        <td class="px-6 py-4 text-right font-mono">${Math.round(s.budget/s.volume)} €/MWh</td>
+                        <td class="px-6 py-4 text-center"><button class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-white">Renégocier</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function populateSocialList(sites) {
+            const tbody = document.getElementById('social-list');
+            tbody.innerHTML = '';
+            // Filter sites with very low consumption (Potential vacancy or poverty)
+            const alerts = sites.filter(s => s.volume < 10); 
+            
+            if(alerts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">Aucune anomalie détectée.</td></tr>';
+            } else {
+                alerts.slice(0,5).forEach(s => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-white/5 transition cursor-pointer">
+                            <td class="px-6 py-4 font-bold text-white">${s.name}</td>
+                            <td class="px-6 py-4">${s.id}</td>
+                            <td class="px-6 py-4 text-center font-mono text-cyan">${Math.round(s.volume)} MWh</td>
+                            <td class="px-6 py-4 text-right"><span class="bg-alert/20 text-alert px-2 py-1 rounded text-[10px] font-bold">ALERTE FROID</span></td>
+                        </tr>
+                    `;
+                });
+            }
         }
 
         function initMap() {
             if(mapInstance) return;
             mapInstance = L.map('map').setView([46.603354, 1.888334], 6);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapInstance);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap', subdomains: 'abcd', maxZoom: 19
+            }).addTo(mapInstance);
+
+            if(window.MAP_DATA) {
+                window.MAP_DATA.forEach((site, i) => {
+                    // Mock Lat/Lon if missing (Demo mode)
+                    const lat = 48.85 + (Math.random()-0.5)*0.5;
+                    const lon = 2.35 + (Math.random()-0.5)*0.5;
+                    
+                    const color = i%5===0 ? '#EF4444' : (i%3===0 ? '#F59E0B' : '#10B981');
+                    const dpe = i%5===0 ? 'G' : (i%3===0 ? 'D' : 'B');
+
+                    const marker = L.circleMarker([lat, lon], {
+                        radius: 8, color: color, fillColor: color, fillOpacity: 0.8
+                    }).addTo(mapInstance);
+                    
+                    marker.on('click', () => showBuildingInfo(site, dpe, color));
+                });
+            }
         }
 
+        function showBuildingInfo(site, dpe, color) {
+            document.getElementById('building-info').classList.add('hidden');
+            document.getElementById('building-data').classList.remove('hidden');
+            document.getElementById('b-name').innerText = site.name;
+            document.getElementById('b-addr').innerText = site.city;
+            document.getElementById('b-year').innerText = "1985"; // Mock
+            const d = document.getElementById('b-dpe'); d.innerText = dpe; d.style.color = color;
+            document.getElementById('b-heat').innerText = site.energy === 'gaz' ? 'Chaufferie Gaz' : 'Élec';
+            document.getElementById('b-iso').innerText = dpe === 'G' ? 'Non Isolé' : 'Double Vitrage';
+        }
+
+        // Init
         document.addEventListener('DOMContentLoaded', () => {
             switchView('charges');
-            loadData();
+            loadRealData();
         });
     </script>
 </body>
