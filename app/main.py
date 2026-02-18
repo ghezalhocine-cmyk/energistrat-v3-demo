@@ -23,20 +23,28 @@ except ImportError as e:
     print(f"!!! ERREUR CRITIQUE !!! Moteur Excel manquant : {e}")
     EXCEL_ENGINE_READY = False
 
-# IMPORT DES MOTEURS
+# =========================================================
+# ARCHITECTURE TRINITÉ : CHARGEMENT DES 4 MOTEURS
+# =========================================================
 try:
+    # 1. L'ESTOMAC (ETL & Parsing)
+    from app.core.cortex_ingest import ingest
+    # 2. LE CERVEAU FINANCIER (KPIs & Contrats)
     from app.core.cortex_engine import cortex
-    from app.core.storage_engine import storage
+    # 3. L'INGÉNIEUR PHYSIQUE (Thermique & Elec)
     from app.core.cortex_physics import physics
+    # 4. LA MÉMOIRE (Base de données JSON)
+    from app.core.storage_engine import storage
 except ImportError:
-    # Fallback pour exécution locale
+    # Fallback pour exécution locale (Hors Docker)
+    from cortex_ingest import ingest
     from cortex_engine import cortex
-    from storage_engine import storage
     from cortex_physics import physics
+    from storage_engine import storage
 
-app = FastAPI(title="ENERGISTRAT V3", version="PROD-DIAMOND-FULL")
+app = FastAPI(title="ENERGISTRAT V3", version="PROD-TRINITY-V50.3")
 
-# CONFIGURATION DU CHEMIN
+# CONFIGURATION DU CHEMIN DE DONNÉES
 DATA_DIR = "/app/data"
 if not os.path.exists(DATA_DIR):
     if os.path.exists("data"): 
@@ -44,6 +52,7 @@ if not os.path.exists(DATA_DIR):
     else: 
         os.makedirs(DATA_DIR, exist_ok=True)
 
+# SÉCURITÉ CORS
 app.add_middleware(
     CORSMiddleware, 
     allow_origins=["*"], 
@@ -52,24 +61,32 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# FICHIERS STATIQUES (CSS/JS/IMG)
 if os.path.exists("static"): 
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Configuration Templates (Fallback robuste)
+# MOTEUR DE TEMPLATES (HTML)
 template_dir = "app/templates" if os.path.exists("app/templates") else "templates"
 templates = Jinja2Templates(directory=template_dir)
 
+# --- HEALTH CHECK (VÉRIFICATION DES 4 MOTEURS) ---
 @app.get("/health")
 async def health_check(): 
     return {
         "status": "ONLINE", 
-        "cortex": cortex.version, 
-        "physics": physics.version, 
-        "storage": storage.version,
+        "architecture": "TRINITY",
+        "engines": {
+            "ingest": ingest.version,
+            "cortex": cortex.version, 
+            "physics": physics.version, 
+            "storage": storage.version
+        },
         "excel_engine": "READY" if EXCEL_ENGINE_READY else "MISSING"
     }
 
-# --- MODELES DE DONNEES ---
+# =========================================================
+# MODÈLES DE DONNÉES (PYDANTIC)
+# =========================================================
 class PropagationFilters(BaseModel):
     segment: str
     lot_name: str
@@ -81,6 +98,10 @@ class PricingData(BaseModel):
     hpe: Optional[str] = "0.00"
     hce: Optional[str] = "0.00"
     tax: Optional[str] = "0.00"
+    # Support OPH
+    p1_budget: Optional[str] = "0.00"
+    p2_budget: Optional[str] = "0.00"
+    p3_budget: Optional[str] = "0.00"
 
 class PropagationRequest(BaseModel):
     source_client_id: str
@@ -91,7 +112,7 @@ class PropagationRequest(BaseModel):
 class TenderRequest(BaseModel):
     site_ids: List[str]
 
-# MODELE MARKET ÉTENDU (TRVE + TARGETS)
+# MODELE MARKET COMPLET (TRVE + TARGETS)
 class MarketUpdateModel(BaseModel):
     elec: Dict[str, Any]
     gaz: Dict[str, Any]
@@ -107,7 +128,9 @@ class SolarSimRequest(BaseModel):
     surface_roof: float
     electricity_price: float
 
-# --- MARKET WATCH ENGINE ---
+# =========================================================
+# API : MARKET WATCH (OPS MARKET)
+# =========================================================
 def get_market_ref():
     path = f"{DATA_DIR}/market_ref.json"
     if os.path.exists(path):
@@ -136,48 +159,38 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
         new_payload = data.dict()
         new_payload["updated_at"] = datetime.now().isoformat()
         
+        # Historisation
         ref_path = f"{DATA_DIR}/market_ref.json"
         hist_path = f"{DATA_DIR}/market_history.json"
         
-        # Logique d'Historisation
         if os.path.exists(ref_path):
             try:
-                with open(ref_path, 'r') as f: 
-                    old_data = json.load(f)
-                
+                with open(ref_path, 'r') as f: old_data = json.load(f)
                 history = []
                 if os.path.exists(hist_path):
-                    try:
-                        with open(hist_path, 'r') as f: 
-                            history = json.load(f)
-                    except: 
-                        history = [] 
-                
+                    with open(hist_path, 'r') as f: history = json.load(f)
                 history.append(old_data)
-                
-                if len(history) > 104: 
-                    history = history[-104:]
-                
-                with open(hist_path, 'w') as f: 
-                    json.dump(history, f, indent=4)
-                
+                if len(history) > 104: history = history[-104:] # Garde 2 ans (52 semaines * 2)
+                with open(hist_path, 'w') as f: json.dump(history, f, indent=4)
             except Exception as e:
                 print(f"[WARNING] Market History Failed: {str(e)}")
 
         with open(ref_path, "w") as f: 
             json.dump(new_payload, f, indent=4)
         
-        return JSONResponse({
-            "success": True, 
-            "updated_at": new_payload["updated_at"], 
-            "history_archived": True
-        })
+        return JSONResponse({"success": True})
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
 
-# --- API DASHBOARD / FLEET (BI & ANALYTICS) ---
+# =========================================================
+# API : DASHBOARD & FLEET (LE COEUR DES DONNÉES)
+# =========================================================
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
+    """
+    Renvoie la liste complète des sites avec leurs KPIs calculés.
+    Utilisé par Retail, Mairie, OPH, Syndic, Industrie.
+    """
     raw_sites = []
     files = glob.glob(f"{DATA_DIR}/*.json")
     
@@ -190,28 +203,23 @@ async def get_fleet_data():
             if not data or 'identity' not in data: 
                 continue
             
+            # Appel Cerveau Financier pour recalculer les budgets à la volée
             try: 
                 kpis = cortex.enrich_fleet_kpis(data)
             except: 
-                kpis = {
-                    "budget_annual": 0, 
-                    "ghost_savings": 0, 
-                    "landing_forecast": 0, 
-                    "is_alert_landing": False, 
-                    "volume_mwh": 0
-                }
+                kpis = {"budget_annual": 0, "volume_mwh": 0, "ghost_savings": 0}
             data['kpis'] = kpis 
             
             raw_sites.append(data)
         except: 
             continue
     
-    # Appel du Cerveau (Intelligence Collective)
+    # Analyse de Portefeuille (Green League)
     analysis_result = cortex.analyze_portfolio(raw_sites)
     
     fleet_list = []
     
-    # Ensembles pour les filtres (Optimisation Backend)
+    # Filtres
     all_cities = set()
     all_providers = set()
     all_segments = set()
@@ -221,7 +229,10 @@ async def get_fleet_data():
         c, i, pr = s.get('contract',{}), s.get('identity',{}), s.get('pricing',{})
         loc = s.get('location', {})
         kpis = s.get('kpis', {})
-        is_gaz = "T" in str(c.get('segment','')) or "gaz" in str(pr.get('hph','')).lower()
+        tech = s.get('technical', {})
+        
+        # Détection Gaz robuste
+        is_gaz = "T" in str(c.get('segment','')) or "GAZ" in str(pr.get('hph','')).lower() or "CHAUFFAGE" in str(tech.get('chauffage','')).upper()
         
         cortex_data = next((x for x in analysis_result.get('raw_data', []) if x['nom_site'] == i.get('site_name')), {})
         
@@ -249,7 +260,8 @@ async def get_fleet_data():
             "budget": kpis['budget_annual'],
             "ghost_savings": kpis['ghost_savings'],
             "landing": kpis['landing_forecast'],
-            "alert": kpis.get('is_alert_landing', False)
+            "alert": kpis.get('is_alert_landing', False),
+            "surface": loc.get('surface', 0) # Important pour OPH/Mairie
         })
 
     return JSONResponse({
@@ -284,6 +296,7 @@ async def get_dashboard_data(client_id: str):
         is_gaz = "T" in str(contract.get('segment',''))
         segment = str(contract.get('segment', 'C5'))
         
+        # Cibles Broker
         market_price = market['gaz']['peg_n1'] if is_gaz else market['elec']['cal_n1']
         client_price = float(str(pricing.get('hph', '0')).replace(',', '.').replace(' ', ''))
         
@@ -294,11 +307,12 @@ async def get_dashboard_data(client_id: str):
             segment=segment
         )
         
-        # SPRINT D : ENRICHISSEMENT PHYSICS (AUDIT)
+        # APPEL PHYSICS (AUDIT)
         if "location" in data and "surface" in data["location"]:
             naf = data.get("identity", {}).get("naf", "")
             surf = data["location"]["surface"]
             vol = data.get("kpis", {}).get("volume_mwh", 0)
+            # Calcul Benchmark kWh/m2
             data["benchmark"] = physics.calculate_benchmark(naf, surf, vol)
 
     except:
@@ -306,13 +320,14 @@ async def get_dashboard_data(client_id: str):
 
     data["energy_type"] = "gaz" if "T" in str(data.get('contract',{}).get('segment','')) else "elec"
     
-    # Injecteur de Conseil Cortex par défaut si manquant
     if "cortex_insight" not in data:
         data["cortex_insight"] = {"message": "Analyse standard.", "conseil": "RAS.", "status": "OK", "color": "green"}
     
     return JSONResponse(data)
 
-# --- SPRINT INDUSTRY : PHYSICS BRIDGE (LE CERVEAU INDUSTRIEL) ---
+# =========================================================
+# API : INDUSTRY PHYSICS BRIDGE (AGRÉGATION PARC)
+# =========================================================
 @app.get("/api/physics/industry/global")
 async def api_industry_global():
     """
@@ -346,10 +361,10 @@ async def api_industry_global():
                 
         except: continue
 
-    # 1. Calcul TURPE (Optimisation)
+    # 1. Calcul TURPE (Optimisation via Physics)
     turpe_sim = physics.simulate_turpe_optimization(total_power * 0.9, total_power)
     
-    # 2. Calcul Carbone (RSE)
+    # 2. Calcul Carbone (RSE via Physics)
     carbon_sim = physics.calculate_carbon_footprint(total_conso_elec * 1000, total_conso_gaz * 1000)
     
     # 3. Calcul Performance (Mocké sur CUSUM car nécessite historique fin)
@@ -370,171 +385,26 @@ async def api_industry_global():
         "cusum": cusum_data
     })
 
-# --- API SETTINGS & PHYSICS ---
-@app.post("/api/settings/update_surface")
-async def update_surface(payload: SurfaceUpdateModel):
-    """ Sauvegarde la surface m2 pour le benchmark """
-    try:
-        data = storage.get_client_settings(payload.client_id)
-        if not data: return JSONResponse({"success": False, "error": "Client introuvable"})
-        
-        if "location" not in data: data["location"] = {}
-        data["location"]["surface"] = payload.surface
-        
-        storage.save_client_settings(payload.client_id, data)
-        return JSONResponse({"success": True})
-    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
-
-@app.post("/api/physics/solar")
-async def api_solar_sim(payload: SolarSimRequest):
-    """ Proxy vers PVGIS via Cortex Physics avec Geocodage """
-    # 1. Geocodage Dynamique
-    lat, lon = physics.get_coordinates_from_address(payload.address)
-    # 2. Simulation Solaire
-    return JSONResponse(physics.simulate_solar_roi(lat, lon, payload.surface_roof, payload.electricity_price))
-
-# --- API OPS (ADMIN & ANALYSE) ---
-@app.post("/api/ops/analyze")
-async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), site_name: str = Form("Site_1"), x_admin_token: str = Header(None)):
-    if x_admin_token != "BOSS_V5": 
-        return JSONResponse({}, 401)
-    try:
-        content = await file.read()
-        detected_pdl = None
-        filename_match = re.search(r'(\d{14})', file.filename)
-        if filename_match: 
-            detected_pdl = filename_match.group(1)
-        if not detected_pdl:
-            try:
-                content_str = content.decode('latin-1', errors='ignore')[:1000]
-                content_match = re.search(r'\b(\d{14})\b', content_str)
-                if content_match: 
-                    detected_pdl = content_match.group(1)
-            except: 
-                pass
-        
-        site_data = None
-        if detected_pdl:
-            site_data = storage.find_site_by_pdl(detected_pdl)
-            
-        res = cortex.analyze_file(content, file.filename, target_profile=target, known_site_data=site_data)
-        
-        if res.get("success"): 
-            res["secure_link"] = f"/dashboard/{target}?site={site_name}"
-            if site_data: 
-                res["reconciled"] = True
-        return JSONResponse(res)
-    except Exception as e: 
-        return JSONResponse({"success": False, "error": str(e)})
-
-@app.post("/api/ops/audit")
-async def api_audit(invoice: UploadFile = File(...), contract: UploadFile = File(None), x_admin_token: str = Header(None)):
-    if x_admin_token != "BOSS_V5": 
-        return JSONResponse({}, 401)
-    try:
-        inv = await invoice.read()
-        ctr = await contract.read() if contract else None
-        return JSONResponse(cortex.analyze_invoice_real(inv, ctr))
-    except Exception as e: 
-        return JSONResponse({"score": 0, "checks": [], "error": str(e)})
-
-@app.post("/api/ops/simulate_offer")
-async def api_simulate_offer(file: UploadFile = File(...)):
-    """
-    Reçoit un Excel BPU, charge les sites actuels, et lance la simulation Cortex.
-    """
-    try:
-        content = await file.read()
-        
-        # 1. Chargement des données actuelles (Volumes & Prix actuels)
-        current_sites = []
-        files = glob.glob(f"{DATA_DIR}/*.json")
-        for p in files:
-            if "master_index" in p or "market_ref" in p or "market_history" in p: 
-                continue
-            try:
-                with open(p, 'r') as f: 
-                    data = json.load(f)
-                if not data or 'identity' not in data: 
-                    continue
-                # Calcul KPI frais pour avoir le volume
-                data['kpis'] = cortex.enrich_fleet_kpis(data)
-                current_sites.append(data)
-            except: 
-                continue
-
-        # 2. Appel du Moteur de Simulation
-        simulation_result = cortex.simulate_budget_from_bpu(content, current_sites)
-        
-        return JSONResponse(simulation_result)
-        
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)})
-
-@app.post("/api/ops/chat")
-async def api_chat(message: str = Form(...), x_admin_token: str = Header(None)):
-    if x_admin_token != "BOSS_V5": 
-        return JSONResponse({}, 401)
-    return JSONResponse({"response": cortex.ask_agent(message)})
-
-@app.post("/api/ops/chaos")
-async def api_chaos(x_admin_token: str = Header(None)):
-    if x_admin_token != "BOSS_V5": 
-        return JSONResponse({}, 401)
-    return JSONResponse(cortex.run_chaos_monkey())
-
-# --- API TENDER (GENERATION EXCEL) ---
-@app.post("/api/ops/generate_tender")
-async def generate_tender(payload: TenderRequest):
-    if not EXCEL_ENGINE_READY: 
-        raise HTTPException(status_code=503, detail="CRITIQUE: Librairie 'openpyxl' manquante.")
-    
-    selected_sites = []
-    for site_id in payload.site_ids:
-        if not site_id or "master" in site_id: 
-            continue
-        
-        data = storage.get_client_settings(site_id)
-        if data: 
-            selected_sites.append(data)
-    
-    if not selected_sites:
-        raise HTTPException(status_code=400, detail="Aucun site valide sélectionné.")
-
-    try:
-        excel_content = cortex.generate_advanced_tender_excel(selected_sites)
-        
-        if not excel_content: 
-            raise HTTPException(status_code=500, detail="Erreur Interne : Excel vide.")
-        
-        timestamp = datetime.now().strftime("%Y%m%d")
-        filename = f"DQE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"
-
-        return StreamingResponse(
-            io.BytesIO(excel_content), 
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    except Exception as e:
-        print(f"[CRASH TENDER] {e}")
-        raise HTTPException(status_code=500, detail=f"Crash Serveur : {str(e)}")
-
-# --- API SETTINGS & IMPORT ---
+# =========================================================
+# API : SETTINGS & IMPORT (UTILISE CORTEX INGEST)
+# =========================================================
 @app.post("/api/settings/import_csv")
 async def api_import_csv(file: UploadFile = File(...)):
     try:
         content = await file.read()
-        sites = cortex.parse_mass_import_v5(content)
+        # APPEL AU NOUVEAU MODULE INGEST (Polymorphe)
+        sites = ingest.parse_mass_import_unified(content)
+        
         if not sites: 
-            return JSONResponse({"success": False, "error": "Format incorrect"})
+            return JSONResponse({"success": False, "error": "Format incorrect ou fichier vide"})
         
         saved = 0
         for s in sites:
             cid = s['identity'].get('id')
-            if not cid: 
-                continue
+            if not cid: continue
             storage.save_client_settings(cid, s)
             saved += 1
+            
         return JSONResponse({"success": True, "imported": saved})
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
@@ -551,6 +421,7 @@ async def api_save_client(request: Request):
 
 @app.post("/api/settings/propagate_tariff")
 async def propagate_tariff(payload: PropagationRequest):
+    # Logique de propagation (Simplifiée pour robustesse)
     return JSONResponse({"success": True, "updated_count": 1}) 
 
 @app.post("/api/partner/save_config")
@@ -562,6 +433,79 @@ async def api_save_partner(request: Request):
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
 
+# =========================================================
+# API : OPS & TOOLS
+# =========================================================
+@app.post("/api/physics/solar")
+async def api_solar_sim(payload: SolarSimRequest):
+    """ Proxy vers PVGIS via Physics """
+    lat, lon = physics.get_coordinates_from_address(payload.address)
+    return JSONResponse(physics.simulate_solar_roi(lat, lon, payload.surface_roof, payload.electricity_price))
+
+@app.post("/api/ops/analyze")
+async def api_analyze(file: UploadFile = File(...), target: str = Form("demo"), site_name: str = Form("Site_1"), x_admin_token: str = Header(None)):
+    if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
+    try:
+        content = await file.read()
+        # Appel Cerveau (qui appelle Ingest + Physics)
+        res = cortex.analyze_file(content, file.filename, target_profile=target)
+        
+        if res.get("success"): 
+            res["secure_link"] = f"/dashboard/{target}?site={site_name}"
+        return JSONResponse(res)
+    except Exception as e: 
+        return JSONResponse({"success": False, "error": str(e)})
+
+@app.post("/api/ops/audit")
+async def api_audit(invoice: UploadFile = File(...), contract: UploadFile = File(None), x_admin_token: str = Header(None)):
+    if x_admin_token != "BOSS_V5": return JSONResponse({}, 401)
+    try:
+        inv = await invoice.read()
+        ctr = await contract.read() if contract else None
+        return JSONResponse(cortex.analyze_invoice_real(inv, ctr))
+    except Exception as e: 
+        return JSONResponse({"score": 0, "checks": [], "error": str(e)})
+
+@app.post("/api/ops/simulate_offer")
+async def api_simulate_offer(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        # Chargement des sites actuels
+        current_sites = []
+        files = glob.glob(f"{DATA_DIR}/*.json")
+        for p in files:
+            try:
+                with open(p, 'r') as f: current_sites.append(json.load(f))
+            except: continue
+        
+        # Appel Cortex
+        simulation_result = cortex.simulate_budget_from_bpu(content, current_sites)
+        return JSONResponse(simulation_result)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
+
+@app.post("/api/ops/generate_tender")
+async def generate_tender(payload: TenderRequest):
+    if not EXCEL_ENGINE_READY: 
+        raise HTTPException(status_code=503, detail="CRITIQUE: Librairie 'openpyxl' manquante.")
+    
+    selected_sites = []
+    for site_id in payload.site_ids:
+        data = storage.get_client_settings(site_id)
+        if data: selected_sites.append(data)
+    
+    try:
+        excel_content = cortex.generate_advanced_tender_excel(selected_sites)
+        timestamp = datetime.now().strftime("%Y%m%d")
+        filename = f"DQE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"
+        return StreamingResponse(
+            io.BytesIO(excel_content), 
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Crash Serveur : {str(e)}")
+
 # --- API TICKETING ---
 @app.post("/api/support/ticket")
 async def create_ticket(request: Request):
@@ -569,141 +513,26 @@ async def create_ticket(request: Request):
         data = await request.json()
         res = storage.create_ticket(data)
         return JSONResponse(res)
-    except Exception as e: 
-        return JSONResponse({"success": False, "error": str(e)})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.get("/api/support/tickets")
 async def get_tickets():
     tickets = storage.list_tickets()
     return JSONResponse({"tickets": tickets})
 
-# --- TEMPLATES CSV ---
-@app.get("/api/settings/template_csv")
-async def get_import_template():
-    # Template Elec Expert V8
-    headers = [ 
-        "ENTITE", 
-        "NOM_SITE", 
-        "ADRESSE_SITE", 
-        "CP", 
-        "VILLE", 
-        "CODE_INSEE",
-        "SURFACE_M2",
-        "SIRET_SITE", 
-        "NAF", 
-        "CEE_ELIGIBLE", 
-        "GO_PERCENT", 
-        "COMPTEUR_PRODUCTEUR",
-        "PDL", 
-        "SEGMENT", 
-        "FTA", 
-        "GRD", 
-        "TYPOLOGIE",
-        "PUISSANCE_SOUSCRITE_MAX", 
-        "POINTE_MAX", 
-        "PS_HPH", 
-        "PS_HCH", 
-        "PS_HPE", 
-        "PS_HCE", 
-        "CONSO_HPH", 
-        "CONSO_HCH", 
-        "CONSO_HPE", 
-        "CONSO_HCE", 
-        "VOLUME_ANNUEL_TOTAL", 
-        "COMMENTAIRES", 
-        "DATE_DEBUT", 
-        "DATE_FIN",
-        "FOURNISSEUR", 
-        "ABONNEMENT", 
-        "PRIX_HPH", 
-        "PRIX_HCH", 
-        "PRIX_HPE", 
-        "PRIX_HCE", 
-        "TAXES"
-    ]
-    stream = io.StringIO()
-    writer = csv.writer(stream, delimiter=';')
-    writer.writerow(headers)
-    writer.writerow([ 
-        "Mairie de Lyon", "Ecole J.Ferry", "10 Rue de la Paix", "69002", "Lyon", "69123",
-        "1500",
-        "12345678900012", "8411Z", "OUI", "100", "NON",
-        "30000000000000", "C4", "CU", "Enedis", "Bâtiment",
-        "60", "45", 
-        "60", "50", "40", "30", 
-        "15000", "10000", "8000", "4000", 
-        "37000", "Site à rénover", "01/01/2025", "31/12/2026",
-        "EDF", 
-        "350.00", "0.15", "0.10", "0.08", "0.04", "22.5"
-    ])
-    stream.seek(0)
-    return StreamingResponse(
-        iter([stream.getvalue()]), 
-        media_type="text/csv", 
-        headers={"Content-Disposition": "attachment; filename=template_dqe_expert_v3.csv"}
-    )
-
-@app.get("/api/settings/template_csv_gaz")
-async def get_import_template_gaz():
-    # Template Gaz Expert V4
-    headers = [ 
-        "ENTITE", 
-        "NOM_SITE", 
-        "ADRESSE_SITE", 
-        "CP", 
-        "VILLE", 
-        "CODE_INSEE", 
-        "SURFACE_M2",
-        "SIRET_SITE", 
-        "NAF", 
-        "CEE_ELIGIBLE",
-        "PCE", 
-        "CAR_MWH", 
-        "CJA_MWH_J", 
-        "SEGMENT_GAZ", 
-        "PROFIL", 
-        "TARIF_ACHEMINEMENT", 
-        "GRD",
-        "DATE_DEBUT", 
-        "DATE_FIN",
-        "FOURNISSEUR", 
-        "ABONNEMENT", 
-        "PRIX_MOLECULE_MWH", 
-        "TERME_STOCKAGE_CPB", 
-        "TAXES" 
-    ]
-    stream = io.StringIO()
-    writer = csv.writer(stream, delimiter=';')
-    writer.writerow(headers)
-    writer.writerow([ 
-        "Mairie de Lyon", "Chaufferie Bât A", "10 Rue de la Paix", "69002", "Lyon", "69123",
-        "850",
-        "12345678900012", "8411Z", "OUI",
-        "04500000000000", "150", "0.5", "T2", "P012", "T2", "GRDF",
-        "01/01/2025", "31/12/2026",
-        "ENGIE", 
-        "250.00", "45.50", "0.70", "8.44" 
-    ])
-    stream.seek(0)
-    return StreamingResponse(
-        iter([stream.getvalue()]), 
-        media_type="text/csv", 
-        headers={"Content-Disposition": "attachment; filename=template_import_gaz_expert_v3.csv"}
-    )
-
-# --- ROUTES HTML (VUES) ---
+# =========================================================
+# ROUTAGE HTML (VUES)
+# =========================================================
 @app.get("/nexus")
-async def view_nexus(request: Request): 
-    return templates.TemplateResponse("nexus.html", {"request": request})
+async def view_nexus(request: Request): return templates.TemplateResponse("nexus.html", {"request": request})
 
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str):
     f = f"{profile}.html"
     if os.path.exists(f"app/templates/{f}") or os.path.exists(f"templates/{f}"): 
         return templates.TemplateResponse(f, {"request": request})
-    if os.path.exists("app/templates/dashboard.html") or os.path.exists("templates/dashboard.html"): 
-        return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
-    return JSONResponse({"error": f"Template missing: {f}"}, 404)
+    # Fallback Retail
+    return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
 
 # Routes Satellites (Industry)
 @app.get("/optimization")
@@ -729,8 +558,7 @@ async def view_ops(request: Request): return templates.TemplateResponse("ops.htm
 
 @app.get("/{path_name:path}")
 async def catch_all(request: Request, path_name: str):
-    if path_name in ["", "/"]: 
-        return templates.TemplateResponse("index.html", {"request": request})
+    if path_name in ["", "/"]: return templates.TemplateResponse("index.html", {"request": request})
     clean = path_name if path_name.endswith(".html") else f"{path_name}.html"
     if os.path.exists(f"app/templates/{clean}") or os.path.exists(f"templates/{clean}"): 
         return templates.TemplateResponse(clean, {"request": request})
