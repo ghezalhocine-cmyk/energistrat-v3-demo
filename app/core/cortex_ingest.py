@@ -2,833 +2,320 @@ import pandas as pd
 import numpy as np
 import io
 import re
-import math
 import logging
 import csv
-from datetime import datetime
+import chardet # Bibliothèque de détection d'encodage (Robustesse)
 
-# CONFIGURATION IA & LOGGING
-VERTEX_REGION = "europe-west9"
-VERTEX_MODEL = "gemini-1.5-flash-001"
-
+# CONFIGURATION LOGGING
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_MASTER_V49_5_FINAL")
+logger = logging.getLogger("CORTEX_INGEST_HEAVY")
 
-# CHARGEMENT DES LIBRAIRIES OPTIONNELLES
+# DEPENDANCES OPTIONNELLES
 try:
     import pdfplumber
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
+    logger.warning("PDFPlumber manquant : L'analyse des factures PDF sera désactivée.")
 
-try:
-    import vertexai
-    from vertexai.generative_models import GenerativeModel
-    vertexai.init(location=VERTEX_REGION)
-    AI_MODEL = GenerativeModel(VERTEX_MODEL)
-    AI_AVAILABLE = True
-except:
-    AI_AVAILABLE = False
-
-class CortexEngine:
+class CortexIngest:
     def __init__(self):
-        self.version = "49.5 (Full Engine + DQE Fix)"
-        # Base de connaissance Métier (NAF)
-        self.NAF_DB = {
-            "1071C": "Boulangerie", "1071D": "Pâtisserie", "1013A": "Charcuterie", 
-            "1013B": "Boucherie", "5610A": "Restauration Trad.", "5610C": "Fast Food",
-            "4711D": "Supermarché", "4711F": "Hypermarché", "4711B": "Supérette",
-            "4722Z": "Boucherie (Retail)", "4771Z": "Habillement", "4520A": "Garage Auto",
-            "8510Z": "École Maternelle", "8520Z": "École Primaire", "8531Z": "Collège/Lycée",
-            "8559A": "Formation Continue", "8552Z": "Enseignement Culturel",
-            "8411Z": "Mairie / Admin", "8412Z": "Santé Publique", "8424Z": "Ordre Public",
-            "9311Z": "Gymnase / Stade", "9329Z": "Loisirs", "9101Z": "Bibliothèque",
-            "2562B": "Mécanique Ind.", "2511Z": "Métallurgie", "2229A": "Plasturgie",
-            "1812Z": "Imprimerie", "3312Z": "Maintenance Ind.", "2059Z": "Chimie",
-            "6820A": "Bailleur Social", "6820B": "Location Terrains", "8110Z": "Syndic / Copro",
-            "5510Z": "Hôtellerie", "6832A": "Administration Immeubles", "6832B": "Supports Immobiliers"
+        self.version = "52.0 (Heavy Duty Ingestion Engine)"
+        self.supported_formats = ['.csv', '.xlsx', '.xls', '.txt', '.pdf']
+        
+        # Dictionnaire de Mapping des Colonnes (Le "Dico Universel")
+        # Permet de reconnaître une colonne même si le client l'a mal nommée
+        self.COLUMN_MAPPING = {
+            # IDENTIFICATION
+            "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "ID_SITE", "REF_PDL", "RÉFÉRENCE", "PCE"],
+            "nom": ["NOM", "NOM_SITE", "RAISON_SOCIALE", "CLIENT", "ENTITE", "SITE"],
+            # ADRESSE
+            "adresse": ["ADRESSE", "RUE", "LIGNE_ADRESSE", "ADDRESS"],
+            "cp": ["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
+            "ville": ["VILLE", "COMMUNE", "CITY"],
+            # TECHNIQUE
+            "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "PS_MAX", "CAR", "CAPACITE"],
+            "conso": ["CONSO", "CONSOMMATION", "VOLUME", "ANNUEL", "ESTIMATION", "CJA"],
+            "surface": ["SURFACE", "M2", "SHAB", "SU", "S_UTILE"],
+            # OPH / HABITAT
+            "p1": ["P1", "BUDGET_P1", "ENERGIE_EURO", "COUT_ENERGIE"],
+            "p2": ["P2", "BUDGET_P2", "MAINTENANCE", "P2_FORFAIT"],
+            "p3": ["P3", "BUDGET_P3", "GROS_ENTRETIEN"],
+            "tantiemes": ["TANTIEMES", "PART", "MILLIEMES", "QUOTE_PART"],
+            "dpe": ["DPE", "ETIQUETTE", "CLASSE_ENERGIE", "DIAGNOSTIC"],
+            "chauffage": ["CHAUFFAGE", "TYPE_CHAUFFAGE", "SYSTEME_CHAUFFE"],
+            # PRIX
+            "prix_hph": ["PRIX_HPH", "PRIX_UNITAIRE", "HPH", "P_KWH"],
+            "abonnement": ["ABONNEMENT", "ABO", "PRIME_FIXE", "PART_FIXE"]
         }
 
-    # --- HELPERS DE NETTOYAGE ---
-    def _safe_int(self, value):
-        try:
-            if value is None: return 0
-            val_str = str(value).replace(',', '.').replace(' ', '').replace('\xa0', '').replace('€', '').replace('kVA', '')
-            if not val_str or val_str.lower() == 'nan': return 0
-            return int(float(val_str))
-        except: return 0
+    # =========================================================
+    # UTILITAIRES DE ROBUSTESSE (SAFETY FIRST)
+    # =========================================================
 
-    def _safe_float(self, value):
-        try:
-            if value is None: return 0.0
-            val_str = str(value).replace(',', '.').replace(' ', '').replace('\xa0', '').replace('€', '').replace('kVA', '')
-            if not val_str or val_str.lower() == 'nan': return 0.0
-            return float(val_str)
+    def _detect_encoding(self, buffer):
+        """ Détecte l'encodage du fichier pour éviter les crashs UTF-8/Latin-1 """
+        raw = buffer.read(10000)
+        buffer.seek(0)
+        result = chardet.detect(raw)
+        return result['encoding'] or 'utf-8'
+
+    def _detect_separator(self, line):
+        """ Devine si le CSV est séparé par ; ou , ou \t """
+        if line.count(';') > line.count(','): return ';'
+        if line.count('\t') > line.count(';'): return '\t'
+        return ','
+
+    def _clean_header(self, header):
+        """ Nettoie les entêtes pour correspondre au mapping """
+        return str(header).upper().strip().replace(' ', '_').replace('.', '').replace('É', 'E').replace('È', 'E')
+
+    def _find_col(self, df_cols, key):
+        """ Cherche une colonne dans le DataFrame selon le mapping """
+        candidates = self.COLUMN_MAPPING.get(key, [])
+        for col in df_cols:
+            clean_col = self._clean_header(col)
+            # Match exact
+            if clean_col in candidates: return col
+            # Match partiel
+            for cand in candidates:
+                if cand in clean_col: return col
+        return None
+
+    def _safe_float(self, val):
+        if pd.isna(val) or val == '': return 0.0
+        s = str(val).replace(',', '.').replace(' ', '').replace('€', '').replace('%', '').replace('kVA', '')
+        try: return float(s)
         except: return 0.0
 
-    def _normalize_supplier(self, raw_name):
-        if not raw_name: return "Inconnu"
-        n = str(raw_name).upper().strip()
-        if "EDF" in n: return "EDF"
-        if "TOTAL" in n: return "TotalEnergies"
-        if "ENGIE" in n: return "Engie"
-        if "ENI" in n: return "Eni"
-        if "VATTENFALL" in n: return "Vattenfall"
-        if "IBERDROLA" in n: return "Iberdrola"
-        if "AXPO" in n: return "Axpo"
-        if "ALPIQ" in n: return "Alpiq"
-        if "GEG" in n: return "GEG"
-        if "IMPORT" in n: return "Import CSV"
-        return n.title() 
+    def _safe_int(self, val):
+        return int(self._safe_float(val))
 
     # =========================================================
-    # MODULE 1 : TENDER FACTORY V2 (PATCHED)
+    # 1. MOTEUR D'IMPORT DE MASSE (LE "BROYEUR")
     # =========================================================
-    def generate_advanced_tender_excel(self, sites_data):
-        if not sites_data: return b""
+    def parse_mass_import_unified(self, file_content):
+        """
+        Lit n'importe quel fichier plat (Excel/CSV) et tente d'en extraire
+        des objets 'Site' standardisés, quel que soit le format d'origine.
+        """
+        sites = []
+        df = None
+        buffer = io.BytesIO(file_content)
+
+        # 1. TENTATIVE DE LECTURE (BRUTE FORCE)
         try:
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                
-                elec_sites = []
-                gaz_sites = []
-                
-                for s in sites_data:
-                    # Sécurisation de l'extraction
-                    contract = s.get('contract', {}) or {}
-                    seg = str(contract.get('segment', '')).upper()
-                    prov = str(contract.get('provider', '')).upper()
-                    
-                    # Détection Gaz robuste
-                    is_gaz = "T" in seg or "GAZ" in prov
-                    if is_gaz:
-                        gaz_sites.append(s)
-                    else:
-                        elec_sites.append(s)
-
-                if elec_sites:
-                    rows_dqe = []
-                    rows_bpu = []
-                    for s in elec_sites:
-                        c = s.get('contract', {}) or {}
-                        i = s.get('identity', {}) or {}
-                        loc = s.get('location', {}) or {}
-                        
-                        # HOTFIX CRITIQUE : Gestion des nulls
-                        conso_det = s.get('consumption_details') or {}
-                        power_det = c.get('power_details') or {}
-                        
-                        siret_val = i.get('siret_site') or i.get('siret', '')
-
-                        rows_dqe.append({
-                            "Entité": s.get('client_name', ''),
-                            "Nom du site": i.get('site_name', ''),
-                            "Adresse": loc.get('address', ''),
-                            "CP": loc.get('zip_code', ''),
-                            "Ville": loc.get('city', ''),
-                            "INSEE": loc.get('insee', ''), 
-                            "SIRET": siret_val,
-                            "Surface": loc.get('surface', ''),
-                            "PDL": c.get('pdl', ''),
-                            "Segment": c.get('segment', ''),
-                            "FTA": c.get('fta', ''),
-                            "PS Max (kVA)": self._safe_float(c.get('power', 0)),
-                            "PS HPH": self._safe_float(power_det.get('hph', 0)),
-                            "PS HCH": self._safe_float(power_det.get('hch', 0)),
-                            "PS HPE": self._safe_float(power_det.get('hpe', 0)),
-                            "PS HCE": self._safe_float(power_det.get('hce', 0)),
-                            "Conso HPH": self._safe_float(conso_det.get('hph', 0)),
-                            "Conso HCH": self._safe_float(conso_det.get('hch', 0)),
-                            "Conso HPE": self._safe_float(conso_det.get('hpe', 0)),
-                            "Conso HCE": self._safe_float(conso_det.get('hce', 0)),
-                            "Vol. Annuel": s.get('kpis', {}).get('volume_mwh', 0) * 1000
-                        })
-                        
-                        rows_bpu.append({
-                            "PDL (Clé)": c.get('pdl', ''),
-                            "Nom Site": i.get('site_name', ''),
-                            "SIRET": siret_val,
-                            "Vol. Annuel (Ref)": s.get('kpis', {}).get('volume_mwh', 0) * 1000,
-                            "OFFRE_ABO_AN (€)": "",
-                            "OFFRE_HPH (€/MWh)": "",
-                            "OFFRE_HCH (€/MWh)": "",
-                            "OFFRE_HPE (€/MWh)": "",
-                            "OFFRE_HCE (€/MWh)": "",
-                            "OFFRE_GESTION (€/an)": "",
-                            "OFFRE_CEE (€/MWh)": ""
-                        })
-                        
-                    pd.DataFrame(rows_dqe).to_excel(writer, sheet_name='1-DQE_ELEC', index=False)
-                    pd.DataFrame(rows_bpu).to_excel(writer, sheet_name='2-BPU_ELEC_REPONSE', index=False)
-
-                if gaz_sites:
-                    rows_dqe_gaz = []
-                    rows_bpu_gaz = []
-                    for s in gaz_sites:
-                        c = s.get('contract', {}) or {}
-                        i = s.get('identity', {}) or {}
-                        loc = s.get('location', {}) or {}
-                        siret_val = i.get('siret_site') or i.get('siret', '')
-
-                        rows_dqe_gaz.append({
-                            "Entité": s.get('client_name', ''),
-                            "Nom du site": i.get('site_name', ''),
-                            "Adresse": loc.get('address', ''),
-                            "CP": loc.get('zip_code', ''),
-                            "Ville": loc.get('city', ''),
-                            "INSEE": loc.get('insee', ''),
-                            "SIRET": siret_val,
-                            "Surface": loc.get('surface', ''),
-                            "PCE": c.get('pdl', ''),
-                            "CAR (MWh)": self._safe_float(c.get('power', 0)),
-                            "CJA": c.get('cja', 0),
-                            "Profil": c.get('profil', ''),
-                            "Tarif Ach.": c.get('tarif_acheminement', '')
-                        })
-                        
-                        rows_bpu_gaz.append({
-                            "PCE (Clé)": c.get('pdl', ''),
-                            "Nom Site": i.get('site_name', ''),
-                            "SIRET": siret_val,
-                            "CAR (Ref)": self._safe_float(c.get('power', 0)),
-                            "OFFRE_ABO_AN (€)": "",
-                            "OFFRE_PRIX_MOLECULE (€/MWh)": "",
-                            "OFFRE_TERME_STOCKAGE (€/MWh)": "",
-                            "OFFRE_CEE (€/MWh)": ""
-                        })
-                        
-                    pd.DataFrame(rows_dqe_gaz).to_excel(writer, sheet_name='3-DQE_GAZ', index=False)
-                    pd.DataFrame(rows_bpu_gaz).to_excel(writer, sheet_name='4-BPU_GAZ_REPONSE', index=False)
-
-            output.seek(0)
-            return output.getvalue()
-        except Exception as e:
-            logger.error(f"Erreur Fatale Excel Generator: {e}")
-            return b""
-
-    # =========================================================
-    # MODULE 2 : MARKET WATCH
-    # =========================================================
-    def analyze_market_position(self, client_price, market_price, energy_type, segment="C5"):
-        if not client_price or math.isnan(client_price) or client_price <= 0: 
-            return {"status": "INCONNU", "message": "Prix non détecté", "color": "gray", "action": "Vérifier Import"}
-        
-        adjusted_client_price = client_price
-        if client_price < 2.0: adjusted_client_price = client_price * 1000
-            
-        TRVE_ELEC_C5 = 230.0 
-        TRVE_GAZ_T1 = 110.0
-        
-        reference_price = market_price
-        ref_label = "marché"
-        
-        is_small_site = str(segment).upper() in ["C5", "C4", "T1", "T2"]
-        if is_small_site:
-            if energy_type == "elec":
-                reference_price = TRVE_ELEC_C5
-                ref_label = "TRVE"
-            else:
-                reference_price = TRVE_GAZ_T1
-                ref_label = "Prix Repère"
-
-        delta = adjusted_client_price - reference_price
-        pct = (delta / reference_price) * 100
-        
-        if delta > 15: 
-            return {"status": "ALERTE PRIX", "color": "red", "message": f"Prix excessif (+{int(pct)}% vs {ref_label}).", "action": f"Payé {int(adjusted_client_price)}€ vs {int(reference_price)}€ cible."}
-        elif delta < -5: 
-            return {"status": "PERFORMANCE", "color": "green", "message": f"Vous battez le {ref_label} de {abs(int(pct))}%.", "action": f"Prix {int(adjusted_client_price)}€/MWh (Top)."}
-        else: 
-            return {"status": "ALIGNE", "color": "blue", "message": f"Prix cohérent avec le {ref_label}.", "action": "Pas d'action requise."}
-
-    # =========================================================
-    # MODULE 3 : ROI & KPI
-    # =========================================================
-    def enrich_fleet_kpis(self, site_data):
-        contract = site_data.get('contract', {}) or {}
-        pricing = site_data.get('pricing', {}) or {}
-        conso_det = site_data.get('consumption_details', {})
-        is_gaz = "T" in str(contract.get('segment', ''))
-        
-        # 1. CALCUL DU VOLUME RÉEL
-        imported_total_vol = site_data.get('contract', {}).get('annual_volume_estimated', 0)
-        
-        if imported_total_vol > 0:
-            vol_mwh = imported_total_vol / 1000
-        else:
-            real_conso_kwh = (
-                self._safe_float(conso_det.get('hph')) +
-                self._safe_float(conso_det.get('hch')) +
-                self._safe_float(conso_det.get('hpe')) +
-                self._safe_float(conso_det.get('hce'))
-            )
-            if real_conso_kwh > 0:
-                vol_mwh = real_conso_kwh / 1000
-            else:
-                p_sous = self._safe_float(contract.get('power'))
-                if is_gaz: vol_mwh = p_sous 
-                else: vol_mwh = (p_sous * 1500) / 1000 
-            
-        # 2. CALCUL BUDGET
-        price = self._safe_float(pricing.get('hph')) + self._safe_float(pricing.get('tax'))
-        fix = self._safe_float(pricing.get('fix'))
-        storage_cost = self._safe_float(pricing.get('storage'))
-        
-        calc_price = price
-        if price < 2.0: calc_price = price * 1000
-            
-        budget = fix + storage_cost + (vol_mwh * calc_price)
-        
-        day = datetime.now().timetuple().tm_yday
-        landing = budget * (1 / (day/365 if day>0 else 1)) * (day/365)
-        
-        return {
-            "budget_annual": round(budget, 2),
-            "volume_mwh": round(vol_mwh, 1),
-            "ghost_savings": round(budget * 0.15, 2),
-            "landing_forecast": round(landing, 2),
-            "is_alert_landing": False
-        }
-
-    # =========================================================
-    # MODULE 4 : IMPORT MASSE V6.5
-    # =========================================================
-    def parse_mass_import_v5(self, file_content):
-        try:
-            buffer = io.BytesIO(file_content)
-            try: df = pd.read_csv(buffer, sep=';', encoding='utf-8', dtype=str)
-            except: 
+            # Excel ?
+            df = pd.read_excel(buffer)
+        except:
+            # CSV ?
+            buffer.seek(0)
+            enc = self._detect_encoding(buffer)
+            try:
+                # Lecture de la première ligne pour le séparateur
+                first_line = buffer.readline().decode(enc)
+                sep = self._detect_separator(first_line)
                 buffer.seek(0)
-                df = pd.read_csv(buffer, sep=';', encoding='latin-1', dtype=str)
-            
-            headers = [str(c).upper() for c in df.columns]
-            is_gaz = "PCE" in headers
-            sites = []
-            
-            for _, row in df.iterrows():
-                try:
-                    col_entite = next((c for c in df.columns if "ENTIT" in str(c).upper()), None)
-                    col_nom = next((c for c in df.columns if "NOM" in str(c).upper()), None)
-                    col_adresse = next((c for c in df.columns if "ADRESSE" in str(c).upper()), None)
-                    col_cp = next((c for c in df.columns if "CP" == str(c).upper() or "CODE" in str(c).upper()), None)
-                    col_ville = next((c for c in df.columns if "COMMUNE" in str(c).upper() or "VILLE" in str(c).upper()), None)
-                    col_insee = next((c for c in df.columns if "INSEE" in str(c).upper()), None)
-                    col_surf = next((c for c in df.columns if "SURFACE" in str(c).upper() or "M2" in str(c).upper()), None)
-                    col_siret_site = next((c for c in df.columns if "SIRET" in str(c).upper()), None)
-                    col_naf = next((c for c in df.columns if "NAF" in str(c).upper()), None)
-                    col_cee = next((c for c in df.columns if "CEE" in str(c).upper()), None)
-                    col_cpb = next((c for c in df.columns if "STOCKAGE" in str(c).upper() or "CPB" in str(c).upper()), None)
+                df = pd.read_csv(buffer, sep=sep, encoding=enc, dtype=str, on_bad_lines='skip')
+            except Exception as e:
+                logger.error(f"Echec lecture CSV: {e}")
+                return []
 
-                    if is_gaz:
-                        col_pce = next((c for c in df.columns if "PCE" in c), None)
-                        col_car = next((c for c in df.columns if "CAR" in c), None)
-                        col_cja = next((c for c in df.columns if "CJA" in c), None)
-                        col_seg = next((c for c in df.columns if "SEGMENT" in c), None)
-                        col_profil = next((c for c in df.columns if "PROFIL" in c), None)
-                        col_tarif = next((c for c in df.columns if "TARIF" in c), None)
-                        col_grd = next((c for c in df.columns if "GRD" in c), None)
-                        col_prix = next((c for c in df.columns if "PRIX" in c and "MWH" in c), None)
-                        col_prov = next((c for c in df.columns if "FOURNISSEUR" in str(c).upper()), None)
-                        col_abo = next((c for c in df.columns if "ABO" in str(c).upper()), None)
-                        col_tax = next((c for c in df.columns if "TAXES" in str(c).upper()), None)
-                        col_start = next((c for c in df.columns if "DEBUT" in str(c).upper()), None)
-                        col_end = next((c for c in df.columns if "FIN" in str(c).upper()), None)
-
-                        ref_id = str(row[col_pce]).replace(' ', '') if col_pce else "Inconnu"
-                        power = self._safe_int(row.get(col_car, 0))
-                        segment = str(row.get(col_seg, 'T1'))
-                        
-                        site = {
-                            "client_name": str(row.get(col_entite, 'Inconnu')),
-                            "identity": { 
-                                "id": ref_id, "name": str(row.get(col_entite)), "site_name": str(row.get(col_nom)),
-                                "siret_site": str(row.get(col_siret_site, '')), "naf": str(row.get(col_naf, ''))
-                            },
-                            "location": { 
-                                "address": str(row.get(col_adresse)), "zip_code": str(row.get(col_cp)), 
-                                "city": str(row.get(col_ville)), "insee": str(row.get(col_insee, '')),
-                                "surface": self._safe_float(row.get(col_surf, 0))
-                            },
-                            "contract": { 
-                                "pdl": ref_id, "power": power, "segment": segment, "provider": str(row.get(col_prov, 'Import')),
-                                "cja": self._safe_float(row.get(col_cja, 0)), "profil": str(row.get(col_profil, '')),
-                                "tarif_acheminement": str(row.get(col_tarif, '')), "grd": str(row.get(col_grd, '')),
-                                "start_date": str(row.get(col_start, '')), "end_date": str(row.get(col_end, ''))
-                            },
-                            "technical": { "cee_eligible": str(row.get(col_cee, 'NON')) },
-                            "pricing": {
-                                "fix": str(row.get(col_abo, '0')), "hph": str(row.get(col_prix, '0')),
-                                "storage": str(row.get(col_cpb, '0')), "tax": str(row.get(col_tax, '0')),
-                                "hch": "0", "hpe": "0", "hce": "0"
-                            }
-                        }
-                        sites.append(site)
-                    else:
-                        col_pdl = next((c for c in df.columns if "PDL" in str(c).upper() or "PRM" in str(c).upper()), None)
-                        if not col_pdl: continue
-                        pdl = str(row.get(col_pdl, '')).strip()
-                        
-                        col_ps = next((c for c in df.columns if "PUISSANCE_SOUSCRITE_MAX" in str(c).upper()), None)
-                        if not col_ps: col_ps = next((c for c in df.columns if "PUISSANCE" in str(c).upper()), None)
-                        col_pmax = next((c for c in df.columns if "POINTE" in str(c).upper() or "MAX" in str(c).upper()), None)
-                        col_prov = next((c for c in df.columns if "FOURNISSEUR" in str(c).upper()), None)
-                        col_abo = next((c for c in df.columns if "ABO" in str(c).upper()), None)
-                        col_vol_total = next((c for c in df.columns if "VOLUME_ANNUEL" in str(c).upper() or "TOTAL_ANNUEL" in str(c).upper()), None)
-                        col_start = next((c for c in df.columns if "DEBUT" in str(c).upper()), None)
-                        col_end = next((c for c in df.columns if "FIN" in str(c).upper()), None)
-
-                        col_prix_hph = next((c for c in df.columns if "PRIX_HPH" in str(c).upper()), None)
-                        if not col_prix_hph: col_prix_hph = next((c for c in df.columns if "PRIX" in str(c).upper() or "MOLECULE" in str(c).upper()), None)
-                        col_prix_hch = next((c for c in df.columns if "PRIX_HCH" in str(c).upper()), None)
-                        col_prix_hpe = next((c for c in df.columns if "PRIX_HPE" in str(c).upper()), None)
-                        col_prix_hce = next((c for c in df.columns if "PRIX_HCE" in str(c).upper()), None)
-                        
-                        col_ps_hph = next((c for c in df.columns if "PS_HPH" in str(c).upper()), None)
-                        col_ps_hch = next((c for c in df.columns if "PS_HCH" in str(c).upper()), None)
-                        col_ps_hpe = next((c for c in df.columns if "PS_HPE" in str(c).upper()), None)
-                        col_ps_hce = next((c for c in df.columns if "PS_HCE" in str(c).upper()), None)
-                        
-                        col_conso_hph = next((c for c in df.columns if "CONSO_HPH" in str(c).upper() or "HPH" in str(c).upper()), None)
-                        col_conso_hch = next((c for c in df.columns if "CONSO_HCH" in str(c).upper() or "HCH" in str(c).upper()), None)
-                        col_conso_hpe = next((c for c in df.columns if "CONSO_HPE" in str(c).upper() or "HPE" in str(c).upper()), None)
-                        col_conso_hce = next((c for c in df.columns if "CONSO_HCE" in str(c).upper() or "HCE" in str(c).upper()), None)
-
-                        site = {
-                            "client_name": str(row.get(col_entite, 'Inconnu')),
-                            "identity": { 
-                                "id": pdl, "name": str(row.get(col_entite)), "site_name": str(row.get(col_nom)),
-                                "siret_site": str(row.get(col_siret_site, '')), "naf": str(row.get(col_naf, ''))
-                            },
-                            "location": { 
-                                "address": str(row.get(col_adresse)), "zip_code": str(row.get(col_cp)), 
-                                "city": str(row.get(col_ville)), "insee": str(row.get(col_insee, '')),
-                                "surface": self._safe_float(row.get(col_surf, 0))
-                            },
-                            "contract": { 
-                                "pdl": pdl, "power": self._safe_float(row.get(col_ps, 0)), "p_max": self._safe_float(row.get(col_pmax, 0)),
-                                "segment": "C5", "provider": str(row.get(col_prov, 'Import')),
-                                "annual_volume_estimated": self._safe_float(row.get(col_vol_total, 0)),
-                                "start_date": str(row.get(col_start, '')), "end_date": str(row.get(col_end, '')),
-                                "power_details": {
-                                    "hph": self._safe_float(row.get(col_ps_hph, 0)), "hch": self._safe_float(row.get(col_ps_hch, 0)),
-                                    "hpe": self._safe_float(row.get(col_ps_hpe, 0)), "hce": self._safe_float(row.get(col_ps_hce, 0))
-                                }
-                            },
-                            "consumption_details": {
-                                "hph": self._safe_float(row.get(col_conso_hph, 0)), "hch": self._safe_float(row.get(col_conso_hch, 0)),
-                                "hpe": self._safe_float(row.get(col_conso_hpe, 0)), "hce": self._safe_float(row.get(col_conso_hce, 0))
-                            },
-                            "pricing": {
-                                "fix": str(row.get(col_abo, '0')), "hph": str(row.get(col_prix_hph, '0')),
-                                "hch": str(row.get(col_prix_hch, '0')), "hpe": str(row.get(col_prix_hpe, '0')),
-                                "hce": str(row.get(col_prix_hce, '0'))
-                            }
-                        }
-                        sites.append(site)
-
-                except Exception as e:
-                    logger.warning(f"Row Error: {e}")
-                    continue
-            return sites
-        except Exception as e:
-            logger.error(f"Import CSV Error: {e}")
+        if df is None or df.empty:
+            logger.warning("Fichier vide ou illisible")
             return []
 
+        # 2. MAPPING INTELLIGENT
+        cols = df.columns
+        # On cherche les colonnes clés
+        c_nom = self._find_col(cols, "nom")
+        c_pdl = self._find_col(cols, "pdl")
+        c_addr = self._find_col(cols, "adresse")
+        c_ville = self._find_col(cols, "ville")
+        c_cp = self._find_col(cols, "cp")
+        c_puiss = self._find_col(cols, "puissance")
+        c_conso = self._find_col(cols, "conso")
+        c_surf = self._find_col(cols, "surface")
+        
+        # Champs OPH
+        c_p1 = self._find_col(cols, "p1")
+        c_p2 = self._find_col(cols, "p2")
+        c_p3 = self._find_col(cols, "p3")
+        c_dpe = self._find_col(cols, "dpe")
+        c_chauff = self._find_col(cols, "chauffage")
+        c_tant = self._find_col(cols, "tantiemes")
+
+        # Champs Prix
+        c_hph = self._find_col(cols, "prix_hph")
+        c_abo = self._find_col(cols, "abonnement")
+
+        # 3. EXTRACTION LIGNE A LIGNE
+        for idx, row in df.iterrows():
+            try:
+                # Données obligatoires (ou presque)
+                pdl_val = str(row[c_pdl]) if c_pdl else f"SITE_{idx}"
+                nom_val = str(row[c_nom]) if c_nom else "Site Inconnu"
+                
+                # Nettoyage PDL (Garder que les chiffres)
+                pdl_clean = re.sub(r'[^0-9]', '', pdl_val)
+                if not pdl_clean: pdl_clean = f"TEMP_{idx}"
+
+                # Construction de l'objet Site Standardisé
+                site = {
+                    "client_name": nom_val,
+                    "identity": {
+                        "id": pdl_clean,
+                        "site_name": nom_val,
+                        "siret": "", 
+                        "naf": "6820A" # Par défaut OPH/Immo si import masse
+                    },
+                    "location": {
+                        "address": str(row[c_addr]) if c_addr else "",
+                        "zip_code": str(row[c_cp]) if c_cp else "",
+                        "city": str(row[c_ville]) if c_ville else "",
+                        "surface": self._safe_float(row.get(c_surf))
+                    },
+                    "contract": {
+                        "pdl": pdl_clean,
+                        "power": self._safe_float(row.get(c_puiss)),
+                        "segment": "C5", # Sera recalculé par Cortex
+                        "provider": "Inconnu", # A détecter
+                        "annual_volume_estimated": self._safe_float(row.get(c_conso))
+                    },
+                    "technical": {
+                        "chauffage": str(row[c_chauff]) if c_chauff else "Inconnu",
+                        "dpe": str(row[c_dpe]) if c_dpe else "D",
+                        "tantiemes": self._safe_int(row.get(c_tant))
+                    },
+                    "pricing": {
+                        "p1_budget": self._safe_float(row.get(c_p1)),
+                        "p2_budget": self._safe_float(row.get(c_p2)),
+                        "p3_budget": self._safe_float(row.get(c_p3)),
+                        "hph": str(self._safe_float(row.get(c_hph))),
+                        "fix": str(self._safe_float(row.get(c_abo)))
+                    }
+                }
+                sites.append(site)
+
+            except Exception as e:
+                logger.error(f"Erreur ligne {idx}: {e}")
+                continue # On ne plante pas l'import pour une ligne pourrie
+
+        logger.info(f"Import terminé : {len(sites)} sites extraits.")
+        return sites
+
     # =========================================================
-    # MODULE 5 : ANALYSE COURBE DE CHARGE (RESTAURÉ)
+    # 2. PARSING COURBE DE CHARGE (ENEDIS P10 / GRDF)
     # =========================================================
-    def analyze_file(self, file_content, filename, target_profile="demo", known_site_data=None):
+    def parse_load_curve(self, file_content, filename):
+        """
+        Analyseur spécifique pour les fichiers de courbes de charge.
+        Gère le format P10 Enedis (Point 10 minutes) et les CSV GRDF.
+        """
         try:
-            # 1. Parsing
-            df, time_step, meta_tech = self._parse_data(file_content, filename)
-            if df is None or df.empty: return {"success": False, "error": "Fichier illisible ou vide"}
+            buffer = io.BytesIO(file_content)
+            enc = self._detect_encoding(buffer)
+            content_str = file_content.decode(enc, errors='ignore')
             
-            # 2. Contexte
-            context = {
-                "pdl": known_site_data.get('pdl') if known_site_data else meta_tech.get('pdl'),
-                "p_souscrite": float(known_site_data.get('power', 0)) if known_site_data else 0,
-                "segment": known_site_data.get('segment') if known_site_data else "Inconnu",
-                "naf_label": "Inconnu",
-                "address": known_site_data.get('address', "") if known_site_data else ""
-            }
-
-            if not known_site_data or not known_site_data.get('naf_label'):
-                naf_search = re.search(r'\b\d{2}\.?\d{2}[A-Z]?\b', filename)
-                if naf_search:
-                    clean = naf_search.group(0).replace('.', '').replace(' ', '').upper()
-                    context['naf_label'] = self.NAF_DB.get(clean, clean)
-            else:
-                context['naf_label'] = known_site_data.get('naf_label', 'Inconnu')
-
-            cp_match = re.search(r'\b\d{5}\b', context['address'])
-            zip_code = cp_match.group(0) if cp_match else "Inconnu"
-
-            # 3. Calculs
-            base = self._module_socle(df, time_step)
-            ref_pmax = context['p_souscrite'] if context['p_souscrite'] > 0 else base['p_max']
-            finance = self._module_finance_4p(df, time_step, ref_pmax)
-            solar = self._module_solar(df)
-            waste = self._module_ghost(df, base['talon'])
-            
-            # 4. Chart
-            step = max(1, len(df)//2000)
-            df_chart = df.iloc[::step].copy()
-            chart_vals = df_chart['val'].fillna(0).tolist()
-            
-            chart = {
-                "labels": df_chart['date_str'].tolist(),
-                "values": chart_vals,
-                "talon_line": [base['talon']] * len(df_chart),
-                "pmax_line": [base['p_max']] * len(df_chart),
-                "limit_line": [context['p_souscrite']] * len(df_chart) if context['p_souscrite'] > 0 else []
-            }
-
-            full_kpi = {
-                **base, **solar, **waste, **finance,
-                "profiling": {
-                    "type": target_profile, 
-                    "pdl": context['pdl'],
-                    "contrat_actif": "OUI" if known_site_data else "NON (Découverte)",
-                    "metier": context['naf_label'],
-                    "geo": zip_code,
-                    "segment": context['segment']
-                },
-                "meta": {"filename": filename, "points": len(df)}
-            }
-            
-            narrative = self._generate_insight(full_kpi, context)
-            return {"success": True, "kpi": full_kpi, "chart": chart, "ai_insight": narrative}
-
-        except Exception as e:
-            logger.exception("Crash Cortex V46")
-            return {"success": False, "error": f"Erreur Moteur: {str(e)}"}
-
-    # --- SOUS-MODULES INTERNES (RESTAURÉS) ---
-    def _parse_data(self, file_content, filename):
-        try:
-            content_str = file_content.decode('latin-1', errors='ignore')
-            
-            # Détection PDL
-            pdl_match = re.search(r'\b(\d{14})\b', content_str)
+            # RECHERCHE DU PDL (REGEX)
+            # Cherche une suite de 14 chiffres isolée
+            pdl_match = re.search(r'(?<!\d)(\d{14})(?!\d)', content_str)
             pdl = pdl_match.group(1) if pdl_match else "Inconnu"
             
-            # Parsing CSV
-            df = pd.read_csv(io.StringIO(content_str), sep=';', on_bad_lines='skip', low_memory=False)
+            # LECTURE DU DATA FRAME
+            buffer.seek(0)
+            # On saute les lignes de métadonnées souvent présentes chez Enedis
+            # On cherche la ligne d'entête
+            lines = content_str.split('\n')
+            header_row = 0
+            for i, line in enumerate(lines[:50]): # Scan des 50 premières lignes
+                if "DATE" in line.upper() or "HORODATAGE" in line.upper():
+                    header_row = i
+                    break
             
-            # Normalisation Colonnes
-            df.columns = [str(c).upper().strip() for c in df.columns]
-            col_date = next((c for c in df.columns if "HORODATAGE" in c or "DATE" in c), None)
-            col_val = next((c for c in df.columns if "PUISSANCE" in c or "VALEUR" in c), None)
+            buffer.seek(0)
+            df = pd.read_csv(buffer, sep=';', encoding=enc, skiprows=header_row, on_bad_lines='skip', low_memory=False)
             
-            if not col_date or not col_val: return None, 0, {}
+            # NETTOYAGE COLONNES
+            df.columns = [self._clean_header(c) for c in df.columns]
             
+            # IDENTIFICATION DES COLONNES CLEFS
+            col_date = next((c for c in df.columns if "DATE" in c or "HORODATAGE" in c), None)
+            col_val = next((c for c in df.columns if "PUISSANCE" in c or "VALEUR" in c or "KWH" in c), None)
+            
+            if not col_date or not col_val:
+                logger.error("Colonnes Date/Valeur introuvables dans la courbe")
+                return None, 0, {}
+            
+            # FORMATAGE DES DONNÉES
             df = df.rename(columns={col_date: 'date', col_val: 'val'})
+            
+            # Conversion Date (Robuste)
             df['date'] = pd.to_datetime(df['date'], dayfirst=True, errors='coerce')
-            df['val'] = pd.to_numeric(df['val'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
             df = df.dropna(subset=['date']).sort_values('date')
+            
+            # Conversion Valeur
+            df['val'] = pd.to_numeric(df['val'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
             
             if df.empty: return None, 0, {}
             
-            # Time Step
-            delta = (df['date'].iloc[1] - df['date'].iloc[0]).seconds / 60
-            time_step = int(delta) if delta > 0 else 10
-            
+            # CALCUL DU PAS DE TEMPS (10min, 30min, 60min ?)
+            if len(df) > 1:
+                delta = (df['date'].iloc[1] - df['date'].iloc[0]).total_seconds() / 60
+                time_step = int(delta)
+            else:
+                time_step = 10 # Par défaut
+                
+            # Stringification pour JSON
             df['date_str'] = df['date'].dt.strftime('%d/%m %H:%M')
-            return df, time_step, {"pdl": pdl}
-        except: return None, 0, {}
-
-    def _module_socle(self, df, step):
-        p_max = df['val'].max()
-        p_avg = df['val'].mean()
-        # Talon = Quantile 5% (Bruit de fond)
-        talon = df['val'].quantile(0.05)
-        return {"p_max": round(p_max, 1), "p_avg": round(p_avg, 1), "talon": round(talon, 1)}
-
-    def _module_finance_4p(self, df, step, p_sous):
-        # Simulation simplifiée TURPE
-        depassements = df[df['val'] > p_sous]
-        kwh_excess = depassements['val'].sum() * (step/60)
-        cout_depassement = kwh_excess * 0.15 # Prix pénalité moyen
-        return {"turpe_optim": round(cout_depassement, 2)}
-
-    def _module_solar(self, df):
-        # Conso Jour vs Nuit
-        df['hour'] = df['date'].dt.hour
-        day_conso = df[(df['hour'] >= 8) & (df['hour'] <= 18)]['val'].sum()
-        night_conso = df[(df['hour'] < 8) | (df['hour'] > 18)]['val'].sum()
-        total = day_conso + night_conso
-        solar_score = (day_conso / total * 100) if total > 0 else 0
-        return {"solar_potential": round(solar_score, 1)}
-
-    def _module_ghost(self, df, talon):
-        # Gaspillage = (Talon * 8760h)
-        annual_waste = talon * 8760
-        cost = annual_waste * 0.15 # 15cts/kWh
-        return {"ghost_kwh": int(annual_waste), "ghost_euro": int(cost)}
-
-    def _generate_insight(self, kpi, ctx):
-        # Mini IA déterministe
-        msg = f"Site {ctx.get('pdl')}. "
-        if kpi['ghost_euro'] > 1000:
-            msg += f"ALERTE: Talon élevé ({kpi['talon']}kW). Gaspillage estimé: {kpi['ghost_euro']}€/an. "
-        if kpi['p_max'] < (ctx.get('p_souscrite', 0) * 0.6):
-            msg += "Puissance souscrite trop élevée. Gisement d'économie TURPE. "
-        return msg
-
-    # =========================================================
-    # MODULE 6 : DIAMOND INTELLIGENCE (V45 - Market Share)
-    # =========================================================
-    def analyze_portfolio(self, sites_data):
-        if not sites_data: return {"error": "Aucune donnée"}
-
-        total_conso = 0.0
-        total_budget = 0.0
-        sites_analysis = []
-        cortex_insights = []
-        suppliers_stats = {} 
-        
-        MARKET_REF_PRICE = 90.0
-        POWER_OPTIM_THRESHOLD = 0.70
-
-        for site in sites_data:
-            contract = site.get('contract', {}) or {}
-            pricing = site.get('pricing', {}) or {}
-            ident = site.get('identity', {}) or {}
-            loc = site.get('location', {}) or {}
-
-            p_sous = self._safe_float(contract.get('power', 0))
-            p_att = self._safe_float(contract.get('p_max', 0)) 
             
-            if 'kpis' in site and 'volume_mwh' in site['kpis']:
-                vol = site['kpis']['volume_mwh']
-            else:
-                vol = p_sous * 1.5 
-            
-            if 'kpis' in site:
-                budget_est = site['kpis'].get('budget_annual', 0)
-            else:
-                price_hph = self._safe_float(pricing.get('hph', 0))
-                if price_hph < 2.0: price_hph *= 1000 
-                budget_est = vol * price_hph
-            
-            pmc = (budget_est / vol) if vol > 0 else 0
-            
-            raw_provider = contract.get('provider', 'Inconnu')
-            clean_provider = self._normalize_supplier(raw_provider)
-            if clean_provider not in suppliers_stats: suppliers_stats[clean_provider] = 0
-            suppliers_stats[clean_provider] += budget_est
-            
-            ratio_p = (p_att / p_sous) if p_sous > 0 else 1.0
-            site_flags = []
-            
-            if p_sous > 36 and p_att > 0 and ratio_p < POWER_OPTIM_THRESHOLD:
-                diff_kva = p_sous - p_att
-                economy_pot = diff_kva * 15 
-                msg = f"📉 <b>{ident.get('site_name')}</b> : {int(diff_kva)} kVA inutilisés. Gain potentiel : <b>{int(economy_pot)} €/an</b>."
-                cortex_insights.append({"type": "optimization", "msg": msg, "priority": 2})
-                site_flags.append("TURPE_OPTIM")
-            
-            if pmc > (MARKET_REF_PRICE * 1.3):
-                surcout = (pmc - MARKET_REF_PRICE) * vol
-                msg = f"💰 <b>{ident.get('site_name')}</b> : Payé {int(pmc)}€/MWh. Enjeu : <b>{int(surcout)} €/an</b>."
-                cortex_insights.append({"type": "alert", "msg": msg, "priority": 1})
-                site_flags.append("HIGH_PRICE")
-
-            total_conso += vol
-            total_budget += budget_est
-            
-            sites_analysis.append({
-                "nom_site": ident.get('site_name', 'Inconnu'),
-                "ville": loc.get('city', loc.get('address', '')),
-                "fournisseur": clean_provider,
-                "pmc": pmc,
-                "consommation": vol,
-                "depense": budget_est,
-                "flags": site_flags
-            })
-
-        active_sites = [s for s in sites_analysis if s['consommation'] > 0]
-        sorted_sites = sorted(active_sites, key=lambda x: x['pmc'])
-        flop_3 = sorted(sorted_sites, key=lambda x: x['pmc'], reverse=True)[:3] if len(sorted_sites) > 3 else []
-
-        global_pmc = (total_budget / total_conso) if total_conso > 0 else 0
-        
-        main_cortex = f"Parc à {int(global_pmc)}€/MWh."
-        if global_pmc > MARKET_REF_PRICE:
-            main_cortex += f" Potentiel global : {int(total_budget - (total_conso * MARKET_REF_PRICE))} € d'économies."
-        else:
-            main_cortex += " Performance achat validée."
-
-        return {
-            "kpis": {
-                "total_conso": total_conso,
-                "total_budget": total_budget,
-                "global_pmc": global_pmc,
-                "nb_sites": len(sites_data)
-            },
-            "market_share": { 
-                "labels": list(suppliers_stats.keys()),
-                "values": list(suppliers_stats.values())
-            },
-            "green_league": {
-                "gold": sorted_sites[0] if len(sorted_sites) > 0 else None,
-                "silver": sorted_sites[1] if len(sorted_sites) > 1 else None,
-                "bronze": sorted_sites[2] if len(sorted_sites) > 2 else None,
-                "cancres": flop_3
-            },
-            "cortex": {
-                "main_message": main_cortex,
-                "insights": sorted(cortex_insights, key=lambda x: x['priority'])
-            },
-            "raw_data": sites_analysis
-        }
-
-    # =========================================================
-    # MODULE 7 : OFFER LAB (SIMULATOR) - NOUVEAU V49.0
-    # =========================================================
-    def simulate_budget_from_bpu(self, bpu_content, current_sites):
-        """
-        Simulateur de budget basé sur un fichier BPU Excel rempli par un fournisseur.
-        """
-        try:
-            # 1. Lecture du BPU Excel
-            bpu_df = None
-            is_gaz = False
-            
-            # Détection auto du format (Elec ou Gaz)
-            try:
-                # Tentative Elec
-                bpu_df = pd.read_excel(io.BytesIO(bpu_content), sheet_name='2-BPU_ELEC_REPONSE')
-            except:
-                try:
-                    # Tentative Gaz
-                    bpu_df = pd.read_excel(io.BytesIO(bpu_content), sheet_name='4-BPU_GAZ_REPONSE')
-                    is_gaz = True
-                except:
-                    return {"error": "Format BPU non reconnu (Onglet manquant)"}
-
-            if bpu_df is None or bpu_df.empty:
-                return {"error": "Fichier BPU vide ou illisible"}
-
-            # 2. Indexation des sites actuels pour recherche rapide
-            sites_map = {s['contract']['pdl']: s for s in current_sites if 'contract' in s and 'pdl' in s['contract']}
-            
-            simulation_results = []
-            total_current_budget = 0.0
-            total_simulated_budget = 0.0
-            
-            # 3. Boucle de Simulation
-            for _, row in bpu_df.iterrows():
-                # Clé de jointure
-                ref_id = str(row.get('PDL (Clé)') or row.get('PCE (Clé)')).strip()
-                if ref_id not in sites_map: continue
-                
-                site = sites_map[ref_id]
-                
-                # Récupération des données actuelles
-                current_budget = site.get('kpis', {}).get('budget_annual', 0)
-                vol_mwh = site.get('kpis', {}).get('volume_mwh', 0)
-                
-                # Récupération de l'offre (Avec sécurité)
-                offer_budget = 0.0
-                
-                if is_gaz:
-                    # Simulation Gaz
-                    abo = self._safe_float(row.get('OFFRE_ABO_AN (€)'))
-                    prix_mol = self._safe_float(row.get('OFFRE_PRIX_MOLECULE (€/MWh)'))
-                    stockage = self._safe_float(row.get('OFFRE_TERME_STOCKAGE (€/MWh)'))
-                    cee = self._safe_float(row.get('OFFRE_CEE (€/MWh)'))
-                    
-                    offer_budget = abo + (vol_mwh * (prix_mol + stockage + cee))
-                else:
-                    # Simulation Elec
-                    abo = self._safe_float(row.get('OFFRE_ABO_AN (€)'))
-                    # On applique le prix unique ou détaillé selon dispo
-                    p_hph = self._safe_float(row.get('OFFRE_HPH (€/MWh)'))
-                    # ... (Logique détaillée possible ici si on a les volumes horaires)
-                    # Pour l'instant, on prend une moyenne si pas de détail horaire
-                    if p_hph == 0: p_hph = self._safe_float(row.get('OFFRE_PRIX_MOYEN', 0))
-                    
-                    offer_budget = abo + (vol_mwh * p_hph)
-
-                # Calculs Ecarts
-                delta = offer_budget - current_budget
-                delta_pct = (delta / current_budget * 100) if current_budget > 0 else 0
-                
-                total_current_budget += current_budget
-                total_simulated_budget += offer_budget
-                
-                simulation_results.append({
-                    "site_name": site['identity']['site_name'],
-                    "pdl": ref_id,
-                    "volume": vol_mwh,
-                    "current_budget": round(current_budget, 2),
-                    "simulated_budget": round(offer_budget, 2),
-                    "delta_euro": round(delta, 2),
-                    "delta_pct": round(delta_pct, 1)
-                })
-
-            # 4. Synthèse
-            global_delta = total_simulated_budget - total_current_budget
-            global_pct = (global_delta / total_current_budget * 100) if total_current_budget > 0 else 0
-            
-            return {
-                "success": True,
-                "summary": {
-                    "total_current": round(total_current_budget, 2),
-                    "total_simulated": round(total_simulated_budget, 2),
-                    "savings_euro": round(global_delta * -1, 2), # Inversé pour afficher le gain positif
-                    "savings_pct": round(global_pct * -1, 1),
-                    "nb_sites_simulated": len(simulation_results)
-                },
-                "details": simulation_results
+            meta = {
+                "pdl": pdl,
+                "start_date": df['date'].min().isoformat(),
+                "end_date": df['date'].max().isoformat(),
+                "points": len(df),
+                "step_min": time_step
             }
+            
+            return df, time_step, meta
 
         except Exception as e:
-            logger.error(f"Simulation Error: {e}")
-            return {"error": str(e)}
+            logger.error(f"Load Curve Parsing Error: {e}")
+            return None, 0, {}
 
-    # --- AUDIT (Inchangé) ---
-    def analyze_invoice_real(self, inv_b, ctr_b):
-        txt = ""
-        if PDF_AVAILABLE and inv_b:
-            try:
-                with pdfplumber.open(io.BytesIO(inv_b)) as pdf:
-                    for p in pdf.pages: txt += p.extract_text() + "\n"
-            except: pass
-        m_sous = re.search(r"(?:souscrite|ps|p\.souscrite).*?(\d+[.,]?\d*)", txt, re.I)
-        m_max = re.search(r"(?:atteinte|max|pointe).*?(\d+[.,]?\d*)", txt, re.I)
-        p_sous = float(m_sous.group(1).replace(',', '.')) if m_sous else 0
-        p_att = float(m_max.group(1).replace(',', '.')) if m_max else 0
-        checks = [
-            {"point": "Puissance Souscrite", "a": f"{p_sous} kVA", "b": "Seuil", "status": "INFO", "error": False},
-            {"point": "Puissance Atteinte", "a": f"{p_att} kVA", "b": "Relevé", "status": "ALERTE" if p_att > p_sous else "OK", "error": p_att > p_sous},
-            {"point": "Contrat Associé", "a": "Présent" if ctr_b else "Manquant", "b": "-", "status": "OK" if ctr_b else "MANQUANT", "error": not ctr_b}
-        ]
-        return {"score": 100, "checks": checks}
+    # =========================================================
+    # 3. PARSING BPU (OFFRE LAB)
+    # =========================================================
+    def parse_bpu_excel(self, file_content):
+        """
+        Lit les fichiers de réponse aux appels d'offres (BPU).
+        """
+        try:
+            buffer = io.BytesIO(file_content)
+            xls = pd.ExcelFile(buffer)
+            
+            # Détection de l'onglet
+            sheet_elec = next((s for s in xls.sheet_names if "ELEC" in s.upper()), None)
+            sheet_gaz = next((s for s in xls.sheet_names if "GAZ" in s.upper()), None)
+            
+            is_gaz = False
+            df = None
+            
+            if sheet_gaz:
+                df = pd.read_excel(xls, sheet_name=sheet_gaz)
+                is_gaz = True
+            elif sheet_elec:
+                df = pd.read_excel(xls, sheet_name=sheet_elec)
+                is_gaz = False
+            else:
+                # Fallback : prend la première feuille
+                df = pd.read_excel(xls, sheet_name=0)
+                
+            return df, is_gaz
+            
+        except Exception as e:
+            logger.error(f"BPU Parsing Error: {e}")
+            return None, False
 
-    def run_chaos_monkey(self): return [{"test": "Maths", "status": "OK"}]
-    def ask_agent(self, msg): return self._generate_insight({}, {"p_souscrite": 0})
-    
-    # --- LEGACY CSV (POUR COMPATIBILITÉ TOTALE) ---
-    def generate_tender_package(self, sites_data):
-        output = io.StringIO()
-        writer = csv.writer(output, delimiter=';')
-        writer.writerow(["REF_ID", "NOM", "ADRESSE", "CONSO", "PUISSANCE", "SEGMENT"])
-        for s in sites_data:
-            try:
-                c = s.get('contract', {})
-                i = s.get('identity', {})
-                writer.writerow([
-                    c.get('pdl', ''), 
-                    i.get('name', ''), 
-                    s.get('location', {}).get('address', ''), 
-                    c.get('power', 0), 
-                    c.get('power', 0), 
-                    c.get('segment', '')
-                ])
-            except: continue
-        output.seek(0)
-        return output.getvalue()
-
-cortex = CortexEngine()
+# INSTANCE EXPORTÉE
+ingest = CortexIngest()
