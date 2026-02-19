@@ -32,7 +32,7 @@ except ImportError:
 # =========================================================
 # 2. CONFIGURATION DU SERVEUR
 # =========================================================
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-ROUTING-V62")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-OMNISCIENT-V70")
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,7 +61,7 @@ if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # =========================================================
-# 3. API : FONCTIONS VITALES (Import & Save)
+# 3. API : FONCTIONS VITALES (Back-End)
 # =========================================================
 
 @app.post("/api/settings/save_client")
@@ -74,13 +74,10 @@ async def api_save_client(request: Request):
             cid = f"CLI_{uuid.uuid4().hex[:8]}"
             if "identity" not in data: data["identity"] = {}
             data["identity"]["id"] = cid
-            
         safe_id = str(cid).replace('/', '_').replace('\\', '_').replace(' ', '')
         file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
-        
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
-            
         return JSONResponse({"success": True, "id": cid})
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)})
@@ -91,10 +88,7 @@ async def api_import_csv(file: UploadFile = File(...)):
     try:
         content = await file.read()
         sites = ingest.parse_mass_import_unified(content)
-        
-        if not sites: 
-            return JSONResponse({"success": False, "error": "Fichier vide."})
-        
+        if not sites: return JSONResponse({"success": False, "error": "Fichier vide."})
         saved_count = 0
         for s in sites:
             try:
@@ -106,7 +100,6 @@ async def api_import_csv(file: UploadFile = File(...)):
                     json.dump(s, f, indent=4, ensure_ascii=False)
                 saved_count += 1
             except: pass
-            
         return JSONResponse({"success": True, "imported": len(sites), "saved": saved_count})
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
@@ -116,7 +109,6 @@ async def get_fleet_data():
     """ Données Dashboard """
     raw_sites = []
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
-    
     for p in files:
         if "master" in p or "market" in p: continue
         try:
@@ -131,18 +123,15 @@ async def get_fleet_data():
     
     fleet_list = []
     all_cities, all_providers, all_segments = set(), set(), set()
-
     for s in raw_sites:
         fin = s['computed_financials']
         contract = s.get('contract', {})
         city = fin['meta']['city']
         prov = contract.get('provider', 'Inconnu')
         seg = contract.get('segment', '-')
-        
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         if seg: all_segments.add(seg)
-
         fleet_list.append({
             "id": s.get('identity',{}).get('id'),
             "name": fin['meta']['site_label'],
@@ -154,17 +143,12 @@ async def get_fleet_data():
             "budget": fin['budget_annual'],
             "ratio": fin['kpis']['pmc_eur_mwh']
         })
-
     return JSONResponse({
         "fleet": fleet_list, 
         "count": len(fleet_list),
         "green_league": analysis.get('green_league'),
         "global_kpis": analysis.get('global'),
-        "filters_meta": { 
-            "cities": sorted(list(all_cities)),
-            "providers": sorted(list(all_providers)),
-            "segments": sorted(list(all_segments))
-        }
+        "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments": sorted(list(all_segments)) }
     })
 
 @app.get("/api/dashboard/data/{client_id}")
@@ -177,95 +161,70 @@ async def get_dashboard_data(client_id: str):
     return JSONResponse(data)
 
 # =========================================================
-# 4. ROUTAGE HTML (CORRECTIF NAVIGATION)
+# 4. ROUTAGE INTELLIGENT (LE CERVEAU DE NAVIGATION)
 # =========================================================
 
-# --- A. PARCOURS UTILISATEUR (UX FLOW) ---
-
+# A. ROUTES PRINCIPALES (Explicites)
 @app.get("/")
-async def view_landing(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-@app.get("/index.html")
-async def view_landing_explicit(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/onboarding")
-async def view_onboarding(request: Request):
-    return templates.TemplateResponse("onboarding.html", {"request": request})
-
-@app.get("/onboarding.html")
-async def view_onboarding_explicit(request: Request):
-    return templates.TemplateResponse("onboarding.html", {"request": request})
+async def view_onboarding(request: Request): return templates.TemplateResponse("onboarding.html", {"request": request})
 
 @app.get("/processing")
-async def view_processing(request: Request):
-    return templates.TemplateResponse("processing.html", {"request": request})
+async def view_processing(request: Request): return templates.TemplateResponse("processing.html", {"request": request})
 
-@app.get("/processing.html")
-async def view_processing_explicit(request: Request):
-    return templates.TemplateResponse("processing.html", {"request": request})
+# B. ROUTES DASHBOARDS (Avec injection de profil)
+@app.get("/dashboard/{profile}")
+async def view_dashboard(request: Request, profile: str):
+    # Essaie de trouver un template spécifique (ex: retail.html)
+    template_name = f"{profile}.html"
+    path = os.path.join(TEMPLATE_DIR, template_name)
+    if os.path.exists(path):
+        return templates.TemplateResponse(template_name, {"request": request, "profile": profile})
+    # Fallback générique
+    return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
 
-# --- B. DASHBOARDS MÉTIERS ---
+# C. CORRESPONDANCES SPÉCIALES (Mapping manuel pour vos liens spécifiques)
+# C'est ici qu'on règle le problème "Partner Settings"
+@app.get("/partner/settings")
+async def view_partner_settings(request: Request):
+    # D'après votre screenshot, le fichier est settings_partner.html
+    return templates.TemplateResponse("settings_partner.html", {"request": request})
 
-@app.get("/dashboard/retail")
-async def view_retail(request: Request):
-    return templates.TemplateResponse("retail.html", {"request": request, "profile": "retail"})
+@app.get("/ops/market")
+async def view_ops_market(request: Request):
+    return templates.TemplateResponse("ops_market.html", {"request": request})
 
-@app.get("/dashboard/mairie")
-async def view_mairie(request: Request):
-    return templates.TemplateResponse("mairie.html", {"request": request, "profile": "mairie"})
-
-@app.get("/dashboard/industry")
-async def view_industry(request: Request):
-    return templates.TemplateResponse("industry.html", {"request": request, "profile": "industry"})
-
-@app.get("/dashboard/syndic")
-async def view_syndic(request: Request):
-    return templates.TemplateResponse("syndic.html", {"request": request, "profile": "syndic"})
-
-@app.get("/dashboard/b2b")
-async def view_b2b(request: Request):
-    return templates.TemplateResponse("b2b.html", {"request": request, "profile": "b2b"})
-
-# --- C. PAGES SATELLITES (LE FIX EST ICI) ---
-
-@app.get("/settings")
-async def view_settings(request: Request):
-    """ Route sans extension """
-    return templates.TemplateResponse("settings.html", {"request": request})
-
-@app.get("/settings.html")
-async def view_settings_explicit(request: Request):
-    """ Route AVEC extension (pour les liens href='settings.html') """
-    return templates.TemplateResponse("settings.html", {"request": request})
-
-@app.get("/audit")
-async def view_audit(request: Request): return templates.TemplateResponse("audit.html", {"request": request})
-@app.get("/audit.html")
-async def view_audit_explicit(request: Request): return templates.TemplateResponse("audit.html", {"request": request})
-
-@app.get("/optimization")
-async def view_opti(request: Request): return templates.TemplateResponse("optimization.html", {"request": request})
-@app.get("/optimization.html")
-async def view_opti_explicit(request: Request): return templates.TemplateResponse("optimization.html", {"request": request})
-
-@app.get("/carbon")
-async def view_carbon(request: Request): return templates.TemplateResponse("carbon.html", {"request": request})
-@app.get("/carbon.html")
-async def view_carbon_explicit(request: Request): return templates.TemplateResponse("carbon.html", {"request": request})
-
-# --- D. SÉCURITÉ (CATCH-ALL) ---
-
-@app.get("/{full_path:path}")
-async def catch_all(request: Request, full_path: str):
-    # Gestion des fichiers statiques manquants
-    if any(x in full_path for x in ["static", "assets", "favicon", ".js", ".css", ".png", ".jpg"]):
-        return JSONResponse({"error": "File not found"}, status_code=404)
+# D. ROUTEUR DYNAMIQUE (LA MAGIE)
+# Cette fonction attrape TOUTES les pages (ethique, vitality, store, etc.) sans avoir à les lister
+@app.get("/{page_name}")
+async def serve_dynamic_pages(request: Request, page_name: str):
     
-    # Redirection vers Index SEULEMENT si ce n'est pas une ressource technique
-    # Cela évite les "délires" de redirection sur des fausses routes
-    print(f"⚠️ Redirection Catch-All déclenchée par : {full_path}")
+    # 1. Sécurité : on ignore les fichiers statiques (images, js...)
+    if any(ext in page_name for ext in [".js", ".css", ".png", ".jpg", ".svg", ".ico", ".woff"]):
+        return JSONResponse({"error": "Asset not found"}, status_code=404)
+
+    # 2. Nettoyage du nom (ex: "ethique" -> "ethique.html")
+    clean_name = page_name if page_name.endswith(".html") else f"{page_name}.html"
+    
+    # 3. Vérification de l'existence du fichier
+    file_path = os.path.join(TEMPLATE_DIR, clean_name)
+    
+    if os.path.exists(file_path):
+        # BINGO : On sert la page demandée
+        return templates.TemplateResponse(clean_name, {"request": request})
+    
+    # 4. Si la page n'existe vraiment pas -> Redirection Index (Catch-All)
+    print(f"⚠️ Page inconnue demandée : {page_name} -> Redirection Index")
+    return templates.TemplateResponse("index.html", {"request": request})
+
+# E. CATCH-ALL ULTIME (Pour les sous-dossiers profonds)
+@app.get("/{full_path:path}")
+async def catch_all_deep(request: Request, full_path: str):
+    # Ignore les assets
+    if any(x in full_path for x in ["static", "assets", "favicon"]):
+        return JSONResponse({"error": "File not found"}, status_code=404)
     return templates.TemplateResponse("index.html", {"request": request})
 
 if __name__ == "__main__":
