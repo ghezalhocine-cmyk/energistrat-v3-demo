@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # =========================================================
-# 1. CHARGEMENT DES ORGANES VITAUX (TRI-CORTEX)
+# 1. CHARGEMENT DES ORGANES VITAUX
 # =========================================================
 try:
     from app.core.cortex_ingest import ingest
@@ -26,13 +26,13 @@ except ImportError:
         from cortex_ingest import ingest
         from cortex_engine import cortex
         from cortex_physics import physics
-    except ImportError as e:
-        print(f"🚨 ERREUR CRITIQUE: Modules Cortex manquants. {e}")
+    except ImportError:
+        print("🚨 ERREUR CRITIQUE: Modules Cortex manquants.")
 
 # =========================================================
 # 2. CONFIGURATION DU SERVEUR
 # =========================================================
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-UX-V61-FIXED")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-ROUTING-V62")
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,79 +61,59 @@ if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # =========================================================
-# 3. API : CRÉATION DE COMPTE & IMPORT (LE FIX EST ICI)
+# 3. API : FONCTIONS VITALES (Import & Save)
 # =========================================================
 
-# --- LA ROUTE MANQUANTE QUI BLOQUAIT L'ONBOARDING ---
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
-    """
-    Reçoit les données du formulaire Onboarding (Nom, Entité, Profil).
-    Crée le fichier JSON initial pour le client.
-    """
+    """ Création de compte (Onboarding) """
     try:
         data = await request.json()
-        
-        # Génération ID si absent
         cid = data.get("identity", {}).get("id")
         if not cid:
             cid = f"CLI_{uuid.uuid4().hex[:8]}"
             if "identity" not in data: data["identity"] = {}
             data["identity"]["id"] = cid
             
-        # Sauvegarde sur disque
         safe_id = str(cid).replace('/', '_').replace('\\', '_').replace(' ', '')
         file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
         
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
             
-        return JSONResponse({"success": True, "id": cid, "message": "Compte créé."})
+        return JSONResponse({"success": True, "id": cid})
     except Exception as e:
-        print(f"Erreur Création Compte: {e}")
         return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/settings/import_csv")
 async def api_import_csv(file: UploadFile = File(...)):
-    """ Import Massif Excel/CSV """
+    """ Import Massif """
     try:
         content = await file.read()
         sites = ingest.parse_mass_import_unified(content)
         
         if not sites: 
-            return JSONResponse({"success": False, "error": "Fichier vide ou format non reconnu."})
+            return JSONResponse({"success": False, "error": "Fichier vide."})
         
         saved_count = 0
         for s in sites:
             try:
-                cid = s.get('identity', {}).get('id')
-                if not cid:
-                    cid = f"GEN_{uuid.uuid4().hex[:8]}"
-                    s['identity']['id'] = cid
-                
+                cid = s.get('identity', {}).get('id') or f"GEN_{uuid.uuid4().hex[:8]}"
+                s['identity']['id'] = cid
                 safe_id = str(cid).replace('/', '_').replace('\\', '_').replace(' ', '')
                 file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
-                
                 with open(file_path, 'w', encoding='utf-8') as f:
                     json.dump(s, f, indent=4, ensure_ascii=False)
                 saved_count += 1
-            except Exception as e:
-                print(f"Erreur sauvegarde site {cid}: {e}")
+            except: pass
             
-        return JSONResponse({
-            "success": True, 
-            "imported": len(sites), 
-            "saved": saved_count
-        })
+        return JSONResponse({"success": True, "imported": len(sites), "saved": saved_count})
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
 
-# =========================================================
-# 4. API : LECTURE DONNÉES (DASHBOARD)
-# =========================================================
-
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
+    """ Données Dashboard """
     raw_sites = []
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     
@@ -191,30 +171,43 @@ async def get_fleet_data():
 async def get_dashboard_data(client_id: str):
     safe_id = str(client_id).replace('/', '_').replace(' ', '')
     path = os.path.join(DATA_DIR, f"{safe_id}.json")
-    if not os.path.exists(path): 
-        return JSONResponse({"error": "Site introuvable"}, status_code=404)
-    with open(path, 'r', encoding='utf-8') as f: 
-        data = json.load(f)
+    if not os.path.exists(path): return JSONResponse({"error": "Site introuvable"}, 404)
+    with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
     data['financials'] = cortex.enrich_site_financials(data)
     return JSONResponse(data)
 
 # =========================================================
-# 5. ROUTAGE UX STRICT
+# 4. ROUTAGE HTML (CORRECTIF NAVIGATION)
 # =========================================================
+
+# --- A. PARCOURS UTILISATEUR (UX FLOW) ---
 
 @app.get("/")
 async def view_landing(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/index.html")
+async def view_landing_explicit(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/onboarding")
 async def view_onboarding(request: Request):
     return templates.TemplateResponse("onboarding.html", {"request": request})
 
+@app.get("/onboarding.html")
+async def view_onboarding_explicit(request: Request):
+    return templates.TemplateResponse("onboarding.html", {"request": request})
+
 @app.get("/processing")
 async def view_processing(request: Request):
     return templates.TemplateResponse("processing.html", {"request": request})
 
-# DASHBOARDS
+@app.get("/processing.html")
+async def view_processing_explicit(request: Request):
+    return templates.TemplateResponse("processing.html", {"request": request})
+
+# --- B. DASHBOARDS MÉTIERS ---
+
 @app.get("/dashboard/retail")
 async def view_retail(request: Request):
     return templates.TemplateResponse("retail.html", {"request": request, "profile": "retail"})
@@ -235,21 +228,44 @@ async def view_syndic(request: Request):
 async def view_b2b(request: Request):
     return templates.TemplateResponse("b2b.html", {"request": request, "profile": "b2b"})
 
-# SATELLITES
+# --- C. PAGES SATELLITES (LE FIX EST ICI) ---
+
+@app.get("/settings")
+async def view_settings(request: Request):
+    """ Route sans extension """
+    return templates.TemplateResponse("settings.html", {"request": request})
+
+@app.get("/settings.html")
+async def view_settings_explicit(request: Request):
+    """ Route AVEC extension (pour les liens href='settings.html') """
+    return templates.TemplateResponse("settings.html", {"request": request})
+
 @app.get("/audit")
 async def view_audit(request: Request): return templates.TemplateResponse("audit.html", {"request": request})
+@app.get("/audit.html")
+async def view_audit_explicit(request: Request): return templates.TemplateResponse("audit.html", {"request": request})
+
 @app.get("/optimization")
 async def view_opti(request: Request): return templates.TemplateResponse("optimization.html", {"request": request})
+@app.get("/optimization.html")
+async def view_opti_explicit(request: Request): return templates.TemplateResponse("optimization.html", {"request": request})
+
 @app.get("/carbon")
 async def view_carbon(request: Request): return templates.TemplateResponse("carbon.html", {"request": request})
-@app.get("/settings")
-async def view_settings(request: Request): return templates.TemplateResponse("settings.html", {"request": request})
+@app.get("/carbon.html")
+async def view_carbon_explicit(request: Request): return templates.TemplateResponse("carbon.html", {"request": request})
 
-# CATCH-ALL
+# --- D. SÉCURITÉ (CATCH-ALL) ---
+
 @app.get("/{full_path:path}")
 async def catch_all(request: Request, full_path: str):
-    if "static" in full_path or "assets" in full_path or "favicon" in full_path:
+    # Gestion des fichiers statiques manquants
+    if any(x in full_path for x in ["static", "assets", "favicon", ".js", ".css", ".png", ".jpg"]):
         return JSONResponse({"error": "File not found"}, status_code=404)
+    
+    # Redirection vers Index SEULEMENT si ce n'est pas une ressource technique
+    # Cela évite les "délires" de redirection sur des fausses routes
+    print(f"⚠️ Redirection Catch-All déclenchée par : {full_path}")
     return templates.TemplateResponse("index.html", {"request": request})
 
 if __name__ == "__main__":
