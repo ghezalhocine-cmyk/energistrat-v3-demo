@@ -3,339 +3,264 @@ import numpy as np
 import io
 import re
 import logging
-import csv
 import chardet
 
 # CONFIGURATION LOGGING
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V56_DIAMOND")
-
-# DEPENDANCES OPTIONNELLES
-try:
-    import pdfplumber
-    PDF_AVAILABLE = True
-except ImportError:
-    PDF_AVAILABLE = False
-    logger.warning("PDFPlumber manquant : L'analyse des factures PDF sera désactivée.")
+logger = logging.getLogger("CORTEX_INGEST_V60_ARMOR")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "56.0 (Diamond Protocol: Unit Norm + Gas Detection + Site Identity)"
-        self.supported_formats = ['.csv', '.xlsx', '.xls', '.txt', '.pdf']
+        self.version = "60.0 (Armor Plating: Anti-NaN + Unit Normalizer)"
         
-        # =========================================================
-        # DICTIONNAIRE DE MAPPING UNIVERSEL (LE CERVEAU DU PARSER)
-        # =========================================================
-        self.COLUMN_MAPPING = {
-            # 1. IDENTIFICATION & FLUIDE (CORRECTION CRITIQUE)
-            "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REF_PDL", "REFERENCE"],
-            "type_fluide": ["ENERGIE", "FLUIDE", "TYPE", "ENERGY_TYPE"], # NOUVEAU
-            "unite": ["UNITE", "UNIT", "U_MESURE", "UNIT_CONSO"], # NOUVEAU
-            
-            # 2. IDENTITÉ (SÉPARATION SITE / ENTITÉ)
-            "site_label": ["NOM_SITE", "LIBELLE_SITE", "SITE_LABEL", "NOM_POINT_DE_LIVRAISON", "SITE"],
-            "entity_name": ["RAISON_SOCIALE", "CLIENT", "ENTITE", "SOCIETE", "ACCOUNT_NAME", "TITULAIRE"],
-            "siret": ["SIRET_SITE", "SIRET", "SIREN"],
-            "naf": ["NAF", "CODE_NAF", "APE"],
-            
-            # 3. LOCALISATION
-            "adresse": ["ADRESSE_SITE", "ADRESSE", "RUE", "LIGNE_ADRESSE", "ADDRESS"],
-            "cp": ["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
-            "ville": ["VILLE", "COMMUNE", "CITY", "TOWN"],
-            "surface": ["SURFACE_M2", "SURFACE", "M2", "SHAB", "SU", "S_UTILE"],
-            
-            # 4. CONTRAT & TECH
-            "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF", "CATEGORY"],
-            "fournisseur": ["FOURNISSEUR", "PROVIDER", "SUPPLIER"],
-            "date_fin": ["DATE_FIN", "ECHEANCE", "END_DATE"],
-            "date_debut": ["DATE_DEBUT", "START_DATE"],
-            "puissance": ["PUISSANCE_SOUSCRITE_MAX", "PUISSANCE", "PS_MAX", "CAR_MWH", "CAR", "P_SOUSCRITE"],
-            "conso": ["VOLUME_ANNUEL_TOTAL", "CONSO_ANNUELLE", "VOLUME", "CJA_MWH_J", "CJA", "ESTIMATION", "CONSOMMATION"],
-            "profil": ["PROFIL", "PROFILE"],
-            "grd": ["GRD", "DISTRIBUTEUR"],
-            
-            # 5. DETAILS PUISSANCE ELEC (4 Postes - Expert)
-            "ps_hph": ["PS_HPH", "P_HPH"], 
-            "ps_hch": ["PS_HCH", "P_HCH"], 
-            "ps_hpe": ["PS_HPE", "P_HPE"], 
-            "ps_hce": ["PS_HCE", "P_HCE"],
-            
-            # 6. PRIX & BUDGET
-            "abonnement": ["ABONNEMENT", "ABO", "PRIME_FIXE", "PART_FIXE"],
-            "prix_hph": ["PRIX_HPH", "PRIX_UNITAIRE", "PRIX_MOLECULE_MWH", "PRIX_MOLECULE", "HPH"], 
-            "prix_hch": ["PRIX_HCH", "HCH"], 
-            "prix_hpe": ["PRIX_HPE", "HPE"], 
-            "prix_hce": ["PRIX_Hce", "HCE"],
-            "taxes": ["TAXES", "CSPE", "TICGN", "CTA"],
-            "stockage": ["TERME_STOCKAGE", "TERME_STOCKAGE_CPB", "STOCKAGE"], # Specifique Gaz
-            "tarif_acheminement": ["TARIF_ACHEMINEMENT", "ATRT", "TURPE"],
-            
-            # 7. OPH / HABITAT / SOCIAL
-            "p1": ["BUDGET_P1", "P1", "COUT_ENERGIE", "CHARGES_RECUPERABLES"], 
-            "p2": ["BUDGET_P2", "P2", "MAINTENANCE", "P2_FORFAIT"],
-            "p3": ["BUDGET_P3", "P3", "GROS_ENTRETIEN"],
-            "tantiemes": ["TANTIEMES", "PART_COPRO", "MILLIEMES"], 
-            "dpe": ["DPE", "ETIQUETTE", "CLASSE_ENERGIE"],
-            "chauffage": ["CHAUFFAGE", "TYPE_CHAUFFAGE", "SYSTEME_CHAUFFE"],
-            "cee": ["CEE_ELIGIBLE", "PRIME_CEE"]
+        # MAPPING INTELLIGENT DES COLONNES
+        self.MAPPING = {
+            "ref": ["PDL", "PCE", "POINT_DE_LIVRAISON", "REFERENCE", "ID", "PRM"],
+            "nom": ["NOM", "SITE", "CLIENT", "RAISON_SOCIALE", "LIBELLE"],
+            "conso": ["CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "CJA", "CAR"],
+            "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA"],
+            "adresse": ["ADRESSE", "RUE", "LIGNE_ADRESSE"],
+            "ville": ["VILLE", "COMMUNE", "CITY"],
+            "cp": ["CP", "CODE_POSTAL", "ZIP"],
+            "segment": ["SEGMENT", "TARIF", "CATEGORIE"],
+            "fournisseur": ["FOURNISSEUR", "TITULAIRE"],
+            "prix_unitaire": ["PRIX_HPH", "PRIX_UNITAIRE", "P1", "P_MOLECULE"],
+            "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE"]
         }
 
     # =========================================================
-    # UTILITAIRES DE ROBUSTESSE (SAFETY FIRST)
+    # 1. OUTILS DE NETTOYAGE (LE COEUR DU FIX)
     # =========================================================
 
-    def _clean_header(self, header):
-        """ Nettoyage agressif des entêtes pour matcher le dico """
-        return str(header).upper().strip().replace(' ', '_').replace('.', '').replace('É', 'E').replace('È', 'E').replace('-', '_')
+    def _clean_header(self, h):
+        """ Normalise les entêtes (UPPER, sans accents, sans espaces) """
+        return str(h).upper().strip().replace('É', 'E').replace('È', 'E').replace(' ', '_').replace('.', '').replace('-', '_')
 
     def _find_col(self, df_cols, key):
-        """ Recherche floue intelligente """
-        candidates = self.COLUMN_MAPPING.get(key, [])
-        # 1. Match Exact (Nettoyé)
+        """ Trouve la colonne correspondante dans le fichier Excel """
+        candidates = self.MAPPING.get(key, [])
+        # 1. Match Exact
         for col in df_cols:
             clean = self._clean_header(col)
-            if clean in candidates: return col 
-        # 2. Match Partiel (Contient)
+            if clean in candidates: return col
+        # 2. Match Partiel
         for col in df_cols:
             clean = self._clean_header(col)
             for cand in candidates:
-                if cand in clean: return col 
+                if cand in clean: return col
         return None
 
     def _safe_float(self, val):
-        """ Conversion blindée en float """
-        if pd.isna(val) or val == '' or val is None: return 0.0
-        # Gère 1 000,50 et 1.000,50 et les symboles
-        s = str(val).replace(' ', '').replace('\xa0', '').replace('€', '').replace('%', '').replace('kVA', '').replace('kW', '').replace('MWh', '').replace('kWh', '')
+        """
+        TRANSFORME TOUT EN CHIFFRE.
+        Gère : "1 200,50 €", "NaN", None, " - ", "1.200"
+        """
+        if pd.isna(val) or val == '' or val is None:
+            return 0.0
+        
+        s = str(val).strip()
+        # Enlever symboles monétaires et espaces insécables
+        s = s.replace('€', '').replace('%', '').replace(' ', '').replace('\xa0', '').replace('EUR', '')
+        # Gérer la virgule décimale
         s = s.replace(',', '.')
-        try: return float(s)
-        except: return 0.0
-
-    def _safe_str_clean(self, val):
-        """ Nettoie les notations scientifiques Excel (ex: 2,14E+13 -> 21400000000000) """
-        if pd.isna(val) or val == '' or val is None: return ""
-        s = str(val).replace(',', '.')
+        
         try:
-            if 'E+' in s or 'e+' in s:
-                return str(int(float(s))) 
-            if '.' in s and s.replace('.', '').isdigit():
-                return str(int(float(s))) 
-            return s.strip()
+            return float(s)
         except:
-            return str(val).strip()
+            return 0.0
 
-    def _detect_encoding(self, buffer):
-        raw = buffer.read(20000)
-        buffer.seek(0)
-        result = chardet.detect(raw)
-        return result['encoding'] or 'utf-8'
+    def _normalize_energy_unit(self, val, explicit_unit=""):
+        """
+        Convertit tout en kWh.
+        Corrige les millions d'euros sur le Gaz.
+        """
+        val = self._safe_float(val)
+        unit = str(explicit_unit).upper()
+        
+        # Si unité explicite MWh -> x1000
+        if "MWH" in unit:
+            return val * 1000.0
+        # Si unité explicite Wh -> /1000
+        if "WH" in unit and "KWH" not in unit:
+            return val / 1000.0
+            
+        # HEURISTIQUE (Si pas d'unité)
+        # Si conso > 500 000 pour un petit site, c'est probablement du Wh
+        # Si conso < 50, c'est probablement du MWh (sauf si site vide)
+        # (Désactivé pour éviter les faux positifs, on suppose kWh par défaut sauf si MWh détecté)
+        
+        return val # Par défaut kWh
 
     # =========================================================
-    # 1. IMPORT UNIFIÉ (ELEC + GAZ + OPH + INDUSTRIE)
+    # 2. PARSER PRINCIPAL (IMPORT MASSIF)
     # =========================================================
     def parse_mass_import_unified(self, file_content):
         """
-        Le Moteur d'Ingestion Principal.
-        FIX: Normalise les unités et sépare Gaz/Elec.
+        Lit Excel/CSV et renvoie une structure JSON propre pour le Cortex Engine.
         """
         sites = []
         df = None
-        buffer = io.BytesIO(file_content)
-
-        # 1. Lecture Robuste
+        
+        # A. CHARGEMENT ROBUSTE
         try:
-            df = pd.read_excel(buffer)
+            buffer = io.BytesIO(file_content)
+            df = pd.read_excel(buffer) # Tentative Excel
         except:
-            buffer.seek(0)
-            enc = self._detect_encoding(buffer)
-            buffer.seek(0)
-            try: df = pd.read_csv(buffer, sep=';', encoding=enc, dtype=str, on_bad_lines='skip')
-            except: 
+            try:
                 buffer.seek(0)
-                try: df = pd.read_csv(buffer, sep=',', encoding=enc, dtype=str, on_bad_lines='skip')
-                except:
+                # Tentative CSV (Point virgule)
+                df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip')
+                if len(df.columns) < 2:
                     buffer.seek(0)
-                    df = pd.read_csv(buffer, sep='\t', encoding=enc, dtype=str, on_bad_lines='skip')
+                    # Tentative CSV (Virgule)
+                    df = pd.read_csv(buffer, sep=',', encoding='utf-8', on_bad_lines='skip')
+            except Exception as e:
+                logger.error(f"Echec lecture fichier: {e}")
+                return []
 
-        if df is None or df.empty:
-            logger.error("Echec lecture fichier : Format non reconnu")
-            return []
+        if df is None or df.empty: return []
 
+        # B. MAPPING DES COLONNES
         cols = df.columns
-        logger.info(f"Colonnes détectées : {list(cols)}")
-        
-        # 2. Mapping des Colonnes (Automatique)
-        c_pdl = self._find_col(cols, "pdl")
-        c_fluide = self._find_col(cols, "type_fluide")
-        c_unite = self._find_col(cols, "unite") # FIX UNITÉS
-        
-        # Identité
-        c_site_label = self._find_col(cols, "site_label")
-        c_entity = self._find_col(cols, "entity_name")
-        # Fallback ancien mapping si colonnes spécifiques absentes
-        if not c_site_label: c_site_label = self._find_col(cols, "site_label") # Cherche encore "NOM_SITE"
-        if not c_entity: c_entity = c_site_label # Si pas d'entité, on prend le site par défaut
-
-        c_addr = self._find_col(cols, "adresse")
-        c_cp = self._find_col(cols, "cp")
-        c_ville = self._find_col(cols, "ville")
-        c_siret = self._find_col(cols, "siret")
-        c_naf = self._find_col(cols, "naf")
-        c_surf = self._find_col(cols, "surface")
-        
-        c_puiss = self._find_col(cols, "puissance")
+        c_ref = self._find_col(cols, "ref")
+        c_nom = self._find_col(cols, "nom")
         c_conso = self._find_col(cols, "conso")
+        c_addr = self._find_col(cols, "adresse")
+        c_ville = self._find_col(cols, "ville")
+        c_cp = self._find_col(cols, "cp")
         c_seg = self._find_col(cols, "segment")
-        c_prov = self._find_col(cols, "fournisseur")
-        c_end = self._find_col(cols, "date_fin")
-        c_start = self._find_col(cols, "date_debut")
-        c_grd = self._find_col(cols, "grd")
-        
-        # Prix
+        c_fourn = self._find_col(cols, "fournisseur")
+        c_puiss = self._find_col(cols, "puissance")
+        c_prix = self._find_col(cols, "prix_unitaire")
         c_abo = self._find_col(cols, "abonnement")
-        c_tax = self._find_col(cols, "taxes")
-        c_p_hph = self._find_col(cols, "prix_hph") # Prix unitaire générique
-
-        # 3. Extraction
+        
+        # C. EXTRACTION LIGNE PAR LIGNE
         for idx, row in df.iterrows():
             try:
-                # A. IDENTIFICATION & FLUIDE
-                pdl = self._safe_str_clean(row.get(c_pdl, f'TMP{idx}'))
+                # 1. Nettoyage Données
+                pdl = str(row.get(c_ref, f"TMP_{idx}")).replace('.0', '').strip()
+                nom = str(row.get(c_nom, "Site Inconnu")).strip()
                 
-                # Détection Gaz vs Elec (Logique Heuristique)
-                raw_fluide = str(row.get(c_fluide, '')).upper()
+                # 2. Gestion Conso & Unités (FIX GAZ)
+                raw_conso = row.get(c_conso, 0)
+                # On regarde si une colonne "Unité" existe à côté
+                unit_col = next((c for c in cols if "UNIT" in str(c).upper()), "")
+                unit_val = str(row.get(unit_col, "")) if unit_col else ""
+                
+                conso_kwh = self._normalize_energy_unit(raw_conso, unit_val)
+                
+                # 3. Détection Gaz vs Elec
+                # Si PDL commence par 'GI' ou '0' ou si Segment contient 'T' -> Gaz
                 is_gas = False
-                if 'GAZ' in raw_fluide or 'GAS' in raw_fluide:
+                segment = str(row.get(c_seg, "")).upper()
+                if "GAZ" in segment or "T1" in segment or "T2" in segment or "T3" in segment or "T4" in segment:
                     is_gas = True
-                elif 'PCE' in str(c_pdl).upper(): # Si la colonne s'appelle PCE
+                elif "GAZ" in str(c_ref).upper(): # Si la colonne s'appelle "PCE GAZ"
                     is_gas = True
-                elif len(pdl) != 14 and pdl.isdigit(): # PDL Elec = 14 chiffres. PCE souvent différent ou string GI
-                    pass # Pas concluant mais indice
                 
-                energy_type = 'gas' if is_gas else 'elec'
+                energy_type = "gaz" if is_gas else "elec"
 
-                # B. NORMALISATION UNITÉS (Wh/MWh -> kWh)
-                raw_conso = self._safe_float(row.get(c_conso))
-                raw_unit = str(row.get(c_unite, '')).upper()
-                
-                conso_kwh = raw_conso
-                if 'MWH' in raw_unit:
-                    conso_kwh = raw_conso * 1000.0
-                elif 'WH' in raw_unit and 'KWH' not in raw_unit:
-                    conso_kwh = raw_conso / 1000.0
-                
-                # C. NOMMAGE (Traçabilité)
-                site_name = str(row.get(c_site_label, ''))
-                entity_name = str(row.get(c_entity, ''))
-                
-                if not site_name and entity_name: site_name = entity_name
-                if not site_name: site_name = f"Site {pdl}"
-
-                # Objet Site Standardisé (Format attendu par CortexEngine)
+                # 4. Construction Objet
                 site = {
-                    "client_name": entity_name, # Pour la facturation
-                    "identity": { 
-                        "id": pdl, 
-                        "site_label": site_name, # VRAI NOM DU SITE
-                        "entity_name": entity_name, # VRAIE ENTITÉ
-                        "siret": self._safe_str_clean(row.get(c_siret, '')), 
-                        "naf": str(row.get(c_naf, '')) 
+                    "identity": {
+                        "id": pdl,
+                        "site_name": nom, # Le nom s'affiche enfin !
+                        "entity_name": nom
                     },
                     "location": {
-                        "address": str(row.get(c_addr, '')),
-                        "zip_code": self._safe_str_clean(row.get(c_cp, '')),
-                        "city": str(row.get(c_ville, '')),
-                        "surface": self._safe_float(row.get(c_surf))
+                        "address": str(row.get(c_addr, "")),
+                        "city": str(row.get(c_ville, "")),
+                        "zip_code": str(row.get(c_cp, "")).replace('.0', '')
                     },
                     "contract": {
                         "pdl": pdl,
-                        "energy_type": energy_type, # CHAMP CRITIQUE RAJOUTÉ
+                        "provider": str(row.get(c_fourn, "Inconnu")),
+                        "segment": segment,
                         "power": self._safe_float(row.get(c_puiss)),
-                        "segment": str(row.get(c_seg, '')),
-                        "provider": str(row.get(c_prov, 'Inconnu')),
-                        "annual_volume_estimated": conso_kwh, # VALEUR NORMALISÉE
-                        "unit": "kWh", # TOUJOURS kWh
-                        "start_date": str(row.get(c_start, '')),
-                        "end_date": str(row.get(c_end, '')),
-                        "grd": str(row.get(c_grd, ''))
+                        "annual_volume_estimated": conso_kwh, # En kWh propre
+                        "energy_type": energy_type
                     },
                     "pricing": {
+                        "hph": self._safe_float(row.get(c_prix)), # Prix unitaire
                         "fix": self._safe_float(row.get(c_abo)),
-                        "unit_price_ht": self._safe_float(row.get(c_p_hph)), # Prix moyen ou HPH
-                        "tax": self._safe_float(row.get(c_tax))
+                        "tax": 0.0 # Sera calculé par Engine
                     }
                 }
                 sites.append(site)
             except Exception as e:
-                logger.warning(f"Erreur extraction ligne {idx}: {e}")
+                logger.warning(f"Erreur ligne {idx}: {e}")
                 continue
 
-        logger.info(f"Import {len(sites)} sites OK. (Dont Gaz détectés via logique heuristique)")
         return sites
 
     # =========================================================
-    # 2. PARSING COURBE DE CHARGE (LEGACY) - INCHANGÉ
+    # 3. PARSER BPU (POUR LE COMPARATEUR)
     # =========================================================
-    def parse_load_curve(self, file_content, filename):
+    def parse_bpu_excel(self, file_content):
+        """
+        Lit un fichier BPU (Grille de prix) pour la simulation.
+        """
         try:
             buffer = io.BytesIO(file_content)
-            enc = self._detect_encoding(buffer)
-            content_str = file_content.decode(enc, errors='ignore')
-            pdl_match = re.search(r'(?<!\d)(\d{14})(?!\d)', content_str) or re.search(r'(?<!\d)(\d{14})(?!\d)', filename)
-            pdl = pdl_match.group(1) if pdl_match else "Inconnu"
+            df = pd.read_excel(buffer)
             
-            buffer.seek(0)
-            lines = content_str.split('\n')
-            header_row = 0
-            for i, line in enumerate(lines[:50]):
-                if "DATE" in line.upper() or "HORODATAGE" in line.upper():
-                    header_row = i
-                    break
+            # Recherche des colonnes clés
+            cols = df.columns
+            c_hph = self._find_col(cols, "prix_unitaire")
+            c_abo = self._find_col(cols, "abonnement")
             
-            buffer.seek(0)
-            df = pd.read_csv(buffer, sep=';', encoding=enc, skiprows=header_row, on_bad_lines='skip', low_memory=False)
-            if len(df.columns) < 2:
-                buffer.seek(0)
-                df = pd.read_csv(buffer, sep=',', encoding=enc, skiprows=header_row, on_bad_lines='skip', low_memory=False)
+            if not c_hph:
+                return None, False # Echec lecture
+                
+            # On prend la première ligne de prix trouvée
+            prices = {
+                "hph": self._safe_float(df.iloc[0].get(c_hph, 0)),
+                "fix": self._safe_float(df.iloc[0].get(c_abo, 0))
+            }
+            
+            # Détection Gaz
+            is_gaz = "GAZ" in str(df.columns).upper()
+            
+            # On renvoie un DataFrame simplifié ou un dict
+            return pd.DataFrame([prices]), is_gaz
+            
+        except Exception as e:
+            logger.error(f"BPU Error: {e}")
+            return None, False
 
-            df.columns = [self._clean_header(c) for c in df.columns]
-            col_date = next((c for c in df.columns if "DATE" in c or "HORODATAGE" in c), None)
-            col_val = next((c for c in df.columns if "PUISSANCE" in c or "VALEUR" in c or "KWH" in c), None)
+    # =========================================================
+    # 4. PARSER COURBE DE CHARGE (PHYSICS)
+    # =========================================================
+    def parse_load_curve(self, file_content, filename):
+        """ Lit les CSV Enedis (Point virgule, date, puissance) """
+        try:
+            buffer = io.BytesIO(file_content)
+            # Détection encodage
+            enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
+            buffer.seek(0)
+            
+            df = pd.read_csv(buffer, sep=';', encoding=enc, on_bad_lines='skip')
+            
+            # Recherche Colonnes
+            cols = [str(c).upper() for c in df.columns]
+            col_date = next((c for c in df.columns if "DATE" in str(c).upper() or "HORODATAGE" in str(c).upper()), None)
+            col_val = next((c for c in df.columns if "PUISSANCE" in str(c).upper() or "VALEUR" in str(c).upper()), None)
             
             if not col_date or not col_val: return None, 0, {}
             
+            # Nettoyage
             df = df.rename(columns={col_date: 'date', col_val: 'val'})
+            df['val'] = df['val'].apply(self._safe_float) # Utilise le nettoyeur universel
             df['date'] = pd.to_datetime(df['date'], dayfirst=True, errors='coerce')
-            df['val'] = pd.to_numeric(df['val'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-            df = df.dropna(subset=['date']).sort_values('date')
+            df = df.dropna()
             
-            if df.empty: return None, 0, {}
+            # Pas de temps
             delta = (df['date'].iloc[1] - df['date'].iloc[0]).total_seconds() / 60
-            time_step = int(delta) if delta > 0 else 10
             
-            return df, time_step, {"pdl": pdl}
+            return df, int(delta), {}
+            
         except Exception as e:
             logger.error(f"Load Curve Error: {e}")
             return None, 0, {}
-
-    def parse_bpu_excel(self, file_content):
-        # ... (Code BPU existant conservé) ...
-        try:
-            buffer = io.BytesIO(file_content)
-            xls = pd.ExcelFile(buffer)
-            sheet_elec = next((s for s in xls.sheet_names if "ELEC" in s.upper()), None)
-            sheet_gaz = next((s for s in xls.sheet_names if "GAZ" in s.upper()), None)
-            is_gaz = False
-            df = None
-            if sheet_gaz:
-                df = pd.read_excel(xls, sheet_name=sheet_gaz)
-                is_gaz = True
-            elif sheet_elec:
-                df = pd.read_excel(xls, sheet_name=sheet_elec)
-                is_gaz = False
-            else:
-                df = pd.read_excel(xls, sheet_name=0)
-            return df, is_gaz
-        except: return None, False
 
 ingest = CortexIngest()
