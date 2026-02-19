@@ -8,11 +8,10 @@ from datetime import datetime
 
 # FRAMEWORK FASTAPI
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
 # =========================================================
 # 1. CHARGEMENT DES ORGANES VITAUX
@@ -32,7 +31,7 @@ except ImportError:
 # =========================================================
 # 2. CONFIGURATION DU SERVEUR
 # =========================================================
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-OMNISCIENT-V70")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-SMART-SETTINGS-V71")
 
 app.add_middleware(
     CORSMiddleware,
@@ -66,7 +65,7 @@ if os.path.exists(STATIC_DIR):
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
-    """ Création de compte (Onboarding) """
+    """ Création de compte """
     try:
         data = await request.json()
         cid = data.get("identity", {}).get("id")
@@ -161,68 +160,71 @@ async def get_dashboard_data(client_id: str):
     return JSONResponse(data)
 
 # =========================================================
-# 4. ROUTAGE INTELLIGENT (LE CERVEAU DE NAVIGATION)
+# 4. ROUTAGE INTELLIGENT (SMART ROUTING)
 # =========================================================
 
-# A. ROUTES PRINCIPALES (Explicites)
+# A. FLUX PRINCIPAL
 @app.get("/")
 async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
-
 @app.get("/onboarding")
 async def view_onboarding(request: Request): return templates.TemplateResponse("onboarding.html", {"request": request})
-
 @app.get("/processing")
 async def view_processing(request: Request): return templates.TemplateResponse("processing.html", {"request": request})
 
-# B. ROUTES DASHBOARDS (Avec injection de profil)
+# B. DASHBOARDS (Profils)
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str):
-    # Essaie de trouver un template spécifique (ex: retail.html)
     template_name = f"{profile}.html"
     path = os.path.join(TEMPLATE_DIR, template_name)
     if os.path.exists(path):
         return templates.TemplateResponse(template_name, {"request": request, "profile": profile})
-    # Fallback générique
     return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
 
-# C. CORRESPONDANCES SPÉCIALES (Mapping manuel pour vos liens spécifiques)
-# C'est ici qu'on règle le problème "Partner Settings"
+# C. GESTION DES SETTINGS (LE FIX EST ICI)
+# ---------------------------------------------------------
+@app.get("/settings")
+async def view_settings(request: Request):
+    """ Route standard pour Settings """
+    return templates.TemplateResponse("settings.html", {"request": request})
+
 @app.get("/partner/settings")
-async def view_partner_settings(request: Request):
-    # D'après votre screenshot, le fichier est settings_partner.html
-    return templates.TemplateResponse("settings_partner.html", {"request": request})
+async def view_partner_settings_smart(request: Request):
+    """
+    Route 'Intelligente' :
+    - Si l'utilisateur vient du Dashboard SUPPLIER -> Affiche Settings Partenaire.
+    - Sinon (Retail, Mairie, etc.) -> Redirige vers Settings Standard.
+    """
+    referer = request.headers.get("referer", "")
+    
+    # Si le referer contient 'supplier' ou 'fournisseur', c'est un partenaire
+    if "supplier" in referer or "fournisseur" in referer:
+        return templates.TemplateResponse("settings_partner.html", {"request": request})
+    
+    # Pour TOUS les autres (Retail, Mairie, Citoyen...), on force le standard
+    return templates.TemplateResponse("settings.html", {"request": request})
 
+# D. AUTRES PAGES SATELLITES
 @app.get("/ops/market")
-async def view_ops_market(request: Request):
-    return templates.TemplateResponse("ops_market.html", {"request": request})
+async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
 
-# D. ROUTEUR DYNAMIQUE (LA MAGIE)
-# Cette fonction attrape TOUTES les pages (ethique, vitality, store, etc.) sans avoir à les lister
+# E. ROUTEUR DYNAMIQUE (Pour tout le reste)
 @app.get("/{page_name}")
 async def serve_dynamic_pages(request: Request, page_name: str):
-    
-    # 1. Sécurité : on ignore les fichiers statiques (images, js...)
-    if any(ext in page_name for ext in [".js", ".css", ".png", ".jpg", ".svg", ".ico", ".woff"]):
+    if any(ext in page_name for ext in [".js", ".css", ".png", ".jpg", ".svg", ".ico"]):
         return JSONResponse({"error": "Asset not found"}, status_code=404)
 
-    # 2. Nettoyage du nom (ex: "ethique" -> "ethique.html")
     clean_name = page_name if page_name.endswith(".html") else f"{page_name}.html"
-    
-    # 3. Vérification de l'existence du fichier
     file_path = os.path.join(TEMPLATE_DIR, clean_name)
     
     if os.path.exists(file_path):
-        # BINGO : On sert la page demandée
         return templates.TemplateResponse(clean_name, {"request": request})
     
-    # 4. Si la page n'existe vraiment pas -> Redirection Index (Catch-All)
-    print(f"⚠️ Page inconnue demandée : {page_name} -> Redirection Index")
+    # Fallback Index
     return templates.TemplateResponse("index.html", {"request": request})
 
-# E. CATCH-ALL ULTIME (Pour les sous-dossiers profonds)
+# F. CATCH-ALL DEEP
 @app.get("/{full_path:path}")
 async def catch_all_deep(request: Request, full_path: str):
-    # Ignore les assets
     if any(x in full_path for x in ["static", "assets", "favicon"]):
         return JSONResponse({"error": "File not found"}, status_code=404)
     return templates.TemplateResponse("index.html", {"request": request})
