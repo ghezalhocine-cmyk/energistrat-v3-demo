@@ -5,13 +5,12 @@ import logging
 import chardet
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V95_DEBUG")
+logger = logging.getLogger("CORTEX_INGEST_V100")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "95.0 (Debug: OpenPyXL Enforced)"
+        self.version = "100.0 (Platinum: Verbose Error Reporting)"
         
-        # MAPPING (Conservé de la V90)
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE"],
             "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL"],
@@ -72,20 +71,14 @@ class CortexIngest:
         sites = []
         df = None
         
-        # TENTATIVE DE LECTURE AVEC DEBUG
+        # 1. LECTURE SANS FILET (Pour voir la vraie erreur)
+        buffer = io.BytesIO(file_content)
         try:
-            buffer = io.BytesIO(file_content)
-            # On force le moteur openpyxl pour voir si ça crashe
-            try:
-                df = pd.read_excel(buffer, engine='openpyxl')
-            except ImportError:
-                # Fallback si openpyxl manque (mais ça plantera plus loin)
-                buffer.seek(0)
-                df = pd.read_excel(buffer)
-                
+            # On laisse Pandas deviner le moteur. Si c'est du XLS, il faut xlrd (optionnel).
+            # Si c'est du XLSX, il prend openpyxl.
+            df = pd.read_excel(buffer)
         except Exception as e_xls:
-            print(f"⚠️ ERREUR EXCEL : {e_xls}")
-            # Tentative CSV si Excel échoue
+            # Si Excel échoue, on tente CSV en dernier recours
             try:
                 buffer.seek(0)
                 enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
@@ -95,14 +88,22 @@ class CortexIngest:
                     buffer.seek(0)
                     df = pd.read_csv(buffer, sep=',', encoding=enc, on_bad_lines='skip')
             except Exception as e_csv:
-                print(f"⚠️ ERREUR CSV : {e_csv}")
-                return []
+                # SI TOUT ÉCHOUE, ON RENVOIE L'ERREUR EXACTE
+                raise ValueError(f"Lecture impossible. Erreur Excel: {str(e_xls)} | Erreur CSV: {str(e_csv)}")
 
-        if df is None or df.empty: return []
+        if df is None or df.empty:
+            raise ValueError("Fichier vide ou format non reconnu.")
 
-        # ... (Reste du code de mapping identique à la V90) ...
         cols = df.columns
+        
+        # 2. VÉRIFICATION DES COLONNES CRITIQUES
         c_pdl = self._find_col(cols, "pdl")
+        if not c_pdl:
+            # On liste les colonnes trouvées pour aider au debug
+            found_cols = ", ".join(list(cols)[:5])
+            raise ValueError(f"Colonne 'PDL' introuvable. Colonnes vues: {found_cols}...")
+
+        # ... (Suite du mapping identique V90) ...
         c_nom_site = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
@@ -174,10 +175,11 @@ class CortexIngest:
             except: continue
         return sites
 
+    # ... (Méthodes BPU et Load Curve inchangées) ...
     def parse_bpu_excel(self, file_content):
         try:
             buffer = io.BytesIO(file_content)
-            df = pd.read_excel(buffer) # Utilise openpyxl par défaut si dispo
+            df = pd.read_excel(buffer)
             cols = df.columns
             c_hph = self._find_col(cols, "prix_unitaire")
             if not c_hph:
