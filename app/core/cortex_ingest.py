@@ -5,37 +5,51 @@ import logging
 import chardet
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V100")
+logger = logging.getLogger("CORTEX_INGEST_V101_MAX")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "100.0 (Platinum: Verbose Error Reporting)"
+        self.version = "101.0 (Titanium: Full Mapping + Debug Mode)"
         
+        # --- MAPPING COMPLET (RIEN NE MANQUE) ---
         self.COLUMN_MAPPING = {
+            # IDENTIFICATION
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE"],
             "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL"],
             "entity": ["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT"],
+            
+            # LOCALISATION
             "adresse": ["ADRESSE_SITE", "ADRESSE", "RUE"],
             "ville": ["VILLE", "COMMUNE", "CITY"],
             "cp": ["CP", "CODE_POSTAL", "ZIP"],
+            "siret": ["SIRET", "SIRET_SITE"],
+            
+            # CONTRAT GLOBAL
             "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL"],
             "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)"],
             "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF"],
             "fournisseur": ["FOURNISSEUR", "TITULAIRE"],
             "date_fin": ["DATE_FIN", "ECHEANCE"],
+            
+            # --- DÉTAILS ELEC (POUR LE DQE) ---
             "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH"],
             "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH"],
             "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE"],
             "ps_hce": ["PS HCE", "PUISSANCE HCE", "P_HCE"],
+            
             "conso_hph": ["CONSO HPH", "C_HPH", "HP HAUTE"],
             "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE"],
             "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE"],
             "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE"],
+
+            # PRIX & BUDGET
             "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
             "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE"],
             "taxes": ["TAXES", "CSPE", "TICGN"],
             "stockage": ["TERME_STOCK", "STOCKAGE", "TERME_STOCKAGE"]
         }
+        
+        # Blacklist pour éviter le nom "CLIENT"
         self.NAME_BLACKLIST = ["CLIENT", "SITE", "INCONNU", "NAN", "NONE", "NOM_SITE", "0", ".", "COMMUNE", "MAIRIE", "SOCIETE"]
 
     def _clean_header(self, h):
@@ -46,6 +60,7 @@ class CortexIngest:
         for col in df_cols:
             clean = self._clean_header(col)
             if clean in candidates: return col
+            # Recherche partielle prudente
             if len(key) > 3:
                 for cand in candidates:
                     if cand in clean: return col
@@ -59,6 +74,7 @@ class CortexIngest:
         except: return 0.0
 
     def _safe_str_clean(self, val):
+        """ Décodeur Notation Scientifique """
         if pd.isna(val) or val == '' or val is None: return ""
         s = str(val).replace(',', '.')
         try:
@@ -68,17 +84,17 @@ class CortexIngest:
         except: return str(val).strip()
 
     def parse_mass_import_unified(self, file_content):
+        """ MOTEUR D'IMPORTATION (AVEC DEBUG) """
         sites = []
         df = None
         
-        # 1. LECTURE SANS FILET (Pour voir la vraie erreur)
+        # 1. LECTURE (Excel > CSV)
         buffer = io.BytesIO(file_content)
         try:
-            # On laisse Pandas deviner le moteur. Si c'est du XLS, il faut xlrd (optionnel).
-            # Si c'est du XLSX, il prend openpyxl.
+            # On laisse Pandas choisir le moteur (openpyxl pour xlsx, xlrd pour xls)
             df = pd.read_excel(buffer)
         except Exception as e_xls:
-            # Si Excel échoue, on tente CSV en dernier recours
+            # Fallback CSV si Excel échoue
             try:
                 buffer.seek(0)
                 enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
@@ -88,94 +104,117 @@ class CortexIngest:
                     buffer.seek(0)
                     df = pd.read_csv(buffer, sep=',', encoding=enc, on_bad_lines='skip')
             except Exception as e_csv:
-                # SI TOUT ÉCHOUE, ON RENVOIE L'ERREUR EXACTE
-                raise ValueError(f"Lecture impossible. Erreur Excel: {str(e_xls)} | Erreur CSV: {str(e_csv)}")
+                # On remonte l'erreur exacte pour votre popup
+                raise ValueError(f"Lecture impossible. Excel: {str(e_xls)} | CSV: {str(e_csv)}")
 
-        if df is None or df.empty:
-            raise ValueError("Fichier vide ou format non reconnu.")
+        if df is None or df.empty: return []
 
         cols = df.columns
         
-        # 2. VÉRIFICATION DES COLONNES CRITIQUES
+        # 2. MAPPING COMPLET
         c_pdl = self._find_col(cols, "pdl")
-        if not c_pdl:
-            # On liste les colonnes trouvées pour aider au debug
-            found_cols = ", ".join(list(cols)[:5])
-            raise ValueError(f"Colonne 'PDL' introuvable. Colonnes vues: {found_cols}...")
+        # Si pas de PDL, on arrête tout de suite
+        if not c_pdl: 
+             found = ", ".join(list(cols)[:5])
+             raise ValueError(f"Colonne PDL introuvable. Colonnes vues : {found}...")
 
-        # ... (Suite du mapping identique V90) ...
         c_nom_site = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
         c_cp = self._find_col(cols, "cp")
         c_ville = self._find_col(cols, "ville")
         c_siret = self._find_col(cols, "siret")
+        
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
         c_seg = self._find_col(cols, "segment")
         c_fourn = self._find_col(cols, "fournisseur")
         c_end = self._find_col(cols, "date_fin")
+        
+        # Détails 4 Postes (Pour le DQE)
         c_ps_hph = self._find_col(cols, "ps_hph")
         c_ps_hch = self._find_col(cols, "ps_hch")
         c_ps_hpe = self._find_col(cols, "ps_hpe")
         c_ps_hce = self._find_col(cols, "ps_hce")
+        
         c_c_hph = self._find_col(cols, "conso_hph")
         c_c_hch = self._find_col(cols, "conso_hch")
         c_c_hpe = self._find_col(cols, "conso_hpe")
         c_c_hce = self._find_col(cols, "conso_hce")
+
+        # Prix
         c_prix = self._find_col(cols, "prix_unitaire")
         c_abo = self._find_col(cols, "abonnement")
         c_tax = self._find_col(cols, "taxes")
         c_stock = self._find_col(cols, "stockage")
 
+        # 3. EXTRACTION
         for idx, row in df.iterrows():
             try:
+                # A. ID Propre
                 pdl = self._safe_str_clean(row.get(c_pdl, f"TMP_{idx}"))
+                
+                # B. Nommage Intelligent (Blacklist)
                 nom_brut = str(row.get(c_nom_site, "")).strip()
                 entite_brut = str(row.get(c_entite, "")).strip()
                 ville = str(row.get(c_ville, "")).strip()
                 
                 final_name = "Site Inconnu"
                 is_nom_bad = not nom_brut or any(b in nom_brut.upper() for b in self.NAME_BLACKLIST)
+                
                 if not is_nom_bad: final_name = nom_brut
                 elif entite_brut and not any(b in entite_brut.upper() for b in self.NAME_BLACKLIST): final_name = entite_brut
                 elif ville: final_name = f"{ville} ({pdl[-4:]})"
 
+                # C. Conso & Unités
                 raw_conso = self._safe_float(row.get(c_conso))
                 conso_kwh = raw_conso
-                if c_conso and "MWH" in str(c_conso).upper(): conso_kwh = raw_conso * 1000.0
+                if c_conso and "MWH" in str(c_conso).upper():
+                    conso_kwh = raw_conso * 1000.0
 
+                # D. Énergie
                 segment = str(row.get(c_seg, "")).upper()
                 is_gas = False
-                if "GAZ" in segment or "T1" in segment or "T2" in segment or "T3" in segment: is_gas = True
+                if "GAZ" in segment or "T1" in segment or "T2" in segment or "T3" in segment or "T4" in segment: is_gas = True
                 elif c_pdl and "PCE" in str(c_pdl).upper(): is_gas = True
                 energy_type = "gaz" if is_gas else "elec"
 
                 site = {
-                    "identity": { "id": pdl, "site_name": final_name, "entity_name": entite_brut, "siret": self._safe_str_clean(row.get(c_siret)) },
-                    "location": { "address": str(row.get(c_addr, "")), "zip_code": self._safe_str_clean(row.get(c_cp, "")), "city": ville },
+                    "identity": { 
+                        "id": pdl, "site_name": final_name, "entity_name": entite_brut,
+                        "siret": self._safe_str_clean(row.get(c_siret))
+                    },
+                    "location": {
+                        "address": str(row.get(c_addr, "")), "zip_code": self._safe_str_clean(row.get(c_cp, "")), "city": ville
+                    },
                     "contract": {
                         "pdl": pdl, "provider": str(row.get(c_fourn, "Inconnu")),
                         "segment": segment, "power": self._safe_float(row.get(c_puiss)),
                         "annual_volume_estimated": conso_kwh, "energy_type": energy_type,
                         "end_date": str(row.get(c_end, "")),
+                        # DÉTAILS CRITIQUES POUR DQE
                         "details": {
-                            "ps_hph": self._safe_float(row.get(c_ps_hph)), "ps_hch": self._safe_float(row.get(c_ps_hch)),
-                            "ps_hpe": self._safe_float(row.get(c_ps_hpe)), "ps_hce": self._safe_float(row.get(c_ps_hce)),
-                            "conso_hph": self._safe_float(row.get(c_c_hph)), "conso_hch": self._safe_float(row.get(c_c_hch)),
-                            "conso_hpe": self._safe_float(row.get(c_c_hpe)), "conso_hce": self._safe_float(row.get(c_c_hce))
+                            "ps_hph": self._safe_float(row.get(c_ps_hph)),
+                            "ps_hch": self._safe_float(row.get(c_ps_hch)),
+                            "ps_hpe": self._safe_float(row.get(c_ps_hpe)),
+                            "ps_hce": self._safe_float(row.get(c_ps_hce)),
+                            "conso_hph": self._safe_float(row.get(c_c_hph)),
+                            "conso_hch": self._safe_float(row.get(c_c_hch)),
+                            "conso_hpe": self._safe_float(row.get(c_c_hpe)),
+                            "conso_hce": self._safe_float(row.get(c_c_hce))
                         }
                     },
                     "pricing": {
-                        "hph": self._safe_float(row.get(c_prix)), "fix": self._safe_float(row.get(c_abo)),
-                        "tax": self._safe_float(row.get(c_tax)), "storage": self._safe_float(row.get(c_stock))
+                        "hph": self._safe_float(row.get(c_prix)),
+                        "fix": self._safe_float(row.get(c_abo)),
+                        "tax": self._safe_float(row.get(c_tax)),
+                        "storage": self._safe_float(row.get(c_stock))
                     }
                 }
                 sites.append(site)
             except: continue
         return sites
 
-    # ... (Méthodes BPU et Load Curve inchangées) ...
     def parse_bpu_excel(self, file_content):
         try:
             buffer = io.BytesIO(file_content)
