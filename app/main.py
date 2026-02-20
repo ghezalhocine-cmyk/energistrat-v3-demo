@@ -15,14 +15,12 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# BLOC IMPORT ROBUSTE
 try:
     import pandas as pd
     PANDAS_READY = True
 except ImportError:
     PANDAS_READY = False
 
-# CHARGEMENT CORTEX
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
@@ -33,9 +31,9 @@ except ImportError:
         from cortex_engine import cortex
         from cortex_physics import physics
     except ImportError:
-        print("🚨 ERREUR CRITIQUE: Modules Cortex manquants.")
+        pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-TITANIUM-V101")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-DIAMOND-V110")
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,7 +43,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# GESTION DOSSIERS
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
@@ -56,15 +53,12 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# UTILS
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
     elif isinstance(data, list): return [json_compliant(v) for v in data]
     elif isinstance(data, float):
         if math.isnan(data) or math.isinf(data): return 0.0
     return data
-
-# --- API CRUD ---
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
@@ -81,7 +75,6 @@ async def api_save_client(request: Request):
 
 @app.post("/api/settings/update_site")
 async def api_update_site(request: Request):
-    """ FIX AUDIT : SAUVEGARDE DE LA SURFACE """
     try:
         payload = await request.json()
         site_id = payload.get('id')
@@ -93,16 +86,15 @@ async def api_update_site(request: Request):
         if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
         if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
-        return JSONResponse({"success": True, "message": "Données sauvegardées"})
+        return JSONResponse({"success": True, "message": "Sauvegardé"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.post("/api/settings/import_csv")
 async def api_import_csv(file: UploadFile = File(...)):
-    """ IMPORT MASSIF AVEC RETOUR ERREUR """
     try:
         content = await file.read()
-        # Ingest V101 peut lever ValueError
         sites = ingest.parse_mass_import_unified(content)
+        if not sites: return JSONResponse({"success": False, "error": "Fichier illisible."})
         saved = 0
         for s in sites:
             try:
@@ -114,10 +106,8 @@ async def api_import_csv(file: UploadFile = File(...)):
                 saved += 1
             except: pass
         return JSONResponse({"success": True, "imported": len(sites), "saved": saved})
-    except ValueError as ve:
-        return JSONResponse({"success": False, "error": str(ve)})
-    except Exception as e:
-        return JSONResponse({"success": False, "error": f"Erreur Technique: {str(e)}"})
+    except ValueError as ve: return JSONResponse({"success": False, "error": str(ve)})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
@@ -135,6 +125,7 @@ async def get_fleet_data():
     fleet_list = []
     all_cities, all_providers, all_segments = set(), set(), set()
     for s in raw_sites:
+        if s.get('identity',{}).get('id') == "new_client": continue
         fin = s['computed_financials']
         contract = s.get('contract', {})
         city = fin['meta']['city']
@@ -169,36 +160,42 @@ async def get_dashboard_data(client_id: str):
     path = os.path.join(DATA_DIR, f"{safe_id}.json")
     if not os.path.exists(path): return JSONResponse({"error": "Site introuvable"}, 404)
     with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
-    data['financials'] = cortex.enrich_site_financials(data)
+    
+    # Enrichissement
+    financials = cortex.enrich_site_financials(data)
+    
+    # FIX DRILL-DOWN : APLATISSEMENT JSON
+    # On fusionne les données financières à la racine pour que le Frontend JS les trouve
+    merged_data = {**data, **financials, "budget": financials['budget_annual'], "volume_mwh": financials['volume_mwh']}
+    
     if "location" in data and "surface" in data["location"]:
         naf = data.get("identity", {}).get("naf", "")
         surf = data["location"]["surface"]
-        vol = data['financials']['volume_mwh']
-        data["benchmark"] = cortex.calculate_benchmark(naf, surf, vol)
-    return JSONResponse(json_compliant(data))
-
-# --- API OUTILS EXPERTS ---
+        vol = financials['volume_mwh']
+        merged_data["benchmark"] = cortex.calculate_benchmark(naf, surf, vol)
+    
+    return JSONResponse(json_compliant(merged_data))
 
 @app.post("/api/physics/solar")
 async def api_solar_sim(request: Request):
-    """ FIX SOLAR : Connexion Physics """
     try:
         payload = await request.json()
         address = payload.get('address', '')
         surface = float(payload.get('surface_roof', 0))
-        price = float(payload.get('electricity_price', 0.20))
+        # FIX SOLAR NAN : PRIX PAR DEFAUT SI MANQUANT
+        price_raw = payload.get('electricity_price')
+        price = float(price_raw) if price_raw and float(price_raw) > 0 else 0.20
+        
         lat, lon = physics.get_coordinates_from_address(address)
         return JSONResponse(physics.simulate_solar_roi(lat, lon, surface, price))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.get("/api/tools/template/{template_type}")
 async def download_template(template_type: str):
-    """ FIX SETTINGS : Téléchargement Template (Excel ou CSV) """
     if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
     stream = io.BytesIO()
     try:
-        # Essai Excel
-        with pd.ExcelWriter(stream) as writer:
+        with pd.ExcelWriter(stream, engine='openpyxl') as writer:
             if template_type == "import":
                 df = pd.DataFrame(columns=["PDL", "NOM_SITE", "ADRESSE", "CP", "VILLE", "VOLUME_ANNUEL", "PUISSANCE", "PRIX_HPH", "ABONNEMENT"])
                 df.to_excel(writer, index=False)
@@ -207,14 +204,18 @@ async def download_template(template_type: str):
                 df.to_excel(writer, index=False)
         stream.seek(0)
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=template_{template_type}.xlsx"})
-    except Exception as e:
-        # Fallback CSV
+    except:
         stream = io.StringIO()
-        df = pd.DataFrame(columns=["PDL", "NOM_SITE", "ADRESSE", "CP", "VILLE", "VOLUME_ANNUEL", "PUISSANCE", "PRIX_HPH", "ABONNEMENT"])
-        df.to_csv(stream, index=False, sep=';')
-        response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
-        response.headers["Content-Disposition"] = f"attachment; filename=template_{template_type}.csv"
-        return response
+        pd.DataFrame().to_csv(stream)
+        return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
+
+# FIX TEMPLATE REDIRECT (Si le frontend appelle un fichier statique)
+@app.get("/app/assets/{filename}")
+async def get_static_asset(filename: str):
+    # Redirige vers la génération dynamique si c'est un template
+    if "template" in filename:
+        return await download_template("import")
+    return JSONResponse({"error": "File not found"}, 404)
 
 @app.post("/api/ops/simulate_offer")
 async def api_simulate_offer(file: UploadFile = File(...)):
@@ -239,7 +240,6 @@ async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
 
 @app.post("/api/ops/generate_tender")
 async def generate_tender(request: Request):
-    """ FIX DQE : Export Excel """
     if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
     try:
         body = await request.json()
@@ -252,16 +252,12 @@ async def generate_tender(request: Request):
                 with open(path, 'r', encoding='utf-8') as f: selected_sites.append(json.load(f))
         df_dqe = cortex.generate_dqe_structure(selected_sites)
         stream = io.BytesIO()
-        try:
-            with pd.ExcelWriter(stream) as writer: df_dqe.to_excel(writer, index=False, sheet_name="DQE_Sites")
-        except:
-            return JSONResponse({"error": "Moteur Excel manquant"}, 500)
+        with pd.ExcelWriter(stream, engine='openpyxl') as writer: df_dqe.to_excel(writer, index=False, sheet_name="DQE_Sites")
         stream.seek(0)
         timestamp = datetime.now().strftime("%Y%m%d")
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-# --- ROUTAGE HTML ---
 @app.get("/")
 async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
 @app.get("/onboarding")
