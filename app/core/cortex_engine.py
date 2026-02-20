@@ -10,15 +10,12 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V75_FINAL")
+logger = logging.getLogger("CORTEX_ENGINE_V85_DQE_FIX")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "75.0 (Final: NaN Terminator)"
-        self.MARKET_DEFAULTS = {
-            "elec": {"price": 0.18, "tax": 0.05}, 
-            "gas": {"price": 0.08, "tax": 0.02}
-        }
+        self.version = "85.0 (Diamond: DQE Mask Compliance)"
+        self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.05}, "gas": {"price": 0.08, "tax": 0.02}}
 
     def _safe_float(self, value, default=0.0):
         try:
@@ -27,13 +24,10 @@ class CortexEngine:
         except: return default
 
     def _safe_div(self, num, den):
-        n = self._safe_float(num)
-        d = self._safe_float(den)
-        if d == 0: return 0.0
-        return n / d
+        n, d = self._safe_float(num), self._safe_float(den)
+        return n / d if d != 0 else 0.0
     
     def _sanitize(self, val):
-        """ TUEUR DE NAN """
         if pd.isna(val) or np.isinf(val): return 0.0
         return val
 
@@ -43,7 +37,6 @@ class CortexEngine:
         pricing = site_data.get('pricing', {})
         loc = site_data.get('location', {})
         
-        # Nommage
         site_label = ident.get('site_name', 'Site Inconnu')
         if not site_label or site_label == "Site Inconnu":
             site_label = f"{loc.get('city', 'Site')} ({str(contract.get('pdl', ''))[-4:]})"
@@ -51,7 +44,6 @@ class CortexEngine:
         energy_type = contract.get('energy_type', 'elec').lower()
         is_gas = 'gaz' in energy_type or 'gas' in energy_type
         
-        # Calculs
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
         raw_price = self._safe_float(pricing.get('hph'))
         unit_price = raw_price / 1000.0 if raw_price > 2.0 else raw_price
@@ -63,7 +55,6 @@ class CortexEngine:
 
         fixe = self._safe_float(pricing.get('fix'))
         commodity = vol_kwh * unit_price
-        
         file_tax = self._safe_float(pricing.get('tax'))
         tax_rate = self.MARKET_DEFAULTS['gas']['tax'] if is_gas else self.MARKET_DEFAULTS['elec']['tax']
         taxes = file_tax if file_tax > 0 else (vol_kwh * tax_rate)
@@ -72,7 +63,6 @@ class CortexEngine:
         landing = budget_ttc * 1.02
         pmc_mwh = self._safe_div(budget_ttc, (vol_kwh / 1000))
 
-        # SANITIZATION FINALE (Le secret est ici)
         return {
             "meta": {
                 "site_label": str(site_label).upper(),
@@ -132,7 +122,6 @@ class CortexEngine:
             }
         }
 
-    # SATELLITES BRIDGE
     def analyze_load_curve(self, content, filename, power_subscribed=36):
         if physics and ingest:
             df, step, meta = ingest.parse_load_curve(content, filename)
@@ -142,26 +131,46 @@ class CortexEngine:
     def simulate_budget_from_bpu(self, bpu_content, current_sites):
         if not ingest: return {"error": "Ingest missing"}
         df_bpu, is_gaz = ingest.parse_bpu_excel(bpu_content)
-        if df_bpu is None: return {"error": "BPU Illisible ou Colonnes manquantes"}
-        
+        if df_bpu is None: return {"error": "BPU Illisible"}
         offer_price = float(df_bpu.iloc[0]['hph'])
         if offer_price > 2.0: offer_price /= 1000.0
-            
         total_savings = 0
         for s in current_sites:
             fin = self.enrich_site_financials(s)
-            site_is_gas = "Gaz" in fin['meta']['energy_type']
-            if site_is_gas == is_gaz:
+            if ("Gaz" in fin['meta']['energy_type']) == is_gaz:
                 old_cost = fin['details']['commodity']
                 new_cost = fin['volume_kwh'] * offer_price
                 total_savings += (old_cost - new_cost)
         return {"success": True, "savings_total": self._sanitize(round(total_savings, 2))}
     
+    # --- FIX DQE : MASQUE CONFORME ---
     def generate_dqe_structure(self, sites_data):
         rows = []
         for s in sites_data:
-            fin = self.enrich_site_financials(s)
-            rows.append({"PDL": s.get('identity',{}).get('id'), "Site": fin['meta']['site_label'], "Budget": fin['budget_annual']})
+            ident = s.get('identity', {})
+            loc = s.get('location', {})
+            con = s.get('contract', {})
+            pricing = s.get('pricing', {})
+            
+            # Mapping STRICT basé sur votre screenshot
+            row = {
+                "Entité": ident.get('entity_name', ''),
+                "Nom du site": ident.get('site_name', ''),
+                "Adresse": loc.get('address', ''),
+                "CP": loc.get('zip_code', ''),
+                "Ville": loc.get('city', ''),
+                "INSEE": "", # Donnée non dispo dans import standard
+                "SIRET": ident.get('siret', ''),
+                "PDL": ident.get('id', ''),
+                "Segment": con.get('segment', ''),
+                "FTA": "CU", # Par défaut
+                "S Max (kVA)": con.get('power', 0),
+                # Colonnes vides pour remplissage manuel ou futures données
+                "PS HPH": con.get('power', 0), "PS HCH": con.get('power', 0), "PS HPE": con.get('power', 0), "PS HCE": con.get('power', 0),
+                "Conso HPH": "", "Conso HCH": "", "Conso HPE": "", "Conso HCE": "",
+                "Vol. Annuel": con.get('annual_volume_estimated', 0)
+            }
+            rows.append(row)
         return pd.DataFrame(rows)
     
     def calculate_benchmark(self, naf, surface, volume_mwh):
