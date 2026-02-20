@@ -5,11 +5,11 @@ import logging
 import chardet
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V102_ENGINE_FORCE")
+logger = logging.getLogger("CORTEX_INGEST_V105_UNIVERSAL")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "102.0 (Fix: Force OpenPyXL Engine)"
+        self.version = "105.0 (Universal: XLS/XLSX + Latin-1 Support)"
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE"],
@@ -24,7 +24,6 @@ class CortexIngest:
             "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF"],
             "fournisseur": ["FOURNISSEUR", "TITULAIRE"],
             "date_fin": ["DATE_FIN", "ECHEANCE"],
-            # DQE Details
             "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH"],
             "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH"],
             "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE"],
@@ -33,7 +32,6 @@ class CortexIngest:
             "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE"],
             "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE"],
             "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE"],
-            # Prix
             "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
             "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE"],
             "taxes": ["TAXES", "CSPE", "TICGN"],
@@ -73,36 +71,45 @@ class CortexIngest:
     def parse_mass_import_unified(self, file_content):
         sites = []
         df = None
+        buffer = io.BytesIO(file_content)
         
-        # --- CORRECTION CRITIQUE ICI ---
+        # --- STRATÉGIE DE LECTURE EN CASCADE ---
+        errors = []
+        
+        # 1. Tentative EXCEL STANDARD (Auto-détection .xls / .xlsx)
         try:
-            buffer = io.BytesIO(file_content)
-            # ON FORCE LE MOTEUR OPENPYXL EXPLICITEMENT
-            df = pd.read_excel(buffer, engine='openpyxl')
+            # On ne force PAS openpyxl, on laisse Pandas choisir (nécessite xlrd pour .xls)
+            df = pd.read_excel(buffer)
         except Exception as e_xls:
-            # Si échec Excel, on tente CSV
+            errors.append(f"Excel: {str(e_xls)}")
+            
+            # 2. Tentative CSV FRANÇAIS (Latin-1 + Point-virgule) -> C'est ça qui bloquait !
             try:
                 buffer.seek(0)
-                enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
-                buffer.seek(0)
-                df = pd.read_csv(buffer, sep=';', encoding=enc, on_bad_lines='skip')
-                if len(df.columns) < 2:
+                df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip')
+                # Vérif si lecture a sens (min 2 colonnes)
+                if len(df.columns) < 2: raise ValueError("Separateur incorrect")
+            except Exception as e_csv_fr:
+                errors.append(f"CSV-FR: {str(e_csv_fr)}")
+                
+                # 3. Tentative CSV UNIVERSEL (UTF-8 + Virgule)
+                try:
                     buffer.seek(0)
-                    df = pd.read_csv(buffer, sep=',', encoding=enc, on_bad_lines='skip')
-            except Exception as e_csv:
-                # On remonte l'erreur précise
-                raise ValueError(f"Lecture impossible. Excel (openpyxl): {str(e_xls)} | CSV: {str(e_csv)}")
+                    df = pd.read_csv(buffer, sep=',', encoding='utf-8', on_bad_lines='skip')
+                except Exception as e_csv_us:
+                    errors.append(f"CSV-US: {str(e_csv_us)}")
+                    # ECHEC TOTAL
+                    raise ValueError(f"Fichier illisible. Détails: {'; '.join(errors)}")
 
         if df is None or df.empty: return []
 
+        # ... (Le reste du mapping est strictement identique à la V101 validée) ...
         cols = df.columns
         c_pdl = self._find_col(cols, "pdl")
-        # Si pas de PDL, c'est que le fichier est lu mais mal structuré
         if not c_pdl:
              found = ", ".join(list(cols)[:5])
              raise ValueError(f"Colonne PDL introuvable. Colonnes vues : {found}...")
 
-        # ... (Reste du mapping inchangé) ...
         c_nom_site = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
@@ -175,10 +182,10 @@ class CortexIngest:
         return sites
 
     def parse_bpu_excel(self, file_content):
+        # ... (Inchangé) ...
         try:
             buffer = io.BytesIO(file_content)
-            # ICI AUSSI ON FORCE OPENPYXL
-            df = pd.read_excel(buffer, engine='openpyxl')
+            df = pd.read_excel(buffer)
             cols = df.columns
             c_hph = self._find_col(cols, "prix_unitaire")
             if not c_hph:
@@ -197,6 +204,7 @@ class CortexIngest:
         except: return None, False
 
     def parse_load_curve(self, file_content, filename):
+        # ... (Inchangé) ...
         try:
             buffer = io.BytesIO(file_content)
             enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
