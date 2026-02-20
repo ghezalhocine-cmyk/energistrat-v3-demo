@@ -1,16 +1,15 @@
 import pandas as pd
 import numpy as np
 import io
-import re
 import logging
 import chardet
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V75_FINAL")
+logger = logging.getLogger("CORTEX_INGEST_V85_DIAMOND")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "75.0 (Final: Aggressive BPU + Blacklist)"
+        self.version = "85.0 (Diamond: Strict Blacklist + Gas MWh)"
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE"],
@@ -27,9 +26,8 @@ class CortexIngest:
             "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE"],
             "taxes": ["TAXES", "CSPE", "TICGN"]
         }
-        
-        # Mots interdits comme nom de site
-        self.NAME_BLACKLIST = ["CLIENT", "SITE", "INCONNU", "NAN", "NONE", "NOM_SITE", "0", "."]
+        # Blacklist renforcée
+        self.NAME_BLACKLIST = ["CLIENT", "SITE", "INCONNU", "NAN", "NONE", "NOM_SITE", "0", ".", "COMMUNE", "MAIRIE", "SOCIETE"]
 
     def _clean_header(self, h):
         return str(h).upper().strip().replace('É', 'E').replace('È', 'E').replace(' ', '_').replace('.', '').replace('-', '_')
@@ -85,31 +83,30 @@ class CortexIngest:
         for idx, row in df.iterrows():
             try:
                 pdl = str(row.get(c_pdl, f"TMP_{idx}")).replace('.0', '').strip()
-                
-                # --- NOMMAGE INTELLIGENT ---
                 nom_brut = str(row.get(c_nom_site, "")).strip()
                 entite_brut = str(row.get(c_entite, "")).strip()
                 
                 final_name = "Site Inconnu"
                 
-                # 1. Essai Nom Site
-                if nom_brut and nom_brut.upper() not in self.NAME_BLACKLIST:
+                # Logique de nommage stricte
+                # Si le nom brut est dans la blacklist, on l'ignore
+                is_nom_bad = not nom_brut or any(b in nom_brut.upper() for b in self.NAME_BLACKLIST)
+                is_entite_bad = not entite_brut or any(b in entite_brut.upper() for b in self.NAME_BLACKLIST)
+                
+                if not is_nom_bad:
                     final_name = nom_brut
-                # 2. Essai Entité
-                elif entite_brut and entite_brut.upper() not in self.NAME_BLACKLIST:
+                elif not is_entite_bad:
                     final_name = entite_brut
-                # 3. Fallback Ville
                 else:
+                    # Fallback Ville + PDL
                     ville = str(row.get(c_ville, "")).strip()
-                    if ville: final_name = f"{ville} ({pdl[-4:]})"
+                    final_name = f"{ville} ({pdl[-4:]})"
 
-                # --- UNITÉS ---
                 raw_conso = self._safe_float(row.get(c_conso))
                 conso_kwh = raw_conso
                 if c_conso and "MWH" in str(c_conso).upper():
                     conso_kwh = raw_conso * 1000.0
 
-                # --- ÉNERGIE ---
                 segment = str(row.get(c_seg, "")).upper()
                 is_gas = False
                 if "GAZ" in segment or "T1" in segment or "T2" in segment or "T3" in segment: is_gas = True
@@ -139,43 +136,29 @@ class CortexIngest:
         return sites
 
     def parse_bpu_excel(self, file_content):
-        """ SCANNER AGRESSIF POUR LE COMPARATEUR """
         try:
             buffer = io.BytesIO(file_content)
             df = pd.read_excel(buffer)
             cols = df.columns
-            
-            # Recherche colonne Prix
             c_hph = self._find_col(cols, "prix_unitaire")
             if not c_hph:
-                # Mode Agressif : Cherche n'importe quelle colonne numérique qui ressemble à un prix (0.05 < x < 500)
                 for c in cols:
                     try:
                         val = self._safe_float(df.iloc[0][c])
-                        if 0.01 < val < 500: # Fourchette large d'un prix unitaire
+                        if 0.01 < val < 500:
                             c_hph = c
                             break
                     except: continue
-            
             if not c_hph: return None, False
-            
-            # Recherche Abonnement
             c_abo = self._find_col(cols, "abonnement")
             fix_val = 0.0
             if c_abo: fix_val = self._safe_float(df.iloc[0].get(c_abo, 0))
-            
-            prices = {
-                "hph": self._safe_float(df.iloc[0].get(c_hph, 0)),
-                "fix": fix_val
-            }
+            prices = {"hph": self._safe_float(df.iloc[0].get(c_hph, 0)),"fix": fix_val}
             is_gaz = "GAZ" in str(df.columns).upper()
             return pd.DataFrame([prices]), is_gaz
-        except Exception as e:
-            logger.error(f"BPU Fail: {e}")
-            return None, False
+        except: return None, False
 
     def parse_load_curve(self, file_content, filename):
-        # ... (Inchangé) ...
         try:
             buffer = io.BytesIO(file_content)
             enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
