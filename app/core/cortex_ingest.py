@@ -5,28 +5,49 @@ import logging
 import chardet
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V85_DIAMOND")
+logger = logging.getLogger("CORTEX_INGEST_V90_TITANIUM")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "85.0 (Diamond: Strict Blacklist + Gas MWh)"
+        self.version = "90.0 (Titanium: Elec 4-Postes + Gaz MWh/Taxes Fix)"
         
         self.COLUMN_MAPPING = {
+            # IDENTIFICATION
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE"],
             "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL"],
             "entity": ["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT"],
+            
+            # LOCALISATION
             "adresse": ["ADRESSE_SITE", "ADRESSE", "RUE"],
             "ville": ["VILLE", "COMMUNE", "CITY"],
             "cp": ["CP", "CODE_POSTAL", "ZIP"],
-            "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION"],
-            "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA"],
+            "siret": ["SIRET", "SIRET_SITE"],
+            
+            # CONTRAT GLOBAL
+            "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL"],
+            "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)"],
             "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF"],
             "fournisseur": ["FOURNISSEUR", "TITULAIRE"],
+            "date_fin": ["DATE_FIN", "ECHEANCE"],
+            
+            # --- DÉTAILS ELEC (4 QUADRANTS) ---
+            "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH"],
+            "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH"],
+            "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE"],
+            "ps_hce": ["PS HCE", "PUISSANCE HCE", "P_HCE"],
+            
+            "conso_hph": ["CONSO HPH", "C_HPH", "HP HAUTE"],
+            "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE"],
+            "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE"],
+            "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE"],
+
+            # PRIX & BUDGET
             "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
             "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE"],
-            "taxes": ["TAXES", "CSPE", "TICGN"]
+            "taxes": ["TAXES", "CSPE", "TICGN"],
+            "stockage": ["TERME_STOCK", "STOCKAGE", "TERME_STOCKAGE"] # Spécifique Gaz
         }
-        # Blacklist renforcée
+        
         self.NAME_BLACKLIST = ["CLIENT", "SITE", "INCONNU", "NAN", "NONE", "NOM_SITE", "0", ".", "COMMUNE", "MAIRIE", "SOCIETE"]
 
     def _clean_header(self, h):
@@ -36,9 +57,12 @@ class CortexIngest:
         candidates = self.COLUMN_MAPPING.get(key, [])
         for col in df_cols:
             clean = self._clean_header(col)
+            # Match Exact
             if clean in candidates: return col
-            for cand in candidates:
-                if cand in clean: return col
+            # Match Partiel (sauf pour les clés courtes comme CP ou PS)
+            if len(key) > 3:
+                for cand in candidates:
+                    if cand in clean: return col
         return None
 
     def _safe_float(self, val):
@@ -48,93 +72,130 @@ class CortexIngest:
         try: return float(s)
         except: return 0.0
 
+    def _safe_str_clean(self, val):
+        """ Nettoie la notation scientifique (9,35E+12 -> 935...) """
+        if pd.isna(val) or val == '' or val is None: return ""
+        s = str(val).replace(',', '.')
+        try:
+            # Si c'est un float scientifique
+            if 'E+' in s or 'e+' in s:
+                return str(int(float(s))) 
+            if '.' in s:
+                return str(int(float(s)))
+            return s.strip()
+        except:
+            return str(val).strip()
+
     def parse_mass_import_unified(self, file_content):
         sites = []
         df = None
         try:
             buffer = io.BytesIO(file_content)
             df = pd.read_excel(buffer)
-        except:
-            try:
-                buffer.seek(0)
-                df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip')
-                if len(df.columns) < 2:
-                    buffer.seek(0)
-                    df = pd.read_csv(buffer, sep=',', encoding='utf-8', on_bad_lines='skip')
-            except: return []
+        except: return []
 
         if df is None or df.empty: return []
 
         cols = df.columns
+        # Mapping dynamique
         c_pdl = self._find_col(cols, "pdl")
         c_nom_site = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
-        c_ville = self._find_col(cols, "ville")
         c_cp = self._find_col(cols, "cp")
+        c_ville = self._find_col(cols, "ville")
+        c_siret = self._find_col(cols, "siret")
+        
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
         c_seg = self._find_col(cols, "segment")
         c_fourn = self._find_col(cols, "fournisseur")
+        c_end = self._find_col(cols, "date_fin")
+        
+        # Détails Elec
+        c_ps_hph = self._find_col(cols, "ps_hph")
+        c_ps_hch = self._find_col(cols, "ps_hch")
+        c_ps_hpe = self._find_col(cols, "ps_hpe")
+        c_ps_hce = self._find_col(cols, "ps_hce")
+        
+        c_c_hph = self._find_col(cols, "conso_hph")
+        c_c_hch = self._find_col(cols, "conso_hch")
+        c_c_hpe = self._find_col(cols, "conso_hpe")
+        c_c_hce = self._find_col(cols, "conso_hce")
+
+        # Prix
         c_prix = self._find_col(cols, "prix_unitaire")
         c_abo = self._find_col(cols, "abonnement")
         c_tax = self._find_col(cols, "taxes")
+        c_stock = self._find_col(cols, "stockage")
 
         for idx, row in df.iterrows():
             try:
-                pdl = str(row.get(c_pdl, f"TMP_{idx}")).replace('.0', '').strip()
+                # 1. ID Scientifique Fix
+                pdl = self._safe_str_clean(row.get(c_pdl, f"TMP_{idx}"))
+                
+                # 2. Nommage Intelligent
                 nom_brut = str(row.get(c_nom_site, "")).strip()
                 entite_brut = str(row.get(c_entite, "")).strip()
+                ville = str(row.get(c_ville, "")).strip()
                 
                 final_name = "Site Inconnu"
-                
-                # Logique de nommage stricte
-                # Si le nom brut est dans la blacklist, on l'ignore
                 is_nom_bad = not nom_brut or any(b in nom_brut.upper() for b in self.NAME_BLACKLIST)
-                is_entite_bad = not entite_brut or any(b in entite_brut.upper() for b in self.NAME_BLACKLIST)
                 
-                if not is_nom_bad:
-                    final_name = nom_brut
-                elif not is_entite_bad:
-                    final_name = entite_brut
-                else:
-                    # Fallback Ville + PDL
-                    ville = str(row.get(c_ville, "")).strip()
-                    final_name = f"{ville} ({pdl[-4:]})"
+                if not is_nom_bad: final_name = nom_brut
+                elif entite_brut and not any(b in entite_brut.upper() for b in self.NAME_BLACKLIST): final_name = entite_brut
+                elif ville: final_name = f"{ville} ({pdl[-4:]})"
 
+                # 3. Normalisation Conso
                 raw_conso = self._safe_float(row.get(c_conso))
                 conso_kwh = raw_conso
                 if c_conso and "MWH" in str(c_conso).upper():
                     conso_kwh = raw_conso * 1000.0
 
+                # 4. Énergie
                 segment = str(row.get(c_seg, "")).upper()
                 is_gas = False
-                if "GAZ" in segment or "T1" in segment or "T2" in segment or "T3" in segment: is_gas = True
+                if "GAZ" in segment or "T1" in segment or "T2" in segment or "T3" in segment or "T4" in segment: is_gas = True
                 elif c_pdl and "PCE" in str(c_pdl).upper(): is_gas = True
                 energy_type = "gaz" if is_gas else "elec"
 
                 site = {
-                    "identity": { "id": pdl, "site_name": final_name, "entity_name": entite_brut },
+                    "identity": { 
+                        "id": pdl, "site_name": final_name, "entity_name": entite_brut,
+                        "siret": self._safe_str_clean(row.get(c_siret))
+                    },
                     "location": {
-                        "address": str(row.get(c_addr, "")),
-                        "city": str(row.get(c_ville, "")),
-                        "zip_code": str(row.get(c_cp, "")).replace('.0', '')
+                        "address": str(row.get(c_addr, "")), "zip_code": self._safe_str_clean(row.get(c_cp, "")), "city": ville
                     },
                     "contract": {
                         "pdl": pdl, "provider": str(row.get(c_fourn, "Inconnu")),
                         "segment": segment, "power": self._safe_float(row.get(c_puiss)),
-                        "annual_volume_estimated": conso_kwh, "energy_type": energy_type
+                        "annual_volume_estimated": conso_kwh, "energy_type": energy_type,
+                        "end_date": str(row.get(c_end, "")),
+                        # STOCKAGE DES DÉTAILS 4-CADRANS (Pour le DQE)
+                        "details": {
+                            "ps_hph": self._safe_float(row.get(c_ps_hph)),
+                            "ps_hch": self._safe_float(row.get(c_ps_hch)),
+                            "ps_hpe": self._safe_float(row.get(c_ps_hpe)),
+                            "ps_hce": self._safe_float(row.get(c_ps_hce)),
+                            "conso_hph": self._safe_float(row.get(c_c_hph)),
+                            "conso_hch": self._safe_float(row.get(c_c_hch)),
+                            "conso_hpe": self._safe_float(row.get(c_c_hpe)),
+                            "conso_hce": self._safe_float(row.get(c_c_hce))
+                        }
                     },
                     "pricing": {
                         "hph": self._safe_float(row.get(c_prix)),
                         "fix": self._safe_float(row.get(c_abo)),
-                        "tax": self._safe_float(row.get(c_tax))
+                        "tax": self._safe_float(row.get(c_tax)),
+                        "storage": self._safe_float(row.get(c_stock))
                     }
                 }
                 sites.append(site)
             except: continue
         return sites
 
+    # ... (Garder parse_bpu_excel et parse_load_curve de la V85 inchangés) ...
     def parse_bpu_excel(self, file_content):
         try:
             buffer = io.BytesIO(file_content)
