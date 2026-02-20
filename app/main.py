@@ -33,7 +33,7 @@ except ImportError:
     except ImportError:
         pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-FINAL-V95")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-FINAL-V100")
 
 app.add_middleware(
     CORSMiddleware,
@@ -91,10 +91,15 @@ async def api_update_site(request: Request):
 
 @app.post("/api/settings/import_csv")
 async def api_import_csv(file: UploadFile = File(...)):
+    """ 
+    IMPORT MASSIF AVEC RETOUR D'ERREUR PRÉCIS 
+    """
     try:
         content = await file.read()
+        
+        # Appel Ingest qui peut désormais lever une ValueError explicite
         sites = ingest.parse_mass_import_unified(content)
-        if not sites: return JSONResponse({"success": False, "error": "Fichier illisible (Format ou Colonnes)."})
+        
         saved = 0
         for s in sites:
             try:
@@ -105,8 +110,15 @@ async def api_import_csv(file: UploadFile = File(...)):
                 with open(file_path, 'w', encoding='utf-8') as f: json.dump(s, f, indent=4, ensure_ascii=False)
                 saved += 1
             except: pass
+            
         return JSONResponse({"success": True, "imported": len(sites), "saved": saved})
-    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
+        
+    except ValueError as ve:
+        # Erreur logique (ex: Colonne manquante)
+        return JSONResponse({"success": False, "error": str(ve)})
+    except Exception as e:
+        # Erreur technique (ex: Crash Pandas)
+        return JSONResponse({"success": False, "error": f"Erreur Technique: {str(e)}"})
 
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data():
@@ -179,14 +191,14 @@ async def api_solar_sim(request: Request):
 
 @app.get("/api/tools/template/{template_type}")
 async def download_template(template_type: str):
-    """ Génère un template (Excel si possible, sinon CSV) """
+    """ TÉLÉCHARGEMENT ROBUSTE (Excel ou CSV) """
     if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
     
     stream = io.BytesIO()
     
-    # Tentative Excel
     try:
-        with pd.ExcelWriter(stream, engine='openpyxl') as writer:
+        # Essai Excel
+        with pd.ExcelWriter(stream) as writer: # On laisse Pandas choisir le moteur
             if template_type == "import":
                 df = pd.DataFrame(columns=["PDL", "NOM_SITE", "ADRESSE", "CP", "VILLE", "VOLUME_ANNUEL", "PUISSANCE", "PRIX_HPH", "ABONNEMENT"])
                 df.to_excel(writer, index=False)
@@ -197,7 +209,8 @@ async def download_template(template_type: str):
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=template_{template_type}.xlsx"})
     
     except Exception as e:
-        # Fallback CSV si openpyxl manque
+        # Fallback CSV si Excel plante (ex: openpyxl manquant malgré requirements)
+        print(f"⚠️ Erreur Excel Template: {e} -> Fallback CSV")
         stream = io.StringIO()
         df = pd.DataFrame(columns=["PDL", "NOM_SITE", "ADRESSE", "CP", "VILLE", "VOLUME_ANNUEL", "PUISSANCE", "PRIX_HPH", "ABONNEMENT"])
         df.to_csv(stream, index=False, sep=';')
@@ -241,7 +254,7 @@ async def generate_tender(request: Request):
         df_dqe = cortex.generate_dqe_structure(selected_sites)
         stream = io.BytesIO()
         try:
-            with pd.ExcelWriter(stream, engine='openpyxl') as writer: df_dqe.to_excel(writer, index=False, sheet_name="DQE_Sites")
+            with pd.ExcelWriter(stream) as writer: df_dqe.to_excel(writer, index=False, sheet_name="DQE_Sites")
         except:
             return JSONResponse({"error": "Moteur Excel (openpyxl) manquant."}, 500)
         stream.seek(0)
