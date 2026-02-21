@@ -29,7 +29,7 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V300-SEARCH")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V350-LINK-FIX")
 
 app.add_middleware(
     CORSMiddleware,
@@ -60,33 +60,27 @@ def json_compliant(data):
     return data
 
 def get_safe_id(raw_id):
-    """ Nettoyage standard pour l'écriture """
+    """ Nettoyage strict pour URL et Fichiers """
     return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
 
-# --- FONCTION CRITIQUE : LA TÊTE CHERCHEUSE ---
+# --- FONCTION DE RECHERCHE ROBUSTE ---
 def find_site_file(target_id):
-    """
-    Cherche un site peu importe son nom de fichier exact.
-    Compare l'ID demandé avec l'ID stocké DANS le JSON.
-    """
-    # 1. Essai direct (Rapide)
+    # 1. Essai direct avec ID propre (Cas nominal)
     safe_target = get_safe_id(target_id)
     direct_path = os.path.join(DATA_DIR, f"{safe_target}.json")
-    if os.path.exists(direct_path):
-        return direct_path
+    if os.path.exists(direct_path): return direct_path
     
-    # 2. Recherche exhaustive (Lent mais Infaillible)
+    # 2. Recherche par contenu (Cas désespéré)
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     for p in files:
         try:
             with open(p, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # On compare l'ID interne
+                # On compare l'ID stocké avec ce qu'on cherche
                 stored_id = str(data.get('identity', {}).get('id', ''))
-                if stored_id == str(target_id) or stored_id == safe_target:
+                if stored_id == str(target_id) or get_safe_id(stored_id) == safe_target:
                     return p
         except: continue
-    
     return None
 
 # --- API ---
@@ -105,19 +99,15 @@ async def api_save_client(request: Request):
 
 @app.post("/api/settings/update_site")
 async def api_update_site(request: Request):
-    """ FIX AUDIT : Utilise la recherche intelligente """
     try:
         payload = await request.json()
         site_id = payload.get('id')
         if not site_id: return JSONResponse({"error": "ID manquant"}, 400)
         
-        # RECHERCHE INTELLIGENTE
         file_path = find_site_file(site_id)
-        if not file_path: return JSONResponse({"error": "Site introuvable sur le disque"}, 404)
+        if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
         
         with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
-        
-        # Mise à jour
         if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
         if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
         
@@ -136,7 +126,7 @@ async def api_import_csv(file: UploadFile = File(...)):
             try:
                 cid = s.get('identity', {}).get('id') or f"GEN_{uuid.uuid4().hex[:8]}"
                 s['identity']['id'] = cid
-                # ON UTILISE L'ID SÉCURISÉ POUR L'ÉCRITURE
+                # ON ÉCRIT AVEC L'ID SÉCURISÉ
                 file_path = os.path.join(DATA_DIR, f"{get_safe_id(cid)}.json")
                 with open(file_path, 'w', encoding='utf-8') as f: json.dump(s, f, indent=4, ensure_ascii=False)
                 saved += 1
@@ -161,7 +151,7 @@ async def get_fleet_data():
     fleet_list = []
     all_cities, all_providers = set(), set()
     for s in raw_sites:
-        if "CLI_" in str(s.get('identity',{}).get('id')): continue # Masque le compte admin
+        if "CLI_" in str(s.get('identity',{}).get('id')): continue
         
         fin = s['computed_financials']
         contract = s.get('contract', {})
@@ -170,12 +160,12 @@ async def get_fleet_data():
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         
-        # ON RENVOIE L'ID BRUT (NON NETTOYÉ) AU FRONTEND
-        # C'est la clé : le frontend garde l'ID original, et le backend se débrouille pour trouver le fichier
-        original_id = s.get('identity',{}).get('id')
+        # --- CORRECTIF CRITIQUE ICI ---
+        # On envoie l'ID SÉCURISÉ au frontend pour que l'URL du clic soit valide
+        safe_id = get_safe_id(s.get('identity',{}).get('id'))
         
         fleet_list.append({
-            "id": original_id, 
+            "id": safe_id, # C'est cet ID qui sera dans l'URL du clic
             "name": fin['meta']['site_label'],
             "city": city,
             "volume": fin['volume_mwh'],
@@ -196,30 +186,28 @@ async def get_fleet_data():
 
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str):
-    """ FIX DETAIL SITE : Utilise la recherche intelligente """
+    # Utilisation de la recherche robuste
     file_path = find_site_file(client_id)
     
     if not file_path: 
-        print(f"❌ Site introuvable pour ID: {client_id}")
         return JSONResponse({"error": "Site introuvable"}, 404)
     
     with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
     
     financials = cortex.enrich_site_financials(data)
     
-    # APLATISSEMENT VITAL (Pour que le Frontend trouve ses billes)
+    # --- APLATISSEMENT MASSIF (POUR GARANTIR L'AFFICHAGE) ---
     merged_data = {
-        **data,
-        **financials,
-        "id": data.get('identity', {}).get('id'), # ID explicite
+        **data, # Données brutes
+        **financials, # Meta, Details, KPIs
+        # Alias pour compatibilité totale Frontend
+        "id": data.get('identity', {}).get('id'),
         "budget": financials['budget_annual'],
         "volume_mwh": financials['volume_mwh'],
         "surface": data.get('location', {}).get('surface', 0),
         "electricity_price": financials['kpis']['unit_price_kwh'],
-        # Données de contrat à la racine
-        "pdl": data.get('contract', {}).get('pdl'),
-        "provider": data.get('contract', {}).get('provider'),
-        "power": data.get('contract', {}).get('power')
+        "contract_provider": data.get('contract', {}).get('provider'),
+        "contract_power": data.get('contract', {}).get('power')
     }
     
     if "location" in data and "surface" in data["location"]:
@@ -301,8 +289,7 @@ async def generate_tender(request: Request):
         site_ids = body.get('site_ids', [])
         selected_sites = []
         for sid in site_ids:
-            # ICI AUSSI : RECHERCHE INTELLIGENTE
-            file_path = find_site_file(sid)
+            file_path = find_site_file(sid) # Recherche robuste
             if file_path:
                 with open(file_path, 'r', encoding='utf-8') as f: selected_sites.append(json.load(f))
         
@@ -320,7 +307,6 @@ async def generate_tender(request: Request):
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-# ROUTAGE HTML
 @app.get("/")
 async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
 @app.get("/onboarding")
