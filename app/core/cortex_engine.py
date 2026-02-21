@@ -10,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V900_TITANIUM")
+logger = logging.getLogger("CORTEX_ENGINE_V601")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "900.0 (Titanium: Complete Logic)"
+        self.version = "601.0 (Hotfix: Lowercase Energy)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.05}, "gas": {"price": 0.08, "tax": 0.02}}
 
     def _safe_float(self, value, default=0.0):
@@ -37,20 +37,20 @@ class CortexEngine:
         pricing = site_data.get('pricing', {})
         loc = site_data.get('location', {})
         
-        # Nommage
         site_label = ident.get('site_name', 'Site Inconnu')
         if not site_label or site_label == "Site Inconnu":
             site_label = f"{loc.get('city', 'Site')} ({str(contract.get('pdl', ''))[-4:]})"
         
-        energy_type = contract.get('energy_type', 'elec').lower()
-        is_gas = 'gaz' in energy_type or 'gas' in energy_type
+        # --- FIX CRITIQUE : MINUSCULE OBLIGATOIRE ---
+        raw_type = str(contract.get('energy_type', 'elec')).lower()
+        is_gas = 'gaz' in raw_type or 'gas' in raw_type
+        energy_type_frontend = "gaz" if is_gas else "elec"
         
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
         
-        # PRIX (Avec correction MWh)
         raw_price = self._safe_float(pricing.get('hph'))
         unit_price = raw_price
-        if unit_price > 2.0: unit_price /= 1000.0
+        if unit_price > 1.0: unit_price = unit_price / 1000.0
             
         is_estimated = False
         if unit_price <= 0.001:
@@ -64,18 +64,20 @@ class CortexEngine:
         if raw_tax > 1.0: raw_tax /= 1000.0
         taxes = (vol_kwh * raw_tax) if raw_tax > 0 else (vol_kwh * self.MARKET_DEFAULTS['gas' if is_gas else 'elec']['tax'])
         
-        storage_cost = vol_kwh * (self._safe_float(pricing.get('storage')) / (1000.0 if self._safe_float(pricing.get('storage')) > 1.0 else 1.0))
+        raw_stock = self._safe_float(pricing.get('storage'))
+        if raw_stock > 1.0: raw_stock /= 1000.0
+        storage_cost = vol_kwh * raw_stock
         
         budget_ttc = commodity + fixe + taxes + storage_cost
         landing = budget_ttc * 1.02
         pmc_mwh = self._safe_div(budget_ttc, (vol_kwh / 1000))
-        ghost_savings = budget_ttc * 0.15
 
         return {
             "meta": {
                 "site_label": str(site_label).upper(),
                 "city": loc.get('city', ''),
-                "energy_type": "Gaz" if is_gas else "Électricité"
+                "energy_type": energy_type_frontend, # "gaz" (minuscule)
+                "is_gas": is_gas
             },
             "volume_kwh": self._sanitize(round(vol_kwh, 0)),
             "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)),
@@ -88,16 +90,42 @@ class CortexEngine:
                 "storage": self._sanitize(round(storage_cost, 2))
             },
             "kpis": {
-                "budget_annual": self._sanitize(round(budget_ttc, 2)),
-                "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)),
-                "ghost_savings": self._sanitize(round(ghost_savings, 2)),
-                "landing_forecast": self._sanitize(round(landing, 2)),
                 "pmc_eur_mwh": self._sanitize(round(pmc_mwh, 2)),
-                "unit_price_kwh": unit_price,
-                "is_estimated_price": is_estimated
+                "is_estimated_price": is_estimated,
+                "unit_price_kwh": unit_price
             },
-            "pricing_details": pricing
+            # On renvoie l'objet pricing complet pour l'affichage
+            "pricing_frontend": {
+                "fix": self._sanitize(round(fixe, 2)),
+                "hph": self._sanitize(round(raw_price, 4)),
+                "tax": self._sanitize(round(raw_tax * (1000 if raw_tax < 1 else 1), 2)),
+                "storage": self._sanitize(round(raw_stock * (1000 if raw_stock < 1 else 1), 2)),
+                "hch": self._safe_float(pricing.get('hch')),
+                "hpe": self._safe_float(pricing.get('hpe')),
+                "hce": self._safe_float(pricing.get('hce'))
+            }
         }
+
+    def analyze_market_position(self, current_price, market_ref, is_gas, segment="C5"):
+        try:
+            ref_price = 0.0
+            if is_gas:
+                ref_price = float(market_ref.get('gaz', {}).get('peg_n1', 40))
+            else:
+                ref_price = float(market_ref.get('elec', {}).get('cal_n1', 90))
+            
+            client_price_mwh = current_price
+            if client_price_mwh < 2.0: client_price_mwh *= 1000.0
+            
+            if client_price_mwh <= 0: return {"status": "INCONNU", "message": "Prix non détecté", "color": "gray", "action": "-"}
+
+            delta = client_price_mwh - ref_price
+            pct = (delta / ref_price) * 100
+
+            if delta > 10: return {"status": "ALERTE", "color": "red", "message": f"Prix élevé (+{int(pct)}%)", "action": f"Payé {int(client_price_mwh)}€ vs {int(ref_price)}€"}
+            elif delta < -5: return {"status": "OPTIMISÉ", "color": "green", "message": "Performance Achat", "action": f"Sous le marché ({int(client_price_mwh)}€)"}
+            else: return {"status": "NEUTRE", "color": "blue", "message": "Aligné marché", "action": f"Prix cohérent ({int(client_price_mwh)}€)"}
+        except: return {"status": "ERREUR", "color": "gray", "message": "Données indisponibles", "action": "-"}
 
     def generate_dqe_structure(self, sites_data):
         rows = []
@@ -106,16 +134,15 @@ class CortexEngine:
             ident = s.get('identity', {})
             loc = s.get('location', {})
             con = s.get('contract', {})
-            pow_det = con.get('power_details', {})
-            con_det = con.get('consumption_details', {})
+            det = con.get('details', {})
             energy = con.get('energy_type', 'elec')
             
             vol_annuel = con.get('annual_volume_estimated', 0)
             if vol_annuel == 0:
-                vol_annuel = (con_det.get('hph', 0) + con_det.get('hch', 0) + con_det.get('hpe', 0) + con_det.get('hce', 0))
+                vol_annuel = (det.get('hph', 0) + det.get('hch', 0) + det.get('hpe', 0) + det.get('hce', 0))
 
             row = {
-                "Type": "GAZ" if "gaz" in energy else "ELEC",
+                "Type": "GAZ" if "gaz" in str(energy).lower() else "ELEC",
                 "Entité": ident.get('entity_name', ''),
                 "Nom du site": ident.get('site_name', ''),
                 "Adresse": loc.get('address', ''),
@@ -125,10 +152,10 @@ class CortexEngine:
                 "Segment": con.get('segment', ''),
                 "FTA": con.get('fta', ''),
                 "S Max (kVA)": con.get('power', 0),
-                "PS HPH": pow_det.get('hph', 0), "PS HCH": pow_det.get('hch', 0), 
-                "PS HPE": pow_det.get('hpe', 0), "PS HCE": pow_det.get('hce', 0),
-                "Conso HPH": con_det.get('hph', 0), "Conso HCH": con_det.get('hch', 0), 
-                "Conso HPE": con_det.get('hpe', 0), "Conso HCE": con_det.get('hce', 0),
+                "PS HPH": det.get('ps_hph', 0), "PS HCH": det.get('ps_hch', 0), 
+                "PS HPE": det.get('ps_hpe', 0), "PS HCE": det.get('ps_hce', 0),
+                "Conso HPH": det.get('conso_hph', 0), "Conso HCH": det.get('conso_hch', 0), 
+                "Conso HPE": det.get('conso_hpe', 0), "Conso HCE": det.get('conso_hce', 0),
                 "Vol. Annuel": vol_annuel,
                 "SIRET": ident.get('siret', '')
             }
@@ -146,15 +173,14 @@ class CortexEngine:
                 if fin['volume_kwh'] <= 1: continue
                 stats['nb'] += 1
                 stats['total_budget'] += fin['budget_annual']
-                if "Gaz" in fin['meta']['energy_type']: stats['total_gas'] += fin['volume_kwh']
+                if fin['meta']['is_gas']: stats['total_gas'] += fin['volume_kwh']
                 else: stats['total_elec'] += fin['volume_kwh']
                 processed.append({
                     "id": s.get('identity',{}).get('id'),
                     "name": fin['meta']['site_label'],
                     "ratio_pmc": fin['kpis']['pmc_eur_mwh'],
                     "conso_mwh": fin['volume_mwh'],
-                    "budget": fin['budget_annual'],
-                    "ghost_savings": fin['kpis']['ghost_savings']
+                    "budget": fin['budget_annual']
                 })
             except: continue
         valid = [s for s in processed if s['conso_mwh'] > 0.1]
@@ -173,26 +199,6 @@ class CortexEngine:
             }
         }
 
-    # ANALYSE MARCHE DYNAMIQUE (POUR LA BULLE)
-    def analyze_market_position(self, current_price, market_ref, is_gas, segment="C5"):
-        try:
-            ref_price = 0.0
-            if is_gas: ref_price = float(market_ref.get('gaz', {}).get('peg_n1', 40))
-            else: ref_price = float(market_ref.get('elec', {}).get('cal_n1', 90))
-            
-            client_price_mwh = current_price
-            if client_price_mwh < 2.0: client_price_mwh *= 1000.0
-            
-            if client_price_mwh <= 0: return {"status": "INCONNU", "message": "Prix non détecté", "color": "gray", "action": "-"}
-
-            delta = client_price_mwh - ref_price
-            pct = (delta / ref_price) * 100
-
-            if delta > 10: return {"status": "ALERTE", "color": "red", "message": f"Prix élevé (+{int(pct)}%)", "action": f"Payé {int(client_price_mwh)}€ vs {int(ref_price)}€"}
-            elif delta < -5: return {"status": "OPTIMISÉ", "color": "green", "message": "Performance Achat", "action": f"Sous le marché ({int(client_price_mwh)}€)"}
-            else: return {"status": "NEUTRE", "color": "blue", "message": "Aligné marché", "action": f"Prix cohérent ({int(client_price_mwh)}€)"}
-        except: return {"status": "ERREUR", "color": "gray", "message": "Données indisponibles", "action": "-"}
-
     def analyze_load_curve(self, content, filename, power_subscribed=36):
         if physics and ingest:
             df, step, meta = ingest.parse_load_curve(content, filename)
@@ -208,7 +214,7 @@ class CortexEngine:
         total_savings = 0
         for s in current_sites:
             fin = self.enrich_site_financials(s)
-            if ("Gaz" in fin['meta']['energy_type']) == is_gaz:
+            if fin['meta']['is_gas'] == is_gaz:
                 new_cost = fin['volume_kwh'] * offer_price
                 total_savings += (fin['details']['commodity'] - new_cost)
         return {"success": True, "savings_total": self._sanitize(round(total_savings, 2))}
