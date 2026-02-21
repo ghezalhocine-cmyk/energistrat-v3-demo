@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
-# BLOC IMPORT ROBUSTE
+# BLOC IMPORT
 try:
     import pandas as pd
     PANDAS_READY = True
@@ -27,14 +27,9 @@ try:
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
 except ImportError:
-    try:
-        from cortex_ingest import ingest
-        from cortex_engine import cortex
-        from cortex_physics import physics
-    except ImportError:
-        pass
+    pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V202-CUMUL")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V300-SEARCH")
 
 app.add_middleware(
     CORSMiddleware,
@@ -65,8 +60,34 @@ def json_compliant(data):
     return data
 
 def get_safe_id(raw_id):
-    """ ID SÉCURISÉ (V201) : Pas de majuscule forcée, pas de caractères spéciaux """
-    return str(raw_id).replace('/', '_').replace(' ', '').replace('+', '').replace(',', '').strip()
+    """ Nettoyage standard pour l'écriture """
+    return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
+
+# --- FONCTION CRITIQUE : LA TÊTE CHERCHEUSE ---
+def find_site_file(target_id):
+    """
+    Cherche un site peu importe son nom de fichier exact.
+    Compare l'ID demandé avec l'ID stocké DANS le JSON.
+    """
+    # 1. Essai direct (Rapide)
+    safe_target = get_safe_id(target_id)
+    direct_path = os.path.join(DATA_DIR, f"{safe_target}.json")
+    if os.path.exists(direct_path):
+        return direct_path
+    
+    # 2. Recherche exhaustive (Lent mais Infaillible)
+    files = glob.glob(os.path.join(DATA_DIR, "*.json"))
+    for p in files:
+        try:
+            with open(p, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                # On compare l'ID interne
+                stored_id = str(data.get('identity', {}).get('id', ''))
+                if stored_id == str(target_id) or stored_id == safe_target:
+                    return p
+        except: continue
+    
+    return None
 
 # --- API ---
 
@@ -77,23 +98,29 @@ async def api_save_client(request: Request):
         cid = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
         if "identity" not in data: data["identity"] = {}
         data["identity"]["id"] = cid
-        safe_id = get_safe_id(cid)
-        file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
+        file_path = os.path.join(DATA_DIR, f"{get_safe_id(cid)}.json")
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "id": cid})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/settings/update_site")
 async def api_update_site(request: Request):
+    """ FIX AUDIT : Utilise la recherche intelligente """
     try:
         payload = await request.json()
         site_id = payload.get('id')
         if not site_id: return JSONResponse({"error": "ID manquant"}, 400)
-        file_path = os.path.join(DATA_DIR, f"{get_safe_id(site_id)}.json")
-        if not os.path.exists(file_path): return JSONResponse({"error": "Site introuvable"}, 404)
+        
+        # RECHERCHE INTELLIGENTE
+        file_path = find_site_file(site_id)
+        if not file_path: return JSONResponse({"error": "Site introuvable sur le disque"}, 404)
+        
         with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
+        
+        # Mise à jour
         if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
         if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
+        
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "message": "Sauvegardé"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
@@ -101,24 +128,17 @@ async def api_update_site(request: Request):
 @app.post("/api/settings/import_csv")
 async def api_import_csv(file: UploadFile = File(...)):
     try:
-        # --- CORRECTIF V202 : PLUS DE PURGE AUTOMATIQUE ---
-        # On permet le cumul des fichiers (Elec + Gaz)
-        
         content = await file.read()
         sites = ingest.parse_mass_import_unified(content)
-        
         if not sites: return JSONResponse({"success": False, "error": "Fichier illisible."})
-        
         saved = 0
         for s in sites:
             try:
                 cid = s.get('identity', {}).get('id') or f"GEN_{uuid.uuid4().hex[:8]}"
                 s['identity']['id'] = cid
+                # ON UTILISE L'ID SÉCURISÉ POUR L'ÉCRITURE
                 file_path = os.path.join(DATA_DIR, f"{get_safe_id(cid)}.json")
-                
-                # ÉCRITURE / ÉCRASEMENT (Mise à jour)
-                with open(file_path, 'w', encoding='utf-8') as f: 
-                    json.dump(s, f, indent=4, ensure_ascii=False)
+                with open(file_path, 'w', encoding='utf-8') as f: json.dump(s, f, indent=4, ensure_ascii=False)
                 saved += 1
             except: pass
         return JSONResponse({"success": True, "imported": len(sites), "saved": saved})
@@ -139,24 +159,28 @@ async def get_fleet_data():
         except: continue
     analysis = cortex.analyze_portfolio(raw_sites)
     fleet_list = []
-    all_cities, all_providers, all_segments = set(), set(), set()
+    all_cities, all_providers = set(), set()
     for s in raw_sites:
-        if "CLI_" in str(s.get('identity',{}).get('id')): continue
+        if "CLI_" in str(s.get('identity',{}).get('id')): continue # Masque le compte admin
+        
         fin = s['computed_financials']
         contract = s.get('contract', {})
         city = fin['meta']['city']
         prov = contract.get('provider', 'Inconnu')
-        seg = contract.get('segment', '-')
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         
+        # ON RENVOIE L'ID BRUT (NON NETTOYÉ) AU FRONTEND
+        # C'est la clé : le frontend garde l'ID original, et le backend se débrouille pour trouver le fichier
+        original_id = s.get('identity',{}).get('id')
+        
         fleet_list.append({
-            "id": get_safe_id(s.get('identity',{}).get('id')),
+            "id": original_id, 
             "name": fin['meta']['site_label'],
             "city": city,
             "volume": fin['volume_mwh'],
             "energy": "gaz" if "Gaz" in fin['meta']['energy_type'] else "elec",
-            "segment": seg,
+            "segment": contract.get('segment', '-'),
             "provider": prov,
             "budget": fin['budget_annual'],
             "ratio": fin['kpis']['pmc_eur_mwh'],
@@ -172,19 +196,30 @@ async def get_fleet_data():
 
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str):
-    file_path = os.path.join(DATA_DIR, f"{get_safe_id(client_id)}.json")
-    if not os.path.exists(file_path): return JSONResponse({"error": "Site introuvable"}, 404)
+    """ FIX DETAIL SITE : Utilise la recherche intelligente """
+    file_path = find_site_file(client_id)
+    
+    if not file_path: 
+        print(f"❌ Site introuvable pour ID: {client_id}")
+        return JSONResponse({"error": "Site introuvable"}, 404)
+    
     with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
     
     financials = cortex.enrich_site_financials(data)
     
+    # APLATISSEMENT VITAL (Pour que le Frontend trouve ses billes)
     merged_data = {
         **data,
         **financials,
+        "id": data.get('identity', {}).get('id'), # ID explicite
         "budget": financials['budget_annual'],
         "volume_mwh": financials['volume_mwh'],
         "surface": data.get('location', {}).get('surface', 0),
-        "electricity_price": financials['kpis']['unit_price_kwh']
+        "electricity_price": financials['kpis']['unit_price_kwh'],
+        # Données de contrat à la racine
+        "pdl": data.get('contract', {}).get('pdl'),
+        "provider": data.get('contract', {}).get('provider'),
+        "power": data.get('contract', {}).get('power')
     }
     
     if "location" in data and "surface" in data["location"]:
@@ -233,85 +268,4 @@ async def download_template(template_type: str):
 @app.get("/app/assets/{filename}")
 async def get_static_asset(filename: str):
     if "template" in filename: return await download_template("import")
-    if "bpu" in filename: return await download_template("bpu")
-    return JSONResponse({"error": "File not found"}, 404)
-
-@app.post("/api/ops/simulate_offer")
-async def api_simulate_offer(file: UploadFile = File(...)):
-    try:
-        content = await file.read()
-        current_sites = []
-        files = glob.glob(os.path.join(DATA_DIR, "*.json"))
-        for p in files:
-            if "master" in p: continue
-            if "," in p or "+" in p: continue
-            try:
-                with open(p, 'r', encoding='utf-8') as f: current_sites.append(json.load(f))
-            except: continue
-        res = cortex.simulate_budget_from_bpu(content, current_sites)
-        return JSONResponse(json_compliant(res))
-    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
-
-@app.post("/api/ops/analyze")
-async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
-    content = await file.read()
-    res = cortex.analyze_load_curve(content, file.filename)
-    return JSONResponse(json_compliant(res))
-
-@app.post("/api/ops/generate_tender")
-async def generate_tender(request: Request):
-    if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
-    try:
-        body = await request.json()
-        site_ids = body.get('site_ids', [])
-        selected_sites = []
-        for sid in site_ids:
-            file_path = os.path.join(DATA_DIR, f"{get_safe_id(sid)}.json")
-            if os.path.exists(file_path):
-                with open(file_path, 'r', encoding='utf-8') as f: selected_sites.append(json.load(f))
-        
-        df_dqe = cortex.generate_dqe_structure(selected_sites)
-        df_elec = df_dqe[df_dqe['Type'] == 'ELEC']
-        df_gaz = df_dqe[df_dqe['Type'] == 'GAZ']
-        
-        stream = io.BytesIO()
-        with pd.ExcelWriter(stream, engine='openpyxl') as writer:
-            if not df_elec.empty: df_elec.to_excel(writer, index=False, sheet_name="ELEC")
-            if not df_gaz.empty: df_gaz.to_excel(writer, index=False, sheet_name="GAZ")
-            if df_elec.empty and df_gaz.empty: df_dqe.to_excel(writer, index=False, sheet_name="TOUT")
-        stream.seek(0)
-        timestamp = datetime.now().strftime("%Y%m%d")
-        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_{timestamp}.xlsx"})
-    except Exception as e: return JSONResponse({"error": str(e)}, 500)
-
-@app.get("/")
-async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
-@app.get("/onboarding")
-async def view_onboarding(request: Request): return templates.TemplateResponse("onboarding.html", {"request": request})
-@app.get("/processing")
-async def view_processing(request: Request): return templates.TemplateResponse("processing.html", {"request": request})
-@app.get("/dashboard/{profile}")
-async def view_dashboard(request: Request, profile: str):
-    t = f"{profile}.html"
-    if os.path.exists(os.path.join(TEMPLATE_DIR, t)): return templates.TemplateResponse(t, {"request": request, "profile": profile})
-    return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
-@app.get("/settings")
-async def view_settings(request: Request): return templates.TemplateResponse("settings.html", {"request": request})
-@app.get("/partner/settings")
-async def view_partner_settings(request: Request):
-    if "supplier" in request.headers.get("referer", ""): return templates.TemplateResponse("settings_partner.html", {"request": request})
-    return templates.TemplateResponse("settings.html", {"request": request})
-@app.get("/{page_name}")
-async def serve_dynamic(request: Request, page_name: str):
-    if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
-    c = page_name if page_name.endswith(".html") else f"{page_name}.html"
-    if os.path.exists(os.path.join(TEMPLATE_DIR, c)): return templates.TemplateResponse(c, {"request": request})
-    return templates.TemplateResponse("index.html", {"request": request})
-@app.get("/{full_path:path}")
-async def catch_all_deep(request: Request, full_path: str):
-    if any(x in full_path for x in ["static", "assets", "favicon"]): return JSONResponse({}, 404)
-    return templates.TemplateResponse("index.html", {"request": request})
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    if "bpu" in filename: return await download_tem
