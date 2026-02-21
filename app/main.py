@@ -33,7 +33,7 @@ except ImportError:
     except ImportError:
         pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-HYBRID-V140")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-EMERALD-V150")
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,6 +61,7 @@ def json_compliant(data):
     return data
 
 def get_safe_id(raw_id):
+    """ DOUANE ID : Nettoie tout pour garantir la correspondance """
     return str(raw_id).replace('/', '_').replace(' ', '').replace('+', '').replace(',', '').strip()
 
 # --- API ---
@@ -83,11 +84,14 @@ async def api_update_site(request: Request):
         payload = await request.json()
         site_id = payload.get('id')
         if not site_id: return JSONResponse({"error": "ID manquant"}, 400)
+        
         file_path = os.path.join(DATA_DIR, f"{get_safe_id(site_id)}.json")
         if not os.path.exists(file_path): return JSONResponse({"error": "Site introuvable"}, 404)
+        
         with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
         if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
         if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
+        
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "message": "Sauvegardé"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
@@ -137,10 +141,8 @@ async def get_fleet_data():
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         if seg: all_segments.add(seg)
-        
-        # APLATISSEMENT HYBRIDE : On donne au frontend exactement ce qu'il attendait dans la V49
         fleet_list.append({
-            "id": get_safe_id(s.get('identity',{}).get('id')),
+            "id": get_safe_id(s.get('identity',{}).get('id')), # ID SÉCURISÉ POUR LE FRONTEND
             "name": fin['meta']['site_label'],
             "city": city,
             "volume": fin['volume_mwh'],
@@ -167,8 +169,6 @@ async def get_dashboard_data(client_id: str):
     
     financials = cortex.enrich_site_financials(data)
     
-    # MAPPING CRITIQUE POUR AUDIT & SOLAR
-    # On met les données aux deux endroits (racine et sous-objet) pour être sûr
     merged_data = {
         **data,
         **financials,
@@ -260,19 +260,14 @@ async def generate_tender(request: Request):
             file_path = os.path.join(DATA_DIR, f"{get_safe_id(sid)}.json")
             if os.path.exists(file_path):
                 with open(file_path, 'r', encoding='utf-8') as f: selected_sites.append(json.load(f))
-        
         df_dqe = cortex.generate_dqe_structure(selected_sites)
-        
-        # SPLIT ELEC / GAZ
         df_elec = df_dqe[df_dqe['Type'] == 'ELEC']
         df_gaz = df_dqe[df_dqe['Type'] == 'GAZ']
-        
         stream = io.BytesIO()
         with pd.ExcelWriter(stream, engine='openpyxl') as writer:
             if not df_elec.empty: df_elec.to_excel(writer, index=False, sheet_name="ELEC")
             if not df_gaz.empty: df_gaz.to_excel(writer, index=False, sheet_name="GAZ")
             if df_elec.empty and df_gaz.empty: df_dqe.to_excel(writer, index=False, sheet_name="TOUT")
-            
         stream.seek(0)
         timestamp = datetime.now().strftime("%Y%m%d")
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_{timestamp}.xlsx"})
