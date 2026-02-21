@@ -8,20 +8,19 @@ import traceback
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-# BLOC IMPORT
 try:
     import pandas as pd
     PANDAS_READY = True
 except ImportError:
     PANDAS_READY = False
 
-# CHARGEMENT CORTEX
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
@@ -29,7 +28,7 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V500-FINAL")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V600-MARKET-LINK")
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,18 +38,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# GESTION DOSSIERS
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
-
 TEMPLATE_DIR = os.path.join(BASE_DIR, "app/templates")
 if not os.path.exists(TEMPLATE_DIR): TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
-
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# --- UTILS & MODELS ---
+
+class MarketUpdateModel(BaseModel):
+    elec: Dict[str, Any]
+    gaz: Dict[str, Any]
+    trve: Optional[Dict[str, Any]] = None
+    targets: Optional[Dict[str, Any]] = None
 
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
@@ -77,7 +81,40 @@ def find_site_file(target_id):
         except: continue
     return None
 
-# --- API ---
+def get_market_ref():
+    """ Charge les données de marché sauvegardées """
+    path = os.path.join(DATA_DIR, "market_ref.json")
+    if os.path.exists(path):
+        try:
+            with open(path, 'r') as f: return json.load(f)
+        except: pass
+    # Valeurs par défaut si pas de fichier
+    return {
+        "updated_at": datetime.now().isoformat(),
+        "elec": { "cal_n1": 85.0 },
+        "gaz": { "peg_n1": 35.0 },
+        "trve": { "elec_c5": 230.0, "gaz": 110.0 },
+        "targets": { "c5": 190.0, "gaz": 85.0 }
+    }
+
+# --- API MARKET (RESTORED) ---
+
+@app.get("/api/market/current")
+async def api_get_market(): 
+    return JSONResponse(get_market_ref())
+
+@app.post("/api/ops/market/update")
+async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header(None)):
+    try:
+        new_payload = data.dict()
+        new_payload["updated_at"] = datetime.now().isoformat()
+        ref_path = os.path.join(DATA_DIR, "market_ref.json")
+        with open(ref_path, "w") as f: json.dump(new_payload, f, indent=4)
+        return JSONResponse({"success": True})
+    except Exception as e: 
+        return JSONResponse({"success": False, "error": str(e)})
+
+# --- API CORE ---
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
@@ -156,7 +193,7 @@ async def get_fleet_data():
             "name": fin['meta']['site_label'],
             "city": city,
             "volume": fin['volume_mwh'],
-            "energy": "gaz" if "Gaz" in fin['meta']['energy_type'] else "elec",
+            "energy": "gaz" if fin['meta']['is_gas'] else "elec", # Utilise le flag boolean sûr
             "segment": contract.get('segment', '-'),
             "provider": prov,
             "budget": fin['budget_annual'],
@@ -178,8 +215,8 @@ async def get_dashboard_data(client_id: str):
     with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
     
     financials = cortex.enrich_site_financials(data)
+    market_ref = get_market_ref() # CHARGEMENT MARCHÉ
     
-    # --- MAPPING COMPLET POUR AFFICHAGE GAZ & ELEC ---
     merged_data = {
         **data,
         **financials,
@@ -189,29 +226,32 @@ async def get_dashboard_data(client_id: str):
         "surface": data.get('location', {}).get('surface', 0),
         "electricity_price": financials['kpis']['unit_price_kwh'],
         
-        # Données Communes
+        # DONNEES COMMUNES
         "fta": data.get('contract', {}).get('fta', '-'),
         "grd": data.get('contract', {}).get('grd', '-'),
         "start_date": data.get('contract', {}).get('start_date', '-'),
         "end_date": data.get('contract', {}).get('end_date', '-'),
         "p_max": data.get('contract', {}).get('p_max', '-'),
         
-        # Données Gaz Spécifiques (Injectées pour remplacer les champs Elec)
+        # INJECTION CHAMPS GAZ (POUR REMPLACER CEUX D'ELEC)
         "cja": data.get('contract', {}).get('cja', '-'),
         "profil": data.get('contract', {}).get('profil', '-'),
         "tarif_acheminement": data.get('contract', {}).get('tarif_acheminement', '-'),
         
-        # Prix Détaillés (HCH, HPE...)
+        # PRIX
         "hph": financials['pricing_details'].get('hph', 0),
         "hch": financials['pricing_details'].get('hch', 0),
         "hpe": financials['pricing_details'].get('hpe', 0),
         "hce": financials['pricing_details'].get('hce', 0),
         
-        # Puissances Détaillées
+        # PUISSANCES
         "ps_hph": data.get('contract', {}).get('power_details', {}).get('hph', 0),
         "ps_hch": data.get('contract', {}).get('power_details', {}).get('hch', 0),
         "ps_hpe": data.get('contract', {}).get('power_details', {}).get('hpe', 0),
         "ps_hce": data.get('contract', {}).get('power_details', {}).get('hce', 0),
+        
+        # INJECTION MARCHÉ POUR LE FRONTEND
+        "market_ref": market_ref, 
         
         "cortex_insight": {"message": "Analyse active.", "conseil": "RAS.", "status": "OK", "color": "green"},
         "market_analysis": {"status": "NEUTRE", "action": "-", "color": "gray"},
@@ -311,7 +351,7 @@ async def generate_tender(request: Request):
             if df_elec.empty and df_gaz.empty: df_dqe.to_excel(writer, index=False, sheet_name="TOUT")
         stream.seek(0)
         timestamp = datetime.now().strftime("%Y%m%d")
-        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=EXPORT_DQE_ENERGISTRAT_{timestamp}.xlsx"})
+        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.get("/")
@@ -331,6 +371,8 @@ async def view_settings(request: Request): return templates.TemplateResponse("se
 async def view_partner_settings(request: Request):
     if "supplier" in request.headers.get("referer", ""): return templates.TemplateResponse("settings_partner.html", {"request": request})
     return templates.TemplateResponse("settings.html", {"request": request})
+@app.get("/ops/market")
+async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str):
     if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
