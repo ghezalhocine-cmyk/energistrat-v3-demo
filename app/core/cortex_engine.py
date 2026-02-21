@@ -10,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V800")
+logger = logging.getLogger("CORTEX_ENGINE_V900_TITANIUM")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "800.0 (Final: Display vs Calculation)"
+        self.version = "900.0 (Titanium: Complete Logic)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.05}, "gas": {"price": 0.08, "tax": 0.02}}
 
     def _safe_float(self, value, default=0.0):
@@ -37,6 +37,7 @@ class CortexEngine:
         pricing = site_data.get('pricing', {})
         loc = site_data.get('location', {})
         
+        # Nommage
         site_label = ident.get('site_name', 'Site Inconnu')
         if not site_label or site_label == "Site Inconnu":
             site_label = f"{loc.get('city', 'Site')} ({str(contract.get('pdl', ''))[-4:]})"
@@ -46,10 +47,10 @@ class CortexEngine:
         
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
         
-        # PRIX : DISSOCIATION AFFICHAGE / CALCUL
-        raw_price = self._safe_float(pricing.get('hph')) # Ex: 45.50
+        # PRIX (Avec correction MWh)
+        raw_price = self._safe_float(pricing.get('hph'))
         unit_price = raw_price
-        if unit_price > 2.0: unit_price /= 1000.0 # Ex: 0.0455
+        if unit_price > 2.0: unit_price /= 1000.0
             
         is_estimated = False
         if unit_price <= 0.001:
@@ -68,6 +69,7 @@ class CortexEngine:
         budget_ttc = commodity + fixe + taxes + storage_cost
         landing = budget_ttc * 1.02
         pmc_mwh = self._safe_div(budget_ttc, (vol_kwh / 1000))
+        ghost_savings = budget_ttc * 0.15
 
         return {
             "meta": {
@@ -88,20 +90,13 @@ class CortexEngine:
             "kpis": {
                 "budget_annual": self._sanitize(round(budget_ttc, 2)),
                 "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)),
+                "ghost_savings": self._sanitize(round(ghost_savings, 2)),
+                "landing_forecast": self._sanitize(round(landing, 2)),
                 "pmc_eur_mwh": self._sanitize(round(pmc_mwh, 2)),
                 "unit_price_kwh": unit_price,
                 "is_estimated_price": is_estimated
             },
-            # ICI : ON RENVOIE LE PRIX BRUT (45.50) POUR L'AFFICHAGE
-            "pricing_details": {
-                "hph": raw_price, 
-                "fix": fixe,
-                "tax": self._safe_float(pricing.get('tax')),
-                "storage": self._safe_float(pricing.get('storage')),
-                "hch": self._safe_float(pricing.get('hch')),
-                "hpe": self._safe_float(pricing.get('hpe')),
-                "hce": self._safe_float(pricing.get('hce'))
-            }
+            "pricing_details": pricing
         }
 
     def generate_dqe_structure(self, sites_data):
@@ -158,7 +153,8 @@ class CortexEngine:
                     "name": fin['meta']['site_label'],
                     "ratio_pmc": fin['kpis']['pmc_eur_mwh'],
                     "conso_mwh": fin['volume_mwh'],
-                    "budget": fin['budget_annual']
+                    "budget": fin['budget_annual'],
+                    "ghost_savings": fin['kpis']['ghost_savings']
                 })
             except: continue
         valid = [s for s in processed if s['conso_mwh'] > 0.1]
@@ -176,6 +172,26 @@ class CortexEngine:
                 "ranking": sorted_sites[:5]
             }
         }
+
+    # ANALYSE MARCHE DYNAMIQUE (POUR LA BULLE)
+    def analyze_market_position(self, current_price, market_ref, is_gas, segment="C5"):
+        try:
+            ref_price = 0.0
+            if is_gas: ref_price = float(market_ref.get('gaz', {}).get('peg_n1', 40))
+            else: ref_price = float(market_ref.get('elec', {}).get('cal_n1', 90))
+            
+            client_price_mwh = current_price
+            if client_price_mwh < 2.0: client_price_mwh *= 1000.0
+            
+            if client_price_mwh <= 0: return {"status": "INCONNU", "message": "Prix non détecté", "color": "gray", "action": "-"}
+
+            delta = client_price_mwh - ref_price
+            pct = (delta / ref_price) * 100
+
+            if delta > 10: return {"status": "ALERTE", "color": "red", "message": f"Prix élevé (+{int(pct)}%)", "action": f"Payé {int(client_price_mwh)}€ vs {int(ref_price)}€"}
+            elif delta < -5: return {"status": "OPTIMISÉ", "color": "green", "message": "Performance Achat", "action": f"Sous le marché ({int(client_price_mwh)}€)"}
+            else: return {"status": "NEUTRE", "color": "blue", "message": "Aligné marché", "action": f"Prix cohérent ({int(client_price_mwh)}€)"}
+        except: return {"status": "ERREUR", "color": "gray", "message": "Données indisponibles", "action": "-"}
 
     def analyze_load_curve(self, content, filename, power_subscribed=36):
         if physics and ingest:
