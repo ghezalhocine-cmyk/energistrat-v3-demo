@@ -10,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V250")
+logger = logging.getLogger("CORTEX_ENGINE_V300_DQE_SUM")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "250.0 (Preservation: Full Pricing Details)"
+        self.version = "300.0 (DQE Auto-Sum)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.05}, "gas": {"price": 0.08, "tax": 0.02}}
 
     def _safe_float(self, value, default=0.0):
@@ -37,7 +37,6 @@ class CortexEngine:
         pricing = site_data.get('pricing', {})
         loc = site_data.get('location', {})
         
-        # Nommage
         site_label = ident.get('site_name', 'Site Inconnu')
         if not site_label or site_label == "Site Inconnu":
             site_label = f"{loc.get('city', 'Site')} ({str(contract.get('pdl', ''))[-4:]})"
@@ -47,7 +46,6 @@ class CortexEngine:
         
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
         
-        # PRIX (Avec correction MWh)
         raw_price = self._safe_float(pricing.get('hph'))
         unit_price = raw_price
         if unit_price > 2.0: unit_price /= 1000.0
@@ -70,7 +68,6 @@ class CortexEngine:
         landing = budget_ttc * 1.02
         pmc_mwh = self._safe_div(budget_ttc, (vol_kwh / 1000))
 
-        # ON RENVOIE TOUT, Y COMPRIS LES PRIX DÉTAILLÉS
         return {
             "meta": {
                 "site_label": str(site_label).upper(),
@@ -94,22 +91,28 @@ class CortexEngine:
                 "unit_price_kwh": unit_price,
                 "is_estimated_price": is_estimated
             },
-            # RESTITUTION BRUTE DES PRIX DÉTAILLÉS POUR LE FRONTEND
             "pricing_details": pricing
         }
 
     def generate_dqe_structure(self, sites_data):
-        # ... (Inchangé V140) ...
         rows = []
         for s in sites_data:
             if s.get('identity',{}).get('id') == "new_client": continue
             ident = s.get('identity', {})
             loc = s.get('location', {})
             con = s.get('contract', {})
-            # Récupère power_details et consumption_details (Legacy Ingest)
             pow_det = con.get('power_details', {})
             con_det = con.get('consumption_details', {})
             energy = con.get('energy_type', 'elec')
+            
+            # CALCUL DU VOLUME TOTAL REEL (SI MANQUANT OU 0)
+            vol_annuel = con.get('annual_volume_estimated', 0)
+            if vol_annuel == 0:
+                vol_annuel = (
+                    con_det.get('hph', 0) + con_det.get('hch', 0) + 
+                    con_det.get('hpe', 0) + con_det.get('hce', 0)
+                )
+
             row = {
                 "Type": "GAZ" if "gaz" in energy else "ELEC",
                 "Entité": ident.get('entity_name', ''),
@@ -125,13 +128,13 @@ class CortexEngine:
                 "PS HPE": pow_det.get('hpe', 0), "PS HCE": pow_det.get('hce', 0),
                 "Conso HPH": con_det.get('hph', 0), "Conso HCH": con_det.get('hch', 0), 
                 "Conso HPE": con_det.get('hpe', 0), "Conso HCE": con_det.get('hce', 0),
-                "Vol. Annuel": con.get('annual_volume_estimated', 0)
+                "Vol. Annuel": vol_annuel,
+                "SIRET": ident.get('siret', '')
             }
             rows.append(row)
         return pd.DataFrame(rows)
 
     def analyze_portfolio(self, raw_sites_data):
-        # ... (Inchangé V140) ...
         if not raw_sites_data: return {"global": {}, "green_league": []}
         processed = []
         stats = {"total_budget": 0, "total_elec": 0, "total_gas": 0, "nb": 0}
