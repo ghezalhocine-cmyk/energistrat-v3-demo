@@ -14,14 +14,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
-# BLOC IMPORT
 try:
     import pandas as pd
     PANDAS_READY = True
 except ImportError:
     PANDAS_READY = False
 
-# CHARGEMENT CORTEX
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
@@ -29,7 +27,7 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V400-HYPERFLAT")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V500-LEGACY-FIX")
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,15 +37,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# GESTION DOSSIERS
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
-
 TEMPLATE_DIR = os.path.join(BASE_DIR, "app/templates")
 if not os.path.exists(TEMPLATE_DIR): TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
-
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -60,18 +55,22 @@ def json_compliant(data):
     return data
 
 def get_safe_id(raw_id):
-    """ ID SÉCURISÉ : Nettoyage strict """
     return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
 
-# --- FONCTION DE RECHERCHE ---
 def find_site_file(target_id):
-    # 1. Essai direct (Nom de fichier propre)
     safe_target = get_safe_id(target_id)
     direct_path = os.path.join(DATA_DIR, f"{safe_target}.json")
     if os.path.exists(direct_path): return direct_path
+    files = glob.glob(os.path.join(DATA_DIR, "*.json"))
+    for p in files:
+        try:
+            with open(p, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                stored_id = str(data.get('identity', {}).get('id', ''))
+                if stored_id == str(target_id) or get_safe_id(stored_id) == safe_target:
+                    return p
+        except: continue
     return None
-
-# --- API ---
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
@@ -91,14 +90,11 @@ async def api_update_site(request: Request):
         payload = await request.json()
         site_id = payload.get('id')
         if not site_id: return JSONResponse({"error": "ID manquant"}, 400)
-        
         file_path = find_site_file(site_id)
         if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
-        
         with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
         if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
         if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
-        
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "message": "Sauvegardé"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
@@ -139,7 +135,6 @@ async def get_fleet_data():
     all_cities, all_providers = set(), set()
     for s in raw_sites:
         if "CLI_" in str(s.get('identity',{}).get('id')): continue
-        
         fin = s['computed_financials']
         contract = s.get('contract', {})
         city = fin['meta']['city']
@@ -147,7 +142,7 @@ async def get_fleet_data():
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         
-        # ID SÉCURISÉ POUR LE LIEN
+        # ID CLEAN POUR LE LIEN
         safe_id = get_safe_id(s.get('identity',{}).get('id'))
         
         fleet_list.append({
@@ -172,46 +167,21 @@ async def get_fleet_data():
 
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str):
-    # Recherche fichier
     file_path = find_site_file(client_id)
     if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
-    
     with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
     
     financials = cortex.enrich_site_financials(data)
     
-    # --- HYPER-APLATISSEMENT (POUR DÉBLOQUER LE FRONTEND) ---
-    # On expose TOUTES les variables possibles à la racine
+    # ON INJECTE LES KPIS LEGACY DANS LE JSON FINAL
     merged_data = {
         **data,
         **financials,
-        # Identité
-        "id": data.get('identity', {}).get('id'),
-        "name": financials['meta']['site_label'],
-        "site_name": financials['meta']['site_label'],
-        "entity_name": data.get('identity', {}).get('entity_name'),
-        
-        # Localisation
-        "city": financials['meta']['city'],
-        "address": data.get('location', {}).get('address'),
-        "zip_code": data.get('location', {}).get('zip_code'),
-        "surface": data.get('location', {}).get('surface', 0),
-        
-        # Contrat
-        "pdl": data.get('contract', {}).get('pdl'),
-        "provider": data.get('contract', {}).get('provider'),
-        "power": data.get('contract', {}).get('power'),
-        "segment": data.get('contract', {}).get('segment'),
-        "energy_type": financials['meta']['energy_type'],
-        
-        # Finances
+        "kpis": financials['kpis'], # <--- C'EST CA QUI MANQUAIT AU JS
         "budget": financials['budget_annual'],
-        "budget_annual": financials['budget_annual'],
         "volume_mwh": financials['volume_mwh'],
-        "landing": financials['landing_forecast'],
-        "landing_forecast": financials['landing_forecast'],
-        "electricity_price": financials['kpis']['unit_price_kwh'],
-        "unit_price": financials['kpis']['unit_price_kwh']
+        "surface": data.get('location', {}).get('surface', 0),
+        "electricity_price": financials['kpis']['unit_price_kwh']
     }
     
     if "location" in data and "surface" in data["location"]:
