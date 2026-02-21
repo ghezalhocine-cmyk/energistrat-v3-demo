@@ -10,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V300_DQE_SUM")
+logger = logging.getLogger("CORTEX_ENGINE_V350")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "300.0 (DQE Auto-Sum)"
+        self.version = "350.0 (Stable Engine)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.05}, "gas": {"price": 0.08, "tax": 0.02}}
 
     def _safe_float(self, value, default=0.0):
@@ -105,7 +105,6 @@ class CortexEngine:
             con_det = con.get('consumption_details', {})
             energy = con.get('energy_type', 'elec')
             
-            # CALCUL DU VOLUME TOTAL REEL (SI MANQUANT OU 0)
             vol_annuel = con.get('annual_volume_estimated', 0)
             if vol_annuel == 0:
                 vol_annuel = (
@@ -122,7 +121,7 @@ class CortexEngine:
                 "Ville": loc.get('city', ''),
                 "PDL": ident.get('id', ''),
                 "Segment": con.get('segment', ''),
-                "FTA": "CU",
+                "FTA": con.get('fta', ''), # Nouveau
                 "S Max (kVA)": con.get('power', 0),
                 "PS HPH": pow_det.get('hph', 0), "PS HCH": pow_det.get('hch', 0), 
                 "PS HPE": pow_det.get('hpe', 0), "PS HCE": pow_det.get('hce', 0),
