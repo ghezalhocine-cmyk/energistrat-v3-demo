@@ -10,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V350")
+logger = logging.getLogger("CORTEX_ENGINE_V400")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "350.0 (Stable Engine)"
+        self.version = "400.0 (Precision)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.05}, "gas": {"price": 0.08, "tax": 0.02}}
 
     def _safe_float(self, value, default=0.0):
@@ -46,6 +46,7 @@ class CortexEngine:
         
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
         
+        # PRIX (Avec correction MWh)
         raw_price = self._safe_float(pricing.get('hph'))
         unit_price = raw_price
         if unit_price > 2.0: unit_price /= 1000.0
@@ -121,7 +122,7 @@ class CortexEngine:
                 "Ville": loc.get('city', ''),
                 "PDL": ident.get('id', ''),
                 "Segment": con.get('segment', ''),
-                "FTA": con.get('fta', ''), # Nouveau
+                "FTA": con.get('fta', ''),
                 "S Max (kVA)": con.get('power', 0),
                 "PS HPH": pow_det.get('hph', 0), "PS HCH": pow_det.get('hch', 0), 
                 "PS HPE": pow_det.get('hpe', 0), "PS HCE": pow_det.get('hce', 0),
