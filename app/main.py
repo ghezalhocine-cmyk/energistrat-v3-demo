@@ -14,12 +14,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
+# BLOC IMPORT
 try:
     import pandas as pd
     PANDAS_READY = True
 except ImportError:
     PANDAS_READY = False
 
+# CHARGEMENT CORTEX
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
@@ -27,7 +29,7 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V500-LEGACY-FIX")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V600-MIRROR")
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,12 +39,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# GESTION DOSSIERS
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
+
 TEMPLATE_DIR = os.path.join(BASE_DIR, "app/templates")
 if not os.path.exists(TEMPLATE_DIR): TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
+
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -71,6 +76,8 @@ def find_site_file(target_id):
                     return p
         except: continue
     return None
+
+# --- API ---
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
@@ -142,7 +149,7 @@ async def get_fleet_data():
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         
-        # ID CLEAN POUR LE LIEN
+        # ID SÉCURISÉ
         safe_id = get_safe_id(s.get('identity',{}).get('id'))
         
         fleet_list.append({
@@ -173,12 +180,18 @@ async def get_dashboard_data(client_id: str):
     
     financials = cortex.enrich_site_financials(data)
     
-    # ON INJECTE LES KPIS LEGACY DANS LE JSON FINAL
+    # --- MIRROR MODE : ON REPRODUIT EXACTEMENT L'ANCIEN FORMAT ---
     merged_data = {
         **data,
         **financials,
-        "kpis": financials['kpis'], # <--- C'EST CA QUI MANQUAIT AU JS
-        "budget": financials['budget_annual'],
+        # COMPATIBILITÉ LEGACY CRITIQUE
+        "cortex_insight": {"message": "Analyse active.", "conseil": "RAS.", "status": "OK", "color": "green"},
+        "market_analysis": {"status": "NEUTRE", "action": "-", "color": "gray"},
+        "energy_type": financials['meta']['energy_type'].lower(),
+        
+        # DOUBLONNAGE POUR SÉCURITÉ
+        "kpis": financials['kpis'], # Pour le JS Legacy
+        "budget": financials['budget_annual'], # Pour le JS Moderne
         "volume_mwh": financials['volume_mwh'],
         "surface": data.get('location', {}).get('surface', 0),
         "electricity_price": financials['kpis']['unit_price_kwh']
