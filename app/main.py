@@ -29,7 +29,7 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V300-DQE-NAME")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V350-FULL-DATA")
 
 app.add_middleware(
     CORSMiddleware,
@@ -149,10 +149,8 @@ async def get_fleet_data():
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         
-        safe_id = get_safe_id(s.get('identity',{}).get('id'))
-        
         fleet_list.append({
-            "id": safe_id,
+            "id": get_safe_id(s.get('identity',{}).get('id')),
             "name": fin['meta']['site_label'],
             "city": city,
             "volume": fin['volume_mwh'],
@@ -187,14 +185,24 @@ async def get_dashboard_data(client_id: str):
         "volume_mwh": financials['volume_mwh'],
         "surface": data.get('location', {}).get('surface', 0),
         "electricity_price": financials['kpis']['unit_price_kwh'],
+        
+        # INJECTION CRITIQUE POUR DÉTAIL
+        "fta": data.get('contract', {}).get('fta', '-'),
+        "grd": data.get('contract', {}).get('grd', '-'),
+        "start_date": data.get('contract', {}).get('start_date', '-'),
+        "end_date": data.get('contract', {}).get('end_date', '-'),
+        
+        # PRIX DÉTAILLÉS (Minuscules pour Frontend)
         "hph": financials['pricing_details'].get('hph', 0),
         "hch": financials['pricing_details'].get('hch', 0),
         "hpe": financials['pricing_details'].get('hpe', 0),
         "hce": financials['pricing_details'].get('hce', 0),
+        
         "ps_hph": data.get('contract', {}).get('power_details', {}).get('hph', 0),
         "ps_hch": data.get('contract', {}).get('power_details', {}).get('hch', 0),
         "ps_hpe": data.get('contract', {}).get('power_details', {}).get('hpe', 0),
         "ps_hce": data.get('contract', {}).get('power_details', {}).get('hce', 0),
+        
         "cortex_insight": {"message": "Analyse active.", "conseil": "RAS.", "status": "OK", "color": "green"},
         "market_analysis": {"status": "NEUTRE", "action": "-", "color": "gray"},
     }
