@@ -8,11 +8,12 @@ import traceback
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 try:
     import pandas as pd
@@ -27,7 +28,7 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V800-PERSISTENCE")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V900-TITANIUM")
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,6 +47,12 @@ templates = Jinja2Templates(directory=TEMPLATE_DIR)
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+class MarketUpdateModel(BaseModel):
+    elec: Dict[str, Any]
+    gaz: Dict[str, Any]
+    trve: Optional[Dict[str, Any]] = None
+    targets: Optional[Dict[str, Any]] = None
 
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
@@ -72,39 +79,47 @@ def find_site_file(target_id):
         except: continue
     return None
 
+def get_market_ref():
+    path = os.path.join(DATA_DIR, "market_ref.json")
+    if os.path.exists(path):
+        try:
+            with open(path, 'r') as f: return json.load(f)
+        except: pass
+    return {
+        "updated_at": datetime.now().isoformat(),
+        "elec": { "cal_n1": 85.0 }, "gaz": { "peg_n1": 35.0 },
+        "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 }
+    }
+
 # --- API ---
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
-    """ SAVE INTELLIGENT (MERGE) """
+    """ FIX STYLO : MERGE AU LIEU D'ECRASER """
     try:
         payload = await request.json()
         cid = payload.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
+        if "identity" not in payload: payload["identity"] = {}
+        payload["identity"]["id"] = cid
         
-        # 1. On cherche si le fichier existe déjà
         file_path = find_site_file(cid)
         if not file_path:
-            # Nouveau Site
             file_path = os.path.join(DATA_DIR, f"{get_safe_id(cid)}.json")
             data = payload
         else:
-            # Site Existant -> On MERGE
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
             
-            # Mise à jour des champs modifiés uniquement
+            # MERGE INTELLIGENT
             if 'location' in payload:
                 data['location'] = {**data.get('location', {}), **payload['location']}
             if 'identity' in payload:
                 data['identity']['site_name'] = payload['identity'].get('site_name', data['identity']['site_name'])
             if 'contract' in payload:
-                # Attention à ne pas écraser tout le contrat, juste les champs editables
                 data['contract']['provider'] = payload['contract'].get('provider', data['contract'].get('provider'))
                 data['contract']['power'] = payload['contract'].get('power', data['contract'].get('power'))
             if 'pricing' in payload:
                 data['pricing']['hph'] = payload['pricing'].get('hph', data['pricing'].get('hph'))
 
-        # Sauvegarde
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "id": cid})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
@@ -185,6 +200,14 @@ async def get_dashboard_data(client_id: str):
     with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
     
     financials = cortex.enrich_site_financials(data)
+    market_ref = get_market_ref()
+    
+    # CALCUL DYNAMIQUE MARCHÉ
+    market_analysis = cortex.analyze_market_position(
+        financials['pricing_details']['hph'], 
+        market_ref,
+        financials['meta']['is_gas']
+    )
     
     merged_data = {
         **data,
@@ -195,12 +218,17 @@ async def get_dashboard_data(client_id: str):
         "surface": data.get('location', {}).get('surface', 0),
         "electricity_price": financials['kpis']['unit_price_kwh'],
         
-        # CHAMPS GAZ SPECIFIQUES
+        # INJECTIONS VITALES
+        "fta": data.get('contract', {}).get('fta', '-'),
+        "grd": data.get('contract', {}).get('grd', '-'),
+        "start_date": data.get('contract', {}).get('start_date', '-'),
+        "end_date": data.get('contract', {}).get('end_date', '-'),
+        "p_max": data.get('contract', {}).get('p_max', '-'),
+        
         "cja": data.get('contract', {}).get('cja', '-'),
         "profil": data.get('contract', {}).get('profil', '-'),
         "tarif_acheminement": data.get('contract', {}).get('tarif_acheminement', '-'),
         
-        # PRIX DÉTAILLÉS (BRUTS POUR AFFICHAGE)
         "hph": financials['pricing_details'].get('hph', 0),
         "hch": financials['pricing_details'].get('hch', 0),
         "hpe": financials['pricing_details'].get('hpe', 0),
@@ -212,7 +240,7 @@ async def get_dashboard_data(client_id: str):
         "ps_hce": data.get('contract', {}).get('power_details', {}).get('hce', 0),
         
         "cortex_insight": {"message": "Analyse active.", "conseil": "RAS.", "status": "OK", "color": "green"},
-        "market_analysis": {"status": "NEUTRE", "action": "-", "color": "gray"},
+        "market_analysis": market_analysis,
     }
     
     if "location" in data and "surface" in data["location"]:
@@ -222,6 +250,16 @@ async def get_dashboard_data(client_id: str):
         merged_data["benchmark"] = cortex.calculate_benchmark(naf, surf, vol)
     
     return JSONResponse(json_compliant(merged_data))
+
+@app.post("/api/ops/market/update")
+async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header(None)):
+    try:
+        new_payload = data.dict()
+        new_payload["updated_at"] = datetime.now().isoformat()
+        ref_path = os.path.join(DATA_DIR, "market_ref.json")
+        with open(ref_path, "w") as f: json.dump(new_payload, f, indent=4)
+        return JSONResponse({"success": True})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/physics/solar")
 async def api_solar_sim(request: Request):
@@ -328,6 +366,8 @@ async def view_settings(request: Request): return templates.TemplateResponse("se
 async def view_partner_settings(request: Request):
     if "supplier" in request.headers.get("referer", ""): return templates.TemplateResponse("settings_partner.html", {"request": request})
     return templates.TemplateResponse("settings.html", {"request": request})
+@app.get("/ops/market")
+async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str):
     if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
