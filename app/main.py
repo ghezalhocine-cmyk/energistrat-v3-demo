@@ -33,7 +33,7 @@ except ImportError:
     except ImportError:
         pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-SAPPHIRE-V130")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-HYBRID-V140")
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,7 +61,6 @@ def json_compliant(data):
     return data
 
 def get_safe_id(raw_id):
-    """ Nettoie l'ID pour éviter les crashs d'URL et de fichiers """
     return str(raw_id).replace('/', '_').replace(' ', '').replace('+', '').replace(',', '').strip()
 
 # --- API ---
@@ -84,16 +83,11 @@ async def api_update_site(request: Request):
         payload = await request.json()
         site_id = payload.get('id')
         if not site_id: return JSONResponse({"error": "ID manquant"}, 400)
-        
         file_path = os.path.join(DATA_DIR, f"{get_safe_id(site_id)}.json")
         if not os.path.exists(file_path): return JSONResponse({"error": "Site introuvable"}, 404)
-        
         with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
-        
-        # Merge intelligent pour l'Audit
         if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
         if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
-        
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "message": "Sauvegardé"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
@@ -123,18 +117,14 @@ async def get_fleet_data():
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     for p in files:
         if "master" in p or "market" in p: continue
-        # FILTRE ANTI-ZOMBIES (Fichiers avec noms corrompus)
         if "," in p or "+" in p: continue
-        
         try:
             with open(p, 'r', encoding='utf-8') as f: data = json.load(f)
             fin = cortex.enrich_site_financials(data)
             data['computed_financials'] = fin
             raw_sites.append(data)
         except: continue
-    
     analysis = cortex.analyze_portfolio(raw_sites)
-    
     fleet_list = []
     all_cities, all_providers, all_segments = set(), set(), set()
     for s in raw_sites:
@@ -144,14 +134,13 @@ async def get_fleet_data():
         city = fin['meta']['city']
         prov = contract.get('provider', 'Inconnu')
         seg = contract.get('segment', '-')
-        
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         if seg: all_segments.add(seg)
         
-        # APLATISSEMENT POUR LE FRONTEND (FIXE LE DRILL-DOWN)
+        # APLATISSEMENT HYBRIDE : On donne au frontend exactement ce qu'il attendait dans la V49
         fleet_list.append({
-            "id": get_safe_id(s.get('identity',{}).get('id')), # ID SÉCURISÉ
+            "id": get_safe_id(s.get('identity',{}).get('id')),
             "name": fin['meta']['site_label'],
             "city": city,
             "volume": fin['volume_mwh'],
@@ -178,14 +167,15 @@ async def get_dashboard_data(client_id: str):
     
     financials = cortex.enrich_site_financials(data)
     
-    # APLATISSEMENT VITAL POUR AUDIT & SOLAR & DETAIL
+    # MAPPING CRITIQUE POUR AUDIT & SOLAR
+    # On met les données aux deux endroits (racine et sous-objet) pour être sûr
     merged_data = {
         **data,
-        **financials, # Injecte meta, details, kpis à la racine
+        **financials,
         "budget": financials['budget_annual'],
         "volume_mwh": financials['volume_mwh'],
-        "surface": data.get('location', {}).get('surface', 0), # Pour l'Audit
-        "electricity_price": financials['kpis']['unit_price_kwh'] # Pour le Solaire
+        "surface": data.get('location', {}).get('surface', 0),
+        "electricity_price": financials['kpis']['unit_price_kwh']
     }
     
     if "location" in data and "surface" in data["location"]:
@@ -231,15 +221,8 @@ async def download_template(template_type: str):
         pd.DataFrame().to_csv(stream)
         return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
 
-# ROUTEUR PASSE-PARTOUT POUR LES LIENS STATIQUES
 @app.get("/app/assets/{filename}")
 async def get_static_asset(filename: str):
-    if "template" in filename: return await download_template("import")
-    if "bpu" in filename: return await download_template("bpu")
-    return JSONResponse({"error": "File not found"}, 404)
-
-@app.get("/assets/{filename}")
-async def get_static_asset_root(filename: str):
     if "template" in filename: return await download_template("import")
     if "bpu" in filename: return await download_template("bpu")
     return JSONResponse({"error": "File not found"}, 404)
@@ -252,7 +235,7 @@ async def api_simulate_offer(file: UploadFile = File(...)):
         files = glob.glob(os.path.join(DATA_DIR, "*.json"))
         for p in files:
             if "master" in p: continue
-            if "," in p or "+" in p: continue # Anti-Zombie
+            if "," in p or "+" in p: continue
             try:
                 with open(p, 'r', encoding='utf-8') as f: current_sites.append(json.load(f))
             except: continue
@@ -277,20 +260,24 @@ async def generate_tender(request: Request):
             file_path = os.path.join(DATA_DIR, f"{get_safe_id(sid)}.json")
             if os.path.exists(file_path):
                 with open(file_path, 'r', encoding='utf-8') as f: selected_sites.append(json.load(f))
+        
         df_dqe = cortex.generate_dqe_structure(selected_sites)
+        
+        # SPLIT ELEC / GAZ
         df_elec = df_dqe[df_dqe['Type'] == 'ELEC']
         df_gaz = df_dqe[df_dqe['Type'] == 'GAZ']
+        
         stream = io.BytesIO()
         with pd.ExcelWriter(stream, engine='openpyxl') as writer:
             if not df_elec.empty: df_elec.to_excel(writer, index=False, sheet_name="ELEC")
             if not df_gaz.empty: df_gaz.to_excel(writer, index=False, sheet_name="GAZ")
             if df_elec.empty and df_gaz.empty: df_dqe.to_excel(writer, index=False, sheet_name="TOUT")
+            
         stream.seek(0)
         timestamp = datetime.now().strftime("%Y%m%d")
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-# ROUTAGE HTML
 @app.get("/")
 async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
 @app.get("/onboarding")
