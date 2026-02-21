@@ -21,7 +21,7 @@ try:
 except ImportError:
     PANDAS_READY = False
 
-# CHARGEMENT CORTEX (Avec sécurité anti-crash)
+# CHARGEMENT CORTEX
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
@@ -34,7 +34,7 @@ except ImportError:
     except ImportError:
         pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V201-FIXED")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V202-CUMUL")
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,7 +44,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# GESTION DOSSIERS (Cloud Run Friendly)
+# GESTION DOSSIERS
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
@@ -65,44 +65,23 @@ def json_compliant(data):
     return data
 
 def get_safe_id(raw_id):
-    """ 
-    CORRECTIF V201 : Suppression du .upper() qui cassait l'onboarding.
-    On reste souple sur la casse mais strict sur les caractères spéciaux.
-    """
+    """ ID SÉCURISÉ (V201) : Pas de majuscule forcée, pas de caractères spéciaux """
     return str(raw_id).replace('/', '_').replace(' ', '').replace('+', '').replace(',', '').strip()
-
-def purge_data_folder():
-    """ Nettoyage pré-import pour éviter les doublons """
-    try:
-        files = glob.glob(os.path.join(DATA_DIR, "*.json"))
-        for f in files:
-            # On ne supprime pas le profil admin (celui qui contient 'CLI_')
-            if "CLI_" in f: continue
-            os.remove(f)
-    except Exception as e:
-        print(f"Purge Warning: {e}")
 
 # --- API ---
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
-    """ Création de compte (Le point de blocage actuel) """
     try:
         data = await request.json()
         cid = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
         if "identity" not in data: data["identity"] = {}
         data["identity"]["id"] = cid
-        
-        # Utilisation de l'ID sécurisé (sans forcer la majuscule)
         safe_id = get_safe_id(cid)
         file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
-        
-        with open(file_path, 'w', encoding='utf-8') as f: 
-            json.dump(data, f, indent=4, ensure_ascii=False)
-            
+        with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "id": cid})
-    except Exception as e: 
-        return JSONResponse({"success": False, "error": str(e)})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/settings/update_site")
 async def api_update_site(request: Request):
@@ -110,15 +89,11 @@ async def api_update_site(request: Request):
         payload = await request.json()
         site_id = payload.get('id')
         if not site_id: return JSONResponse({"error": "ID manquant"}, 400)
-        
         file_path = os.path.join(DATA_DIR, f"{get_safe_id(site_id)}.json")
         if not os.path.exists(file_path): return JSONResponse({"error": "Site introuvable"}, 404)
-        
         with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
-        
         if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
         if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
-        
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "message": "Sauvegardé"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
@@ -126,8 +101,8 @@ async def api_update_site(request: Request):
 @app.post("/api/settings/import_csv")
 async def api_import_csv(file: UploadFile = File(...)):
     try:
-        # PURGE INTELLIGENTE (Garde le compte admin)
-        purge_data_folder()
+        # --- CORRECTIF V202 : PLUS DE PURGE AUTOMATIQUE ---
+        # On permet le cumul des fichiers (Elec + Gaz)
         
         content = await file.read()
         sites = ingest.parse_mass_import_unified(content)
@@ -140,7 +115,10 @@ async def api_import_csv(file: UploadFile = File(...)):
                 cid = s.get('identity', {}).get('id') or f"GEN_{uuid.uuid4().hex[:8]}"
                 s['identity']['id'] = cid
                 file_path = os.path.join(DATA_DIR, f"{get_safe_id(cid)}.json")
-                with open(file_path, 'w', encoding='utf-8') as f: json.dump(s, f, indent=4, ensure_ascii=False)
+                
+                # ÉCRITURE / ÉCRASEMENT (Mise à jour)
+                with open(file_path, 'w', encoding='utf-8') as f: 
+                    json.dump(s, f, indent=4, ensure_ascii=False)
                 saved += 1
             except: pass
         return JSONResponse({"success": True, "imported": len(sites), "saved": saved})
@@ -159,21 +137,16 @@ async def get_fleet_data():
             data['computed_financials'] = fin
             raw_sites.append(data)
         except: continue
-    
     analysis = cortex.analyze_portfolio(raw_sites)
-    
     fleet_list = []
-    all_cities, all_providers = set(), set()
-    
+    all_cities, all_providers, all_segments = set(), set(), set()
     for s in raw_sites:
-        # On exclut le compte admin du tableau de bord
         if "CLI_" in str(s.get('identity',{}).get('id')): continue
-        
         fin = s['computed_financials']
         contract = s.get('contract', {})
         city = fin['meta']['city']
         prov = contract.get('provider', 'Inconnu')
-        
+        seg = contract.get('segment', '-')
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         
@@ -183,13 +156,12 @@ async def get_fleet_data():
             "city": city,
             "volume": fin['volume_mwh'],
             "energy": "gaz" if "Gaz" in fin['meta']['energy_type'] else "elec",
-            "segment": contract.get('segment', '-'),
+            "segment": seg,
             "provider": prov,
             "budget": fin['budget_annual'],
             "ratio": fin['kpis']['pmc_eur_mwh'],
             "landing": fin['landing_forecast']
         })
-        
     response = {
         "fleet": fleet_list, "count": len(fleet_list),
         "green_league": analysis.get('green_league'),
@@ -206,7 +178,6 @@ async def get_dashboard_data(client_id: str):
     
     financials = cortex.enrich_site_financials(data)
     
-    # APLATISSEMENT POUR LE FRONTEND (FIX AUDIT/SOLAR/DETAIL)
     merged_data = {
         **data,
         **financials,
@@ -313,7 +284,6 @@ async def generate_tender(request: Request):
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-# ROUTAGE HTML
 @app.get("/")
 async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
 @app.get("/onboarding")
