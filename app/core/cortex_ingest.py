@@ -5,11 +5,11 @@ import logging
 import chardet
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V140")
+logger = logging.getLogger("CORTEX_INGEST_V150")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "140.0 (Hybrid: Legacy Structure + Modern Parsing)"
+        self.version = "150.0 (Final: Volume Sanity Check)"
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE"],
@@ -24,7 +24,6 @@ class CortexIngest:
             "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF"],
             "fournisseur": ["FOURNISSEUR", "TITULAIRE"],
             "date_fin": ["DATE_FIN", "ECHEANCE"],
-            # MAPPING 4 POSTES (RESTAURÉ POUR LE DQE)
             "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH", "PS_HPH"],
             "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH", "PS_HCH"],
             "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE", "PS_HPE"],
@@ -55,8 +54,9 @@ class CortexIngest:
 
     def _safe_float(self, val):
         if pd.isna(val) or val == '' or val is None: return 0.0
+        # Remplacement virgule AVANT conversion pour éviter 24,828 -> 24828
         s = str(val).strip().replace('€', '').replace('%', '').replace(' ', '').replace('\xa0', '').replace('EUR', '')
-        s = s.replace(',', '.')
+        s = s.replace(',', '.') 
         try: return float(s)
         except: return 0.0
 
@@ -74,7 +74,6 @@ class CortexIngest:
         df = None
         buffer = io.BytesIO(file_content)
         
-        # LECTURE UNIVERSELLE (Excel / CSV / Latin-1)
         try:
             df = pd.read_excel(buffer)
         except:
@@ -94,8 +93,7 @@ class CortexIngest:
         c_pdl = self._find_col(cols, "pdl")
         if not c_pdl: return []
 
-        # Mapping des colonnes
-        c_nom = self._find_col(cols, "site_label")
+        c_nom_site = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
         c_cp = self._find_col(cols, "cp")
@@ -107,7 +105,6 @@ class CortexIngest:
         c_fourn = self._find_col(cols, "fournisseur")
         c_end = self._find_col(cols, "date_fin")
         
-        # Détails 4 Postes
         c_ps_hph = self._find_col(cols, "ps_hph")
         c_ps_hch = self._find_col(cols, "ps_hch")
         c_ps_hpe = self._find_col(cols, "ps_hpe")
@@ -125,7 +122,7 @@ class CortexIngest:
         for idx, row in df.iterrows():
             try:
                 pdl = self._safe_str_clean(row.get(c_pdl, f"TMP_{idx}"))
-                nom_brut = str(row.get(c_nom, "")).strip()
+                nom_brut = str(row.get(c_nom_site, "")).strip()
                 entite_brut = str(row.get(c_entite, "")).strip()
                 ville = str(row.get(c_ville, "")).strip()
                 
@@ -135,9 +132,18 @@ class CortexIngest:
                 elif entite_brut and not any(b in entite_brut.upper() for b in self.NAME_BLACKLIST): final_name = entite_brut
                 elif ville: final_name = f"{ville} ({pdl[-4:]})"
 
+                # --- CORRECTION VOLUME (DECIMAL FORCE) ---
                 raw_conso = self._safe_float(row.get(c_conso))
                 conso_kwh = raw_conso
-                if c_conso and "MWH" in str(c_conso).upper(): conso_kwh = raw_conso * 1000.0
+                
+                # 1. Si MWh détecté dans le titre -> x1000
+                if c_conso and "MWH" in str(c_conso).upper():
+                    conso_kwh = raw_conso * 1000.0
+                
+                # 2. SANITY CHECK : Si volume > 10 GWh (10 Millions kWh), c'est une erreur de lecture virgule
+                # Ex: 24,828 lu comme 24828 MWh -> 24 828 000 kWh. On divise par 1000.
+                if conso_kwh > 10_000_000:
+                    conso_kwh = conso_kwh / 1000.0
 
                 segment = str(row.get(c_seg, "")).upper()
                 is_gas = False
@@ -153,14 +159,11 @@ class CortexIngest:
                         "segment": segment, "power": self._safe_float(row.get(c_puiss)),
                         "annual_volume_estimated": conso_kwh, "energy_type": energy_type,
                         "end_date": str(row.get(c_end, "")),
-                        # RETOUR A LA STRUCTURE 'power_details' DE L'ANCIEN CODE POUR COMPATIBILITÉ DQE
-                        "power_details": {
-                            "hph": self._safe_float(row.get(c_ps_hph)), "hch": self._safe_float(row.get(c_ps_hch)),
-                            "hpe": self._safe_float(row.get(c_ps_hpe)), "hce": self._safe_float(row.get(c_ps_hce))
-                        },
-                        "consumption_details": {
-                            "hph": self._safe_float(row.get(c_c_hph)), "hch": self._safe_float(row.get(c_c_hch)),
-                            "hpe": self._safe_float(row.get(c_c_hpe)), "hce": self._safe_float(row.get(c_c_hce))
+                        "details": {
+                            "ps_hph": self._safe_float(row.get(c_ps_hph)), "ps_hch": self._safe_float(row.get(c_ps_hch)),
+                            "ps_hpe": self._safe_float(row.get(c_ps_hpe)), "ps_hce": self._safe_float(row.get(c_ps_hce)),
+                            "conso_hph": self._safe_float(row.get(c_c_hph)), "conso_hch": self._safe_float(row.get(c_c_hch)),
+                            "conso_hpe": self._safe_float(row.get(c_c_hpe)), "conso_hce": self._safe_float(row.get(c_c_hce))
                         }
                     },
                     "pricing": {
@@ -173,7 +176,6 @@ class CortexIngest:
         return sites
 
     def parse_bpu_excel(self, file_content):
-        # ... (Inchangé V105) ...
         try:
             buffer = io.BytesIO(file_content)
             df = pd.read_excel(buffer)
@@ -195,7 +197,6 @@ class CortexIngest:
         except: return None, False
 
     def parse_load_curve(self, file_content, filename):
-        # ... (Inchangé V105) ...
         try:
             buffer = io.BytesIO(file_content)
             enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
