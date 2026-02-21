@@ -5,12 +5,11 @@ import logging
 import chardet
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V110")
+logger = logging.getLogger("CORTEX_INGEST_V130")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "110.0 (Final Sync: DQE Keys & Universal Reader)"
-        
+        self.version = "130.0 (Stable Titanium)"
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE"],
             "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL"],
@@ -24,15 +23,10 @@ class CortexIngest:
             "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF"],
             "fournisseur": ["FOURNISSEUR", "TITULAIRE"],
             "date_fin": ["DATE_FIN", "ECHEANCE"],
-            # CLES EXACTES POUR DQE
-            "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH", "PS_HPH"],
-            "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH", "PS_HCH"],
-            "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE", "PS_HPE"],
-            "ps_hce": ["PS HCE", "PUISSANCE HCE", "P_HCE", "PS_HCE"],
-            "conso_hph": ["CONSO HPH", "C_HPH", "HP HAUTE", "CONSO_HPH"],
-            "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE", "CONSO_HCH"],
-            "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE", "CONSO_HPE"],
-            "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE", "CONSO_HCE"],
+            "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH"], "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH"],
+            "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE"], "ps_hce": ["PS HCE", "PUISSANCE HCE", "P_HCE"],
+            "conso_hph": ["CONSO HPH", "C_HPH", "HP HAUTE"], "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE"],
+            "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE"], "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE"],
             "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
             "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE"],
             "taxes": ["TAXES", "CSPE", "TICGN"],
@@ -72,32 +66,29 @@ class CortexIngest:
     def parse_mass_import_unified(self, file_content):
         sites = []
         df = None
-        
-        # LECTURE UNIVERSELLE (Excel / CSV / Latin-1)
         buffer = io.BytesIO(file_content)
         try:
-            # Essai Excel (Auto engine)
-            df = pd.read_excel(buffer)
+            df = pd.read_excel(buffer, engine='openpyxl')
         except Exception as e_xls:
             try:
-                # Essai CSV FR
                 buffer.seek(0)
-                df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip')
-                if len(df.columns) < 2: raise ValueError()
-            except:
-                try:
-                    # Essai CSV US
+                enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
+                buffer.seek(0)
+                df = pd.read_csv(buffer, sep=';', encoding=enc, on_bad_lines='skip')
+                if len(df.columns) < 2:
                     buffer.seek(0)
-                    df = pd.read_csv(buffer, sep=',', encoding='utf-8', on_bad_lines='skip')
-                except: return []
+                    df = pd.read_csv(buffer, sep=',', encoding=enc, on_bad_lines='skip')
+            except Exception as e_csv:
+                raise ValueError(f"Lecture impossible. Excel: {str(e_xls)} | CSV: {str(e_csv)}")
 
         if df is None or df.empty: return []
 
         cols = df.columns
         c_pdl = self._find_col(cols, "pdl")
-        if not c_pdl: return [] # Stop si pas de PDL
+        if not c_pdl:
+             found = ", ".join(list(cols)[:5])
+             raise ValueError(f"Colonne PDL introuvable. Colonnes vues : {found}...")
 
-        # Mapping
         c_nom_site = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
@@ -109,8 +100,6 @@ class CortexIngest:
         c_seg = self._find_col(cols, "segment")
         c_fourn = self._find_col(cols, "fournisseur")
         c_end = self._find_col(cols, "date_fin")
-        
-        # Détails DQE
         c_ps_hph = self._find_col(cols, "ps_hph")
         c_ps_hch = self._find_col(cols, "ps_hch")
         c_ps_hpe = self._find_col(cols, "ps_hpe")
@@ -119,7 +108,6 @@ class CortexIngest:
         c_c_hch = self._find_col(cols, "conso_hch")
         c_c_hpe = self._find_col(cols, "conso_hpe")
         c_c_hce = self._find_col(cols, "conso_hce")
-        
         c_prix = self._find_col(cols, "prix_unitaire")
         c_abo = self._find_col(cols, "abonnement")
         c_tax = self._find_col(cols, "taxes")
@@ -156,7 +144,6 @@ class CortexIngest:
                         "segment": segment, "power": self._safe_float(row.get(c_puiss)),
                         "annual_volume_estimated": conso_kwh, "energy_type": energy_type,
                         "end_date": str(row.get(c_end, "")),
-                        # DÉTAILS DQE STOCKÉS ICI
                         "details": {
                             "ps_hph": self._safe_float(row.get(c_ps_hph)), "ps_hch": self._safe_float(row.get(c_ps_hch)),
                             "ps_hpe": self._safe_float(row.get(c_ps_hpe)), "ps_hce": self._safe_float(row.get(c_ps_hce)),
@@ -176,7 +163,7 @@ class CortexIngest:
     def parse_bpu_excel(self, file_content):
         try:
             buffer = io.BytesIO(file_content)
-            df = pd.read_excel(buffer)
+            df = pd.read_excel(buffer, engine='openpyxl')
             cols = df.columns
             c_hph = self._find_col(cols, "prix_unitaire")
             if not c_hph:
