@@ -5,49 +5,51 @@ import logging
 import chardet
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V350")
+logger = logging.getLogger("CORTEX_INGEST_V400")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "350.0 (Full Data: FTA, GRD, Dates, Prices)"
+        self.version = "400.0 (Precision: Strict Price Mapping + P_MAX)"
         
         self.COLUMN_MAPPING = {
+            # IDENTIFICATION
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE"],
             "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL"],
             "entity": ["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT"],
-            "adresse": ["ADRESSE_SITE", "ADRESSE", "RUE"],
-            "ville": ["VILLE", "COMMUNE", "CITY"],
-            "cp": ["CP", "CODE_POSTAL", "ZIP"],
-            "siret": ["SIRET", "SIRET_SITE"],
             
+            # TECH
             "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL"],
             "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)"],
-            "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF"],
             
-            # --- CHAMPS MANQUANTS AJOUTÉS ---
-            "fta": ["FTA", "FORMULE_TARIFAIRE", "FORMULE"],
-            "grd": ["GRD", "GESTIONNAIRE", "DISTRIBUTEUR"],
-            "date_debut": ["DATE_DEBUT", "DEBUT_CONTRAT", "DATE DEBUT"],
-            "date_fin": ["DATE_FIN", "ECHEANCE", "FIN_CONTRAT", "DATE FIN"],
+            # --- AJOUT : POINTE MAX ---
+            "p_max": ["POINTE_MAX", "P_MAX", "PUISSANCE_ATTEINTE", "MAX_ATTEINTE"],
+            
+            "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF"],
             "fournisseur": ["FOURNISSEUR", "TITULAIRE"],
             
-            # PUISSANCES
+            # DATES & FTA
+            "fta": ["FTA", "FORMULE_TARIFAIRE"],
+            "grd": ["GRD", "GESTIONNAIRE"],
+            "date_debut": ["DATE_DEBUT", "DEBUT_CONTRAT"],
+            "date_fin": ["DATE_FIN", "ECHEANCE", "FIN_CONTRAT"],
+            
+            # PUISSANCES DÉTAILLÉES
             "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH", "PS_HPH"],
             "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH", "PS_HCH"],
             "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE", "PS_HPE"],
             "ps_hce": ["PS HCE", "PUISSANCE HCE", "P_HCE", "PS_HCE"],
             
-            # CONSOS
+            # CONSOS DÉTAILLÉES
             "conso_hph": ["CONSO HPH", "C_HPH", "HP HAUTE", "CONSO_HPH"],
             "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE", "CONSO_HCH"],
             "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE", "CONSO_HPE"],
             "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE", "CONSO_HCE"],
 
-            # PRIX (LES 4 POSTES)
-            "prix_hph": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
-            "prix_hch": ["PRIX_HCH", "HCH"],
-            "prix_hpe": ["PRIX_HPE", "HPE"],
-            "prix_hce": ["PRIX_HCE", "HCE"],
+            # PRIX (CORRECTIF STRICT : PLUS DE "HPH" TOUT SEUL)
+            "prix_hph": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1"],
+            "prix_hch": ["PRIX_HCH"],
+            "prix_hpe": ["PRIX_HPE"],
+            "prix_hce": ["PRIX_HCE"],
             
             "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE"],
             "taxes": ["TAXES", "CSPE", "TICGN"],
@@ -62,8 +64,10 @@ class CortexIngest:
         candidates = self.COLUMN_MAPPING.get(key, [])
         for col in df_cols:
             clean = self._clean_header(col)
+            # Match Exact
             if clean in candidates: return col
-            if len(key) > 3:
+            # Match Partiel (Sauf pour les clés courtes ou dangereuses)
+            if len(key) > 3 and key not in ["prix_hph", "prix_hch"]: 
                 for cand in candidates:
                     if cand in clean: return col
         return None
@@ -89,8 +93,7 @@ class CortexIngest:
         df = None
         buffer = io.BytesIO(file_content)
         
-        try:
-            df = pd.read_excel(buffer, dtype=str) # Force tout en texte pour éviter les arrondis scientifiques
+        try: df = pd.read_excel(buffer, dtype=str)
         except:
             try:
                 buffer.seek(0)
@@ -115,19 +118,17 @@ class CortexIngest:
         c_cp = self._find_col(cols, "cp")
         c_ville = self._find_col(cols, "ville")
         c_siret = self._find_col(cols, "siret")
-        
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
+        c_pmax = self._find_col(cols, "p_max") # Nouveau
         c_seg = self._find_col(cols, "segment")
         c_fourn = self._find_col(cols, "fournisseur")
         
-        # NOUVEAUX CHAMPS
         c_fta = self._find_col(cols, "fta")
         c_grd = self._find_col(cols, "grd")
         c_start = self._find_col(cols, "date_debut")
         c_end = self._find_col(cols, "date_fin")
         
-        # Détails 4 Postes
         c_ps_hph = self._find_col(cols, "ps_hph")
         c_ps_hch = self._find_col(cols, "ps_hch")
         c_ps_hpe = self._find_col(cols, "ps_hpe")
@@ -138,12 +139,7 @@ class CortexIngest:
         c_c_hpe = self._find_col(cols, "conso_hpe")
         c_c_hce = self._find_col(cols, "conso_hce")
         
-        # PRIX 4 POSTES
-        c_p_hph = self._find_col(cols, "prix_hph")
-        c_p_hch = self._find_col(cols, "prix_hch")
-        c_p_hpe = self._find_col(cols, "prix_hpe")
-        c_p_hce = self._find_col(cols, "prix_hce")
-        
+        c_prix = self._find_col(cols, "prix_hph")
         c_abo = self._find_col(cols, "abonnement")
         c_tax = self._find_col(cols, "taxes")
         c_stock = self._find_col(cols, "stockage")
@@ -168,7 +164,7 @@ class CortexIngest:
 
                 segment = str(row.get(c_seg, "")).upper()
                 is_gas = False
-                if "GAZ" in segment or "T1" in segment or "T2" in segment or "T3" in segment: is_gas = True
+                if "GAZ" in segment or "T1" in segment or "T2" in segment: is_gas = True
                 elif c_pdl and "PCE" in str(c_pdl).upper(): is_gas = True
                 energy_type = "gaz" if is_gas else "elec"
 
@@ -180,11 +176,12 @@ class CortexIngest:
                         "provider": str(row.get(c_fourn, "Inconnu")),
                         "segment": segment, 
                         "power": self._safe_float(row.get(c_puiss)),
+                        "p_max": self._safe_float(row.get(c_pmax)), # Ajout Pointe Max
                         "annual_volume_estimated": conso_kwh, 
                         "energy_type": energy_type,
-                        "fta": str(row.get(c_fta, "-")), # Nouveau
-                        "grd": str(row.get(c_grd, "Enedis" if not is_gas else "GRDF")), # Nouveau avec fallback
-                        "start_date": str(row.get(c_start, "-")), # Nouveau
+                        "fta": str(row.get(c_fta, "-")),
+                        "grd": str(row.get(c_grd, "Enedis" if not is_gas else "GRDF")),
+                        "start_date": str(row.get(c_start, "-")),
                         "end_date": str(row.get(c_end, "-")),
                         "power_details": {
                             "hph": self._safe_float(row.get(c_ps_hph)), "hch": self._safe_float(row.get(c_ps_hch)),
@@ -196,10 +193,7 @@ class CortexIngest:
                         }
                     },
                     "pricing": {
-                        "hph": self._safe_float(row.get(c_p_hph)), 
-                        "hch": self._safe_float(row.get(c_p_hch)),
-                        "hpe": self._safe_float(row.get(c_p_hpe)),
-                        "hce": self._safe_float(row.get(c_p_hce)),
+                        "hph": self._safe_float(row.get(c_prix)), 
                         "fix": self._safe_float(row.get(c_abo)),
                         "tax": self._safe_float(row.get(c_tax)), 
                         "storage": self._safe_float(row.get(c_stock))
@@ -209,6 +203,7 @@ class CortexIngest:
             except: continue
         return sites
 
+    # ... (Le reste des méthodes reste inchangé : parse_bpu_excel, parse_load_curve) ...
     def parse_bpu_excel(self, file_content):
         try:
             buffer = io.BytesIO(file_content)
