@@ -29,7 +29,7 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V250-SATURATION")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V300-DQE-NAME")
 
 app.add_middleware(
     CORSMiddleware,
@@ -179,7 +179,6 @@ async def get_dashboard_data(client_id: str):
     
     financials = cortex.enrich_site_financials(data)
     
-    # --- SATURATION DES DONNÉES (POUR GARANTIR L'AFFICHAGE) ---
     merged_data = {
         **data,
         **financials,
@@ -188,20 +187,14 @@ async def get_dashboard_data(client_id: str):
         "volume_mwh": financials['volume_mwh'],
         "surface": data.get('location', {}).get('surface', 0),
         "electricity_price": financials['kpis']['unit_price_kwh'],
-        
-        # INJECTION DES PRIX POUR LE DÉTAIL
         "hph": financials['pricing_details'].get('hph', 0),
         "hch": financials['pricing_details'].get('hch', 0),
         "hpe": financials['pricing_details'].get('hpe', 0),
         "hce": financials['pricing_details'].get('hce', 0),
-        
-        # INJECTION DES PUISSANCES POUR LE DÉTAIL
         "ps_hph": data.get('contract', {}).get('power_details', {}).get('hph', 0),
         "ps_hch": data.get('contract', {}).get('power_details', {}).get('hch', 0),
         "ps_hpe": data.get('contract', {}).get('power_details', {}).get('hpe', 0),
         "ps_hce": data.get('contract', {}).get('power_details', {}).get('hce', 0),
-        
-        # COMPATIBILITÉ LEGACY
         "cortex_insight": {"message": "Analyse active.", "conseil": "RAS.", "status": "OK", "color": "green"},
         "market_analysis": {"status": "NEUTRE", "action": "-", "color": "gray"},
     }
@@ -300,7 +293,7 @@ async def generate_tender(request: Request):
             if df_elec.empty and df_gaz.empty: df_dqe.to_excel(writer, index=False, sheet_name="TOUT")
         stream.seek(0)
         timestamp = datetime.now().strftime("%Y%m%d")
-        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_{timestamp}.xlsx"})
+        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.get("/")
