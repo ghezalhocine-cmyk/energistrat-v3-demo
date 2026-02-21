@@ -10,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V150")
+logger = logging.getLogger("CORTEX_ENGINE_V200")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "150.0 (Stable Emerald)"
+        self.version = "200.0 (Platinum: Normalized)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.05}, "gas": {"price": 0.08, "tax": 0.02}}
 
     def _safe_float(self, value, default=0.0):
@@ -41,18 +41,17 @@ class CortexEngine:
         if not site_label or site_label == "Site Inconnu":
             site_label = f"{loc.get('city', 'Site')} ({str(contract.get('pdl', ''))[-4:]})"
         
-        energy_type = contract.get('energy_type', 'elec').lower()
-        is_gas = 'gaz' in energy_type or 'gas' in energy_type
+        # NORMALISATION STRICTE TYPE ENERGIE POUR CAMEMBERT
+        raw_type = str(contract.get('energy_type', 'elec')).lower()
+        energy_type = "gaz" if "gaz" in raw_type or "gas" in raw_type else "elec"
         
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
-        
         raw_price = self._safe_float(pricing.get('hph'))
-        unit_price = raw_price
-        if unit_price > 1.0: unit_price = unit_price / 1000.0
-            
+        unit_price = raw_price / 1000.0 if raw_price > 2.0 else raw_price
+        
         is_estimated = False
         if unit_price <= 0.001:
-            unit_price = self.MARKET_DEFAULTS['gas']['price'] if is_gas else self.MARKET_DEFAULTS['elec']['price']
+            unit_price = self.MARKET_DEFAULTS['gas']['price'] if energy_type == "gaz" else self.MARKET_DEFAULTS['elec']['price']
             is_estimated = True
 
         fixe = self._safe_float(pricing.get('fix'))
@@ -60,7 +59,7 @@ class CortexEngine:
         
         raw_tax = self._safe_float(pricing.get('tax'))
         if raw_tax > 1.0: raw_tax /= 1000.0
-        taxes = (vol_kwh * raw_tax) if raw_tax > 0 else (vol_kwh * self.MARKET_DEFAULTS['gas' if is_gas else 'elec']['tax'])
+        taxes = (vol_kwh * raw_tax) if raw_tax > 0 else (vol_kwh * self.MARKET_DEFAULTS['gas' if energy_type == "gaz" else 'elec']['tax'])
         
         raw_stock = self._safe_float(pricing.get('storage'))
         if raw_stock > 1.0: raw_stock /= 1000.0
@@ -74,7 +73,7 @@ class CortexEngine:
             "meta": {
                 "site_label": str(site_label).upper(),
                 "city": loc.get('city', ''),
-                "energy_type": "Gaz" if is_gas else "Électricité"
+                "energy_type": "Gaz" if energy_type == "gaz" else "Électricité" # Label propre
             },
             "volume_kwh": self._sanitize(round(vol_kwh, 0)),
             "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)),
@@ -126,6 +125,7 @@ class CortexEngine:
         if not raw_sites_data: return {"global": {}, "green_league": []}
         processed = []
         stats = {"total_budget": 0, "total_elec": 0, "total_gas": 0, "nb": 0}
+        
         for s in raw_sites_data:
             if s.get('identity',{}).get('id') == "new_client": continue
             try:
