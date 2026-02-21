@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import logging
-import io
 
 try:
     from app.core.cortex_ingest import ingest
@@ -11,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V140_HYBRID")
+logger = logging.getLogger("CORTEX_ENGINE_V150")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "140.0 (Hybrid: Modern Math + Legacy DQE)"
+        self.version = "150.0 (Stable Emerald)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.05}, "gas": {"price": 0.08, "tax": 0.02}}
 
     def _safe_float(self, value, default=0.0):
@@ -32,7 +31,6 @@ class CortexEngine:
         if pd.isna(val) or np.isinf(val): return 0.0
         return val
 
-    # --- CALCULATEUR MODERNE (V120) ---
     def enrich_site_financials(self, site_data):
         ident = site_data.get('identity', {})
         contract = site_data.get('contract', {})
@@ -47,9 +45,11 @@ class CortexEngine:
         is_gas = 'gaz' in energy_type or 'gas' in energy_type
         
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
-        raw_price = self._safe_float(pricing.get('hph'))
-        unit_price = raw_price / 1000.0 if raw_price > 2.0 else raw_price
         
+        raw_price = self._safe_float(pricing.get('hph'))
+        unit_price = raw_price
+        if unit_price > 1.0: unit_price = unit_price / 1000.0
+            
         is_estimated = False
         if unit_price <= 0.001:
             unit_price = self.MARKET_DEFAULTS['gas']['price'] if is_gas else self.MARKET_DEFAULTS['elec']['price']
@@ -93,25 +93,15 @@ class CortexEngine:
             }
         }
 
-    # --- DQE GENERATOR (RESTORED FROM LEGACY) ---
     def generate_dqe_structure(self, sites_data):
-        # Cette méthode utilise la logique de votre ANCIEN MOTEUR (V49.5)
-        # Mais adaptée pour lire les données du NOUVEL INGEST (V140)
         rows = []
         for s in sites_data:
             if s.get('identity',{}).get('id') == "new_client": continue
-            
             ident = s.get('identity', {})
             loc = s.get('location', {})
             con = s.get('contract', {})
-            
-            # Ingest V140 stocke les détails dans 'power_details' et 'consumption_details'
-            # (Comme l'ancien système)
-            pow_det = con.get('power_details', {})
-            con_det = con.get('consumption_details', {})
-            
+            det = con.get('details', {})
             energy = con.get('energy_type', 'elec')
-            
             row = {
                 "Type": "GAZ" if "gaz" in energy else "ELEC",
                 "Entité": ident.get('entity_name', ''),
@@ -123,11 +113,10 @@ class CortexEngine:
                 "Segment": con.get('segment', ''),
                 "FTA": "CU",
                 "S Max (kVA)": con.get('power', 0),
-                # MAPPING 4 POSTES RESTAURÉ
-                "PS HPH": pow_det.get('hph', 0), "PS HCH": pow_det.get('hch', 0), 
-                "PS HPE": pow_det.get('hpe', 0), "PS HCE": pow_det.get('hce', 0),
-                "Conso HPH": con_det.get('hph', 0), "Conso HCH": con_det.get('hch', 0), 
-                "Conso HPE": con_det.get('hpe', 0), "Conso HCE": con_det.get('hce', 0),
+                "PS HPH": det.get('ps_hph', 0), "PS HCH": det.get('ps_hch', 0), 
+                "PS HPE": det.get('ps_hpe', 0), "PS HCE": det.get('ps_hce', 0),
+                "Conso HPH": det.get('conso_hph', 0), "Conso HCH": det.get('conso_hch', 0), 
+                "Conso HPE": det.get('conso_hpe', 0), "Conso HCE": det.get('conso_hce', 0),
                 "Vol. Annuel": con.get('annual_volume_estimated', 0)
             }
             rows.append(row)
@@ -137,7 +126,6 @@ class CortexEngine:
         if not raw_sites_data: return {"global": {}, "green_league": []}
         processed = []
         stats = {"total_budget": 0, "total_elec": 0, "total_gas": 0, "nb": 0}
-        
         for s in raw_sites_data:
             if s.get('identity',{}).get('id') == "new_client": continue
             try:
