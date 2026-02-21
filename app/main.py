@@ -268,4 +268,87 @@ async def download_template(template_type: str):
 @app.get("/app/assets/{filename}")
 async def get_static_asset(filename: str):
     if "template" in filename: return await download_template("import")
-    if "bpu" in filename: return await download_tem
+    if "bpu" in filename: return await download_template("bpu")
+    return JSONResponse({"error": "File not found"}, 404)
+
+@app.post("/api/ops/simulate_offer")
+async def api_simulate_offer(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        current_sites = []
+        files = glob.glob(os.path.join(DATA_DIR, "*.json"))
+        for p in files:
+            if "master" in p: continue
+            if "," in p or "+" in p: continue
+            try:
+                with open(p, 'r', encoding='utf-8') as f: current_sites.append(json.load(f))
+            except: continue
+        res = cortex.simulate_budget_from_bpu(content, current_sites)
+        return JSONResponse(json_compliant(res))
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
+
+@app.post("/api/ops/analyze")
+async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
+    content = await file.read()
+    res = cortex.analyze_load_curve(content, file.filename)
+    return JSONResponse(json_compliant(res))
+
+@app.post("/api/ops/generate_tender")
+async def generate_tender(request: Request):
+    if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
+    try:
+        body = await request.json()
+        site_ids = body.get('site_ids', [])
+        selected_sites = []
+        for sid in site_ids:
+            # ICI AUSSI : RECHERCHE INTELLIGENTE
+            file_path = find_site_file(sid)
+            if file_path:
+                with open(file_path, 'r', encoding='utf-8') as f: selected_sites.append(json.load(f))
+        
+        df_dqe = cortex.generate_dqe_structure(selected_sites)
+        df_elec = df_dqe[df_dqe['Type'] == 'ELEC']
+        df_gaz = df_dqe[df_dqe['Type'] == 'GAZ']
+        
+        stream = io.BytesIO()
+        with pd.ExcelWriter(stream, engine='openpyxl') as writer:
+            if not df_elec.empty: df_elec.to_excel(writer, index=False, sheet_name="ELEC")
+            if not df_gaz.empty: df_gaz.to_excel(writer, index=False, sheet_name="GAZ")
+            if df_elec.empty and df_gaz.empty: df_dqe.to_excel(writer, index=False, sheet_name="TOUT")
+        stream.seek(0)
+        timestamp = datetime.now().strftime("%Y%m%d")
+        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_{timestamp}.xlsx"})
+    except Exception as e: return JSONResponse({"error": str(e)}, 500)
+
+# ROUTAGE HTML
+@app.get("/")
+async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/onboarding")
+async def view_onboarding(request: Request): return templates.TemplateResponse("onboarding.html", {"request": request})
+@app.get("/processing")
+async def view_processing(request: Request): return templates.TemplateResponse("processing.html", {"request": request})
+@app.get("/dashboard/{profile}")
+async def view_dashboard(request: Request, profile: str):
+    t = f"{profile}.html"
+    if os.path.exists(os.path.join(TEMPLATE_DIR, t)): return templates.TemplateResponse(t, {"request": request, "profile": profile})
+    return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
+@app.get("/settings")
+async def view_settings(request: Request): return templates.TemplateResponse("settings.html", {"request": request})
+@app.get("/partner/settings")
+async def view_partner_settings(request: Request):
+    if "supplier" in request.headers.get("referer", ""): return templates.TemplateResponse("settings_partner.html", {"request": request})
+    return templates.TemplateResponse("settings.html", {"request": request})
+@app.get("/{page_name}")
+async def serve_dynamic(request: Request, page_name: str):
+    if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
+    c = page_name if page_name.endswith(".html") else f"{page_name}.html"
+    if os.path.exists(os.path.join(TEMPLATE_DIR, c)): return templates.TemplateResponse(c, {"request": request})
+    return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/{full_path:path}")
+async def catch_all_deep(request: Request, full_path: str):
+    if any(x in full_path for x in ["static", "assets", "favicon"]): return JSONResponse({}, 404)
+    return templates.TemplateResponse("index.html", {"request": request})
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8080)
