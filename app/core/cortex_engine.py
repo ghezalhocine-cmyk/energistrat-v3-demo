@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import logging
-from datetime import datetime
 
 try:
     from app.core.cortex_ingest import ingest
@@ -11,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V500_LEGACY")
+logger = logging.getLogger("CORTEX_ENGINE_V250")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "500.0 (Legacy Structure Compliance)"
+        self.version = "250.0 (Preservation: Full Pricing Details)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.05}, "gas": {"price": 0.08, "tax": 0.02}}
 
     def _safe_float(self, value, default=0.0):
@@ -38,7 +37,7 @@ class CortexEngine:
         pricing = site_data.get('pricing', {})
         loc = site_data.get('location', {})
         
-        # 1. NOMMAGE
+        # Nommage
         site_label = ident.get('site_name', 'Site Inconnu')
         if not site_label or site_label == "Site Inconnu":
             site_label = f"{loc.get('city', 'Site')} ({str(contract.get('pdl', ''))[-4:]})"
@@ -46,12 +45,13 @@ class CortexEngine:
         energy_type = contract.get('energy_type', 'elec').lower()
         is_gas = 'gaz' in energy_type or 'gas' in energy_type
         
-        # 2. CALCULS (AVEC FIX GAZ MWh)
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
         
+        # PRIX (Avec correction MWh)
         raw_price = self._safe_float(pricing.get('hph'))
-        unit_price = raw_price / 1000.0 if raw_price > 2.0 else raw_price
-        
+        unit_price = raw_price
+        if unit_price > 2.0: unit_price /= 1000.0
+            
         is_estimated = False
         if unit_price <= 0.001:
             unit_price = self.MARKET_DEFAULTS['gas']['price'] if is_gas else self.MARKET_DEFAULTS['elec']['price']
@@ -69,11 +69,8 @@ class CortexEngine:
         budget_ttc = commodity + fixe + taxes + storage_cost
         landing = budget_ttc * 1.02
         pmc_mwh = self._safe_div(budget_ttc, (vol_kwh / 1000))
-        
-        # Calcul Gaspillage (Ghost Savings) pour compatibilité Legacy
-        ghost_savings = budget_ttc * 0.15
 
-        # --- STRUCTURE DE RETOUR STRICTEMENT IDENTIQUE A L'ANCIENNE ---
+        # ON RENVOIE TOUT, Y COMPRIS LES PRIX DÉTAILLÉS
         return {
             "meta": {
                 "site_label": str(site_label).upper(),
@@ -90,24 +87,54 @@ class CortexEngine:
                 "taxes": self._sanitize(round(taxes, 2)),
                 "storage": self._sanitize(round(storage_cost, 2))
             },
-            # C'EST ICI QUE TOUT SE JOUE : ON REMET LES CLÉS DANS 'kpis'
             "kpis": {
-                "budget_annual": self._sanitize(round(budget_ttc, 2)), # CLE VITALE
-                "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)), # CLE VITALE
-                "ghost_savings": self._sanitize(round(ghost_savings, 2)), # CLE VITALE
-                "landing_forecast": self._sanitize(round(landing, 2)), # CLE VITALE
+                "budget_annual": self._sanitize(round(budget_ttc, 2)),
+                "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)),
                 "pmc_eur_mwh": self._sanitize(round(pmc_mwh, 2)),
                 "unit_price_kwh": unit_price,
-                "is_estimated_price": is_estimated,
-                "is_alert_landing": False
-            }
+                "is_estimated_price": is_estimated
+            },
+            # RESTITUTION BRUTE DES PRIX DÉTAILLÉS POUR LE FRONTEND
+            "pricing_details": pricing
         }
 
+    def generate_dqe_structure(self, sites_data):
+        # ... (Inchangé V140) ...
+        rows = []
+        for s in sites_data:
+            if s.get('identity',{}).get('id') == "new_client": continue
+            ident = s.get('identity', {})
+            loc = s.get('location', {})
+            con = s.get('contract', {})
+            # Récupère power_details et consumption_details (Legacy Ingest)
+            pow_det = con.get('power_details', {})
+            con_det = con.get('consumption_details', {})
+            energy = con.get('energy_type', 'elec')
+            row = {
+                "Type": "GAZ" if "gaz" in energy else "ELEC",
+                "Entité": ident.get('entity_name', ''),
+                "Nom du site": ident.get('site_name', ''),
+                "Adresse": loc.get('address', ''),
+                "CP": loc.get('zip_code', ''),
+                "Ville": loc.get('city', ''),
+                "PDL": ident.get('id', ''),
+                "Segment": con.get('segment', ''),
+                "FTA": "CU",
+                "S Max (kVA)": con.get('power', 0),
+                "PS HPH": pow_det.get('hph', 0), "PS HCH": pow_det.get('hch', 0), 
+                "PS HPE": pow_det.get('hpe', 0), "PS HCE": pow_det.get('hce', 0),
+                "Conso HPH": con_det.get('hph', 0), "Conso HCH": con_det.get('hch', 0), 
+                "Conso HPE": con_det.get('hpe', 0), "Conso HCE": con_det.get('hce', 0),
+                "Vol. Annuel": con.get('annual_volume_estimated', 0)
+            }
+            rows.append(row)
+        return pd.DataFrame(rows)
+
     def analyze_portfolio(self, raw_sites_data):
+        # ... (Inchangé V140) ...
         if not raw_sites_data: return {"global": {}, "green_league": []}
         processed = []
         stats = {"total_budget": 0, "total_elec": 0, "total_gas": 0, "nb": 0}
-        
         for s in raw_sites_data:
             if s.get('identity',{}).get('id') == "new_client": continue
             try:
@@ -140,35 +167,6 @@ class CortexEngine:
                 "ranking": sorted_sites[:5]
             }
         }
-
-    def generate_dqe_structure(self, sites_data):
-        rows = []
-        for s in sites_data:
-            if s.get('identity',{}).get('id') == "new_client": continue
-            ident = s.get('identity', {})
-            loc = s.get('location', {})
-            con = s.get('contract', {})
-            det = con.get('details', {})
-            energy = con.get('energy_type', 'elec')
-            row = {
-                "Type": "GAZ" if "gaz" in energy else "ELEC",
-                "Entité": ident.get('entity_name', ''),
-                "Nom du site": ident.get('site_name', ''),
-                "Adresse": loc.get('address', ''),
-                "CP": loc.get('zip_code', ''),
-                "Ville": loc.get('city', ''),
-                "PDL": ident.get('id', ''),
-                "Segment": con.get('segment', ''),
-                "FTA": "CU",
-                "S Max (kVA)": con.get('power', 0),
-                "PS HPH": det.get('ps_hph', 0), "PS HCH": det.get('ps_hch', 0), 
-                "PS HPE": det.get('ps_hpe', 0), "PS HCE": det.get('ps_hce', 0),
-                "Conso HPH": det.get('conso_hph', 0), "Conso HCH": det.get('conso_hch', 0), 
-                "Conso HPE": det.get('conso_hpe', 0), "Conso HCE": det.get('conso_hce', 0),
-                "Vol. Annuel": con.get('annual_volume_estimated', 0)
-            }
-            rows.append(row)
-        return pd.DataFrame(rows)
 
     def analyze_load_curve(self, content, filename, power_subscribed=36):
         if physics and ingest:
