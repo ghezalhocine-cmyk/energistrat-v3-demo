@@ -5,11 +5,11 @@ import logging
 import chardet
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V150")
+logger = logging.getLogger("CORTEX_INGEST_V250")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "150.0 (Final: Volume Sanity Check)"
+        self.version = "250.0 (Legacy Structure + PDL Text Force)"
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE"],
@@ -19,20 +19,31 @@ class CortexIngest:
             "ville": ["VILLE", "COMMUNE", "CITY"],
             "cp": ["CP", "CODE_POSTAL", "ZIP"],
             "siret": ["SIRET", "SIRET_SITE"],
+            
             "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL"],
             "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)"],
             "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF"],
             "fournisseur": ["FOURNISSEUR", "TITULAIRE"],
             "date_fin": ["DATE_FIN", "ECHEANCE"],
+            
+            # --- DETAILS 4 POSTES (PUISSANCE) ---
             "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH", "PS_HPH"],
             "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH", "PS_HCH"],
             "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE", "PS_HPE"],
             "ps_hce": ["PS HCE", "PUISSANCE HCE", "P_HCE", "PS_HCE"],
+            
+            # --- DETAILS 4 POSTES (CONSO) ---
             "conso_hph": ["CONSO HPH", "C_HPH", "HP HAUTE", "CONSO_HPH"],
             "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE", "CONSO_HCH"],
             "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE", "CONSO_HPE"],
             "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE", "CONSO_HCE"],
-            "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
+
+            # --- DETAILS 4 POSTES (PRIX) ---
+            "prix_hph": ["PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
+            "prix_hch": ["PRIX_HCH", "HCH"],
+            "prix_hpe": ["PRIX_HPE", "HPE"],
+            "prix_hce": ["PRIX_HCE", "HCE"],
+            
             "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE"],
             "taxes": ["TAXES", "CSPE", "TICGN"],
             "stockage": ["TERME_STOCK", "STOCKAGE", "TERME_STOCKAGE"]
@@ -54,18 +65,21 @@ class CortexIngest:
 
     def _safe_float(self, val):
         if pd.isna(val) or val == '' or val is None: return 0.0
-        # Remplacement virgule AVANT conversion pour éviter 24,828 -> 24828
         s = str(val).strip().replace('€', '').replace('%', '').replace(' ', '').replace('\xa0', '').replace('EUR', '')
-        s = s.replace(',', '.') 
+        s = s.replace(',', '.')
         try: return float(s)
         except: return 0.0
 
     def _safe_str_clean(self, val):
+        """ NETTOYAGE PDL RENFORCÉ """
         if pd.isna(val) or val == '' or val is None: return ""
         s = str(val).replace(',', '.')
+        # Gestion notation scientifique 3.00E+13 -> 30000000000000
         try:
-            if 'E+' in s or 'e+' in s: return str(int(float(s))) 
-            if '.' in s: return str(int(float(s)))
+            if 'E+' in s or 'e+' in s: 
+                return str(int(float(s))) 
+            if '.' in s: 
+                return str(int(float(s)))
             return s.strip()
         except: return str(val).strip()
 
@@ -74,17 +88,19 @@ class CortexIngest:
         df = None
         buffer = io.BytesIO(file_content)
         
+        # LECTURE
         try:
-            df = pd.read_excel(buffer)
+            # Astuce : dtype=str force Pandas à tout lire en texte, évite la conversion scientifique auto
+            df = pd.read_excel(buffer, dtype=str)
         except:
             try:
                 buffer.seek(0)
-                df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip')
+                df = pd.read_csv(buffer, sep=';', encoding='latin-1', dtype=str, on_bad_lines='skip')
                 if len(df.columns) < 2: raise ValueError()
             except:
                 try:
                     buffer.seek(0)
-                    df = pd.read_csv(buffer, sep=',', encoding='utf-8', on_bad_lines='skip')
+                    df = pd.read_csv(buffer, sep=',', encoding='utf-8', dtype=str, on_bad_lines='skip')
                 except: return []
 
         if df is None or df.empty: return []
@@ -93,7 +109,8 @@ class CortexIngest:
         c_pdl = self._find_col(cols, "pdl")
         if not c_pdl: return []
 
-        c_nom_site = self._find_col(cols, "site_label")
+        # Mapping
+        c_nom = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
         c_cp = self._find_col(cols, "cp")
@@ -105,24 +122,35 @@ class CortexIngest:
         c_fourn = self._find_col(cols, "fournisseur")
         c_end = self._find_col(cols, "date_fin")
         
+        # Détails 4 Postes (Puissance)
         c_ps_hph = self._find_col(cols, "ps_hph")
         c_ps_hch = self._find_col(cols, "ps_hch")
         c_ps_hpe = self._find_col(cols, "ps_hpe")
         c_ps_hce = self._find_col(cols, "ps_hce")
+        
+        # Détails 4 Postes (Conso)
         c_c_hph = self._find_col(cols, "conso_hph")
         c_c_hch = self._find_col(cols, "conso_hch")
         c_c_hpe = self._find_col(cols, "conso_hpe")
         c_c_hce = self._find_col(cols, "conso_hce")
         
-        c_prix = self._find_col(cols, "prix_unitaire")
+        # Détails 4 Postes (Prix)
+        c_p_hph = self._find_col(cols, "prix_hph")
+        c_p_hch = self._find_col(cols, "prix_hch")
+        c_p_hpe = self._find_col(cols, "prix_hpe")
+        c_p_hce = self._find_col(cols, "prix_hce")
+        
         c_abo = self._find_col(cols, "abonnement")
         c_tax = self._find_col(cols, "taxes")
         c_stock = self._find_col(cols, "stockage")
 
         for idx, row in df.iterrows():
             try:
+                # 1. PDL (Nettoyage Scientifique)
                 pdl = self._safe_str_clean(row.get(c_pdl, f"TMP_{idx}"))
-                nom_brut = str(row.get(c_nom_site, "")).strip()
+                
+                # 2. Nommage
+                nom_brut = str(row.get(c_nom, "")).strip()
                 entite_brut = str(row.get(c_entite, "")).strip()
                 ville = str(row.get(c_ville, "")).strip()
                 
@@ -132,19 +160,14 @@ class CortexIngest:
                 elif entite_brut and not any(b in entite_brut.upper() for b in self.NAME_BLACKLIST): final_name = entite_brut
                 elif ville: final_name = f"{ville} ({pdl[-4:]})"
 
-                # --- CORRECTION VOLUME (DECIMAL FORCE) ---
+                # 3. Conso & Unités
                 raw_conso = self._safe_float(row.get(c_conso))
                 conso_kwh = raw_conso
-                
-                # 1. Si MWh détecté dans le titre -> x1000
-                if c_conso and "MWH" in str(c_conso).upper():
-                    conso_kwh = raw_conso * 1000.0
-                
-                # 2. SANITY CHECK : Si volume > 10 GWh (10 Millions kWh), c'est une erreur de lecture virgule
-                # Ex: 24,828 lu comme 24828 MWh -> 24 828 000 kWh. On divise par 1000.
-                if conso_kwh > 10_000_000:
-                    conso_kwh = conso_kwh / 1000.0
+                if c_conso and "MWH" in str(c_conso).upper(): conso_kwh = raw_conso * 1000.0
+                # Fix Decimal Force (Gaz)
+                if conso_kwh > 10_000_000: conso_kwh = conso_kwh / 1000.0
 
+                # 4. Énergie
                 segment = str(row.get(c_seg, "")).upper()
                 is_gas = False
                 if "GAZ" in segment or "T1" in segment or "T2" in segment or "T3" in segment: is_gas = True
@@ -159,16 +182,25 @@ class CortexIngest:
                         "segment": segment, "power": self._safe_float(row.get(c_puiss)),
                         "annual_volume_estimated": conso_kwh, "energy_type": energy_type,
                         "end_date": str(row.get(c_end, "")),
-                        "details": {
-                            "ps_hph": self._safe_float(row.get(c_ps_hph)), "ps_hch": self._safe_float(row.get(c_ps_hch)),
-                            "ps_hpe": self._safe_float(row.get(c_ps_hpe)), "ps_hce": self._safe_float(row.get(c_ps_hce)),
-                            "conso_hph": self._safe_float(row.get(c_c_hph)), "conso_hch": self._safe_float(row.get(c_c_hch)),
-                            "conso_hpe": self._safe_float(row.get(c_c_hpe)), "conso_hce": self._safe_float(row.get(c_c_hce))
+                        # STRUCTURE LEGACY EXACTE : power_details
+                        "power_details": {
+                            "hph": self._safe_float(row.get(c_ps_hph)), "hch": self._safe_float(row.get(c_ps_hch)),
+                            "hpe": self._safe_float(row.get(c_ps_hpe)), "hce": self._safe_float(row.get(c_ps_hce))
+                        },
+                        "consumption_details": {
+                            "hph": self._safe_float(row.get(c_c_hph)), "hch": self._safe_float(row.get(c_c_hch)),
+                            "hpe": self._safe_float(row.get(c_c_hpe)), "hce": self._safe_float(row.get(c_c_hce))
                         }
                     },
+                    # STRUCTURE LEGACY EXACTE : pricing
                     "pricing": {
-                        "hph": self._safe_float(row.get(c_prix)), "fix": self._safe_float(row.get(c_abo)),
-                        "tax": self._safe_float(row.get(c_tax)), "storage": self._safe_float(row.get(c_stock))
+                        "fix": self._safe_float(row.get(c_abo)),
+                        "hph": self._safe_float(row.get(c_p_hph)), 
+                        "hch": self._safe_float(row.get(c_p_hch)),
+                        "hpe": self._safe_float(row.get(c_p_hpe)),
+                        "hce": self._safe_float(row.get(c_p_hce)),
+                        "tax": self._safe_float(row.get(c_tax)), 
+                        "storage": self._safe_float(row.get(c_stock))
                     }
                 }
                 sites.append(site)
@@ -176,9 +208,10 @@ class CortexIngest:
         return sites
 
     def parse_bpu_excel(self, file_content):
+        # ... (Inchangé V130) ...
         try:
             buffer = io.BytesIO(file_content)
-            df = pd.read_excel(buffer)
+            df = pd.read_excel(buffer, engine='openpyxl')
             cols = df.columns
             c_hph = self._find_col(cols, "prix_unitaire")
             if not c_hph:
@@ -197,6 +230,7 @@ class CortexIngest:
         except: return None, False
 
     def parse_load_curve(self, file_content, filename):
+        # ... (Inchangé V130) ...
         try:
             buffer = io.BytesIO(file_content)
             enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
