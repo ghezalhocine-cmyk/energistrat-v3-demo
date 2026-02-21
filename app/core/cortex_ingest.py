@@ -5,26 +5,44 @@ import logging
 import chardet
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V800")
+logger = logging.getLogger("CORTEX_INGEST_V900_TITANIUM")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "800.0 (Final: Gas Display Mapping)"
+        self.version = "900.0 (Titanium: Exhaustive Mapping + Gas Fix)"
         
+        # MAPPING MAXIMALISTE (RIEN N'EST SUPPRIMÉ)
         self.COLUMN_MAPPING = {
+            # IDENTIFICATION
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE"],
             "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL"],
             "entity": ["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT"],
+            
+            # LOCALISATION
             "adresse": ["ADRESSE_SITE", "ADRESSE", "RUE"],
             "ville": ["VILLE", "COMMUNE", "CITY"],
             "cp": ["CP", "CODE_POSTAL", "ZIP"],
             "siret": ["SIRET", "SIRET_SITE"],
+            
+            # DONNEES TECHNIQUES
             "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL"],
             "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)"],
+            "p_max": ["POINTE_MAX", "P_MAX", "PUISSANCE_ATTEINTE"],
+            
+            # CONTRAT
             "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF"],
             "fournisseur": ["FOURNISSEUR", "TITULAIRE"],
+            "fta": ["FTA", "FORMULE_TARIFAIRE"],
+            "grd": ["GRD", "GESTIONNAIRE"],
+            "date_debut": ["DATE_DEBUT", "DEBUT_CONTRAT"],
             "date_fin": ["DATE_FIN", "ECHEANCE"],
-            # DETAILS
+            
+            # GAZ SPECIFIQUE (POUR AFFICHAGE DÉTAIL)
+            "cja": ["CJA", "CJA_MWH_J", "CAPACITE_JOURNALIERE"],
+            "profil": ["PROFIL", "PROFIL_GAZ"],
+            "tarif_ach": ["TARIF_ACHEM", "TARIF_ACHEMINEMENT"],
+
+            # ELEC DETAILS (POUR DQE)
             "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH", "PS_HPH"],
             "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH", "PS_HCH"],
             "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE", "PS_HPE"],
@@ -33,15 +51,16 @@ class CortexIngest:
             "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE", "CONSO_HCH"],
             "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE", "CONSO_HPE"],
             "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE", "CONSO_HCE"],
-            # PRIX
+
+            # PRIX & BUDGET (TOUS LES POSTES)
             "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
+            "prix_hch": ["PRIX_HCH", "HCH"],
+            "prix_hpe": ["PRIX_HPE", "HPE"],
+            "prix_hce": ["PRIX_HCE", "HCE"],
+            
             "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE"],
             "taxes": ["TAXES", "CSPE", "TICGN"],
-            "stockage": ["TERME_STOCK", "STOCKAGE", "TERME_STOCKAGE"],
-            # GAZ TECH
-            "cja": ["CJA", "CJA_MWH_J"],
-            "profil": ["PROFIL", "PROFIL_GAZ"],
-            "tarif_ach": ["TARIF_ACHEM", "TARIF_ACHEMINEMENT"]
+            "stockage": ["TERME_STOCK", "STOCKAGE", "TERME_STOCKAGE"]
         }
         self.NAME_BLACKLIST = ["CLIENT", "SITE", "INCONNU", "NAN", "NONE", "NOM_SITE", "0", ".", "COMMUNE", "MAIRIE", "SOCIETE"]
 
@@ -53,7 +72,8 @@ class CortexIngest:
         for col in df_cols:
             clean = self._clean_header(col)
             if clean in candidates: return col
-            if len(key) > 3 and key not in ["prix_hph", "prix_hch"]: 
+            # Recherche partielle sécurisée (sauf pour les prix courts)
+            if len(key) > 3 and key not in ["prix_hph", "prix_hch", "prix_hpe", "prix_hce"]: 
                 for cand in candidates:
                     if cand in clean: return col
         return None
@@ -78,6 +98,8 @@ class CortexIngest:
         sites = []
         df = None
         buffer = io.BytesIO(file_content)
+        
+        # LECTURE ROBUSTE (XLSX, XLS, CSV, LATIN-1)
         try: df = pd.read_excel(buffer, dtype=str)
         except:
             try:
@@ -96,7 +118,7 @@ class CortexIngest:
         c_pdl = self._find_col(cols, "pdl")
         if not c_pdl: return []
 
-        # Mapping général
+        # Récupération des colonnes
         c_nom = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
@@ -105,11 +127,15 @@ class CortexIngest:
         c_siret = self._find_col(cols, "siret")
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
+        c_pmax = self._find_col(cols, "p_max")
         c_seg = self._find_col(cols, "segment")
         c_fourn = self._find_col(cols, "fournisseur")
+        c_fta = self._find_col(cols, "fta")
+        c_grd = self._find_col(cols, "grd")
+        c_start = self._find_col(cols, "date_debut")
         c_end = self._find_col(cols, "date_fin")
         
-        # Gaz Spec
+        # Gaz Tech
         c_cja = self._find_col(cols, "cja")
         c_profil = self._find_col(cols, "profil")
         c_tarif_ach = self._find_col(cols, "tarif_ach")
@@ -124,7 +150,11 @@ class CortexIngest:
         c_c_hpe = self._find_col(cols, "conso_hpe")
         c_c_hce = self._find_col(cols, "conso_hce")
         
-        c_prix = self._find_col(cols, "prix_unitaire")
+        # Prix
+        c_p_hph = self._find_col(cols, "prix_hph")
+        c_p_hch = self._find_col(cols, "prix_hch")
+        c_p_hpe = self._find_col(cols, "prix_hpe")
+        c_p_hce = self._find_col(cols, "prix_hce")
         c_abo = self._find_col(cols, "abonnement")
         c_tax = self._find_col(cols, "taxes")
         c_stock = self._find_col(cols, "stockage")
@@ -149,16 +179,14 @@ class CortexIngest:
 
                 segment = str(row.get(c_seg, "")).upper()
                 is_gas = False
-                if "GAZ" in segment or "T1" in segment or "T2" in segment: is_gas = True
+                if "GAZ" in segment or "T1" in segment or "T2" in segment or "T3" in segment: is_gas = True
                 elif c_pdl and "PCE" in str(c_pdl).upper(): is_gas = True
                 energy_type = "gaz" if is_gas else "elec"
 
-                # MAPPING PUISSANCE GAZ
-                # Pour le Gaz, la "Puissance" affichée est souvent la CAR (MWh)
+                # MAPPING PUISSANCE / CAR GAZ (Fix Visuel)
                 power_val = self._safe_float(row.get(c_puiss))
                 if is_gas and power_val == 0:
-                     # Si pas de puissance explicite, on prend la CAR brute (MWh) pour l'affichage
-                     power_val = self._safe_float(row.get(c_conso))
+                     power_val = self._safe_float(row.get(c_conso)) # On met la CAR dans power pour affichage
 
                 site = {
                     "identity": { "id": pdl, "site_name": final_name, "entity_name": entite_brut, "siret": self._safe_str_clean(row.get(c_siret)) },
@@ -167,15 +195,19 @@ class CortexIngest:
                         "pdl": pdl, 
                         "provider": str(row.get(c_fourn, "Inconnu")),
                         "segment": segment, 
-                        "power": power_val, # Contient kVA (Elec) ou MWh (Gaz)
+                        "power": power_val,
+                        "p_max": self._safe_float(row.get(c_pmax)),
                         "annual_volume_estimated": conso_kwh, 
                         "energy_type": energy_type,
-                        "end_date": str(row.get(c_end, "")),
-                        # GAZ SPECIFIQUE
+                        "fta": str(row.get(c_fta, "-")),
+                        "grd": str(row.get(c_grd, "Enedis" if not is_gas else "GRDF")),
+                        "start_date": str(row.get(c_start, "-")),
+                        "end_date": str(row.get(c_end, "-")),
+                        # GAZ TECH
                         "cja": self._safe_float(row.get(c_cja)),
                         "profil": str(row.get(c_profil, "")),
                         "tarif_acheminement": str(row.get(c_tarif_ach, "")),
-                        
+                        # ELEC DETAILS
                         "power_details": {
                             "hph": self._safe_float(row.get(c_ps_hph)), "hch": self._safe_float(row.get(c_ps_hch)),
                             "hpe": self._safe_float(row.get(c_ps_hpe)), "hce": self._safe_float(row.get(c_ps_hce))
@@ -186,7 +218,10 @@ class CortexIngest:
                         }
                     },
                     "pricing": {
-                        "hph": self._safe_float(row.get(c_prix)), 
+                        "hph": self._safe_float(row.get(c_p_hph)), 
+                        "hch": self._safe_float(row.get(c_p_hch)),
+                        "hpe": self._safe_float(row.get(c_p_hpe)),
+                        "hce": self._safe_float(row.get(c_p_hce)),
                         "fix": self._safe_float(row.get(c_abo)),
                         "tax": self._safe_float(row.get(c_tax)), 
                         "storage": self._safe_float(row.get(c_stock))
