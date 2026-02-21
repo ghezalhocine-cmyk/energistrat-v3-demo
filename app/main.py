@@ -28,7 +28,7 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V900-TITANIUM")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V601-FRONT-FIX")
 
 app.add_middleware(
     CORSMiddleware,
@@ -95,38 +95,30 @@ def get_market_ref():
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
-    """ FIX STYLO : MERGE AU LIEU D'ECRASER """
     try:
-        payload = await request.json()
-        cid = payload.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
-        if "identity" not in payload: payload["identity"] = {}
-        payload["identity"]["id"] = cid
-        
-        file_path = find_site_file(cid)
-        if not file_path:
-            file_path = os.path.join(DATA_DIR, f"{get_safe_id(cid)}.json")
-            data = payload
-        else:
-            with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
-            
-            # MERGE INTELLIGENT
-            if 'location' in payload:
-                data['location'] = {**data.get('location', {}), **payload['location']}
-            if 'identity' in payload:
-                data['identity']['site_name'] = payload['identity'].get('site_name', data['identity']['site_name'])
-            if 'contract' in payload:
-                data['contract']['provider'] = payload['contract'].get('provider', data['contract'].get('provider'))
-                data['contract']['power'] = payload['contract'].get('power', data['contract'].get('power'))
-            if 'pricing' in payload:
-                data['pricing']['hph'] = payload['pricing'].get('hph', data['pricing'].get('hph'))
-
+        data = await request.json()
+        cid = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
+        if "identity" not in data: data["identity"] = {}
+        data["identity"]["id"] = cid
+        file_path = os.path.join(DATA_DIR, f"{get_safe_id(cid)}.json")
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "id": cid})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/settings/update_site")
 async def api_update_site(request: Request):
-    return await api_save_client(request)
+    try:
+        payload = await request.json()
+        site_id = payload.get('id')
+        if not site_id: return JSONResponse({"error": "ID manquant"}, 400)
+        file_path = find_site_file(site_id)
+        if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
+        with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
+        if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
+        if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
+        with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
+        return JSONResponse({"success": True, "message": "Sauvegardé"})
+    except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.post("/api/settings/import_csv")
 async def api_import_csv(file: UploadFile = File(...)):
@@ -171,14 +163,12 @@ async def get_fleet_data():
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         
-        safe_id = get_safe_id(s.get('identity',{}).get('id'))
-        
         fleet_list.append({
-            "id": safe_id,
+            "id": get_safe_id(s.get('identity',{}).get('id')),
             "name": fin['meta']['site_label'],
             "city": city,
             "volume": fin['volume_mwh'],
-            "energy": "gaz" if "Gaz" in fin['meta']['energy_type'] else "elec",
+            "energy": "gaz" if fin['meta']['is_gas'] else "elec",
             "segment": contract.get('segment', '-'),
             "provider": prov,
             "budget": fin['budget_annual'],
@@ -202,9 +192,8 @@ async def get_dashboard_data(client_id: str):
     financials = cortex.enrich_site_financials(data)
     market_ref = get_market_ref()
     
-    # CALCUL DYNAMIQUE MARCHÉ
     market_analysis = cortex.analyze_market_position(
-        financials['pricing_details']['hph'], 
+        financials['pricing_frontend']['hph'], 
         market_ref,
         financials['meta']['is_gas']
     )
@@ -212,35 +201,31 @@ async def get_dashboard_data(client_id: str):
     merged_data = {
         **data,
         **financials,
+        "id": data.get('identity', {}).get('id'),
+        
+        # --- FIX CRITIQUE : MINUSCULE POUR LE JS ---
+        "energy_type": financials['meta']['energy_type'], 
+        
         "kpis": financials['kpis'],
         "budget": financials['budget_annual'],
         "volume_mwh": financials['volume_mwh'],
+        
+        # --- FIX CRITIQUE : PRICING POUR LE JS ---
+        "pricing": financials['pricing_frontend'], 
+        
+        "market_analysis": market_analysis,
         "surface": data.get('location', {}).get('surface', 0),
         "electricity_price": financials['kpis']['unit_price_kwh'],
-        
-        # INJECTIONS VITALES
-        "fta": data.get('contract', {}).get('fta', '-'),
-        "grd": data.get('contract', {}).get('grd', '-'),
-        "start_date": data.get('contract', {}).get('start_date', '-'),
-        "end_date": data.get('contract', {}).get('end_date', '-'),
-        "p_max": data.get('contract', {}).get('p_max', '-'),
         
         "cja": data.get('contract', {}).get('cja', '-'),
         "profil": data.get('contract', {}).get('profil', '-'),
         "tarif_acheminement": data.get('contract', {}).get('tarif_acheminement', '-'),
         
-        "hph": financials['pricing_details'].get('hph', 0),
-        "hch": financials['pricing_details'].get('hch', 0),
-        "hpe": financials['pricing_details'].get('hpe', 0),
-        "hce": financials['pricing_details'].get('hce', 0),
+        "fta": data.get('contract', {}).get('fta', '-'),
+        "grd": data.get('contract', {}).get('grd', '-'),
+        "p_max": data.get('contract', {}).get('p_max', '-'),
         
-        "ps_hph": data.get('contract', {}).get('power_details', {}).get('hph', 0),
-        "ps_hch": data.get('contract', {}).get('power_details', {}).get('hch', 0),
-        "ps_hpe": data.get('contract', {}).get('power_details', {}).get('hpe', 0),
-        "ps_hce": data.get('contract', {}).get('power_details', {}).get('hce', 0),
-        
-        "cortex_insight": {"message": "Analyse active.", "conseil": "RAS.", "status": "OK", "color": "green"},
-        "market_analysis": market_analysis,
+        "cortex_insight": {"message": "Analyse active.", "conseil": "RAS.", "status": "OK", "color": "green"}
     }
     
     if "location" in data and "surface" in data["location"]:
@@ -346,7 +331,7 @@ async def generate_tender(request: Request):
             if df_elec.empty and df_gaz.empty: df_dqe.to_excel(writer, index=False, sheet_name="TOUT")
         stream.seek(0)
         timestamp = datetime.now().strftime("%Y%m%d")
-        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"})
+        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.get("/")
