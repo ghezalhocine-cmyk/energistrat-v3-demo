@@ -5,11 +5,11 @@ import logging
 import chardet
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V300")
+logger = logging.getLogger("CORTEX_INGEST_V350")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "300.0 (Titanium: Strict Price Mapping)"
+        self.version = "350.0 (Full Data: FTA, GRD, Dates, Prices)"
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE"],
@@ -23,23 +23,31 @@ class CortexIngest:
             "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL"],
             "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)"],
             "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF"],
-            "fournisseur": ["FOURNISSEUR", "TITULAIRE"],
-            "date_fin": ["DATE_FIN", "ECHEANCE"],
             
-            # DETAILS PUISSANCE
+            # --- CHAMPS MANQUANTS AJOUTÉS ---
+            "fta": ["FTA", "FORMULE_TARIFAIRE", "FORMULE"],
+            "grd": ["GRD", "GESTIONNAIRE", "DISTRIBUTEUR"],
+            "date_debut": ["DATE_DEBUT", "DEBUT_CONTRAT", "DATE DEBUT"],
+            "date_fin": ["DATE_FIN", "ECHEANCE", "FIN_CONTRAT", "DATE FIN"],
+            "fournisseur": ["FOURNISSEUR", "TITULAIRE"],
+            
+            # PUISSANCES
             "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH", "PS_HPH"],
             "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH", "PS_HCH"],
             "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE", "PS_HPE"],
             "ps_hce": ["PS HCE", "PUISSANCE HCE", "P_HCE", "PS_HCE"],
             
-            # DETAILS CONSO
+            # CONSOS
             "conso_hph": ["CONSO HPH", "C_HPH", "HP HAUTE", "CONSO_HPH"],
             "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE", "CONSO_HCH"],
             "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE", "CONSO_HPE"],
             "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE", "CONSO_HCE"],
 
-            # PRIX (CORRECTIF ICI : SUPPRESSION DE "HPH", "HCH" SEULS)
-            "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "PRIX"],
+            # PRIX (LES 4 POSTES)
+            "prix_hph": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
+            "prix_hch": ["PRIX_HCH", "HCH"],
+            "prix_hpe": ["PRIX_HPE", "HPE"],
+            "prix_hce": ["PRIX_HCE", "HCE"],
             
             "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE"],
             "taxes": ["TAXES", "CSPE", "TICGN"],
@@ -82,16 +90,16 @@ class CortexIngest:
         buffer = io.BytesIO(file_content)
         
         try:
-            df = pd.read_excel(buffer) # Auto engine
+            df = pd.read_excel(buffer, dtype=str) # Force tout en texte pour éviter les arrondis scientifiques
         except:
             try:
                 buffer.seek(0)
-                df = pd.read_csv(buffer, sep=';', encoding='latin-1', on_bad_lines='skip')
+                df = pd.read_csv(buffer, sep=';', encoding='latin-1', dtype=str, on_bad_lines='skip')
                 if len(df.columns) < 2: raise ValueError()
             except:
                 try:
                     buffer.seek(0)
-                    df = pd.read_csv(buffer, sep=',', encoding='utf-8', on_bad_lines='skip')
+                    df = pd.read_csv(buffer, sep=',', encoding='utf-8', dtype=str, on_bad_lines='skip')
                 except: return []
 
         if df is None or df.empty: return []
@@ -107,12 +115,19 @@ class CortexIngest:
         c_cp = self._find_col(cols, "cp")
         c_ville = self._find_col(cols, "ville")
         c_siret = self._find_col(cols, "siret")
+        
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
         c_seg = self._find_col(cols, "segment")
         c_fourn = self._find_col(cols, "fournisseur")
+        
+        # NOUVEAUX CHAMPS
+        c_fta = self._find_col(cols, "fta")
+        c_grd = self._find_col(cols, "grd")
+        c_start = self._find_col(cols, "date_debut")
         c_end = self._find_col(cols, "date_fin")
         
+        # Détails 4 Postes
         c_ps_hph = self._find_col(cols, "ps_hph")
         c_ps_hch = self._find_col(cols, "ps_hch")
         c_ps_hpe = self._find_col(cols, "ps_hpe")
@@ -123,7 +138,12 @@ class CortexIngest:
         c_c_hpe = self._find_col(cols, "conso_hpe")
         c_c_hce = self._find_col(cols, "conso_hce")
         
-        c_prix = self._find_col(cols, "prix_unitaire")
+        # PRIX 4 POSTES
+        c_p_hph = self._find_col(cols, "prix_hph")
+        c_p_hch = self._find_col(cols, "prix_hch")
+        c_p_hpe = self._find_col(cols, "prix_hpe")
+        c_p_hce = self._find_col(cols, "prix_hce")
+        
         c_abo = self._find_col(cols, "abonnement")
         c_tax = self._find_col(cols, "taxes")
         c_stock = self._find_col(cols, "stockage")
@@ -134,7 +154,6 @@ class CortexIngest:
                 nom_brut = str(row.get(c_nom, "")).strip()
                 entite_brut = str(row.get(c_entite, "")).strip()
                 ville = str(row.get(c_ville, "")).strip()
-                siret = self._safe_str_clean(row.get(c_siret, ""))
                 
                 final_name = "Site Inconnu"
                 is_nom_bad = not nom_brut or any(b in nom_brut.upper() for b in self.NAME_BLACKLIST)
@@ -154,13 +173,19 @@ class CortexIngest:
                 energy_type = "gaz" if is_gas else "elec"
 
                 site = {
-                    "identity": { "id": pdl, "site_name": final_name, "entity_name": entite_brut, "siret": siret },
+                    "identity": { "id": pdl, "site_name": final_name, "entity_name": entite_brut, "siret": self._safe_str_clean(row.get(c_siret)) },
                     "location": { "address": str(row.get(c_addr, "")), "zip_code": self._safe_str_clean(row.get(c_cp, "")), "city": ville },
                     "contract": {
-                        "pdl": pdl, "provider": str(row.get(c_fourn, "Inconnu")),
-                        "segment": segment, "power": self._safe_float(row.get(c_puiss)),
-                        "annual_volume_estimated": conso_kwh, "energy_type": energy_type,
-                        "end_date": str(row.get(c_end, "")),
+                        "pdl": pdl, 
+                        "provider": str(row.get(c_fourn, "Inconnu")),
+                        "segment": segment, 
+                        "power": self._safe_float(row.get(c_puiss)),
+                        "annual_volume_estimated": conso_kwh, 
+                        "energy_type": energy_type,
+                        "fta": str(row.get(c_fta, "-")), # Nouveau
+                        "grd": str(row.get(c_grd, "Enedis" if not is_gas else "GRDF")), # Nouveau avec fallback
+                        "start_date": str(row.get(c_start, "-")), # Nouveau
+                        "end_date": str(row.get(c_end, "-")),
                         "power_details": {
                             "hph": self._safe_float(row.get(c_ps_hph)), "hch": self._safe_float(row.get(c_ps_hch)),
                             "hpe": self._safe_float(row.get(c_ps_hpe)), "hce": self._safe_float(row.get(c_ps_hce))
@@ -171,8 +196,13 @@ class CortexIngest:
                         }
                     },
                     "pricing": {
-                        "hph": self._safe_float(row.get(c_prix)), "fix": self._safe_float(row.get(c_abo)),
-                        "tax": self._safe_float(row.get(c_tax)), "storage": self._safe_float(row.get(c_stock))
+                        "hph": self._safe_float(row.get(c_p_hph)), 
+                        "hch": self._safe_float(row.get(c_p_hch)),
+                        "hpe": self._safe_float(row.get(c_p_hpe)),
+                        "hce": self._safe_float(row.get(c_p_hce)),
+                        "fix": self._safe_float(row.get(c_abo)),
+                        "tax": self._safe_float(row.get(c_tax)), 
+                        "storage": self._safe_float(row.get(c_stock))
                     }
                 }
                 sites.append(site)
@@ -180,7 +210,6 @@ class CortexIngest:
         return sites
 
     def parse_bpu_excel(self, file_content):
-        # ... (Inchangé) ...
         try:
             buffer = io.BytesIO(file_content)
             df = pd.read_excel(buffer, engine='openpyxl')
@@ -202,7 +231,6 @@ class CortexIngest:
         except: return None, False
 
     def parse_load_curve(self, file_content, filename):
-        # ... (Inchangé) ...
         try:
             buffer = io.BytesIO(file_content)
             enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
