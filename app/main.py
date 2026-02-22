@@ -32,7 +32,7 @@ except ImportError:
         import cortex_physics as physics
     except: pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1106")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1107")
 
 app.add_middleware(
     CORSMiddleware,
@@ -344,7 +344,7 @@ async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
     res = cortex.analyze_load_curve(content, file.filename)
     return JSONResponse(json_compliant(res))
 
-# --- GENERATE TENDER AVEC BPU INTEGRE ---
+# --- GENERATE TENDER PRO (BPU DETAILLÉ) ---
 @app.post("/api/ops/generate_tender")
 async def generate_tender(request: Request):
     if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
@@ -361,17 +361,28 @@ async def generate_tender(request: Request):
         df_elec = df_dqe[df_dqe['Type'] == 'ELEC']
         df_gaz = df_dqe[df_dqe['Type'] == 'GAZ']
         
-        # CREATION DES MASQUES BPU VIERGES
-        df_bpu_elec = pd.DataFrame(columns=[
-            "NOM_OFFRE", "PRIX_HPH_EUR_KWH", "PRIX_HCH_EUR_KWH", "PRIX_HPE_EUR_KWH", "PRIX_HCE_EUR_KWH", "ABONNEMENT_EUR_AN"
-        ])
-        # On peut pré-remplir une ligne d'exemple
-        df_bpu_elec.loc[0] = ["OFFRE EXEMPLE", 0.15, 0.10, 0.08, 0.04, 250]
+        # BPU ELEC PRO (Reprise des sites)
+        if not df_elec.empty:
+            df_bpu_elec = df_elec[["PDL", "Nom du site", "CP", "Ville", "Segment", "Vol. Annuel"]].copy()
+            df_bpu_elec["OFFRE_NOM"] = ""
+            df_bpu_elec["PRIX_HPH_EUR_KWH"] = ""
+            df_bpu_elec["PRIX_HCH_EUR_KWH"] = ""
+            df_bpu_elec["PRIX_HPE_EUR_KWH"] = ""
+            df_bpu_elec["PRIX_HCE_EUR_KWH"] = ""
+            df_bpu_elec["ABONNEMENT_EUR_AN"] = ""
+        else:
+            df_bpu_elec = pd.DataFrame()
 
-        df_bpu_gaz = pd.DataFrame(columns=[
-            "NOM_OFFRE", "PRIX_MOLECULE_EUR_MWH", "ABONNEMENT_EUR_AN", "TERME_STOCKAGE_EUR_MWH"
-        ])
-        df_bpu_gaz.loc[0] = ["OFFRE EXEMPLE", 45.0, 250, 0.70]
+        # BPU GAZ PRO (Reprise des sites)
+        if not df_gaz.empty:
+            df_bpu_gaz = df_gaz[["PDL", "Nom du site", "CP", "Ville", "Vol. Annuel"]].copy()
+            df_bpu_gaz = df_bpu_gaz.rename(columns={"PDL": "PCE"})
+            df_bpu_gaz["OFFRE_NOM"] = ""
+            df_bpu_gaz["PRIX_MOLECULE_EUR_MWH"] = ""
+            df_bpu_gaz["ABONNEMENT_EUR_AN"] = ""
+            df_bpu_gaz["TERME_STOCKAGE_EUR_MWH"] = ""
+        else:
+            df_bpu_gaz = pd.DataFrame()
 
         stream = io.BytesIO()
         with pd.ExcelWriter(stream, engine='openpyxl') as writer:
