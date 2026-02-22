@@ -6,11 +6,11 @@ import chardet
 import re
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V1108")
+logger = logging.getLogger("CORTEX_INGEST_V1112")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "1108.0 (Dual Stream BPU)"
+        self.version = "1112.0 (Patrimoine Expert)"
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
@@ -25,6 +25,12 @@ class CortexIngest:
             "cp": ["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
             "surface": ["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER"],
             "typologie": ["TYPOLOGIE", "USAGE", "TYPE_BATIMENT", "ACTIVITE"],
+            
+            # PATRIMOINE TECHNIQUE (NOUVEAU)
+            "chauffage": ["CHAUFFAGE", "TYPE_CHAUFFAGE", "ENERGIE_CHAUFFAGE", "SYSTEME_CVC"],
+            "isolation": ["ISOLATION", "TYPE_ISOLATION", "VITRAGE", "PERFORMANCE_ENVELOPPE"],
+            "regulation": ["REGULATION", "GTB", "GTC", "PILOTAGE"],
+
             "compteur_prod": ["COMPTEUR_PRODUCTION", "PRODUCTEUR", "INJECTION", "COMPTEUR_PROD"],
             "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)", "PUISSANCE_SOUSCRITE"],
             "p_max": ["POINTE_MAX", "P_MAX", "PUISSANCE_ATTEINTE", "MAX_ATTEINTE"],
@@ -91,14 +97,9 @@ class CortexIngest:
         buffer = io.BytesIO(file_content)
         try: df = pd.read_excel(buffer, dtype=str)
         except:
-            try:
-                buffer.seek(0)
-                df = pd.read_csv(buffer, sep=';', encoding='latin-1', dtype=str, on_bad_lines='skip')
-                if len(df.columns) < 2: raise ValueError()
+            try: buffer.seek(0); df = pd.read_csv(buffer, sep=';', encoding='latin-1', dtype=str, on_bad_lines='skip')
             except:
-                try:
-                    buffer.seek(0)
-                    df = pd.read_csv(buffer, sep=',', encoding='utf-8', dtype=str, on_bad_lines='skip')
+                try: buffer.seek(0); df = pd.read_csv(buffer, sep=',', encoding='utf-8', dtype=str, on_bad_lines='skip')
                 except: return []
 
         if df is None or df.empty: return []
@@ -118,6 +119,12 @@ class CortexIngest:
         c_insee = self._find_col(cols, "insee") 
         c_surface = self._find_col(cols, "surface")
         c_typologie = self._find_col(cols, "typologie")
+        
+        # TECH
+        c_chauff = self._find_col(cols, "chauffage")
+        c_isol = self._find_col(cols, "isolation")
+        c_regul = self._find_col(cols, "regulation")
+
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
         c_pmax = self._find_col(cols, "p_max")
@@ -172,6 +179,7 @@ class CortexIngest:
                 p_hph = self._safe_float(row.get(c_p_hph))
                 if is_gas and p_hph > 2.0: p_hph /= 1000.0
                 if not is_gas and p_hph > 5.0: p_hph /= 1000.0
+                
                 site = {
                     "identity": { 
                         "id": pdl, 
@@ -188,6 +196,11 @@ class CortexIngest:
                         "city": ville,
                         "surface": self._safe_float(row.get(c_surface)),
                         "typologie": self._safe_str_clean(row.get(c_typologie))
+                    },
+                    "technical": {
+                        "chauffage": self._safe_str_clean(row.get(c_chauff)),
+                        "isolation": self._safe_str_clean(row.get(c_isol)),
+                        "regulation": self._safe_str_clean(row.get(c_regul))
                     },
                     "contract": {
                         "pdl": pdl, 
@@ -229,66 +242,44 @@ class CortexIngest:
         return sites
 
     def parse_bpu_excel(self, file_content):
-        """
-        PARSEUR BPU DUAL-STREAM (ELEC & GAZ)
-        Renvoie: {"elec": {pdl: prices}, "gas": {pdl: prices}}
-        """
         try:
             buffer = io.BytesIO(file_content)
             xl = pd.ExcelFile(buffer, engine='openpyxl')
             
-            maps = {"elec": {}, "gas": {}}
+            sheet_name = None
+            for s in xl.sheet_names:
+                if "REPONSE" in s.upper():
+                    sheet_name = s
+                    break
             
-            # --- PARSING ELEC ---
-            if "REPONSE_ELEC" in xl.sheet_names:
-                df_elec = pd.read_excel(xl, sheet_name="REPONSE_ELEC", dtype=str)
-                cols_e = [str(c).upper() for c in df_elec.columns]
-                
-                # Identification colonnes précises
-                c_pdl = next((c for c in cols_e if "PDL" in c), None)
-                c_hph = next((c for c in cols_e if "PRIX_HPH" in c), None)
-                c_hch = next((c for c in cols_e if "PRIX_HCH" in c), None)
-                c_hpe = next((c for c in cols_e if "PRIX_HPE" in c), None)
-                c_hce = next((c for c in cols_e if "PRIX_HCE" in c), None)
-                c_abo = next((c for c in cols_e if "ABONNEMENT" in c), None)
-                
-                if c_pdl and c_hph:
-                    for idx, row in df_elec.iterrows():
-                        pdl = self._safe_str_clean(row.get(c_pdl))
-                        if pdl:
-                            maps["elec"][pdl] = {
-                                "hph": self._safe_float(row.get(c_hph)),
-                                "hch": self._safe_float(row.get(c_hch)),
-                                "hpe": self._safe_float(row.get(c_hpe)),
-                                "hce": self._safe_float(row.get(c_hce)),
-                                "fix": self._safe_float(row.get(c_abo))
-                            }
-
-            # --- PARSING GAZ ---
-            if "REPONSE_GAZ" in xl.sheet_names:
-                df_gaz = pd.read_excel(xl, sheet_name="REPONSE_GAZ", dtype=str)
-                cols_g = [str(c).upper() for c in df_gaz.columns]
-                
-                c_pce = next((c for c in cols_g if "PCE" in c or "PDL" in c), None)
-                c_mol = next((c for c in cols_g if "MOLECULE" in c), None)
-                c_abo_g = next((c for c in cols_g if "ABONNEMENT" in c), None)
-                c_stock = next((c for c in cols_g if "STOCKAGE" in c), None)
-                
-                if c_pce and c_mol:
-                    for idx, row in df_gaz.iterrows():
-                        pce = self._safe_str_clean(row.get(c_pce))
-                        if pce:
-                            maps["gas"][pce] = {
-                                "hph": self._safe_float(row.get(c_mol)), # Molecule
-                                "fix": self._safe_float(row.get(c_abo_g)),
-                                "stock": self._safe_float(row.get(c_stock))
-                            }
-
-            return maps
+            df = pd.read_excel(xl, sheet_name=sheet_name if sheet_name else 0, dtype=str)
             
+            cols = [str(c).upper() for c in df.columns]
+            c_pdl = next((c for c in cols if "PDL" in c or "PCE" in c), None)
+            c_hph = next((c for c in cols if "PRIX_HPH" in c or "HPH" in c or "MOLECULE" in c), None)
+            c_abo = next((c for c in cols if "ABONNEMENT" in c), None)
+            
+            price_map = {}
+            is_gaz = False
+            if c_hph and "MOLECULE" in c_hph: is_gaz = True
+            
+            if c_pdl and c_hph:
+                for idx, row in df.iterrows():
+                    pdl = self._safe_str_clean(row.get(c_pdl))
+                    price = self._safe_float(row.get(c_hph))
+                    fix = self._safe_float(row.get(c_abo)) if c_abo else 0.0
+                    if pdl and price > 0:
+                        price_map[pdl] = {"hph": price, "fix": fix}
+            
+            if not price_map and c_hph:
+                val = self._safe_float(df.iloc[0].get(c_hph))
+                if val > 0:
+                    price_map["default"] = {"hph": val, "fix": self._safe_float(df.iloc[0].get(c_abo, 0))}
+
+            return price_map, is_gaz
         except Exception as e: 
             logging.error(f"BPU Parse Error: {e}")
-            return {"elec": {}, "gas": {}}
+            return {}, False
 
     def parse_load_curve(self, file_content, filename):
         try:
