@@ -6,11 +6,11 @@ import chardet
 import re
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V1107_FULL")
+logger = logging.getLogger("CORTEX_INGEST_V1108")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "1107.0 (Full Integral)"
+        self.version = "1108.0 (Dual Stream BPU)"
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
@@ -229,47 +229,66 @@ class CortexIngest:
         return sites
 
     def parse_bpu_excel(self, file_content):
+        """
+        PARSEUR BPU DUAL-STREAM (ELEC & GAZ)
+        Renvoie: {"elec": {pdl: prices}, "gas": {pdl: prices}}
+        """
         try:
             buffer = io.BytesIO(file_content)
             xl = pd.ExcelFile(buffer, engine='openpyxl')
             
-            sheet_name = None
-            for s in xl.sheet_names:
-                if "REPONSE" in s.upper():
-                    sheet_name = s
-                    break
+            maps = {"elec": {}, "gas": {}}
             
-            df = pd.read_excel(xl, sheet_name=sheet_name if sheet_name else 0, dtype=str)
-            
-            cols = [str(c).upper() for c in df.columns]
-            
-            c_pdl = next((c for c in cols if "PDL" in c or "PCE" in c), None)
-            c_hph = next((c for c in cols if "PRIX_HPH" in c or "HPH" in c or "MOLECULE" in c), None)
-            c_abo = next((c for c in cols if "ABONNEMENT" in c), None)
-            
-            price_map = {}
-            is_gaz = False
-            if c_hph and "MOLECULE" in c_hph: is_gaz = True
-            
-            if c_pdl and c_hph:
-                for idx, row in df.iterrows():
-                    pdl = self._safe_str_clean(row.get(c_pdl))
-                    price = self._safe_float(row.get(c_hph))
-                    fix = self._safe_float(row.get(c_abo)) if c_abo else 0.0
-                    
-                    if pdl and price > 0:
-                        price_map[pdl] = {"hph": price, "fix": fix}
-            
-            if not price_map and c_hph:
-                val = self._safe_float(df.iloc[0].get(c_hph))
-                if val > 0:
-                    price_map["default"] = {"hph": val, "fix": self._safe_float(df.iloc[0].get(c_abo, 0))}
+            # --- PARSING ELEC ---
+            if "REPONSE_ELEC" in xl.sheet_names:
+                df_elec = pd.read_excel(xl, sheet_name="REPONSE_ELEC", dtype=str)
+                cols_e = [str(c).upper() for c in df_elec.columns]
+                
+                # Identification colonnes précises
+                c_pdl = next((c for c in cols_e if "PDL" in c), None)
+                c_hph = next((c for c in cols_e if "PRIX_HPH" in c), None)
+                c_hch = next((c for c in cols_e if "PRIX_HCH" in c), None)
+                c_hpe = next((c for c in cols_e if "PRIX_HPE" in c), None)
+                c_hce = next((c for c in cols_e if "PRIX_HCE" in c), None)
+                c_abo = next((c for c in cols_e if "ABONNEMENT" in c), None)
+                
+                if c_pdl and c_hph:
+                    for idx, row in df_elec.iterrows():
+                        pdl = self._safe_str_clean(row.get(c_pdl))
+                        if pdl:
+                            maps["elec"][pdl] = {
+                                "hph": self._safe_float(row.get(c_hph)),
+                                "hch": self._safe_float(row.get(c_hch)),
+                                "hpe": self._safe_float(row.get(c_hpe)),
+                                "hce": self._safe_float(row.get(c_hce)),
+                                "fix": self._safe_float(row.get(c_abo))
+                            }
 
-            return price_map, is_gaz
+            # --- PARSING GAZ ---
+            if "REPONSE_GAZ" in xl.sheet_names:
+                df_gaz = pd.read_excel(xl, sheet_name="REPONSE_GAZ", dtype=str)
+                cols_g = [str(c).upper() for c in df_gaz.columns]
+                
+                c_pce = next((c for c in cols_g if "PCE" in c or "PDL" in c), None)
+                c_mol = next((c for c in cols_g if "MOLECULE" in c), None)
+                c_abo_g = next((c for c in cols_g if "ABONNEMENT" in c), None)
+                c_stock = next((c for c in cols_g if "STOCKAGE" in c), None)
+                
+                if c_pce and c_mol:
+                    for idx, row in df_gaz.iterrows():
+                        pce = self._safe_str_clean(row.get(c_pce))
+                        if pce:
+                            maps["gas"][pce] = {
+                                "hph": self._safe_float(row.get(c_mol)), # Molecule
+                                "fix": self._safe_float(row.get(c_abo_g)),
+                                "stock": self._safe_float(row.get(c_stock))
+                            }
+
+            return maps
             
         except Exception as e: 
             logging.error(f"BPU Parse Error: {e}")
-            return {}, False
+            return {"elec": {}, "gas": {}}
 
     def parse_load_curve(self, file_content, filename):
         try:
