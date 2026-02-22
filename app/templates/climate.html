@@ -135,9 +135,7 @@
                 if(data.fleet) {
                     FLEET_DATA = data.fleet;
                     const sel = document.getElementById('site-selector');
-                    // Reset pour éviter doublons
                     sel.innerHTML = '<option value="">-- Sélectionner un site --</option>';
-                    
                     FLEET_DATA.forEach(site => {
                         const opt = document.createElement('option');
                         opt.value = site.id;
@@ -163,7 +161,7 @@
                 
                 renderAnalysis(data);
                 
-                // Appel Météo avec ville
+                // Appel Météo avec ville (Sécurisé)
                 const city = data.location.city || "Paris";
                 fetchWeatherData(city);
 
@@ -175,34 +173,42 @@
             document.getElementById('climate-dashboard').classList.remove('hidden');
             document.getElementById('loc-city').innerText = data.location.city || "France";
 
-            const conso = data.consumption_details || {};
-            const winter = (conso.hph || 0) + (conso.hch || 0);
-            const summer = (conso.hpe || 0) + (conso.hce || 0);
-            const total = winter + summer;
+            // LOGIQUE ROBUSTE VOLUME
+            const conso = data.contract.consumption_details || {};
+            let winter = (conso.hph || 0) + (conso.hch || 0);
+            let summer = (conso.hpe || 0) + (conso.hce || 0);
+            let total = winter + summer;
 
-            const wVal = total > 0 ? winter : (data.contract.power * 1500 * 0.65);
-            const sVal = total > 0 ? summer : (data.contract.power * 1500 * 0.35);
-            const tVal = wVal + sVal;
+            // Si détail manquant (cas Gaz fréquent), on utilise le volume annuel global
+            if (total < 10) {
+                const globalVol = (data.kpis.volume_mwh || 0) * 1000; // MWh -> kWh
+                // Répartition type Chauffage : 65% Hiver / 35% Eté
+                winter = globalVol * 0.65;
+                summer = globalVol * 0.35;
+                total = globalVol;
+            }
 
-            document.getElementById('vol-winter').innerText = Math.round(wVal/1000) + " MWh";
-            document.getElementById('vol-summer').innerText = Math.round(sVal/1000) + " MWh";
+            // Calculs Affichage
+            document.getElementById('vol-winter').innerText = Math.round(winter/1000) + " MWh";
+            document.getElementById('vol-summer').innerText = Math.round(summer/1000) + " MWh";
             
-            const pctWinter = Math.round((wVal / tVal) * 100);
+            const pctWinter = total > 0 ? Math.round((winter / total) * 100) : 0;
             document.getElementById('pct-winter').innerText = pctWinter + "%";
             document.getElementById('pct-summer').innerText = (100 - pctWinter) + "%";
             
             document.getElementById('bar-winter').style.width = pctWinter + "%";
 
+            // Analyse Sensibilité
             const label = document.getElementById('sensi-label');
             const icon = document.getElementById('sensi-icon');
             const desc = document.getElementById('sensi-desc');
 
-            if (pctWinter > 75) {
+            if (pctWinter > 70) {
                 label.innerText = "Très Sensible (Chauffage)";
                 label.className = "text-xl font-bold text-red-400";
                 icon.innerText = "🔥";
                 desc.innerText = "Forte corrélation avec la température hivernale.";
-            } else if (pctWinter > 60) {
+            } else if (pctWinter > 55) {
                 label.innerText = "Sensibilité Moyenne";
                 label.className = "text-xl font-bold text-yellow-400";
                 icon.innerText = "🏠";
@@ -219,6 +225,7 @@
             let lat = 46.22; 
             let lon = 2.21;
             
+            // 1. GEOCODING
             try {
                 const geoRes = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(city)}&limit=1`);
                 const geoData = await geoRes.json();
@@ -234,6 +241,7 @@
             document.getElementById('ref-year').innerText = lastYear;
             document.getElementById('chart-title').innerText = `Corrélation Conso / Température (${lastYear})`;
 
+            // 2. METEO HISTORIQUE
             try {
                 const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${lastYear}-01-01&end_date=${lastYear}-12-31&daily=temperature_2m_mean&timezone=Europe%2FParis`;
                 
@@ -262,8 +270,9 @@
             const ctx = document.getElementById('climateChart').getContext('2d');
             if(chartInstance) chartInstance.destroy();
 
-            const wLoad = parseFloat(document.getElementById('vol-winter').innerText) * 1000 / 7; 
-            const sLoad = parseFloat(document.getElementById('vol-summer').innerText) * 1000 / 5; 
+            // Simulation profil conso mensuel basé sur l'hiver/été calculé
+            const wLoad = parseFloat(document.getElementById('vol-winter').innerText) * 1000 / 7; // Moyenne mensuelle hiver
+            const sLoad = parseFloat(document.getElementById('vol-summer').innerText) * 1000 / 5; // Moyenne mensuelle été
             
             const consoData = [
                 wLoad, wLoad, wLoad, wLoad, // Jan-Avr
@@ -286,14 +295,13 @@
                     plugins: { legend: { labels: { color: 'white' } } },
                     scales: {
                         y: { position: 'left', grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'gray' } },
-                        y1: { position: 'right', grid: { display: false }, ticks: { color: '#EF4444' }, reverse: true },
+                        y1: { position: 'right', grid: { display: false }, ticks: { color: '#EF4444' }, reverse: true }, // Inversé pour montrer corrélation
                         x: { grid: { display: false }, ticks: { color: 'gray' } }
                     }
                 }
             });
         }
 
-        // --- FIX : CHARGEMENT AU DEMARRAGE ---
         document.addEventListener('DOMContentLoaded', loadSites);
     </script>
 </body>
