@@ -32,7 +32,7 @@ except ImportError:
         import cortex_physics as physics
     except: pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1107")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1112")
 
 app.add_middleware(
     CORSMiddleware,
@@ -105,7 +105,28 @@ async def api_save_client(request: Request):
         data["identity"]["id"] = raw_id
         safe_id = get_safe_id(raw_id)
         file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
-        with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
+        
+        # LOGIQUE DE FUSION (MERGE) POUR NE PAS ECRASE
+        if os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
+            
+            # Merge Deep pour technical et location
+            if 'technical' in data:
+                if 'technical' not in existing_data: existing_data['technical'] = {}
+                existing_data['technical'].update(data['technical'])
+            
+            if 'location' in data:
+                if 'location' not in existing_data: existing_data['location'] = {}
+                existing_data['location'].update(data['location'])
+                
+            # Update root fields if present
+            if 'identity' in data: existing_data['identity'].update(data['identity'])
+            
+            final_data = existing_data
+        else:
+            final_data = data
+
+        with open(file_path, 'w', encoding='utf-8') as f: json.dump(final_data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "id": raw_id})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
@@ -139,7 +160,29 @@ async def api_import_csv(file: UploadFile = File(...)):
                 s['identity']['id'] = raw_id
                 safe_id = get_safe_id(raw_id)
                 file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
-                with open(file_path, 'w', encoding='utf-8') as f: json.dump(s, f, indent=4, ensure_ascii=False)
+                
+                # LOGIQUE MERGE INTELLIGENTE (Si import partiel patrimoine)
+                if os.path.exists(file_path):
+                    with open(file_path, 'r', encoding='utf-8') as f: existing = json.load(f)
+                    
+                    # On met à jour seulement si la nouvelle donnée n'est pas vide
+                    new_tech = s.get('technical', {})
+                    old_tech = existing.get('technical', {})
+                    for k, v in new_tech.items():
+                        if v: old_tech[k] = v
+                    existing['technical'] = old_tech
+                    
+                    new_loc = s.get('location', {})
+                    old_loc = existing.get('location', {})
+                    for k, v in new_loc.items():
+                        if v: old_loc[k] = v
+                    existing['location'] = old_loc
+                    
+                    final_s = existing
+                else:
+                    final_s = s
+
+                with open(file_path, 'w', encoding='utf-8') as f: json.dump(final_s, f, indent=4, ensure_ascii=False)
                 saved += 1
             except: pass
         return JSONResponse({"success": True, "imported": len(sites), "saved": saved})
@@ -186,7 +229,8 @@ async def get_fleet_data(response: Response):
             "budget": fin['budget_annual'],
             "landing": fin['landing_forecast'],
             "alert": fin['kpis']['pmc_eur_mwh'] > 300,
-            "ghost_savings": fin['kpis']['ghost_savings']
+            "ghost_savings": fin['kpis']['ghost_savings'],
+            "power": contract.get('power', 0)
         })
     response_data = {
         "fleet": fleet_list, "count": len(fleet_list),
@@ -221,6 +265,7 @@ async def get_dashboard_data(client_id: str, response: Response):
         "energy_type": "gaz" if is_gas else "elec",
         "identity": data.get('identity', {}),
         "location": data.get('location', {}),
+        "technical": data.get('technical', {}), # AJOUT CRITIQUE POUR MAIRIE.HTML
         "contract": {
             "pdl": contract.get('pdl'),
             "provider": financials['meta'].get('provider'),
@@ -234,13 +279,15 @@ async def get_dashboard_data(client_id: str, response: Response):
             "cja": contract.get('cja'),
             "profil": contract.get('profil'),
             "tarif_acheminement": contract.get('tarif_acheminement'),
-            "power_details": contract.get('power_details', {})
+            "power_details": contract.get('power_details', {}),
+            "consumption_details": contract.get('consumption_details', {})
         },
         "pricing": pricing,
         "kpis": {
             "volume_mwh": financials['volume_mwh'],
             "budget": financials['budget_annual'],
-            "pmc": financials['kpis']['pmc_eur_mwh']
+            "pmc": financials['kpis']['pmc_eur_mwh'],
+            "ghost_savings": financials['kpis']['ghost_savings']
         },
         "cortex_insight": {
             "message": "Analyse CORTEX terminée.",
@@ -287,7 +334,7 @@ async def download_template(template_type: str):
                     "CONSO_HPH", "CONSO_HCH", "CONSO_HPE", "CONSO_HCE", 
                     "VOLUME_ANNUEL", "COMMENTAIRE", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", 
                     "ABONNEMENT", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES", 
-                    "SURFACE_M2", "CODE_INSEE"
+                    "SURFACE_M2", "CODE_INSEE", "CHAUFFAGE", "ISOLATION", "REGULATION"
                 ])
                 df.to_excel(writer, index=False)
             elif "import_gaz" in template_type or "template_csv_gaz" == template_type:
@@ -295,8 +342,13 @@ async def download_template(template_type: str):
                     "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "NAF", 
                     "CEE_ELIGIBLE", "PCE", "CAR_MWH", "CJA_MWH_J", "SEGMENT_GAZ", "PROFIL", 
                     "TARIF_ACHEM", "GRD", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", 
-                    "ABONNEMENT", "PRIX_MOLECULE", "TERME_STOCK", "TAXES", "INSEE", "SURFACE_M2"
+                    "ABONNEMENT", "PRIX_MOLECULE", "TERME_STOCK", "TAXES", "INSEE", "SURFACE_M2",
+                    "CHAUFFAGE", "ISOLATION", "REGULATION"
                 ])
+                df.to_excel(writer, index=False)
+            elif "import_patrimoine" in template_type:
+                # NOUVEAU TEMPLATE PATRIMOINE
+                df = pd.DataFrame(columns=["PDL", "NOM_SITE", "SURFACE_M2", "CHAUFFAGE", "ISOLATION", "REGULATION"])
                 df.to_excel(writer, index=False)
             elif "bpu" in template_type:
                 df = pd.DataFrame(columns=["PRIX_HPH", "ABONNEMENT"])
@@ -305,7 +357,7 @@ async def download_template(template_type: str):
                 df = pd.DataFrame(columns=["A", "B"])
                 df.to_excel(writer, index=False)
         stream.seek(0)
-        filename = "Template_Import_GAZ.xlsx" if "gaz" in template_type else "Template_Import_ELEC.xlsx"
+        filename = f"Template_{template_type}.xlsx"
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename={filename}"})
     except:
         stream = io.StringIO()
@@ -316,6 +368,8 @@ async def download_template(template_type: str):
 async def route_template_elec(): return await download_template("import_elec")
 @app.get("/api/settings/template_csv_gaz")
 async def route_template_gaz(): return await download_template("import_gaz")
+@app.get("/api/settings/template_patrimoine")
+async def route_template_patrimoine(): return await download_template("import_patrimoine")
 
 @app.get("/app/assets/{filename}")
 async def get_static_asset(filename: str):
