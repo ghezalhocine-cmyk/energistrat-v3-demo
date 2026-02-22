@@ -16,15 +16,16 @@ except ImportError:
 
 # CONFIGURATION DU LOGGING
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_PHYSICS_V56_DIAMOND")
+logger = logging.getLogger("CORTEX_PHYSICS_V57_DIAMOND")
 
 class CortexPhysics:
     def __init__(self):
-        self.version = "56.0 (Diamond: Integrated Physics Core)"
+        self.version = "57.0 (Diamond: Integrated Physics Core + Benchmark)"
         
         # RÉFÉRENTIEL NAF - MOYENNES DE CONSOMMATION (kWh/m²/an)
         self.NAF_BENCHMARK = {
-            "10": 450, "47": 250, "84": 140, "85": 110, "52": 160, "93": 220, "DEFAULT": 180
+            "10": 450, "47": 250, "84": 140, "85": 110, "52": 160, "93": 220, 
+            "68": 180, "46": 130, "43": 90, "DEFAULT": 180
         }
 
         # CONSTANTES INDUSTRIELLES & CARBONE (Base ADEME / CRE)
@@ -40,10 +41,6 @@ class CortexPhysics:
     # 0. POINT D'ENTRÉE PRINCIPAL (REQUIS PAR ENGINE)
     # =========================================================
     def compute_optimization(self, df, time_step, contract_power):
-        """
-        Le Chef d'Orchestre Physique.
-        Appelé par CortexEngine pour analyser une courbe de charge complète.
-        """
         if not MATH_ENGINE_READY or df is None or df.empty:
             return {"error": "Données physiques insuffisantes"}
 
@@ -52,18 +49,17 @@ class CortexPhysics:
             p_max_reached = float(df['val'].max())
             p_min_talon = float(df['val'].min())
             p_avg = float(df['val'].mean())
-            total_energy = float(df['val'].sum() * (time_step / 60)) # kW * h
+            total_energy = float(df['val'].sum() * (time_step / 60)) 
             
             # 2. Optimisation Puissance Souscrite (TURPE)
             turpe_opt = self.simulate_turpe_optimization(p_max_reached, float(contract_power))
             
             # 3. Analyse Gaspillage (Weekend Watcher)
-            # Conversion dataframe en liste dict pour la méthode interne
             raw_records = df.to_dict('records')
             weekend_analysis = self.analyze_weekend_waste(raw_records)
             
             # 4. Empreinte Carbone
-            carbon = self.calculate_carbon_footprint(total_energy, 0) # 0 gaz ici car courbe elec
+            carbon = self.calculate_carbon_footprint(total_energy, 0)
 
             # 5. Facteur de Charge
             load_factor = (p_avg / p_max_reached) if p_max_reached > 0 else 0
@@ -90,7 +86,15 @@ class CortexPhysics:
     # =========================================================
     def simulate_solar_roi(self, lat, lon, surface_roof, electricity_price):
         try:
-            lat, lon, surface_roof = float(lat), float(lon), float(surface_roof)
+            # Sécurisation des entrées
+            lat = float(lat) if lat else 46.0
+            lon = float(lon) if lon else 2.0
+            surface_roof = float(surface_roof) if surface_roof else 0
+            
+            # Si prix incohérent ou nul, on force un prix marché moyen (0.20€)
+            market_price = float(electricity_price)
+            if market_price <= 0.01: market_price = 0.20
+            
             kwc = surface_roof / 6.0
             
             if kwc < 3: 
@@ -118,7 +122,7 @@ class CortexPhysics:
                             total_annual_kwh += m['E_m']
                         api_success = True
             except Exception:
-                pass # Silent fail -> Fallback
+                pass 
 
             # TENTATIVE 2 : FALLBACK MATHÉMATIQUE
             if not api_success or total_annual_kwh == 0:
@@ -130,9 +134,8 @@ class CortexPhysics:
             else:
                 source_label = "PVGIS © European Union"
 
-            market_price = float(electricity_price) if electricity_price > 0 else 0.20
-            savings = total_annual_kwh * 0.5 * market_price # Autoconsommation 50%
-            capex = kwc * 1100
+            savings = total_annual_kwh * 0.8 * market_price # Autoconsommation 80% (Optimiste)
+            capex = kwc * 1200 # Coût installation 1200€/kWc
             roi = capex / savings if savings > 0 else 99
 
             return {
@@ -155,32 +158,25 @@ class CortexPhysics:
     # MODULE 2 : OPTIMISATEUR TURPE
     # =========================================================
     def simulate_turpe_optimization(self, max_power_reached, current_sub_power):
-        """ Simule l'optimum technico-économique. """
         results = []
         start_p = int(max_power_reached * 0.8)
         end_p = int(max_power_reached * 1.2)
-        if start_p < 36: start_p = 36 # Min C5/C4 standard
+        if start_p < 36: start_p = 36 
         
         for p_test in range(start_p, end_p + 1, 6):
             cost_fix = p_test * self.IND_FACTORS["turpe_fixe"]
-            
-            # Simulation dépassement (Modèle quadratique simplifié)
             overrun_kwh = 0
             if max_power_reached > p_test:
                 diff = max_power_reached - p_test
-                overrun_kwh = diff * 10 # Facteur durée estimé
-            
+                overrun_kwh = diff * 10 
             cost_var = overrun_kwh * self.IND_FACTORS["turpe_var"]
             results.append({"p": p_test, "cost": cost_fix + cost_var})
             
         if not results: return {"status": "No optimization possible"}
 
         best = min(results, key=lambda x: x['cost'])
-        
-        # Coût actuel estimé
         current_overrun = max(0, max_power_reached - current_sub_power) * 10
         current_cost = (current_sub_power * self.IND_FACTORS["turpe_fixe"]) + (current_overrun * self.IND_FACTORS["turpe_var"])
-        
         savings = current_cost - best['cost']
         
         return {
@@ -191,35 +187,51 @@ class CortexPhysics:
         }
 
     # =========================================================
-    # MODULE 3 : ANALYSE WEEK-END (GASPILLAGE)
+    # MODULE 3 : BENCHMARK AUDIT (LA FONCTION MANQUANTE)
     # =========================================================
-    def analyze_weekend_waste(self, records):
-        """ Analyse Samedi/Dimanche vs Semaine """
-        if not MATH_ENGINE_READY or not records: return {}
+    def calculate_benchmark(self, naf_code, surface_m2, annual_volume_mwh):
+        """ Compare la conso réelle vs théorique (NAF) """
         try:
-            df = pd.DataFrame(records)
-            if 'date' not in df.columns: return {}
+            surface = float(surface_m2)
+            volume_kwh = float(annual_volume_mwh) * 1000.0
             
-            df['date'] = pd.to_datetime(df['date'])
-            df['weekday'] = df['date'].dt.weekday
+            if surface <= 10 or volume_kwh <= 100:
+                return {"status": "INSUFFISANT", "message": "Données manquantes (Surface/Vol)"}
+
+            # 1. Ratio Réel
+            ratio_reel = volume_kwh / surface # kWh/m²
             
-            week = df[df['weekday'] < 5]['val'].mean()
-            weekend = df[df['weekday'] >= 5]['val'].mean()
+            # 2. Ratio Théorique (NAF)
+            naf_cle = str(naf_code)[:2] if naf_code else "DEFAULT"
+            ratio_theorique = self.NAF_BENCHMARK.get(naf_cle, self.NAF_BENCHMARK["DEFAULT"])
             
-            if pd.isna(week) or pd.isna(weekend): return {}
+            # 3. Comparaison
+            delta_pct = ((ratio_reel - ratio_theorique) / ratio_theorique) * 100
             
-            ratio = weekend / week if week > 0 else 0
-            is_waste = ratio > 0.3 # Seuil d'alerte 30%
+            status = "NEUTRE"
+            color = "blue"
             
+            if delta_pct > 20: 
+                status = "SURCONSOMMATION"
+                color = "red"
+                msg = f"Votre site consomme {int(delta_pct)}% de plus que la moyenne de votre secteur ({ratio_theorique} kWh/m²)."
+            elif delta_pct < -20:
+                status = "PERFORMANT"
+                color = "green"
+                msg = f"Excellent ! Vous consommez {abs(int(delta_pct))}% de moins que la moyenne ({ratio_theorique} kWh/m²)."
+            else:
+                msg = f"Consommation cohérente avec votre activité ({ratio_theorique} kWh/m²)."
+
             return {
-                "avg_week_kw": round(week, 1),
-                "avg_weekend_kw": round(weekend, 1),
-                "ratio_pct": round(ratio * 100, 1),
-                "alert": is_waste,
-                "message": "Talon week-end élevé détecté" if is_waste else "Régulation week-end correcte"
+                "status": status,
+                "color": color,
+                "message": msg,
+                "ratio_reel": round(ratio_reel, 1),
+                "ratio_ref": ratio_theorique,
+                "delta": round(delta_pct, 1)
             }
-        except Exception:
-            return {}
+        except Exception as e:
+            return {"status": "ERREUR", "message": str(e)}
 
     # =========================================================
     # MODULE 4 : GEOCODING & CARBONE
@@ -235,7 +247,7 @@ class CortexPhysics:
                 d = json.loads(r.read().decode())
                 if d.get('features'):
                     c = d['features'][0]['geometry']['coordinates']
-                    return c[1], c[0] # API Gouv renvoie [lon, lat]
+                    return c[1], c[0] 
         except: pass
         return lat, lon
 
@@ -247,12 +259,32 @@ class CortexPhysics:
         }
 
     def generate_load_duration_curve(self, values):
-        """ Génère la monotone pour l'affichage """
         if not values: return []
         try:
             sorted_vals = sorted([float(v) for v in values if v is not None], reverse=True)
-            step = max(1, len(sorted_vals) // 50) # Downsampling pour le front
+            step = max(1, len(sorted_vals) // 50) 
             return sorted_vals[::step]
         except: return []
+
+    def analyze_weekend_waste(self, records):
+        if not MATH_ENGINE_READY or not records: return {}
+        try:
+            df = pd.DataFrame(records)
+            if 'date' not in df.columns: return {}
+            df['date'] = pd.to_datetime(df['date'])
+            df['weekday'] = df['date'].dt.weekday
+            week = df[df['weekday'] < 5]['val'].mean()
+            weekend = df[df['weekday'] >= 5]['val'].mean()
+            if pd.isna(week) or pd.isna(weekend): return {}
+            ratio = weekend / week if week > 0 else 0
+            is_waste = ratio > 0.3
+            return {
+                "avg_week_kw": round(week, 1),
+                "avg_weekend_kw": round(weekend, 1),
+                "ratio_pct": round(ratio * 100, 1),
+                "alert": is_waste,
+                "message": "Talon week-end élevé détecté" if is_waste else "Régulation week-end correcte"
+            }
+        except: return {}
 
 physics = CortexPhysics()
