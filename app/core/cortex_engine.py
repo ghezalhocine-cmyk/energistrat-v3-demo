@@ -10,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V900")
+logger = logging.getLogger("CORTEX_ENGINE_V1000_TITANIUM")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "900.0 (Titanium: Raw Display)"
+        self.version = "1000.0 (Integral: All Logic)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.05}, "gas": {"price": 0.08, "tax": 0.02}}
 
     def _safe_float(self, value, default=0.0):
@@ -37,6 +37,7 @@ class CortexEngine:
         pricing = site_data.get('pricing', {})
         loc = site_data.get('location', {})
         
+        # 1. NOMMAGE
         site_label = ident.get('site_name', 'Site Inconnu')
         if not site_label or site_label == "Site Inconnu":
             site_label = f"{loc.get('city', 'Site')} ({str(contract.get('pdl', ''))[-4:]})"
@@ -46,10 +47,12 @@ class CortexEngine:
         
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
         
-        # PRIX : Distinction Calcul vs Affichage
+        # 2. PRIX (DISOCIATION AFFICHAGE / CALCUL)
         raw_price = self._safe_float(pricing.get('hph'))
+        
+        # Pour le calcul, on divise par 1000 si le prix est en MWh (> 2.0)
         unit_price = raw_price
-        if unit_price > 2.0: unit_price /= 1000.0 # Pour le calcul budget uniquement
+        if unit_price > 2.0: unit_price /= 1000.0
             
         is_estimated = False
         if unit_price <= 0.001:
@@ -59,18 +62,21 @@ class CortexEngine:
         fixe = self._safe_float(pricing.get('fix'))
         commodity = vol_kwh * unit_price
         
+        # 3. TAXES & STOCKAGE
         raw_tax = self._safe_float(pricing.get('tax'))
         if raw_tax > 1.0: raw_tax /= 1000.0
         taxes = (vol_kwh * raw_tax) if raw_tax > 0 else (vol_kwh * self.MARKET_DEFAULTS['gas' if is_gas else 'elec']['tax'])
         
         raw_stock = self._safe_float(pricing.get('storage'))
-        # Pas de division par 1000 sur le stockage si c'est déjà petit
         stock_unit = raw_stock if raw_stock < 2.0 else raw_stock / 1000.0
         storage_cost = vol_kwh * stock_unit
         
         budget_ttc = commodity + fixe + taxes + storage_cost
         landing = budget_ttc * 1.02
         pmc_mwh = self._safe_div(budget_ttc, (vol_kwh / 1000))
+        
+        # Calcul Gaspillage pour Legacy
+        ghost_savings = budget_ttc * 0.15
 
         return {
             "meta": {
@@ -93,17 +99,18 @@ class CortexEngine:
                 "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)),
                 "pmc_eur_mwh": self._sanitize(round(pmc_mwh, 2)),
                 "unit_price_kwh": unit_price,
-                "is_estimated_price": is_estimated
+                "is_estimated_price": is_estimated,
+                "ghost_savings": self._sanitize(round(ghost_savings, 2))
             },
-            # ICI : ON RENVOIE LES PRIX BRUTS (NON DIVISÉS)
+            # PRIX BRUTS POUR L'AFFICHAGE
             "pricing_details": {
                 "hph": raw_price, 
                 "hch": self._safe_float(pricing.get('hch')),
                 "hpe": self._safe_float(pricing.get('hpe')),
                 "hce": self._safe_float(pricing.get('hce')),
                 "fix": fixe,
-                "tax": self._safe_float(pricing.get('tax')), # On renvoie la taxe brute (8.44)
-                "storage": raw_stock # On renvoie le stockage brut (0.70)
+                "tax": self._safe_float(pricing.get('tax')),
+                "storage": raw_stock
             }
         }
 
@@ -161,7 +168,8 @@ class CortexEngine:
                     "name": fin['meta']['site_label'],
                     "ratio_pmc": fin['kpis']['pmc_eur_mwh'],
                     "conso_mwh": fin['volume_mwh'],
-                    "budget": fin['budget_annual']
+                    "budget": fin['budget_annual'],
+                    "ghost_savings": fin['kpis']['ghost_savings']
                 })
             except: continue
         valid = [s for s in processed if s['conso_mwh'] > 0.1]
@@ -203,5 +211,24 @@ class CortexEngine:
     def calculate_benchmark(self, naf, surface, volume_mwh):
         if physics: return physics.calculate_benchmark(naf, surface, volume_mwh)
         return {}
+    
+    def analyze_market_position(self, current_price, market_ref, is_gas, segment="C5"):
+        try:
+            ref_price = 0.0
+            if is_gas: ref_price = float(market_ref.get('gaz', {}).get('peg_n1', 40))
+            else: ref_price = float(market_ref.get('elec', {}).get('cal_n1', 90))
+            
+            client_price_mwh = current_price
+            if client_price_mwh < 2.0: client_price_mwh *= 1000.0
+            
+            if client_price_mwh <= 0: return {"status": "INCONNU", "message": "Prix non détecté", "color": "gray", "action": "-"}
+
+            delta = client_price_mwh - ref_price
+            pct = (delta / ref_price) * 100
+
+            if delta > 10: return {"status": "ALERTE", "color": "red", "message": f"Prix élevé (+{int(pct)}%)", "action": f"Payé {int(client_price_mwh)}€ vs {int(ref_price)}€"}
+            elif delta < -5: return {"status": "OPTIMISÉ", "color": "green", "message": "Performance Achat", "action": f"Sous le marché ({int(client_price_mwh)}€)"}
+            else: return {"status": "NEUTRE", "color": "blue", "message": "Aligné marché", "action": f"Prix cohérent ({int(client_price_mwh)}€)"}
+        except: return {"status": "ERREUR", "color": "gray", "message": "Données indisponibles", "action": "-"}
 
 cortex = CortexEngine()
