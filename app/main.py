@@ -32,7 +32,7 @@ except ImportError:
         import cortex_physics as physics
     except: pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1104")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1106")
 
 app.add_middleware(
     CORSMiddleware,
@@ -199,7 +199,6 @@ async def get_fleet_data(response: Response):
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str, response: Response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    
     file_path = find_site_file(client_id)
     if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
     with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
@@ -250,7 +249,6 @@ async def get_dashboard_data(client_id: str, response: Response):
         "market_analysis": market_analysis,
         "electricity_price": financials['kpis']['unit_price_kwh']
     }
-    
     return JSONResponse(json_compliant(response_data))
 
 @app.post("/api/ops/market/update")
@@ -280,8 +278,6 @@ async def download_template(template_type: str):
     stream = io.BytesIO()
     try:
         with pd.ExcelWriter(stream, engine='openpyxl') as writer:
-            
-            # --- TEMPLATE ELEC COMPLET ---
             if "import_elec" in template_type or "template_csv" == template_type:
                 df = pd.DataFrame(columns=[
                     "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "REF_COPRO", 
@@ -294,8 +290,6 @@ async def download_template(template_type: str):
                     "SURFACE_M2", "CODE_INSEE"
                 ])
                 df.to_excel(writer, index=False)
-                
-            # --- TEMPLATE GAZ COMPLET ---
             elif "import_gaz" in template_type or "template_csv_gaz" == template_type:
                 df = pd.DataFrame(columns=[
                     "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "NAF", 
@@ -304,14 +298,12 @@ async def download_template(template_type: str):
                     "ABONNEMENT", "PRIX_MOLECULE", "TERME_STOCK", "TAXES", "INSEE", "SURFACE_M2"
                 ])
                 df.to_excel(writer, index=False)
-                
             elif "bpu" in template_type:
                 df = pd.DataFrame(columns=["PRIX_HPH", "ABONNEMENT"])
                 df.to_excel(writer, index=False)
             else:
                 df = pd.DataFrame(columns=["A", "B"])
                 df.to_excel(writer, index=False)
-                
         stream.seek(0)
         filename = "Template_Import_GAZ.xlsx" if "gaz" in template_type else "Template_Import_ELEC.xlsx"
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename={filename}"})
@@ -320,15 +312,10 @@ async def download_template(template_type: str):
         pd.DataFrame().to_csv(stream)
         return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
 
-# --- ROUTES SPÉCIFIQUES POUR LE FRONTEND ---
 @app.get("/api/settings/template_csv")
-async def route_template_elec():
-    return await download_template("import_elec")
-
+async def route_template_elec(): return await download_template("import_elec")
 @app.get("/api/settings/template_csv_gaz")
-async def route_template_gaz():
-    return await download_template("import_gaz")
-# -------------------------------------------
+async def route_template_gaz(): return await download_template("import_gaz")
 
 @app.get("/app/assets/{filename}")
 async def get_static_asset(filename: str):
@@ -357,6 +344,7 @@ async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
     res = cortex.analyze_load_curve(content, file.filename)
     return JSONResponse(json_compliant(res))
 
+# --- GENERATE TENDER AVEC BPU INTEGRE ---
 @app.post("/api/ops/generate_tender")
 async def generate_tender(request: Request):
     if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
@@ -373,11 +361,31 @@ async def generate_tender(request: Request):
         df_elec = df_dqe[df_dqe['Type'] == 'ELEC']
         df_gaz = df_dqe[df_dqe['Type'] == 'GAZ']
         
+        # CREATION DES MASQUES BPU VIERGES
+        df_bpu_elec = pd.DataFrame(columns=[
+            "NOM_OFFRE", "PRIX_HPH_EUR_KWH", "PRIX_HCH_EUR_KWH", "PRIX_HPE_EUR_KWH", "PRIX_HCE_EUR_KWH", "ABONNEMENT_EUR_AN"
+        ])
+        # On peut pré-remplir une ligne d'exemple
+        df_bpu_elec.loc[0] = ["OFFRE EXEMPLE", 0.15, 0.10, 0.08, 0.04, 250]
+
+        df_bpu_gaz = pd.DataFrame(columns=[
+            "NOM_OFFRE", "PRIX_MOLECULE_EUR_MWH", "ABONNEMENT_EUR_AN", "TERME_STOCKAGE_EUR_MWH"
+        ])
+        df_bpu_gaz.loc[0] = ["OFFRE EXEMPLE", 45.0, 250, 0.70]
+
         stream = io.BytesIO()
         with pd.ExcelWriter(stream, engine='openpyxl') as writer:
-            if not df_elec.empty: df_elec.to_excel(writer, index=False, sheet_name="ELEC")
-            if not df_gaz.empty: df_gaz.to_excel(writer, index=False, sheet_name="GAZ")
-            if df_elec.empty and df_gaz.empty: df_dqe.to_excel(writer, index=False, sheet_name="TOUT")
+            if not df_elec.empty: 
+                df_elec.to_excel(writer, index=False, sheet_name="DATA_ELEC")
+                df_bpu_elec.to_excel(writer, index=False, sheet_name="REPONSE_ELEC")
+            
+            if not df_gaz.empty: 
+                df_gaz.to_excel(writer, index=False, sheet_name="DATA_GAZ")
+                df_bpu_gaz.to_excel(writer, index=False, sheet_name="REPONSE_GAZ")
+            
+            if df_elec.empty and df_gaz.empty: 
+                df_dqe.to_excel(writer, index=False, sheet_name="TOUT")
+
         stream.seek(0)
         timestamp = datetime.now().strftime("%Y%m%d")
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_Energistrat_{timestamp}.xlsx"})
