@@ -10,11 +10,12 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V1104")
+logger = logging.getLogger("CORTEX_ENGINE_V1105")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "1104.0 (UX Hack Extended)"
+        self.version = "1105.0 (Sanctuary Gas & Clean Segments)"
+        # Default Taxes: Elec ~25€/MWh, Gaz ~8.44€/MWh
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.025}, "gas": {"price": 0.045, "tax": 0.00844}}
         self.OPTIMAL_PRICE = {"elec": 0.12, "gas": 0.045} 
 
@@ -42,11 +43,19 @@ class CortexEngine:
         if not site_label or site_label == "Site Inconnu":
             site_label = f"{loc.get('city', 'Site')} ({str(contract.get('pdl', ''))[-4:]})"
         
-        # --- DÉTECTION ROBUSTE GAZ/ELEC ---
-        energy_type_str = contract.get('energy_type', 'elec').lower()
-        segment = str(contract.get('segment', '')).upper()
+        # --- 1. NETTOYAGE SEGMENT (ANTI-DOUBLON NAF) ---
+        # On récupère le segment brut
+        raw_segment = str(contract.get('segment', '')).upper()
+        # Si on détecte le séparateur du Hack UX "|", on ne garde que la partie gauche (le vrai segment)
+        if " | " in raw_segment:
+            segment = raw_segment.split(" | ")[0].strip()
+        else:
+            segment = raw_segment
+
         grd = str(contract.get('grd', '')).upper()
         
+        # --- 2. DÉTECTION ROBUSTE GAZ/ELEC ---
+        energy_type_str = contract.get('energy_type', 'elec').lower()
         is_gas = False
         if 'gaz' in energy_type_str or 'gas' in energy_type_str: is_gas = True
         elif segment in ['T1', 'T2', 'T3', 'T4', 'TP']: is_gas = True
@@ -59,6 +68,7 @@ class CortexEngine:
         raw_price = self._safe_float(pricing.get('hph'))
         unit_price = raw_price
         
+        # Règle MWh -> kWh
         if is_gas and raw_price > 2.0: unit_price = raw_price / 1000.0
         elif not is_gas and raw_price > 5.0: unit_price = raw_price / 1000.0
             
@@ -70,23 +80,49 @@ class CortexEngine:
         fixe = self._safe_float(pricing.get('fix'))
         commodity = vol_kwh * unit_price
         
-        # --- LOGIQUE DE PROTECTION TAXES & STOCKAGE (ANTI-ZERO) ---
-        raw_tax = self._safe_float(pricing.get('tax'))
-        if raw_tax > 0.5: raw_tax_kwh = raw_tax / 1000.0
-        else: raw_tax_kwh = raw_tax
-        
-        if is_gas and raw_tax_kwh < 0.001: raw_tax_kwh = self.MARKET_DEFAULTS['gas']['tax']
-        elif not is_gas and raw_tax_kwh < 0.001: raw_tax_kwh = self.MARKET_DEFAULTS['elec']['tax']
+        # --- 3. SANCTUARISATION TAXES & STOCKAGE GAZ ---
+        if is_gas:
+            # Pour le Gaz, on ne fait pas confiance au JSON s'il a été corrompu par une save Frontend (0€)
+            # On force le calcul standard si la valeur stockée semble aberrante (< 1€ total alors qu'il y a du volume)
+            
+            # Récupération brute
+            stored_tax = self._safe_float(pricing.get('tax'))
+            stored_stock = self._safe_float(pricing.get('storage'))
+            
+            # Définition des standards (TICGN+CTA ~ 8.44€/MWh, Stock ~ 0.70€/MWh)
+            STD_TAX_KWH = 0.00844
+            STD_STOCK_KWH = 0.0007
+            
+            # Logique Taxe
+            # Si la taxe stockée est quasi nulle ALORS qu'il y a du volume, on force le standard
+            if vol_kwh > 0 and stored_tax < 1.0:
+                 taxes_total = vol_kwh * STD_TAX_KWH
+            # Sinon, si la taxe semble être un montant total annuel cohérent, on le garde
+            elif stored_tax > 1.0:
+                 taxes_total = stored_tax
+            # Sinon (cas improbable), standard
+            else:
+                 taxes_total = vol_kwh * STD_TAX_KWH
 
-        taxes_total = vol_kwh * raw_tax_kwh
-        
-        raw_stock = self._safe_float(pricing.get('storage'))
-        if raw_stock > 0.5: raw_stock_kwh = raw_stock / 1000.0
-        else: raw_stock_kwh = raw_stock
-        
-        if is_gas and raw_stock_kwh < 0.0001: raw_stock_kwh = 0.0007
+            # Logique Stockage (Même principe)
+            if vol_kwh > 0 and stored_stock < 0.1:
+                storage_total = vol_kwh * STD_STOCK_KWH
+            elif stored_stock > 0.1:
+                storage_total = stored_stock
+            else:
+                storage_total = vol_kwh * STD_STOCK_KWH
 
-        storage_total = vol_kwh * raw_stock_kwh
+        else:
+            # LOGIQUE ELEC (Classique)
+            raw_tax = self._safe_float(pricing.get('tax'))
+            if raw_tax > 0.5: raw_tax_kwh = raw_tax / 1000.0
+            else: raw_tax_kwh = raw_tax
+            
+            if raw_tax_kwh < 0.001: raw_tax_kwh = self.MARKET_DEFAULTS['elec']['tax']
+            taxes_total = vol_kwh * raw_tax_kwh
+            
+            raw_stock = self._safe_float(pricing.get('storage')) # Souvent 0 en élec
+            storage_total = vol_kwh * (raw_stock / 1000.0 if raw_stock > 0.5 else raw_stock)
         
         budget_ttc = commodity + fixe + taxes_total + storage_total
         landing = budget_ttc * 1.02
@@ -95,6 +131,7 @@ class CortexEngine:
         optimal = self.OPTIMAL_PRICE['gas'] if is_gas else self.OPTIMAL_PRICE['elec']
         ghost = max(0, (unit_price - optimal) * vol_kwh)
 
+        # FIX PRIX SECONDAIRES ELEC
         p_hch = self._safe_float(pricing.get('hch'))
         p_hpe = self._safe_float(pricing.get('hpe'))
         p_hce = self._safe_float(pricing.get('hce'))
@@ -103,17 +140,21 @@ class CortexEngine:
             if p_hpe > 5.0: p_hpe /= 1000.0
             if p_hce > 5.0: p_hce /= 1000.0
 
-        # --- UX HACK EXTENDED: NAF/INSEE/COPRO ---
+        # --- 4. UX HACK : RE-CONSTRUCTION PROPRE DU SEGMENT ---
         naf_code = ident.get('naf', '')
         insee_code = ident.get('insee', '')
-        ref_copro = ident.get('ref_copro', '') # NOUVEAU
+        ref_copro = ident.get('ref_copro', '')
         
+        # On repart du segment nettoyé (sans doublons)
         display_segment = segment
-        if naf_code or insee_code or ref_copro:
-            extras = []
-            if naf_code: extras.append(f"NAF:{naf_code}")
-            if insee_code: extras.append(f"INSEE:{insee_code}")
-            if ref_copro: extras.append(f"COPRO:{ref_copro}") # NOUVEAU
+        extras = []
+        
+        # On ajoute les infos seulement si elles existent
+        if naf_code and "NAF" not in segment: extras.append(f"NAF:{naf_code}")
+        if insee_code and "INSEE" not in segment: extras.append(f"INSEE:{insee_code}")
+        if ref_copro and "COPRO" not in segment: extras.append(f"COPRO:{ref_copro}")
+        
+        if extras:
             display_segment = f"{segment} | {' '.join(extras)}"
 
         return {
@@ -151,8 +192,8 @@ class CortexEngine:
                 "hpe": p_hpe,
                 "hce": p_hce,
                 "fix": fixe,
-                "tax": taxes_total,
-                "storage": storage_total
+                "tax": taxes_total, # Total Annuel renvoyé pour affichage
+                "storage": storage_total # Total Annuel renvoyé pour affichage
             },
             "display_overrides": {
                 "segment": display_segment
@@ -197,7 +238,7 @@ class CortexEngine:
                 "SIRET": ident.get('siret', ''),
                 "NAF": ident.get('naf', ''),
                 "INSEE": ident.get('insee', ''),
-                "REF_COPRO": ident.get('ref_copro', '') # AJOUT DQE
+                "REF_COPRO": ident.get('ref_copro', '')
             }
             rows.append(row)
         return pd.DataFrame(rows)
