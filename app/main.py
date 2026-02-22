@@ -32,7 +32,7 @@ except ImportError:
         import cortex_physics as physics
     except: pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1113")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1114")
 
 app.add_middleware(
     CORSMiddleware,
@@ -108,6 +108,7 @@ async def api_save_client(request: Request):
         
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
+            # Merge Deep pour technical et location
             if 'technical' in data:
                 if 'technical' not in existing_data: existing_data['technical'] = {}
                 existing_data['technical'].update(data['technical'])
@@ -115,6 +116,7 @@ async def api_save_client(request: Request):
                 if 'location' not in existing_data: existing_data['location'] = {}
                 existing_data['location'].update(data['location'])
             if 'identity' in data: existing_data['identity'].update(data['identity'])
+            if 'contract' in data: existing_data['contract'].update(data['contract']) # Force update contract
             final_data = existing_data
         else:
             final_data = data
@@ -156,23 +158,35 @@ async def api_import_csv(file: UploadFile = File(...)):
                 
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f: existing = json.load(f)
+                    
+                    # LOGIQUE V14 : L'IMPORT EXCEL EST MAÎTRE SUR LE CONTRAT ET L'IDENTITÉ
+                    # On met à jour Contract, Pricing, Identity avec les nouvelles données
+                    if 'contract' in s: existing['contract'].update(s['contract'])
+                    if 'pricing' in s: existing['pricing'] = s['pricing'] # Replace pricing entirely to avoid mix
+                    if 'identity' in s: existing['identity'].update(s['identity'])
+                    
+                    # Pour Technical et Location, on merge (pour garder les saisies manuelles non présentes dans l'excel)
                     new_tech = s.get('technical', {})
                     old_tech = existing.get('technical', {})
                     for k, v in new_tech.items():
                         if v: old_tech[k] = v
                     existing['technical'] = old_tech
+                    
                     new_loc = s.get('location', {})
                     old_loc = existing.get('location', {})
                     for k, v in new_loc.items():
                         if v: old_loc[k] = v
                     existing['location'] = old_loc
+                    
                     final_s = existing
                 else:
                     final_s = s
 
                 with open(file_path, 'w', encoding='utf-8') as f: json.dump(final_s, f, indent=4, ensure_ascii=False)
                 saved += 1
-            except: pass
+            except Exception as e: 
+                print(f"Error saving site {raw_id}: {e}")
+                pass
         return JSONResponse({"success": True, "imported": len(sites), "saved": saved})
     except ValueError as ve: return JSONResponse({"success": False, "error": str(ve)})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
@@ -335,10 +349,8 @@ async def download_template(template_type: str):
                 ])
                 df.to_excel(writer, index=False)
             elif "import_patrimoine" in template_type:
-                # TEMPLATE PATRIMOINE AVEC NOTICE
                 df = pd.DataFrame(columns=["PDL", "NOM_SITE", "SURFACE_M2", "CHAUFFAGE", "ISOLATION", "REGULATION"])
                 df.to_excel(writer, index=False, sheet_name="DATA")
-                
                 df_notice = pd.DataFrame({
                     "CHAMP": ["CHAUFFAGE", "ISOLATION", "REGULATION"],
                     "VALEURS_AUTORISEES": [
@@ -348,7 +360,6 @@ async def download_template(template_type: str):
                     ]
                 })
                 df_notice.to_excel(writer, index=False, sheet_name="MODE_EMPLOI")
-                
             elif "bpu" in template_type:
                 df = pd.DataFrame(columns=["PRIX_HPH", "ABONNEMENT"])
                 df.to_excel(writer, index=False)
