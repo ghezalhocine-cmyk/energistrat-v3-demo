@@ -6,61 +6,46 @@ import chardet
 import re
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V1104")
+logger = logging.getLogger("CORTEX_INGEST_V1106")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "1104.0 (Copro & Typology Support)"
-        
+        self.version = "1106.0 (BPU Response Support)"
+        # ... (Le reste du constructeur reste identique à V1104) ...
         self.COLUMN_MAPPING = {
-            # IDENTIFICATION
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
             "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM"],
             "entity": ["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT", "SOCIETE"],
             "siret": ["SIRET", "SIRET_SITE", "SIREN"],
-            "ref_copro": ["REF_COPRO", "IMMATRICULATION", "REGISTRE_COPRO", "MATRICULE"], # NOUVEAU
+            "ref_copro": ["REF_COPRO", "IMMATRICULATION", "REGISTRE_COPRO", "MATRICULE"],
             "naf": ["NAF", "CODE_NAF", "APE", "CODE_APE"], 
             "insee": ["INSEE", "CODE_INSEE", "CODE_COMMUNE"], 
-            
-            # LOCALISATION
             "adresse": ["ADRESSE_SITE", "ADRESSE", "RUE", "LIGNE_ADRESSE"],
             "ville": ["VILLE", "COMMUNE", "CITY", "TOWN"],
             "cp": ["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
             "surface": ["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER"],
-            "typologie": ["TYPOLOGIE", "USAGE", "TYPE_BATIMENT", "ACTIVITE"], # NOUVEAU
-            
-            # TECHNIQUE ELEC
-            "compteur_prod": ["COMPTEUR_PRODUCTION", "PRODUCTEUR", "INJECTION", "COMPTEUR_PROD"], # NOUVEAU
+            "typologie": ["TYPOLOGIE", "USAGE", "TYPE_BATIMENT", "ACTIVITE"],
+            "compteur_prod": ["COMPTEUR_PRODUCTION", "PRODUCTEUR", "INJECTION", "COMPTEUR_PROD"],
             "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)", "PUISSANCE_SOUSCRITE"],
             "p_max": ["POINTE_MAX", "P_MAX", "PUISSANCE_ATTEINTE", "MAX_ATTEINTE"],
             "fta": ["FTA", "FORMULE_TARIFAIRE", "OPTION"],
-            
-            # TECHNIQUE GAZ
             "cja": ["CJA", "CJA_MWH_J", "CAPACITE_JOURNALIERE"],
             "profil": ["PROFIL", "PROFIL_GAZ"],
             "tarif_ach": ["TARIF_ACHEM", "TARIF_ACHEMINEMENT", "ATRT"],
-            
-            # COMMUN
             "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL", "CJA"],
             "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF", "CATEGORIE"],
             "fournisseur": ["FOURNISSEUR", "TITULAIRE", "PROVIDER", "MARCHE"],
             "grd": ["GRD", "GESTIONNAIRE", "DISTRIBUTEUR"],
             "date_debut": ["DATE_DEBUT", "DEBUT_CONTRAT", "START_DATE"],
             "date_fin": ["DATE_FIN", "ECHEANCE", "FIN_CONTRAT", "END_DATE"],
-            
-            # DETAILS PUISSANCE 4 POSTES
             "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH", "PS_HPH", "PS_HPH"],
             "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH", "PS_HCH", "PS_HCH"],
             "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE", "PS_HPE", "PS_HPE"],
             "ps_hce": ["PS HCE", "PUISSANCE HCE", "P_HCE", "PS_HCE", "PS_HCE"],
-            
-            # DETAILS CONSO 4 POSTES
             "conso_hph": ["CONSO HPH", "C_HPH", "HP HAUTE", "CONSO_HPH"],
             "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE", "CONSO_HCH"],
             "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE", "CONSO_HPE"],
             "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE", "CONSO_HCE"],
-            
-            # PRIX
             "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
             "prix_hch": ["PRIX_HCH", "HCH"],
             "prix_hpe": ["PRIX_HPE", "HPE"],
@@ -79,7 +64,6 @@ class CortexIngest:
         for col in df_cols:
             clean = self._clean_header(col)
             if clean in candidates: return col
-            # Match partiel prudent
             if len(key) > 3 and key not in ["prix_hph", "prix_hch", "prix_hpe", "prix_hce"]: 
                 for cand in candidates:
                     if cand in clean: return col
@@ -102,10 +86,10 @@ class CortexIngest:
         except: return str(val).strip()
 
     def parse_mass_import_unified(self, file_content):
+        # ... (Code existant identique à V1104) ...
         sites = []
         df = None
         buffer = io.BytesIO(file_content)
-        
         try: df = pd.read_excel(buffer, dtype=str)
         except:
             try:
@@ -124,24 +108,21 @@ class CortexIngest:
         c_pdl = self._find_col(cols, "pdl")
         if not c_pdl: return []
 
-        # Mapping Champs
         c_nom = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
         c_cp = self._find_col(cols, "cp")
         c_ville = self._find_col(cols, "ville")
         c_siret = self._find_col(cols, "siret")
-        c_ref_copro = self._find_col(cols, "ref_copro") # NOUVEAU
+        c_ref_copro = self._find_col(cols, "ref_copro")
         c_naf = self._find_col(cols, "naf") 
         c_insee = self._find_col(cols, "insee") 
         c_surface = self._find_col(cols, "surface")
-        c_typologie = self._find_col(cols, "typologie") # NOUVEAU
-        
+        c_typologie = self._find_col(cols, "typologie")
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
         c_pmax = self._find_col(cols, "p_max")
-        c_compteur_prod = self._find_col(cols, "compteur_prod") # NOUVEAU
-        
+        c_compteur_prod = self._find_col(cols, "compteur_prod")
         c_seg = self._find_col(cols, "segment")
         c_fourn = self._find_col(cols, "fournisseur")
         c_fta = self._find_col(cols, "fta")
@@ -151,7 +132,6 @@ class CortexIngest:
         c_cja = self._find_col(cols, "cja")
         c_profil = self._find_col(cols, "profil")
         c_tarif_ach = self._find_col(cols, "tarif_ach")
-        
         c_ps_hph = self._find_col(cols, "ps_hph")
         c_ps_hch = self._find_col(cols, "ps_hch")
         c_ps_hpe = self._find_col(cols, "ps_hpe")
@@ -174,39 +154,32 @@ class CortexIngest:
                 nom_brut = str(row.get(c_nom, "")).strip()
                 entite_brut = str(row.get(c_entite, "")).strip()
                 ville = str(row.get(c_ville, "")).strip()
-                
                 final_name = "Site Inconnu"
                 is_nom_bad = not nom_brut or any(b in nom_brut.upper() for b in self.NAME_BLACKLIST)
                 if not is_nom_bad: final_name = nom_brut
                 elif entite_brut and not any(b in entite_brut.upper() for b in self.NAME_BLACKLIST): final_name = entite_brut
                 elif ville: final_name = f"{ville} ({pdl[-4:]})"
-
                 raw_conso = self._safe_float(row.get(c_conso))
                 conso_kwh = raw_conso
                 if c_conso and "MWH" in str(c_conso).upper(): conso_kwh = raw_conso * 1000.0
                 if conso_kwh > 10_000_000: conso_kwh = conso_kwh / 1000.0
-
                 segment = str(row.get(c_seg, "")).upper()
                 is_gas = False
                 if "GAZ" in segment or "T1" in segment or "T2" in segment or "T3" in segment: is_gas = True
                 elif c_pdl and "PCE" in str(c_pdl).upper(): is_gas = True
                 energy_type = "gaz" if is_gas else "elec"
-
                 power_val = self._safe_float(row.get(c_puiss))
                 if is_gas and power_val == 0: power_val = self._safe_float(row.get(c_conso))
-
-                # REGLE DE FER GAZ (PRIX)
                 p_hph = self._safe_float(row.get(c_p_hph))
                 if is_gas and p_hph > 2.0: p_hph /= 1000.0
                 if not is_gas and p_hph > 5.0: p_hph /= 1000.0
-
                 site = {
                     "identity": { 
                         "id": pdl, 
                         "site_name": final_name, 
                         "entity_name": entite_brut, 
                         "siret": self._safe_str_clean(row.get(c_siret)),
-                        "ref_copro": self._safe_str_clean(row.get(c_ref_copro)), # MAPPE
+                        "ref_copro": self._safe_str_clean(row.get(c_ref_copro)),
                         "naf": self._safe_str_clean(row.get(c_naf)), 
                         "insee": self._safe_str_clean(row.get(c_insee)) 
                     },
@@ -215,7 +188,7 @@ class CortexIngest:
                         "zip_code": self._safe_str_clean(row.get(c_cp, "")), 
                         "city": ville,
                         "surface": self._safe_float(row.get(c_surface)),
-                        "typologie": self._safe_str_clean(row.get(c_typologie)) # MAPPE
+                        "typologie": self._safe_str_clean(row.get(c_typologie))
                     },
                     "contract": {
                         "pdl": pdl, 
@@ -232,7 +205,7 @@ class CortexIngest:
                         "cja": self._safe_float(row.get(c_cja)),
                         "profil": str(row.get(c_profil, "")),
                         "tarif_acheminement": str(row.get(c_tarif_ach, "")),
-                        "compteur_prod": self._safe_str_clean(row.get(c_compteur_prod)), # MAPPE
+                        "compteur_prod": self._safe_str_clean(row.get(c_compteur_prod)),
                         "power_details": {
                             "hph": self._safe_float(row.get(c_ps_hph)), "hch": self._safe_float(row.get(c_ps_hch)),
                             "hpe": self._safe_float(row.get(c_ps_hpe)), "hce": self._safe_float(row.get(c_ps_hce))
@@ -259,23 +232,56 @@ class CortexIngest:
     def parse_bpu_excel(self, file_content):
         try:
             buffer = io.BytesIO(file_content)
-            df = pd.read_excel(buffer, engine='openpyxl')
-            cols = df.columns
-            c_hph = self._find_col(cols, "prix_unitaire")
-            if not c_hph:
+            xl = pd.ExcelFile(buffer, engine='openpyxl')
+            
+            # 1. RECHERCHE ONGLET REPONSE
+            sheet_name = None
+            for s in xl.sheet_names:
+                if "REPONSE" in s.upper():
+                    sheet_name = s
+                    break
+            
+            # Si pas d'onglet REPONSE, on prend le premier
+            df = pd.read_excel(xl, sheet_name=sheet_name if sheet_name else 0)
+            
+            # 2. DETECTION COLONNES
+            # On cherche les colonnes générées par le DQE
+            cols = [str(c).upper() for c in df.columns]
+            
+            # ELEC
+            c_hph = next((c for c in cols if "PRIX_HPH" in c or "HPH" in c), None)
+            # GAZ
+            c_mol = next((c for c in cols if "PRIX_MOLECULE" in c or "MOLECULE" in c), None)
+            
+            c_abo = next((c for c in cols if "ABONNEMENT" in c), None)
+            
+            # 3. EXTRACTION VALEURS (Ligne 0 du BPU)
+            prices = {}
+            is_gaz = False
+            
+            if c_mol:
+                is_gaz = True
+                prices["hph"] = self._safe_float(df.iloc[0].get(c_mol, 0)) # MWh dans BPU
+            elif c_hph:
+                prices["hph"] = self._safe_float(df.iloc[0].get(c_hph, 0)) # kWh dans BPU
+            else:
+                # Fallback : on cherche n'importe quel prix
                 for c in cols:
-                    try:
-                        val = self._safe_float(df.iloc[0][c])
-                        if 0.01 < val < 500: c_hph = c; break
-                    except: continue
-            if not c_hph: return None, False
-            c_abo = self._find_col(cols, "abonnement")
-            fix_val = 0.0
-            if c_abo: fix_val = self._safe_float(df.iloc[0].get(c_abo, 0))
-            prices = {"hph": self._safe_float(df.iloc[0].get(c_hph, 0)),"fix": fix_val}
-            is_gaz = "GAZ" in str(df.columns).upper()
+                    val = self._safe_float(df.iloc[0][c])
+                    if 0.01 < val < 500: 
+                        prices["hph"] = val
+                        break
+            
+            if c_abo:
+                prices["fix"] = self._safe_float(df.iloc[0].get(c_abo, 0))
+            else:
+                prices["fix"] = 0.0
+
             return pd.DataFrame([prices]), is_gaz
-        except: return None, False
+            
+        except Exception as e: 
+            logging.error(f"BPU Parse Error: {e}")
+            return None, False
 
     def parse_load_curve(self, file_content, filename):
         try:
