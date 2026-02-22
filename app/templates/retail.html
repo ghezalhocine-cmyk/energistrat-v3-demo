@@ -20,10 +20,8 @@
     <style>
         body { background-color: #050505; color: #E2E8F0; font-family: 'Inter', sans-serif; }
         .bento-card { background: #0F172A; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1rem; position: relative; overflow: hidden; }
-        
         tr.site-row { cursor: pointer; transition: background-color 0.15s ease; }
         tr.site-row:hover td { background-color: rgba(168, 85, 247, 0.15) !important; color: white; }
-
         .gauge-container { background: rgba(255,255,255,0.1); height: 6px; border-radius: 4px; overflow: hidden; position: relative; }
         .gauge-fill { height: 100%; transition: width 1s ease-out; }
         #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
@@ -31,6 +29,11 @@
         .input-edit { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 6px; width: 100%; font-size: 12px; }
         .input-edit:focus { border-color: #00E5FF; outline: none; }
         
+        /* SLIDER WAHOO */
+        input[type=range].stress-test { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range].stress-test::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #EF4444; cursor: pointer; margin-top: -6px; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+        input[type=range].stress-test::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #334155; border-radius: 2px; }
+
         select { 
             -webkit-appearance: none; appearance: none; 
             background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
@@ -100,12 +103,19 @@
                 <h1 class="text-xl font-bold text-white" id="main-title">Vision Consolidée</h1>
                 <p class="text-xs text-gray-400" id="main-subtitle">Données Live • Cortex V49 Active</p>
             </div>
-            <div class="flex gap-6 text-right" id="header-kpis">
-                <div>
-                    <div class="text-[10px] text-gray-500 uppercase font-bold">Sites Connectés</div>
-                    <div class="text-lg font-bold text-white" id="count-display">0</div>
+            
+            <!-- STRESS TEST WAHOO (NOUVEAU) -->
+            <div class="flex items-center gap-6" id="header-kpis">
+                
+                <div class="bg-white/5 border border-white/10 rounded-lg px-4 py-2 w-48 group hover:border-red-500/50 transition">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-[9px] text-gray-400 uppercase font-bold group-hover:text-red-400 transition"><i class="fa-solid fa-chart-line mr-1"></i> Stress Test</span>
+                        <span class="text-xs font-bold text-red-500" id="stress-val">+0%</span>
+                    </div>
+                    <input type="range" min="0" max="50" value="0" step="5" class="stress-test" oninput="window.updateStressTest(this.value)">
                 </div>
-                <div>
+
+                <div class="text-right">
                     <div class="text-[10px] text-gray-500 uppercase font-bold">Budget Total</div>
                     <div class="text-lg font-bold text-white font-mono" id="budget-display">-- €</div>
                 </div>
@@ -293,7 +303,7 @@
                     </label>
                 </div>
 
-                <!-- RESULTAT STAGING (ACTUEL) -->
+                <!-- RESULTAT STAGING -->
                 <div id="sim-results" class="hidden space-y-6">
                     <div class="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10">
                         <div class="text-sm text-gray-400">Résultat de la simulation pour : <span class="text-white font-bold" id="lbl-sim-offer-name">--</span></div>
@@ -331,22 +341,19 @@
                     </div>
                 </div>
 
-                <!-- SECTION PODIUM (NOUVEAU) -->
+                <!-- SECTION PODIUM -->
                 <div id="podium-section" class="hidden space-y-6 pt-8 border-t border-white/10">
                     <div class="flex justify-between items-center">
                         <h2 class="text-2xl font-black text-white italic">CLASSEMENT <span class="text-gold">FINAL</span></h2>
                         <button onclick="window.resetPodium()" class="text-xs text-red-400 hover:text-red-300 underline">Vider le classement</button>
                     </div>
 
-                    <!-- PODIUM VISUEL -->
                     <div class="grid grid-cols-3 gap-6 items-end mb-8" id="podium-display">
-                        <!-- SILVER -->
                         <div class="order-1 bento-card p-6 border-t-4 border-silver transform translate-y-4 text-center opacity-50" id="podium-silver">
                             <div class="text-4xl mb-2">🥈</div>
                             <div class="font-bold text-white text-lg name">--</div>
                             <div class="text-sm text-silver font-mono score">-- €</div>
                         </div>
-                        <!-- GOLD -->
                         <div class="order-2 bento-card p-8 border-t-4 border-gold transform -translate-y-4 text-center shadow-[0_0_40px_rgba(255,215,0,0.2)] z-10" id="podium-gold">
                             <div class="text-6xl mb-4">🥇</div>
                             <div class="text-xs text-gold uppercase font-bold mb-1">Meilleure Offre</div>
@@ -354,7 +361,6 @@
                             <div class="text-lg text-white font-mono font-bold mt-2 score">-- €</div>
                             <div class="text-xs text-green-400 mt-1 savings">--</div>
                         </div>
-                        <!-- BRONZE -->
                         <div class="order-3 bento-card p-6 border-t-4 border-bronze transform translate-y-4 text-center opacity-50" id="podium-bronze">
                             <div class="text-4xl mb-2">🥉</div>
                             <div class="font-bold text-white text-lg name">--</div>
@@ -362,7 +368,6 @@
                         </div>
                     </div>
 
-                    <!-- TABLEAU COMPARATIF -->
                     <div class="bento-card overflow-hidden">
                         <table class="w-full text-left text-sm text-gray-300">
                             <thead class="bg-white/5 text-[10px] uppercase text-gray-400 font-bold">
@@ -428,9 +433,13 @@
         let topChartInstance = null;
         let supplierChartInstance = null;
 
-        // --- VARIABLES PODIUM ---
-        let CURRENT_SIM_DATA = null; // Stocke la simulation active (Staging)
-        let PODIUM_STACK = []; // Liste des offres épinglées
+        // --- STRESS TEST VARS ---
+        let GLOBAL_BUDGET_BASE = 0;
+        let STRESS_RATE = 0;
+
+        // --- PODIUM VARS ---
+        let CURRENT_SIM_DATA = null; 
+        let PODIUM_STACK = []; 
 
         function safeSetText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
         
@@ -438,18 +447,14 @@
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
-            
             const views = ['view-fleet', 'view-league', 'view-detail', 'view-offer-lab'];
             views.forEach(id => { const el = document.getElementById(id); if(el) { el.classList.add('hidden'); el.classList.remove('active'); } });
-
             let targetId = 'view-fleet';
             if (viewName === 'league') targetId = 'view-league';
             if (viewName === 'detail') targetId = 'view-detail';
             if (viewName === 'offer-lab') targetId = 'view-offer-lab';
-
             const targetEl = document.getElementById(targetId);
             if(targetEl) { targetEl.classList.remove('hidden'); targetEl.classList.add('active'); }
-
             if(viewName === 'detail') {
                 safeSetText('main-title', "Détail & Conseil");
                 document.getElementById('header-kpis').classList.add('hidden');
@@ -491,6 +496,10 @@
                     LEAGUE_DATA = data.green_league;
                     GLOBAL_CORTEX = data.cortex;
                     FILTER_META = data.filters_meta || {};
+                    
+                    // INIT BUDGET BASE POUR STRESS TEST
+                    GLOBAL_BUDGET_BASE = FLEET_DATA.reduce((acc, s) => acc + s.budget, 0);
+                    
                     initFilters();
                     window.applyFilters();
                     if (GLOBAL_CORTEX && GLOBAL_CORTEX.main_message) {
@@ -499,6 +508,28 @@
                     }
                 }
             } catch(e) { console.error(e); }
+        }
+
+        // --- STRESS TEST LOGIC ---
+        window.updateStressTest = function(val) {
+            STRESS_RATE = parseInt(val);
+            document.getElementById('stress-val').innerText = `+${STRESS_RATE}%`;
+            
+            // Update Global KPI
+            const impactedBudget = GLOBAL_BUDGET_BASE * (1 + STRESS_RATE/100);
+            safeSetText('budget-display', formatCurrency(impactedBudget));
+            
+            // Update Top Chart (Visual Wahoo)
+            if(topChartInstance) {
+                const newData = topChartInstance.data.datasets[0].data.map((val, i) => {
+                    // On recalcule basé sur la data originale (approximatif pour l'effet visuel)
+                    // Pour être précis, il faudrait stocker les budgets originaux du top 5
+                    return val * (1 + STRESS_RATE/100); 
+                });
+                // Note: Pour une vraie précision, on re-rend le chart, mais ici on veut juste l'effet
+                // On va plutôt rappeler applyFilters qui recalcule tout proprement
+                window.applyFilters();
+            }
         }
 
         function initFilters() {
@@ -546,9 +577,16 @@
                 const matchSearch = !search || site.name.toLowerCase().includes(search) || site.id.toLowerCase().includes(search) || site.city.toLowerCase().includes(search);
                 return matchEnergy && matchProv && matchCity && matchSeg && matchLot && matchSearch;
             });
-            renderTable(filtered);
-            updateGlobalKPIs(filtered);
-            updateCharts(filtered);
+            
+            // APPLIQUER STRESS TEST SUR LES DONNEES FILTREES
+            // On crée une copie pour l'affichage sans toucher aux données brutes
+            const stressedData = filtered.map(s => {
+                return { ...s, budget: s.budget * (1 + STRESS_RATE/100) };
+            });
+
+            renderTable(stressedData);
+            updateGlobalKPIs(stressedData);
+            updateCharts(stressedData);
         }
 
         window.openEditModal = function() {
@@ -710,7 +748,6 @@
                 const data = await res.json();
                 
                 if(data.success && data.summary) {
-                    // STOCKAGE EN MEMOIRE STAGING
                     CURRENT_SIM_DATA = {
                         name: name,
                         summary: data.summary,
@@ -728,43 +765,25 @@
         function renderSimulation(data, offerName) {
             document.getElementById('sim-results').classList.remove('hidden');
             safeSetText('lbl-sim-offer-name', offerName);
-            
             safeSetText('sim-current', formatCurrency(data.summary.total_current));
             safeSetText('sim-offer', formatCurrency(data.summary.total_simulated));
-            
             safeSetText('sim-delta', (data.summary.savings_euro > 0 ? "+" : "") + formatCurrency(data.summary.savings_euro));
             safeSetText('sim-pct', (data.summary.savings_pct > 0 ? "+" : "") + data.summary.savings_pct + " %");
-            
             const isGain = data.summary.savings_euro > 0;
             const colorClass = isGain ? 'text-green-500' : 'text-red-500';
             document.getElementById('sim-delta').className = `text-3xl font-black ${colorClass}`;
-            
             const tbody = document.getElementById('sim-table-body');
             tbody.innerHTML = '';
             data.details.forEach(row => {
                 const rowColor = row.delta_euro < 0 ? 'text-green-400' : 'text-red-400';
-                tbody.innerHTML += `
-                    <tr class="border-b border-white/5">
-                        <td class="px-4 py-2 font-bold text-white">${row.site_name}</td>
-                        <td class="px-4 py-2 text-right text-gray-400 font-mono">${Math.round(row.volume)} MWh</td>
-                        <td class="px-4 py-2 text-right text-gray-300 font-mono">${formatCurrency(row.current_budget)}</td>
-                        <td class="px-4 py-2 text-right text-cyan font-mono">${formatCurrency(row.simulated_budget)}</td>
-                        <td class="px-4 py-2 text-right font-bold ${rowColor}">${Math.round(row.delta_euro)} €</td>
-                    </tr>
-                `;
+                tbody.innerHTML += `<tr class="border-b border-white/5"><td class="px-4 py-2 font-bold text-white">${row.site_name}</td><td class="px-4 py-2 text-right text-gray-400 font-mono">${Math.round(row.volume)} MWh</td><td class="px-4 py-2 text-right text-gray-300 font-mono">${formatCurrency(row.current_budget)}</td><td class="px-4 py-2 text-right text-cyan font-mono">${formatCurrency(row.simulated_budget)}</td><td class="px-4 py-2 text-right font-bold ${rowColor}">${Math.round(row.delta_euro)} €</td></tr>`;
             });
         }
 
-        // --- GESTION PODIUM ---
         window.addToPodium = function() {
             if(!CURRENT_SIM_DATA) return;
-            
-            // Ajout à la pile
             PODIUM_STACK.push(CURRENT_SIM_DATA);
-            
-            // Tri par Budget Offre Croissant (Le moins cher en premier)
             PODIUM_STACK.sort((a, b) => a.summary.total_simulated - b.summary.total_simulated);
-            
             renderPodium();
             document.getElementById('podium-section').classList.remove('hidden');
             window.scrollTo(0, document.body.scrollHeight);
@@ -776,7 +795,6 @@
         }
 
         function renderPodium() {
-            // 1. RENDU CARTE OR (1er)
             if(PODIUM_STACK.length > 0) {
                 const gold = PODIUM_STACK[0];
                 const el = document.getElementById('podium-gold');
@@ -785,8 +803,6 @@
                 el.querySelector('.savings').innerText = "Gain: " + formatCurrency(gold.summary.savings_euro);
                 el.classList.remove('opacity-50');
             }
-
-            // 2. RENDU CARTE ARGENT (2eme)
             if(PODIUM_STACK.length > 1) {
                 const silver = PODIUM_STACK[1];
                 const el = document.getElementById('podium-silver');
@@ -797,8 +813,6 @@
                 document.getElementById('podium-silver').classList.add('opacity-50');
                 document.getElementById('podium-silver').querySelector('.name').innerText = "--";
             }
-
-            // 3. RENDU CARTE BRONZE (3eme)
             if(PODIUM_STACK.length > 2) {
                 const bronze = PODIUM_STACK[2];
                 const el = document.getElementById('podium-bronze');
@@ -809,27 +823,14 @@
                 document.getElementById('podium-bronze').classList.add('opacity-50');
                 document.getElementById('podium-bronze').querySelector('.name').innerText = "--";
             }
-
-            // 4. RENDU TABLEAU COMPLET
             const tbody = document.getElementById('podium-table-body');
             tbody.innerHTML = '';
-            
             const bestBudget = PODIUM_STACK[0].summary.total_simulated;
-
             PODIUM_STACK.forEach((offer, index) => {
                 const rank = index + 1;
                 const ecart = offer.summary.total_simulated - bestBudget;
                 const isBest = rank === 1;
-                
-                tbody.innerHTML += `
-                    <tr class="border-b border-white/5 ${isBest ? 'bg-white/5' : ''}">
-                        <td class="px-4 py-3 text-center font-bold ${rank===1?'text-gold':(rank===2?'text-silver':(rank===3?'text-bronze':'text-gray-500'))}">${rank}</td>
-                        <td class="px-4 py-3 font-bold text-white">${offer.name}</td>
-                        <td class="px-4 py-3 text-right font-mono text-cyan">${formatCurrency(offer.summary.total_simulated)}</td>
-                        <td class="px-4 py-3 text-right font-mono text-green-400 font-bold">${formatCurrency(offer.summary.savings_euro)}</td>
-                        <td class="px-4 py-3 text-right font-mono text-red-400">${isBest ? '-' : '+' + formatCurrency(ecart)}</td>
-                    </tr>
-                `;
+                tbody.innerHTML += `<tr class="border-b border-white/5 ${isBest ? 'bg-white/5' : ''}"><td class="px-4 py-3 text-center font-bold ${rank===1?'text-gold':(rank===2?'text-silver':(rank===3?'text-bronze':'text-gray-500'))}">${rank}</td><td class="px-4 py-3 font-bold text-white">${offer.name}</td><td class="px-4 py-3 text-right font-mono text-cyan">${formatCurrency(offer.summary.total_simulated)}</td><td class="px-4 py-3 text-right font-mono text-green-400 font-bold">${formatCurrency(offer.summary.savings_euro)}</td><td class="px-4 py-3 text-right font-mono text-red-400">${isBest ? '-' : '+' + formatCurrency(ecart)}</td></tr>`;
             });
         }
 
