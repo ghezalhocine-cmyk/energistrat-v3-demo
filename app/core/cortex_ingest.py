@@ -6,15 +6,15 @@ import chardet
 import re
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V1112")
+logger = logging.getLogger("CORTEX_INGEST_V1113")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "1112.0 (Patrimoine Expert)"
+        self.version = "1113.0 (Provider Fix & Wide Mapping)"
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
-            "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM"],
+            "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM", "BATIMENT"],
             "entity": ["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT", "SOCIETE"],
             "siret": ["SIRET", "SIRET_SITE", "SIREN"],
             "ref_copro": ["REF_COPRO", "IMMATRICULATION", "REGISTRE_COPRO", "MATRICULE"],
@@ -23,10 +23,12 @@ class CortexIngest:
             "adresse": ["ADRESSE_SITE", "ADRESSE", "RUE", "LIGNE_ADRESSE"],
             "ville": ["VILLE", "COMMUNE", "CITY", "TOWN"],
             "cp": ["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
-            "surface": ["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER"],
-            "typologie": ["TYPOLOGIE", "USAGE", "TYPE_BATIMENT", "ACTIVITE"],
+            "surface": ["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER", "SHON"],
+            "typologie": ["TYPOLOGIE", "USAGE", "TYPE_BATIMENT", "ACTIVITE", "CATEGORIE"],
             
-            # PATRIMOINE TECHNIQUE (NOUVEAU)
+            # MAPPING ELARGI FOURNISSEUR
+            "fournisseur": ["FOURNISSEUR", "TITULAIRE", "PROVIDER", "MARCHE", "TITULAIRE_MARCHE", "NOM_FOURNISSEUR"],
+            
             "chauffage": ["CHAUFFAGE", "TYPE_CHAUFFAGE", "ENERGIE_CHAUFFAGE", "SYSTEME_CVC"],
             "isolation": ["ISOLATION", "TYPE_ISOLATION", "VITRAGE", "PERFORMANCE_ENVELOPPE"],
             "regulation": ["REGULATION", "GTB", "GTC", "PILOTAGE"],
@@ -40,7 +42,6 @@ class CortexIngest:
             "tarif_ach": ["TARIF_ACHEM", "TARIF_ACHEMINEMENT", "ATRT"],
             "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL", "CJA"],
             "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF", "CATEGORIE"],
-            "fournisseur": ["FOURNISSEUR", "TITULAIRE", "PROVIDER", "MARCHE"],
             "grd": ["GRD", "GESTIONNAIRE", "DISTRIBUTEUR"],
             "date_debut": ["DATE_DEBUT", "DEBUT_CONTRAT", "START_DATE"],
             "date_fin": ["DATE_FIN", "ECHEANCE", "FIN_CONTRAT", "END_DATE"],
@@ -119,12 +120,9 @@ class CortexIngest:
         c_insee = self._find_col(cols, "insee") 
         c_surface = self._find_col(cols, "surface")
         c_typologie = self._find_col(cols, "typologie")
-        
-        # TECH
         c_chauff = self._find_col(cols, "chauffage")
         c_isol = self._find_col(cols, "isolation")
         c_regul = self._find_col(cols, "regulation")
-
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
         c_pmax = self._find_col(cols, "p_max")
@@ -180,6 +178,10 @@ class CortexIngest:
                 if is_gas and p_hph > 2.0: p_hph /= 1000.0
                 if not is_gas and p_hph > 5.0: p_hph /= 1000.0
                 
+                # FOURNISSEUR FIX : On récupère brut et on nettoie
+                provider_raw = self._safe_str_clean(row.get(c_fourn, "Inconnu"))
+                if not provider_raw or provider_raw == "0": provider_raw = "Inconnu"
+
                 site = {
                     "identity": { 
                         "id": pdl, 
@@ -204,7 +206,7 @@ class CortexIngest:
                     },
                     "contract": {
                         "pdl": pdl, 
-                        "provider": str(row.get(c_fourn, "Inconnu")),
+                        "provider": provider_raw, # FIX
                         "segment": segment, 
                         "power": power_val,
                         "p_max": self._safe_float(row.get(c_pmax)),
