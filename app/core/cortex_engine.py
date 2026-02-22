@@ -10,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V1101")
+logger = logging.getLogger("CORTEX_ENGINE_V1102")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "1101.0 (Fix: Prices & Gas Badge)"
+        self.version = "1102.0 (Diamond V2: Gas Taxes Fix)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.025}, "gas": {"price": 0.06, "tax": 0.008}}
         self.OPTIMAL_PRICE = {"elec": 0.12, "gas": 0.045} 
 
@@ -49,13 +49,9 @@ class CortexEngine:
         pdl = str(contract.get('pdl', ''))
 
         is_gas = False
-        # 1. Check explicite string
         if 'gaz' in energy_type_str or 'gas' in energy_type_str: is_gas = True
-        # 2. Check Segment (Force Gaz pour T1-T5)
         elif segment in ['T1', 'T2', 'T3', 'T4', 'TP']: is_gas = True
-        # 3. Check GRD
         elif 'GRDF' in grd: is_gas = True
-        # 4. Check Format PDL (PCE souvent court ou spécifique, mais moins fiable)
         
         # --- VOLUMETRIE ---
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
@@ -64,7 +60,6 @@ class CortexEngine:
         raw_price = self._safe_float(pricing.get('hph'))
         unit_price = raw_price
         
-        # Règle de sécurité Unités
         if is_gas and raw_price > 2.0: unit_price = raw_price / 1000.0
         elif not is_gas and raw_price > 5.0: unit_price = raw_price / 1000.0
             
@@ -76,29 +71,33 @@ class CortexEngine:
         fixe = self._safe_float(pricing.get('fix'))
         commodity = vol_kwh * unit_price
         
-        # Taxes & Stockage
+        # --- CORRECTION TAXES & STOCKAGE GAZ ---
         raw_tax = self._safe_float(pricing.get('tax'))
-        if raw_tax > 0.5: raw_tax /= 1000.0 
-        taxes = (vol_kwh * raw_tax) if raw_tax > 0 else (vol_kwh * self.MARKET_DEFAULTS['gas' if is_gas else 'elec']['tax'])
+        # Si la taxe est > 0.5, c'est probablement du €/MWh -> conversion en €/kWh
+        if raw_tax > 0.5: raw_tax_kwh = raw_tax / 1000.0
+        else: raw_tax_kwh = raw_tax
+        
+        # Si pas de taxe dans le fichier, on met un défaut
+        if raw_tax_kwh == 0: raw_tax_kwh = self.MARKET_DEFAULTS['gas' if is_gas else 'elec']['tax']
+        
+        taxes_total = vol_kwh * raw_tax_kwh
         
         raw_stock = self._safe_float(pricing.get('storage'))
-        if raw_stock > 0.5: raw_stock /= 1000.0
-        storage_cost = vol_kwh * raw_stock
+        if raw_stock > 0.5: raw_stock_kwh = raw_stock / 1000.0
+        else: raw_stock_kwh = raw_stock
+        storage_total = vol_kwh * raw_stock_kwh
         
-        budget_ttc = commodity + fixe + taxes + storage_cost
+        budget_ttc = commodity + fixe + taxes_total + storage_total
         landing = budget_ttc * 1.02
         pmc_mwh = self._safe_div(budget_ttc, (vol_kwh / 1000))
         
-        # Calcul du "Gaspillage"
         optimal = self.OPTIMAL_PRICE['gas'] if is_gas else self.OPTIMAL_PRICE['elec']
         ghost = max(0, (unit_price - optimal) * vol_kwh)
 
-        # --- RECUPERATION DES PRIX SECONDAIRES (FIX BUG 0) ---
+        # FIX PRIX SECONDAIRES ELEC
         p_hch = self._safe_float(pricing.get('hch'))
         p_hpe = self._safe_float(pricing.get('hpe'))
         p_hce = self._safe_float(pricing.get('hce'))
-        
-        # Si Elec et prix > 5, on convertit aussi les heures creuses/pleines
         if not is_gas:
             if p_hch > 5.0: p_hch /= 1000.0
             if p_hpe > 5.0: p_hpe /= 1000.0
@@ -109,7 +108,10 @@ class CortexEngine:
                 "site_label": str(site_label).upper(),
                 "city": loc.get('city', ''),
                 "energy_type": "Gaz" if is_gas else "Électricité",
-                "is_gas": is_gas
+                "is_gas": is_gas,
+                "provider": contract.get('provider', 'Inconnu'), # PASSAGE FOURNISSEUR
+                "naf": ident.get('naf', ''), # PASSAGE NAF
+                "insee": ident.get('insee', '') # PASSAGE INSEE
             },
             "volume_kwh": self._sanitize(round(vol_kwh, 0)),
             "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)),
@@ -118,8 +120,8 @@ class CortexEngine:
             "details": {
                 "commodity": self._sanitize(round(commodity, 2)),
                 "fix": self._sanitize(round(fixe, 2)),
-                "taxes": self._sanitize(round(taxes, 2)),
-                "storage": self._sanitize(round(storage_cost, 2))
+                "taxes": self._sanitize(round(taxes_total, 2)),
+                "storage": self._sanitize(round(storage_total, 2))
             },
             "kpis": {
                 "budget_annual": self._sanitize(round(budget_ttc, 2)),
@@ -131,12 +133,12 @@ class CortexEngine:
             },
             "pricing_details": {
                 "hph": unit_price,
-                "hch": p_hch, # FIX: On renvoie la valeur
-                "hpe": p_hpe, # FIX: On renvoie la valeur
-                "hce": p_hce, # FIX: On renvoie la valeur
+                "hch": p_hch,
+                "hpe": p_hpe,
+                "hce": p_hce,
                 "fix": fixe,
-                "tax": taxes,
-                "storage": storage_cost
+                "tax": taxes_total, # On renvoie le TOTAL ANNUEL (Attendu par Retail.html)
+                "storage": storage_total # On renvoie le TOTAL ANNUEL (Attendu par Retail.html)
             }
         }
 
@@ -175,7 +177,9 @@ class CortexEngine:
                 "Conso HPH": con_det.get('hph', 0), "Conso HCH": con_det.get('hch', 0), 
                 "Conso HPE": con_det.get('hpe', 0), "Conso HCE": con_det.get('hce', 0),
                 "Vol. Annuel": vol_annuel,
-                "SIRET": ident.get('siret', '')
+                "SIRET": ident.get('siret', ''),
+                "NAF": ident.get('naf', ''), # AJOUT DQE
+                "INSEE": ident.get('insee', '') # AJOUT DQE
             }
             rows.append(row)
         return pd.DataFrame(rows)
