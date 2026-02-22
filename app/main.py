@@ -28,7 +28,7 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V1000-INTEGRAL")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V1100-FINAL")
 
 app.add_middleware(
     CORSMiddleware,
@@ -200,7 +200,6 @@ async def get_dashboard_data(client_id: str):
         financials['meta']['is_gas']
     )
     
-    # --- MIROIR DE DONNÉES (POUR QUE LE FRONTEND S'Y RETROUVE) ---
     merged_data = {
         **data,
         **financials,
@@ -210,7 +209,9 @@ async def get_dashboard_data(client_id: str):
         "surface": data.get('location', {}).get('surface', 0),
         "electricity_price": financials['kpis']['unit_price_kwh'],
         
-        # CHAMPS GAZ & ELEC
+        # FIX DU CLIC : ON INJECTE L'OBJET PRICING COMPLET
+        "pricing": financials['pricing_details'],
+        
         "fta": data.get('contract', {}).get('fta', '-'),
         "grd": data.get('contract', {}).get('grd', '-'),
         "start_date": data.get('contract', {}).get('start_date', '-'),
@@ -220,18 +221,15 @@ async def get_dashboard_data(client_id: str):
         "profil": data.get('contract', {}).get('profil', '-'),
         "tarif_acheminement": data.get('contract', {}).get('tarif_acheminement', '-'),
         
-        # PRIX DÉTAILLÉS (BRUTS)
         "hph": financials['pricing_details'].get('hph', 0),
         "hch": financials['pricing_details'].get('hch', 0),
         "hpe": financials['pricing_details'].get('hpe', 0),
         "hce": financials['pricing_details'].get('hce', 0),
         
-        # PUISSANCES & CONSOS DÉTAILLÉES
         "ps_hph": data.get('contract', {}).get('power_details', {}).get('hph', 0),
         "ps_hch": data.get('contract', {}).get('power_details', {}).get('hch', 0),
         "ps_hpe": data.get('contract', {}).get('power_details', {}).get('hpe', 0),
         "ps_hce": data.get('contract', {}).get('power_details', {}).get('hce', 0),
-        "conso_hph": data.get('contract', {}).get('consumption_details', {}).get('hph', 0),
         
         "cortex_insight": {"message": "Analyse active.", "conseil": "RAS.", "status": "OK", "color": "green"},
         "market_analysis": market_analysis,
@@ -340,7 +338,7 @@ async def generate_tender(request: Request):
             if df_elec.empty and df_gaz.empty: df_dqe.to_excel(writer, index=False, sheet_name="TOUT")
         stream.seek(0)
         timestamp = datetime.now().strftime("%Y%m%d")
-        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_Energistrat_{len(selected_sites)}sites_{timestamp}.xlsx"})
+        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_Energistrat_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.get("/")
