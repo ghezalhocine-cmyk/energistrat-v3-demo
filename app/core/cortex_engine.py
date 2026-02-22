@@ -10,12 +10,16 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V1108")
+logger = logging.getLogger("CORTEX_ENGINE_V1110_FULL")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "1108.0 (Dual Stream Simulation)"
-        self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.025}, "gas": {"price": 0.045, "tax": 0.00844}}
+        self.version = "1110.0 (Integral Fix)"
+        # PRIX DE RÉFÉRENCE MARCHÉ PUBLIC (TRVE / PEG)
+        self.MARKET_DEFAULTS = {
+            "elec": {"price": 0.18, "tax": 0.025, "trve_ref": 0.22}, 
+            "gas": {"price": 0.045, "tax": 0.00844, "peg_ref": 0.065}
+        }
         self.OPTIMAL_PRICE = {"elec": 0.12, "gas": 0.045} 
 
     def _safe_float(self, value, default=0.0):
@@ -127,6 +131,9 @@ class CortexEngine:
         
         if extras: display_segment = f"{segment} | {' '.join(extras)}"
 
+        # 7. BENCHMARK TRVE/PEG
+        ref_market_price = self.MARKET_DEFAULTS['gas']['peg_ref'] if is_gas else self.MARKET_DEFAULTS['elec']['trve_ref']
+
         return {
             "meta": {
                 "site_label": str(site_label).upper(),
@@ -153,6 +160,7 @@ class CortexEngine:
                 "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)),
                 "pmc_eur_mwh": self._sanitize(round(pmc_mwh, 2)),
                 "unit_price_kwh": unit_price,
+                "ref_market_price_kwh": ref_market_price,
                 "is_estimated_price": is_estimated,
                 "ghost_savings": self._sanitize(round(ghost, 2))
             },
@@ -286,7 +294,11 @@ class CortexEngine:
             
             # RECUPERATION PRIX
             offer = target_map.get(pdl)
-            if not offer: continue # Pas de prix pour ce site dans le BPU
+            if not offer:
+                # Fallback : Prix par défaut (première ligne du BPU)
+                offer = target_map.get("default")
+            
+            if not offer: continue # Impossible de simuler ce site
             
             # CALCUL COUT SIMULE
             if is_gas:
@@ -328,7 +340,6 @@ class CortexEngine:
             new_fix = offer['fix'] if offer['fix'] > 0 else fin['details']['fix']
             new_stock = offer.get('stock', 0)
             if new_stock > 0:
-                # Si Gaz et Stock > 0.5, conversion probable MWh -> kWh
                 if is_gas and new_stock > 0.5: new_stock /= 1000.0
                 cost_stock = fin['volume_kwh'] * new_stock
             else:
