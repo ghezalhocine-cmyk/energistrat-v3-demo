@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V3 | Mairie.OS (Gestion de Masse)</title>
+    <title>ENERGISTRAT V3 | Mairie.OS (Citoyens & Territoire)</title>
     
     <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,70 +15,67 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: { abysse: '#050505', card: '#0F172A', sidebar: '#020617', mairie: '#3B82F6', cyan: '#00E5FF', gas: '#EF4444', success: '#10B981', alert: '#EF4444', gold: '#F59E0B' },
+                    colors: { abysse: '#050505', card: '#0F172A', sidebar: '#020617', mairie: '#3B82F6', cyan: '#00E5FF', gas: '#EF4444', water: '#0EA5E9', success: '#10B981', alert: '#EF4444', gold: '#F59E0B', citizen: '#8B5CF6' },
                     fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
                 }
             }
         }
     </script>
     <style>
-        body { background-color: #050505; color: #e2e8f0; overflow: hidden; }
+        body { background-color: #050505; color: #e2e8f0; overflow: hidden; font-family: 'Inter', sans-serif; }
         .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.2s; }
-        .bento-card:hover { border-color: rgba(255, 255, 255, 0.1); }
-        tr.site-row { cursor: pointer; transition: background-color 0.15s ease; }
+        tr.site-row { cursor: pointer; transition: background-color 0.1s ease; }
         tr.site-row:hover td { background-color: rgba(59, 130, 246, 0.15) !important; color: white; }
         .nav-item.active { background: rgba(59, 130, 246, 0.1); border-right: 3px solid #3B82F6; color: white; }
         .input-edit { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 6px; width: 100%; font-size: 12px; }
         .input-edit:focus { border-color: #3B82F6; outline: none; }
         
-        @media print {
-            body { background: white; color: black; overflow: visible; }
-            .no-print { display: none !important; }
-            .bento-card { border: 1px solid #ccc; background: white; color: black; break-inside: avoid; }
-        }
-        
         #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
         #action-bar.visible { transform: translateY(0); }
+        
+        /* Scrollbar fine */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
 <body class="flex h-screen w-screen font-sans">
 
     <!-- SIDEBAR -->
-    <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col flex-shrink-0 z-50 no-print">
+    <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col flex-shrink-0 z-50">
         <div class="h-20 flex items-center px-6 border-b border-white/5">
             <div class="w-10 h-10 rounded bg-gradient-to-br from-mairie to-blue-800 flex items-center justify-center text-white font-bold shadow-lg text-xl">
                 <i class="fa-solid fa-landmark"></i>
             </div>
             <div class="ml-3">
                 <div class="font-bold tracking-tight text-white leading-none">MAIRIE<span class="text-mairie">.OS</span></div>
-                <div class="text-[10px] text-gray-500 font-mono mt-1">Collectivité</div>
+                <div class="text-[10px] text-gray-500 font-mono mt-1">Gestion Parc Public</div>
             </div>
         </div>
         
         <div class="p-4 space-y-2">
             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-2 px-2">Pilotage DGS</div>
             <button onclick="switchView('patrimoine')" id="nav-patrimoine" class="nav-item active w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
-                <i class="fa-solid fa-city w-5 text-center"></i> Patrimoine & Flux
+                <i class="fa-solid fa-city w-5 text-center"></i> Patrimoine & Sobriété
+            </button>
+            <button onclick="switchView('citizens')" id="nav-citizens" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+                <i class="fa-solid fa-users-line w-5 text-center text-citizen"></i> Citoyens & Achat
             </button>
             <button onclick="switchView('budget')" id="nav-budget" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
                 <i class="fa-solid fa-chart-pie w-5 text-center text-gold"></i> Budget M57
-            </button>
-            <button onclick="switchView('rapport')" id="nav-rapport" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
-                <i class="fa-solid fa-file-contract w-5 text-center text-white"></i> Rapport Élus
             </button>
         </div>
 
         <div class="px-4 mt-4">
             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-2 px-2">Outils Experts</div>
-            <a href="/audit" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition"><i class="fa-solid fa-stethoscope w-4 text-green-500"></i> Audit</a>
-            <a href="/solar" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition"><i class="fa-solid fa-solar-panel w-4 text-yellow-500"></i> Solaire</a>
-            <a href="/climate" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition"><i class="fa-solid fa-cloud-sun w-4 text-blue-400"></i> Climat</a>
+            <a href="/audit" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition"><i class="fa-solid fa-stethoscope w-4 text-green-500"></i> Audit Décret Tertiaire</a>
+            <a href="/solar" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition"><i class="fa-solid fa-solar-panel w-4 text-yellow-500"></i> Solarisation</a>
         </div>
         
         <div class="mt-auto p-4 border-t border-white/5 bg-black/20">
             <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
                 <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs text-white font-bold group-hover:bg-mairie transition"><i class="fa-solid fa-gear"></i></div>
-                <div class="flex-1 min-w-0"><div class="text-xs font-bold text-white">Administration</div><div class="text-[10px] text-gray-500">Config. & Tickets</div></div>
+                <div class="flex-1 min-w-0"><div class="text-xs font-bold text-white">Administration</div><div class="text-[10px] text-gray-500">Imports & Config</div></div>
             </a>
         </div>
     </aside>
@@ -87,16 +84,16 @@
     <main class="flex-1 flex flex-col min-w-0 bg-abysse relative overflow-hidden">
         
         <!-- HEADER -->
-        <header class="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur sticky top-0 z-40 no-print">
+        <header class="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur sticky top-0 z-40">
             <div class="flex items-center gap-4">
-                <h1 class="text-lg font-bold text-white" id="page-title">Vue d'Ensemble</h1>
-                <div id="global-alert" class="hidden px-3 py-1 rounded bg-alert/20 border border-alert/50 text-alert text-xs font-bold animate-pulse flex items-center gap-2">
-                    <i class="fa-solid fa-triangle-exclamation"></i> DÉRIVE CONSTATÉE
+                <h1 class="text-lg font-bold text-white" id="page-title">Supervision Parc</h1>
+                <div id="sobriety-badge" class="hidden px-3 py-1 rounded bg-alert/20 border border-alert/50 text-alert text-xs font-bold animate-pulse flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation"></i> DÉRIVE SOBRIÉTÉ
                 </div>
             </div>
             <div class="flex gap-6 text-right">
                 <div>
-                    <div class="text-[10px] text-gray-500 uppercase font-bold">Compte 60612 (Est.)</div>
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Budget Annuel</div>
                     <div class="text-lg font-bold text-white font-mono" id="header-budget">-- €</div>
                 </div>
             </div>
@@ -104,67 +101,140 @@
 
         <div class="flex-1 overflow-y-auto p-8 pb-32" id="content-area">
 
-            <!-- VUE 1 : PATRIMOINE -->
+            <!-- VUE 1 : PATRIMOINE (Gestion Technique) -->
             <div id="view-patrimoine" class="view-section active space-y-6">
-                
+                <!-- KPIS -->
                 <div class="grid grid-cols-4 gap-6">
                     <div class="bento-card p-6 border-l-4 border-mairie">
-                        <div class="text-xs font-bold text-gray-400 uppercase mb-1">Sites Raccordés</div>
+                        <div class="text-xs font-bold text-gray-400 uppercase mb-1">Total Sites</div>
                         <div class="text-3xl font-bold text-white" id="kpi-sites">0</div>
-                    </div>
-                    <div class="bento-card p-6 border-l-4 border-gas">
-                        <div class="text-xs font-bold text-gray-400 uppercase mb-1">Mix Énergétique</div>
-                        <div class="flex items-end gap-2">
-                            <span class="text-2xl font-bold text-white" id="kpi-gaz-pct">--%</span>
-                            <span class="text-xs text-gas font-bold mb-1">GAZ</span>
-                        </div>
-                        <div class="w-full bg-white/10 h-1 mt-2 rounded"><div id="bar-gaz" class="h-full bg-gas" style="width: 0%"></div></div>
                     </div>
                     <div class="bento-card p-6 border-l-4 border-alert">
                         <div class="text-xs font-bold text-alert uppercase mb-1">Gaspillage (Talon)</div>
                         <div class="text-3xl font-bold text-white" id="kpi-waste">-- €</div>
                         <div class="text-[10px] text-gray-500">Potentiel économie immédiat</div>
                     </div>
-                    <div class="bento-card p-6 bg-gradient-to-br from-card to-mairie/10 flex flex-col justify-center">
-                        <button onclick="window.print()" class="bg-white text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-gray-200 transition flex items-center justify-center gap-2 shadow-lg">
-                            <i class="fa-solid fa-print"></i> Imprimer Note
+                    <div class="bento-card p-6 border-l-4 border-gold">
+                        <div class="text-xs font-bold text-gold uppercase mb-1">Sites en Alerte</div>
+                        <div class="text-3xl font-bold text-white" id="kpi-alerts">0</div>
+                        <div class="text-[10px] text-gray-500">Surconsommation détectée</div>
+                    </div>
+                    <!-- SELECTEUR ENERGIE -->
+                    <div class="bento-card p-1 flex bg-black/40">
+                        <button onclick="filterEnergy('elec')" id="btn-elec" class="flex-1 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center gap-1 active-energy">
+                            <i class="fa-solid fa-bolt text-lg"></i> Élec
+                        </button>
+                        <div class="w-px bg-white/10 my-2"></div>
+                        <button onclick="filterEnergy('gaz')" id="btn-gaz" class="flex-1 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center gap-1">
+                            <i class="fa-solid fa-fire text-lg"></i> Gaz
+                        </button>
+                        <div class="w-px bg-white/10 my-2"></div>
+                        <button onclick="filterEnergy('eau')" id="btn-eau" class="flex-1 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center gap-1">
+                            <i class="fa-solid fa-droplet text-lg"></i> Eau
                         </button>
                     </div>
                 </div>
 
-                <div class="bento-card overflow-hidden">
+                <!-- TABLEAU DE GESTION -->
+                <div class="bento-card overflow-hidden flex flex-col h-[600px]">
                     <div class="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/5">
                         <div class="flex items-center gap-4">
-                            <h3 class="font-bold text-white flex items-center gap-2"><i class="fa-solid fa-list-check text-mairie"></i> Inventaire</h3>
-                            <div class="flex gap-2">
-                                <select id="filter-type" onchange="applyFilters()" class="bg-abysse border border-white/10 rounded-lg p-1 text-[10px] text-gray-300 outline-none"><option value="all">Tous Types</option><option value="ecole">Écoles</option><option value="sport">Sport</option></select>
-                                <select id="filter-energy" onchange="applyFilters()" class="bg-abysse border border-white/10 rounded-lg p-1 text-[10px] text-gray-300 outline-none"><option value="all">Toutes Énergies</option><option value="elec">Élec</option><option value="gaz">Gaz</option></select>
+                            <div class="relative w-64">
+                                <i class="fa-solid fa-search absolute left-3 top-2.5 text-gray-500 text-xs"></i>
+                                <input type="text" id="search-input" oninput="applyFilters()" placeholder="Rechercher (Nom, PDL, Rue)..." class="w-full bg-abysse border border-white/10 rounded-lg py-2 pl-8 pr-4 text-xs text-white focus:border-mairie outline-none">
                             </div>
+                            <select id="filter-lot" onchange="applyFilters()" class="bg-abysse border border-white/10 rounded-lg p-2 text-xs text-gray-300 outline-none">
+                                <option value="all">Tous les Lots</option>
+                            </select>
+                            <select id="filter-type" onchange="applyFilters()" class="bg-abysse border border-white/10 rounded-lg p-2 text-xs text-gray-300 outline-none">
+                                <option value="all">Toutes Typologies</option>
+                                <option value="ecole">Écoles</option>
+                                <option value="sport">Sport / Gymnase</option>
+                                <option value="admin">Administratif</option>
+                                <option value="ep">Éclairage Public</option>
+                            </select>
                         </div>
-                        <div class="relative w-64">
-                            <i class="fa-solid fa-search absolute left-3 top-2.5 text-gray-500 text-xs"></i>
-                            <input type="text" id="search-input" oninput="applyFilters()" placeholder="Rechercher..." class="w-full bg-abysse border border-white/10 rounded-lg py-2 pl-8 pr-4 text-xs text-white focus:border-mairie outline-none">
-                        </div>
+                        <div class="text-xs text-gray-500"><span id="visible-count">0</span> lignes affichées</div>
                     </div>
-                    <table class="w-full text-left text-sm text-gray-300">
-                        <thead class="bg-white/5 text-[10px] uppercase text-gray-400 font-bold">
-                            <tr>
-                                <th class="px-4 py-3 w-10 text-center"><input type="checkbox" onclick="toggleAll(this)" class="accent-mairie"></th>
-                                <th class="px-4 py-3">Site</th>
-                                <th class="px-4 py-3">PDL / PCE</th>
-                                <th class="px-4 py-3 text-center">Énergie</th>
-                                <th class="px-4 py-3 text-right">Puissance/CAR</th>
-                                <th class="px-4 py-3 text-right">Surface</th>
-                                <th class="px-4 py-3 text-right">Budget</th>
-                                <th class="px-4 py-3 text-center">État</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5" id="fleet-table-body"></tbody>
-                    </table>
+                    
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-card text-[10px] uppercase text-gray-400 font-bold sticky top-0 z-10 shadow-md">
+                                <tr>
+                                    <th class="px-4 py-3 w-10 text-center bg-card"><input type="checkbox" onclick="toggleAll(this)" class="accent-mairie"></th>
+                                    <th class="px-4 py-3 bg-card">Site</th>
+                                    <th class="px-4 py-3 bg-card">Typologie</th>
+                                    <th class="px-4 py-3 bg-card">PDL / PCE</th>
+                                    <th class="px-4 py-3 bg-card">Lot</th>
+                                    <th class="px-4 py-3 text-right bg-card">Conso (MWh)</th>
+                                    <th class="px-4 py-3 text-right bg-card">Budget Est.</th>
+                                    <th class="px-4 py-3 text-center bg-card">Sobriété</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5" id="fleet-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <!-- VUE 2 : BUDGET M57 -->
+            <!-- VUE 2 : CITOYENS & ACHAT GROUPÉ (NOUVEAU) -->
+            <div id="view-citizens" class="view-section hidden space-y-6">
+                
+                <div class="flex justify-between items-end mb-4">
+                    <div>
+                        <h2 class="text-3xl font-black text-white italic tracking-tight">ACHAT <span class="text-citizen">GROUPÉ</span></h2>
+                        <p class="text-sm text-gray-500 mt-2">Mobilisez vos citoyens pour verdir votre territoire.</p>
+                    </div>
+                    <div class="flex items-center gap-4 bg-white/5 p-2 rounded-xl border border-white/10">
+                        <div class="text-right">
+                            <div class="text-[10px] text-gray-400 uppercase font-bold">Score Ville Verte</div>
+                            <div class="text-xs text-success font-bold">Excellent</div>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-success text-abysse font-black flex items-center justify-center text-xl border-4 border-abysse shadow-[0_0_20px_rgba(16,185,129,0.4)]">A+</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-6">
+                    <!-- KPI 1 -->
+                    <div class="bento-card p-6 border-l-4 border-citizen flex flex-col justify-between">
+                        <div>
+                            <div class="text-xs font-bold text-gray-400 uppercase mb-1">Citoyens Inscrits</div>
+                            <div class="text-4xl font-black text-white">1 248</div>
+                        </div>
+                        <div class="mt-4 w-full bg-white/10 h-1 rounded overflow-hidden"><div class="h-full bg-citizen" style="width: 65%"></div></div>
+                        <div class="text-[10px] text-citizen mt-1">Objectif: 2000 foyers</div>
+                    </div>
+                    
+                    <!-- KPI 2 -->
+                    <div class="bento-card p-6 border-l-4 border-cyan flex flex-col justify-between">
+                        <div>
+                            <div class="text-xs font-bold text-gray-400 uppercase mb-1">Volume Négociable</div>
+                            <div class="text-4xl font-black text-white">5.2 <span class="text-lg text-gray-500 font-normal">GWh</span></div>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-400 flex items-center gap-2"><i class="fa-solid fa-users"></i> Puissance d'achat équivalente à 20 Stades</div>
+                    </div>
+
+                    <!-- WIDGET EXPORT -->
+                    <div class="bento-card p-6 bg-gradient-to-br from-card to-citizen/10 flex flex-col justify-center items-center text-center">
+                        <div class="mb-3 text-white font-bold text-sm">Affichez votre score !</div>
+                        <div class="bg-abysse p-3 rounded text-[10px] font-mono text-gray-400 w-full mb-3 select-all">
+                            &lt;iframe src="energistrat.com/widget/ville/score"&gt;&lt;/iframe&gt;
+                        </div>
+                        <button class="bg-white text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-gray-200 transition flex items-center gap-2">
+                            <i class="fa-solid fa-copy"></i> Copier le code Widget
+                        </button>
+                    </div>
+                </div>
+
+                <!-- GRAPHIQUE CAMPAGNE -->
+                <div class="bento-card p-6">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Dynamique d'Inscription (30 jours)</h3>
+                    <div class="h-64 w-full relative"><canvas id="citizenChart"></canvas></div>
+                </div>
+
+            </div>
+
+            <!-- VUE 3 : BUDGET M57 -->
             <div id="view-budget" class="view-section hidden space-y-6">
                 <div class="text-center mb-8">
                     <h2 class="text-3xl font-black text-white italic tracking-tight">PILOTAGE <span class="text-gold">M57</span></h2>
@@ -182,180 +252,37 @@
                 </div>
             </div>
 
-            <!-- VUE 3 : RAPPORT -->
-            <div id="view-rapport" class="view-section hidden space-y-8 max-w-4xl mx-auto bg-white text-black p-12 rounded-xl shadow-2xl">
-                <div class="flex justify-between items-center border-b-2 border-black pb-4 mb-8">
-                    <h1 class="text-3xl font-bold uppercase">Note de Synthèse Énergie</h1>
-                    <div class="text-right"><div class="text-sm font-bold">Mairie de Saint-Lys</div><div class="text-xs text-gray-500">Date: <span id="report-date"></span></div></div>
-                </div>
-                <div class="space-y-6">
-                    <section>
-                        <h2 class="text-xl font-bold text-blue-600 mb-2">1. Situation Budgétaire</h2>
-                        <p class="text-sm text-gray-700 leading-relaxed">Le budget énergie prévisionnel est estimé à <b id="rpt-budget">-- €</b>. L'exécution est conforme.</p>
-                    </section>
-                    <section>
-                        <h2 class="text-xl font-bold text-red-600 mb-2">2. Alertes & Gaspillage (Talon)</h2>
-                        <ul class="list-disc pl-5 text-sm space-y-1" id="rpt-alerts"><li>Analyse en cours...</li></ul>
-                    </section>
-                </div>
-            </div>
-
-            <!-- VUE DÉTAIL (MODALE) -->
-            <div id="detail-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-8 backdrop-blur-sm no-print">
-                <div class="bento-card w-full max-w-5xl h-full max-h-[90vh] overflow-y-auto relative flex flex-col">
-                    <button onclick="closeDetail()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
-                    
-                    <div class="p-8 border-b border-white/5 flex justify-between items-start">
-                        <div>
-                            <h2 class="text-3xl font-bold text-white" id="modal-title">--</h2>
-                            <div class="flex gap-4 mt-2 text-sm text-gray-400">
-                                <span id="modal-address"><i class="fa-solid fa-location-dot mr-1"></i> --</span>
-                                <span id="modal-surface" class="text-cyan font-mono"><i class="fa-solid fa-ruler-combined mr-1"></i> -- m²</span>
-                                <span id="modal-type" class="px-2 py-0.5 rounded text-[10px] font-bold">--</span>
-                            </div>
-                        </div>
-                        <button onclick="openEditMode()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2">
-                            <i class="fa-solid fa-pen-to-square"></i> Modifier Fiche
-                        </button>
-                    </div>
-
-                    <div class="p-8 grid grid-cols-3 gap-8 flex-1">
-                        <div class="col-span-2 space-y-6">
-                            <div class="bento-card p-6 border-l-4 border-mairie bg-white/5">
-                                <h3 class="text-sm font-bold text-white mb-4">Données Techniques</h3>
-                                <div class="grid grid-cols-2 gap-4 text-xs" id="modal-tech-grid"></div>
-                                <div class="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-4 text-xs">
-                                    <div><span class="text-gray-500 block">Chauffage</span><span class="text-white" id="disp-chauffage">--</span></div>
-                                    <div><span class="text-gray-500 block">Isolation</span><span class="text-white" id="disp-isolation">--</span></div>
-                                    <div><span class="text-gray-500 block">Régulation</span><span class="text-white" id="disp-regulation">--</span></div>
-                                </div>
-                            </div>
-                            <div class="h-64 bg-white/5 rounded-xl p-4">
-                                <h3 class="text-xs font-bold text-gray-400 mb-2">Profil de Charge (24h Type)</h3>
-                                <canvas id="modalChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="space-y-6">
-                            <div class="bento-card p-6 border-t-4 border-alert text-center">
-                                <div class="text-alert font-bold text-lg mb-1">ALERTE TALON</div>
-                                <div class="text-3xl font-bold text-white mb-2" id="modal-waste">-- €</div>
-                                <p class="text-[10px] text-gray-400">Consommation inutile estimée (Nuit/WE).</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- MODALE EDITION SINGLE -->
-            <div id="edit-modal" class="fixed inset-0 bg-black/90 z-[70] hidden flex items-center justify-center backdrop-blur-sm">
-                <div class="bento-card p-8 rounded-2xl w-[500px] relative border border-mairie/30 shadow-[0_0_50px_rgba(59,130,246,0.1)]">
-                    <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-mairie"></i> Mise à jour Patrimoine</h3>
-                    <div class="space-y-4">
-                        <input type="hidden" id="edit-id">
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Bâtiment</label><input type="text" id="edit-name" class="input-edit"></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold text-cyan">Surface (m²)</label><input type="number" id="edit-surface" class="input-edit"></div>
-                        
-                        <div class="pt-4 border-t border-white/5"><span class="text-xs font-bold text-white">Carnet de Santé</span></div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-[10px] text-gray-500 uppercase font-bold">Chauffage</label>
-                                <select id="edit-chauffage" class="input-edit bg-abysse">
-                                    <option value="Inconnu">Inconnu</option>
-                                    <option value="Gaz Condensation">Gaz Condensation</option>
-                                    <option value="Fioul">Fioul</option>
-                                    <option value="Élec Direct">Élec Direct</option>
-                                    <option value="PAC">PAC</option>
-                                    <option value="Réseau Chaleur">Réseau Chaleur</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-[10px] text-gray-500 uppercase font-bold">Régulation</label>
-                                <select id="edit-regulation" class="input-edit bg-abysse">
-                                    <option value="Aucune">Aucune</option>
-                                    <option value="Thermostat Simple">Thermostat Simple</option>
-                                    <option value="GTB/GTC">GTB/GTC</option>
-                                    <option value="Horloge">Horloge</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="text-[10px] text-gray-500 uppercase font-bold">Isolation</label>
-                            <select id="edit-isolation" class="input-edit bg-abysse">
-                                <option value="Inconnue">Inconnue</option>
-                                <option value="Non Isolé">Non Isolé</option>
-                                <option value="Double Vitrage">Double Vitrage</option>
-                                <option value="ITE Complète">ITE Complète</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="flex justify-end gap-3 mt-8">
-                        <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button>
-                        <button onclick="saveMairieData()" class="bg-mairie text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 transition shadow-lg">ENREGISTRER</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- MODALE EDITION MASSE (NEW) -->
-            <div id="mass-edit-modal" class="fixed inset-0 bg-black/90 z-[80] hidden flex items-center justify-center backdrop-blur-sm">
-                <div class="bento-card p-8 rounded-2xl w-[500px] relative border border-gold/30 shadow-[0_0_50px_rgba(245,158,11,0.1)]">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center text-gold text-xl"><i class="fa-solid fa-layer-group"></i></div>
-                        <div>
-                            <h3 class="text-lg font-bold text-white">Mise à jour Groupée</h3>
-                            <p class="text-xs text-gray-400"><span id="mass-count">0</span> sites sélectionnés</p>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-4 bg-white/5 p-4 rounded-xl">
-                        <p class="text-[10px] text-gray-400 italic mb-2"><i class="fa-solid fa-circle-info mr-1"></i> Seuls les champs modifiés seront appliqués.</p>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-[10px] text-gray-500 uppercase font-bold">Chauffage</label>
-                                <select id="mass-chauffage" class="input-edit bg-abysse">
-                                    <option value="">-- Ne pas modifier --</option>
-                                    <option value="Gaz Condensation">Gaz Condensation</option>
-                                    <option value="Fioul">Fioul</option>
-                                    <option value="Élec Direct">Élec Direct</option>
-                                    <option value="PAC">PAC</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-[10px] text-gray-500 uppercase font-bold">Régulation</label>
-                                <select id="mass-regulation" class="input-edit bg-abysse">
-                                    <option value="">-- Ne pas modifier --</option>
-                                    <option value="Aucune">Aucune</option>
-                                    <option value="GTB/GTC">GTB/GTC</option>
-                                    <option value="Horloge">Horloge</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="text-[10px] text-gray-500 uppercase font-bold">Isolation</label>
-                            <select id="mass-isolation" class="input-edit bg-abysse">
-                                <option value="">-- Ne pas modifier --</option>
-                                <option value="Non Isolé">Non Isolé</option>
-                                <option value="Double Vitrage">Double Vitrage</option>
-                                <option value="ITE Complète">ITE Complète</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-end gap-3 mt-8">
-                        <button onclick="document.getElementById('mass-edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button>
-                        <button onclick="applyMassUpdate()" class="bg-gold text-black px-6 py-2 rounded-lg text-xs font-bold hover:bg-yellow-500 transition shadow-lg">APPLIQUER</button>
-                    </div>
-                </div>
-            </div>
-
         </div>
 
-        <!-- ACTION BAR -->
-        <div id="action-bar" class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-50 transform translate-y-32 transition-transform duration-300 no-print">
+        <!-- ACTION BAR MASSIVE (PATRIMOINE ONLY) -->
+        <div id="action-bar" class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-50 transform translate-y-32 transition-transform duration-300">
             <div class="font-bold"><span id="selected-count" class="text-mairie">0</span> sites sélectionnés</div>
             <div class="h-6 w-px bg-gray-200"></div>
             <button onclick="openMassEdit()" class="flex items-center gap-2 hover:text-gold font-bold text-sm transition mr-4"><i class="fa-solid fa-pen-to-square"></i> Mise à jour Groupée</button>
-            <button onclick="createLot()" class="flex items-center gap-2 hover:text-mairie font-bold text-sm transition mr-4"><i class="fa-solid fa-layer-group"></i> Créer Lot</button>
+            <button onclick="assignLot()" class="flex items-center gap-2 hover:text-mairie font-bold text-sm transition mr-4"><i class="fa-solid fa-layer-group"></i> Affecter à un Lot</button>
             <button onclick="exportDQE()" class="flex items-center gap-2 hover:text-mairie font-bold text-sm transition"><i class="fa-solid fa-file-excel"></i> Exporter DQE</button>
+        </div>
+
+        <!-- MODAL EDITION MASSE -->
+        <div id="mass-edit-modal" class="fixed inset-0 bg-black/90 z-[80] hidden flex items-center justify-center backdrop-blur-sm">
+            <div class="bento-card p-8 rounded-2xl w-[500px] relative border border-gold/30 shadow-[0_0_50px_rgba(245,158,11,0.1)]">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center text-gold text-xl"><i class="fa-solid fa-layer-group"></i></div>
+                    <div><h3 class="text-lg font-bold text-white">Mise à jour Groupée</h3><p class="text-xs text-gray-400"><span id="mass-count">0</span> sites sélectionnés</p></div>
+                </div>
+                <div class="space-y-4 bg-white/5 p-4 rounded-xl">
+                    <div><label class="text-[10px] text-gray-500 uppercase font-bold">Affecter au Lot</label><input type="text" id="mass-lot-input" placeholder="Ex: Lot 1 - Ecoles" class="input-edit bg-abysse w-full"></div>
+                    <div class="h-px bg-white/10 my-2"></div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="text-[10px] text-gray-500 uppercase font-bold">Typologie</label><select id="mass-type" class="input-edit bg-abysse"><option value="">-- Ne pas modifier --</option><option value="Ecole">École</option><option value="Sport">Sport / Gymnase</option><option value="Admin">Administratif</option><option value="Eclairage">Éclairage Public</option></select></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase font-bold">Chauffage</label><select id="mass-chauffage" class="input-edit bg-abysse"><option value="">-- Ne pas modifier --</option><option value="Gaz">Gaz</option><option value="Elec">Élec</option><option value="Fioul">Fioul</option></select></div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-8">
+                    <button onclick="document.getElementById('mass-edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button>
+                    <button onclick="applyMassUpdate()" class="bg-gold text-black px-6 py-2 rounded-lg text-xs font-bold hover:bg-yellow-500 transition shadow-lg">APPLIQUER</button>
+                </div>
+            </div>
         </div>
 
     </main>
@@ -363,8 +290,9 @@
     <script>
         let FLEET_DATA = [];
         let SELECTED_IDS = new Set();
-        let CURRENT_SITE = null;
-        let modalChartInstance = null;
+        let CURRENT_ENERGY = 'elec'; 
+        let LOTS = new Set();
+        let citizenChartInstance = null;
         let landingChartInstance = null;
         let budgetChartInstance = null;
 
@@ -372,9 +300,14 @@
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active', 'text-white'));
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
-            ['view-patrimoine', 'view-budget', 'view-rapport'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['view-patrimoine', 'view-budget', 'view-citizens'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById('view-' + viewName).classList.remove('hidden');
-            if(viewName === 'rapport') generateReportContent();
+            
+            // Masquer Action Bar si pas Patrimoine
+            if(viewName !== 'patrimoine') document.getElementById('action-bar').classList.remove('visible');
+            else updateActionBar();
+
+            if(viewName === 'citizens') loadCitizenChart();
             if(viewName === 'budget') updateBudgetCharts();
         }
 
@@ -384,95 +317,97 @@
                 const data = await res.json();
                 if(data.fleet) {
                     FLEET_DATA = data.fleet;
+                    LOTS.clear();
+                    FLEET_DATA.forEach(s => { if(s.segment && s.segment.includes("Lot")) LOTS.add(s.segment); });
+                    updateLotSelect();
                     applyFilters();
-                    updateKPIs(FLEET_DATA);
+                    updateKPIs();
                 }
             } catch(e) { console.error(e); }
+        }
+
+        function updateLotSelect() {
+            const sel = document.getElementById('filter-lot');
+            sel.innerHTML = '<option value="all">Tous les Lots</option>';
+            LOTS.forEach(l => { const opt = document.createElement('option'); opt.value = l; opt.innerText = l; sel.appendChild(opt); });
+        }
+
+        window.filterEnergy = function(type) {
+            CURRENT_ENERGY = type;
+            ['elec', 'gaz', 'eau'].forEach(t => {
+                const btn = document.getElementById('btn-' + t);
+                if(t === type) {
+                    btn.classList.add('bg-white/10', 'text-white'); btn.classList.remove('text-gray-400');
+                    if(t === 'elec') btn.classList.add('text-mairie'); if(t === 'gaz') btn.classList.add('text-gas'); if(t === 'eau') btn.classList.add('text-water');
+                } else {
+                    btn.className = "flex-1 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center gap-1";
+                }
+            });
+            applyFilters();
         }
 
         function applyFilters() {
             const term = document.getElementById('search-input').value.toLowerCase();
             const typeFilter = document.getElementById('filter-type').value;
-            const energyFilter = document.getElementById('filter-energy').value;
+            const lotFilter = document.getElementById('filter-lot').value;
 
             const filtered = FLEET_DATA.filter(s => {
+                if(CURRENT_ENERGY !== 'all' && s.energy !== CURRENT_ENERGY) return false;
                 let type = 'admin';
-                if(s.name.toLowerCase().includes('ecole')) type = 'ecole';
-                else if(s.name.toLowerCase().includes('gymnase') || s.name.toLowerCase().includes('stade')) type = 'sport';
-                else if(s.name.toLowerCase().includes('eclairage') || s.name.toLowerCase().includes('ep ')) type = 'ep';
-
-                const matchTerm = s.name.toLowerCase().includes(term) || s.city.toLowerCase().includes(term) || s.id.includes(term);
-                const matchType = (typeFilter === 'all') || (type === typeFilter);
-                const matchEnergy = (energyFilter === 'all') || (s.energy === energyFilter);
-                return matchTerm && matchType && matchEnergy;
+                const n = s.name.toLowerCase();
+                if(n.includes('ecole') || n.includes('scolaire')) type = 'ecole';
+                else if(n.includes('gymnase') || n.includes('stade') || n.includes('sport')) type = 'sport';
+                else if(n.includes('eclairage') || n.includes('ep ')) type = 'ep';
+                if(typeFilter !== 'all' && type !== typeFilter) return false;
+                if(lotFilter !== 'all' && (!s.segment || !s.segment.includes(lotFilter))) return false;
+                return s.name.toLowerCase().includes(term) || s.city.toLowerCase().includes(term) || s.id.includes(term);
             });
             renderTable(filtered);
+            document.getElementById('visible-count').innerText = filtered.length;
         }
 
         function renderTable(data) {
             const tbody = document.getElementById('fleet-table-body');
             tbody.innerHTML = '';
-            data.forEach(site => {
+            const displayData = data.slice(0, 100); 
+            displayData.forEach(site => {
                 const isSelected = SELECTED_IDS.has(site.id);
                 const isGaz = site.energy === 'gaz';
                 const row = document.createElement('tr');
                 row.className = "site-row border-b border-white/5 hover:bg-white/5 cursor-pointer transition";
-                row.onclick = () => openDetail(site.id);
-                
                 let icon = '<i class="fa-solid fa-building"></i>';
-                if(site.name.toLowerCase().includes('ecole')) icon = '<i class="fa-solid fa-school"></i>';
-                if(site.name.toLowerCase().includes('gymnase')) icon = '<i class="fa-solid fa-basketball"></i>';
-
-                const powerLabel = isGaz ? `${Math.round(site.power)} MWh` : `${site.power} kVA`;
-
-                row.innerHTML = `
-                    <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
-                        <input type="checkbox" class="accent-mairie w-4 h-4 cursor-pointer" onchange="window.toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}>
-                    </td>
-                    <td class="px-4 py-3 font-bold text-white flex items-center gap-2"><span class="text-gray-500">${icon}</span> ${site.name}</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono text-xs">${site.id}</td>
-                    <td class="px-4 py-3 text-center"><span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-mairie bg-mairie/10'} px-2 py-1 rounded">${isGaz ? 'GAZ' : 'ELEC'}</span></td>
-                    <td class="px-4 py-3 text-right text-white font-mono text-xs">${powerLabel}</td>
-                    <td class="px-4 py-3 text-right font-mono text-gray-400 text-xs">-- m²</td>
-                    <td class="px-4 py-3 text-right font-bold text-white">${Math.round(site.budget).toLocaleString()} €</td>
-                    <td class="px-4 py-3 text-center">
-                        <div class="inline-block w-2 h-2 rounded-full ${site.alert ? 'bg-alert animate-pulse' : 'bg-success'}"></div>
-                    </td>
-                `;
+                let typeLabel = "Admin";
+                if(site.name.toLowerCase().includes('ecole')) { icon = '<i class="fa-solid fa-school"></i>'; typeLabel = "École"; }
+                if(site.name.toLowerCase().includes('sport') || site.name.toLowerCase().includes('stade')) { icon = '<i class="fa-solid fa-basketball"></i>'; typeLabel = "Sport"; }
+                if(site.name.toLowerCase().includes('eclairage')) { icon = '<i class="fa-solid fa-lightbulb"></i>'; typeLabel = "EP"; }
+                let alertBadge = '<span class="text-success text-[10px]"><i class="fa-solid fa-check"></i> OK</span>';
+                if (site.ghost_savings > 100) {
+                    if (typeLabel === "École") alertBadge = '<span class="text-alert text-[10px] font-bold animate-pulse"><i class="fa-solid fa-triangle-exclamation"></i> VACANCES ?</span>';
+                    else alertBadge = '<span class="text-warning text-[10px] font-bold"><i class="fa-solid fa-clock"></i> TALON WE</span>';
+                }
+                row.innerHTML = `<td class="px-4 py-3 text-center" onclick="event.stopPropagation()"><input type="checkbox" class="accent-mairie w-4 h-4 cursor-pointer" onchange="window.toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}></td><td class="px-4 py-3 font-bold text-white flex items-center gap-2"><span class="text-gray-500 w-5 text-center">${icon}</span> ${site.name}</td><td class="px-4 py-3 text-gray-400 font-mono text-xs">${typeLabel}</td><td class="px-4 py-3 text-gray-500 font-mono text-xs">${site.id}</td><td class="px-4 py-3 text-white text-xs">${site.segment || '-'}</td><td class="px-4 py-3 text-right text-gray-300 font-mono text-xs">${Math.round(site.volume)}</td><td class="px-4 py-3 text-right font-bold text-white">${Math.round(site.budget).toLocaleString()} €</td><td class="px-4 py-3 text-center">${alertBadge}</td>`;
                 tbody.appendChild(row);
             });
-            document.getElementById('kpi-sites').innerText = data.length;
         }
 
-        function updateKPIs(data) {
+        function updateKPIs() {
             let totalBudget = 0;
             let totalWaste = 0;
-            let countGaz = 0;
-            data.forEach(s => { 
-                totalBudget += s.budget; 
-                totalWaste += s.ghost_savings; 
-                if(s.energy === 'gaz') countGaz++;
-            });
-            
+            let countAlerts = 0;
+            FLEET_DATA.forEach(s => { totalBudget += s.budget; totalWaste += s.ghost_savings; if(s.ghost_savings > 100) countAlerts++; });
             document.getElementById('header-budget').innerText = Math.round(totalBudget).toLocaleString() + " €";
             document.getElementById('kpi-waste').innerText = Math.round(totalWaste).toLocaleString() + " €";
-            
-            const gazPct = data.length > 0 ? Math.round((countGaz / data.length) * 100) : 0;
-            document.getElementById('kpi-gaz-pct').innerText = gazPct + "%";
-            document.getElementById('bar-gaz').style.width = gazPct + "%";
-
-            const alertEl = document.getElementById('global-alert');
-            if (totalWaste > totalBudget * 0.1) alertEl.classList.remove('hidden');
-            else alertEl.classList.add('hidden');
+            document.getElementById('kpi-sites').innerText = FLEET_DATA.length;
+            document.getElementById('kpi-alerts').innerText = countAlerts;
+            if(countAlerts > 0) document.getElementById('sobriety-badge').classList.remove('hidden');
+            else document.getElementById('sobriety-badge').classList.add('hidden');
         }
 
         window.toggleAll = function(source) {
-            if(source.checked) FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id));
-            else SELECTED_IDS.clear();
+            if(source.checked) FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); else SELECTED_IDS.clear();
             applyFilters(); updateActionBar();
         }
         window.toggleSelection = function(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
-        
         function updateActionBar() { 
             const count = SELECTED_IDS.size; 
             document.getElementById('selected-count').innerText = count;
@@ -481,60 +416,41 @@
             if(bar) { bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; }
         }
 
-        // --- MASS EDIT LOGIC ---
-        window.openMassEdit = function() {
-            document.getElementById('mass-edit-modal').classList.remove('hidden');
-        }
+        window.openMassEdit = function() { if(SELECTED_IDS.size === 0) return alert("Sélectionnez des sites."); document.getElementById('mass-edit-modal').classList.remove('hidden'); }
+        window.assignLot = function() { if(SELECTED_IDS.size === 0) return alert("Sélectionnez des sites."); document.getElementById('mass-edit-modal').classList.remove('hidden'); document.getElementById('mass-lot-input').focus(); }
 
-        async function applyMassUpdate() {
+        window.applyMassUpdate = async function() {
+            const lotName = document.getElementById('mass-lot-input').value;
+            const typeName = document.getElementById('mass-type').value;
             const chauf = document.getElementById('mass-chauffage').value;
-            const regul = document.getElementById('mass-regulation').value;
-            const isol = document.getElementById('mass-isolation').value;
-            
-            if(!chauf && !regul && !isol) return alert("Aucune modification sélectionnée.");
-            
+            if(!lotName && !typeName && !chauf) return alert("Rien à modifier.");
             const btn = document.querySelector('#mass-edit-modal button:last-child');
             btn.innerText = "TRAITEMENT...";
-            
             let updatedCount = 0;
-            
             for (const id of SELECTED_IDS) {
                 try {
-                    // 1. Fetch current data
                     const resGet = await fetch(`/api/dashboard/data/${id}`);
                     const site = await resGet.json();
-                    
                     if(site.error) continue;
-                    
-                    // 2. Update fields
-                    if(!site.technical) site.technical = {};
-                    if(chauf) site.technical.chauffage = chauf;
-                    if(regul) site.technical.regulation = regul;
-                    if(isol) site.technical.isolation = isol;
-                    
-                    // 3. Save back
-                    await fetch('/api/settings/save_client', { 
-                        method: 'POST', 
-                        headers: {'Content-Type': 'application/json'}, 
-                        body: JSON.stringify(site) 
-                    });
+                    if(lotName) {
+                        if(!site.contract) site.contract = {};
+                        let current = site.contract.segment || "";
+                        if(current.includes("|")) site.contract.segment = lotName + " | " + current.split("|")[1].trim(); else site.contract.segment = lotName;
+                    }
+                    if(typeName) { if(!site.location) site.location = {}; site.location.typologie = typeName; }
+                    if(chauf) { if(!site.technical) site.technical = {}; site.technical.chauffage = chauf; }
+                    await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(site) });
                     updatedCount++;
                 } catch(e) { console.error(e); }
             }
-            
-            alert(`${updatedCount} sites mis à jour avec succès.`);
+            alert(`${updatedCount} sites mis à jour.`);
             document.getElementById('mass-edit-modal').classList.add('hidden');
             btn.innerText = "APPLIQUER";
             loadFleet();
         }
 
-        window.createLot = function() {
-            const name = prompt("Nom du lot (ex: Lot 1 - Écoles) :");
-            if(name) alert(`Lot "${name}" créé avec ${SELECTED_IDS.size} sites.`);
-        }
-
         window.exportDQE = async function() {
-            if(SELECTED_IDS.size === 0) return;
+            if(SELECTED_IDS.size === 0) return alert("Sélectionnez des sites.");
             const ids = Array.from(SELECTED_IDS);
             const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: ids }) });
             if(res.ok) {
@@ -545,112 +461,23 @@
             } else alert("Erreur génération");
         }
 
-        async function openDetail(id) {
-            try {
-                const res = await fetch(`/api/dashboard/data/${id}`);
-                const data = await res.json();
-                CURRENT_SITE = data; // Store for edit
-                
-                document.getElementById('detail-modal').classList.remove('hidden');
-                document.getElementById('modal-title').innerText = data.identity.site_name;
-                document.getElementById('modal-address').innerHTML = `<i class="fa-solid fa-location-dot mr-1"></i> ${data.location.address}`;
-                document.getElementById('modal-waste').innerText = Math.round(data.kpis?.ghost_savings || 0) + " €";
-                
-                const surf = data.location?.surface || 0;
-                document.getElementById('modal-surface').innerText = surf + " m²";
-                
-                const tech = data.technical || {};
-                document.getElementById('disp-chauffage').innerText = tech.chauffage || "Inconnu";
-                document.getElementById('disp-isolation').innerText = tech.isolation || "Inconnue";
-                document.getElementById('disp-regulation').innerText = tech.regulation || "Aucune";
-
-                const isGaz = data.energy_type === 'gaz';
-                const typeBadge = document.getElementById('modal-type');
-                typeBadge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
-                typeBadge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${isGaz ? 'bg-gas/10 text-gas' : 'bg-mairie/10 text-mairie'}`;
-
-                const c = data.contract;
-                const grid = document.getElementById('modal-tech-grid');
-                if (isGaz) {
-                    grid.innerHTML = `
-                        <div><span class="text-gray-500 block">PCE</span><span class="text-white font-mono font-bold">${c.pdl}</span></div>
-                        <div><span class="text-gray-500 block">CAR</span><span class="text-white font-bold text-gas">${c.power} MWh</span></div>
-                        <div><span class="text-gray-500 block">Profil</span><span class="text-white">${c.profil || 'T1'}</span></div>
-                        <div><span class="text-gray-500 block">Fournisseur</span><span class="text-white">${c.provider}</span></div>
-                    `;
-                } else {
-                    grid.innerHTML = `
-                        <div><span class="text-gray-500 block">PDL</span><span class="text-white font-mono font-bold">${c.pdl}</span></div>
-                        <div><span class="text-gray-500 block">Puissance</span><span class="text-white font-bold text-mairie">${c.power} kVA</span></div>
-                        <div><span class="text-gray-500 block">Segment</span><span class="text-white">${c.segment}</span></div>
-                        <div><span class="text-gray-500 block">Fournisseur</span><span class="text-white">${c.provider}</span></div>
-                    `;
-                }
-
-                const ctx = document.getElementById('modalChart').getContext('2d');
-                if(modalChartInstance) modalChartInstance.destroy();
-                modalChartInstance = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: Array.from({length: 24}, (_, i) => i + 'h'),
-                        datasets: [{
-                            label: isGaz ? 'Conso (kWh)' : 'Puissance (kW)',
-                            data: Array.from({length: 24}, (_, i) => (i>22 || i<6) ? 20 : 80),
-                            borderColor: isGaz ? '#EF4444' : '#3B82F6', 
-                            backgroundColor: isGaz ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                            fill: true, tension: 0.4
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
-                });
-
-            } catch(e) { console.error(e); }
-        }
-        window.closeDetail = function() { document.getElementById('detail-modal').classList.add('hidden'); }
-
-        function openEditMode() {
-            if(!CURRENT_SITE) return;
-            document.getElementById('edit-id').value = CURRENT_SITE.identity.id;
-            document.getElementById('edit-name').value = CURRENT_SITE.identity.site_name;
-            document.getElementById('edit-surface').value = CURRENT_SITE.location?.surface || 0;
-            
-            const tech = CURRENT_SITE.technical || {};
-            document.getElementById('edit-chauffage').value = tech.chauffage || "Inconnu";
-            document.getElementById('edit-regulation').value = tech.regulation || "Aucune";
-            document.getElementById('edit-isolation').value = tech.isolation || "Inconnue";
-            
-            document.getElementById('edit-modal').classList.remove('hidden');
-        }
-
-        async function saveMairieData() {
-            if(!CURRENT_SITE) return;
-            const original = CURRENT_SITE;
-            original.identity.site_name = document.getElementById('edit-name').value;
-            if(!original.location) original.location = {};
-            original.location.surface = parseFloat(document.getElementById('edit-surface').value) || 0;
-            if(!original.technical) original.technical = {};
-            original.technical.chauffage = document.getElementById('edit-chauffage').value;
-            original.technical.regulation = document.getElementById('edit-regulation').value;
-            original.technical.isolation = document.getElementById('edit-isolation').value;
-
-            try {
-                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
-                if((await res.json()).success) { 
-                    document.getElementById('edit-modal').classList.add('hidden'); 
-                    alert("Patrimoine mis à jour !"); 
-                    loadFleet(); openDetail(original.identity.id);
-                } else alert("Erreur sauvegarde");
-            } catch(e) { alert("Erreur réseau"); }
-        }
-
-        function generateReportContent() {
-            document.getElementById('report-date').innerText = new Date().toLocaleDateString();
-            document.getElementById('rpt-budget').innerText = document.getElementById('header-budget').innerText;
-            const alerts = FLEET_DATA.filter(s => s.alert).slice(0, 5);
-            const list = document.getElementById('rpt-alerts');
-            list.innerHTML = '';
-            if(alerts.length === 0) list.innerHTML = '<li>Aucune anomalie majeure détectée.</li>';
-            else alerts.forEach(s => list.innerHTML += `<li class="text-red-600 font-bold">${s.name} : Gaspillage estimé à ${Math.round(s.ghost_savings)} €/an.</li>`);
+        function loadCitizenChart() {
+            if(citizenChartInstance) return;
+            const ctx = document.getElementById('citizenChart').getContext('2d');
+            citizenChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 30}, (_, i) => `J-${30-i}`),
+                    datasets: [{
+                        label: 'Inscriptions Citoyennes',
+                        data: Array.from({length: 30}, (_, i) => Math.floor(100 + i * 40 + Math.random() * 50)),
+                        borderColor: '#8B5CF6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        fill: true, tension: 0.4
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            });
         }
 
         function updateBudgetCharts() {
