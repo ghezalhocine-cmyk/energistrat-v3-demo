@@ -22,7 +22,6 @@
         .input-bento { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px; border-radius: 8px; width: 100%; text-align: center; font-family: 'JetBrains Mono'; font-size: 1.2rem; }
         .input-bento:focus { border-color: #10B981; outline: none; }
         
-        /* DPE BARS */
         .dpe-bar { height: 30px; margin-bottom: 8px; border-radius: 4px; position: relative; clip-path: polygon(0% 0%, 95% 0%, 100% 50%, 95% 100%, 0% 100%); display: flex; align-items: center; padding-left: 15px; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5); opacity: 0.3; transition: all 0.3s; }
         .dpe-bar.active { opacity: 1; transform: scale(1.02); box-shadow: 0 0 20px rgba(255,255,255,0.2); border: 2px solid white; z-index: 10; }
         .dpe-A { background: #009C3D; width: 30%; }
@@ -61,13 +60,11 @@
 
         <div class="flex-1 overflow-y-auto p-10">
             
-            <!-- ETAT 0 : RIEN SÉLECTIONNÉ -->
             <div id="blank-state" class="h-full flex flex-col items-center justify-center text-gray-600 border-2 border-dashed border-white/5 rounded-[2rem]">
                 <i class="fa-solid fa-building-user text-6xl mb-4 opacity-20"></i>
                 <p>Sélectionnez un site pour lancer l'audit sectoriel</p>
             </div>
 
-            <!-- ETAT 1 : DEMANDE SURFACE -->
             <div id="surface-request" class="hidden h-full flex flex-col items-center justify-center">
                 <div class="bento-card p-10 text-center max-w-md border border-eco/30 shadow-[0_0_50px_rgba(16,185,129,0.1)]">
                     <div class="w-16 h-16 rounded-full bg-eco/10 text-eco flex items-center justify-center text-3xl mx-auto mb-6"><i class="fa-solid fa-ruler-combined"></i></div>
@@ -81,10 +78,7 @@
                 </div>
             </div>
 
-            <!-- ETAT 2 : RESULTATS AUDIT -->
             <div id="audit-results" class="hidden grid grid-cols-12 gap-8 h-full">
-                
-                <!-- GAUCHE : DPE -->
                 <div class="col-span-5 bento-card p-8 border-l-4 border-eco flex flex-col">
                     <h3 class="text-sm font-bold text-gray-400 uppercase mb-6">Performance Énergétique</h3>
                     <div class="flex-1 flex flex-col justify-center space-y-2" id="dpe-scale">
@@ -108,7 +102,6 @@
                     </div>
                 </div>
 
-                <!-- DROITE : IMPACT & SECTEUR -->
                 <div class="col-span-7 flex flex-col gap-6">
                     <div class="bento-card p-6 flex items-center gap-6">
                         <div class="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-2xl"><i class="fa-solid fa-briefcase"></i></div>
@@ -143,6 +136,9 @@
     <script>
         let FLEET_DATA = [];
         let CURRENT_SITE = null;
+        
+        // REFERENTIEL NAF LOCAL (Secours)
+        const NAF_REF = { "10": 450, "47": 250, "84": 140, "85": 110, "52": 160, "93": 220, "68": 180, "46": 130, "43": 90, "DEFAULT": 180 };
 
         async function loadSites() {
             try {
@@ -174,15 +170,13 @@
                 const res = await fetch(`/api/dashboard/data/${id}`);
                 const data = await res.json();
                 CURRENT_SITE = data;
-                
                 document.getElementById('blank-state').classList.add('hidden');
 
-                // VÉRIFICATION DONNÉES BENCHMARK
-                // Le moteur V57 renvoie 'benchmark' avec 'status' ou 'ratio_reel'
-                if (data.benchmark && (data.benchmark.status === "SURCONSOMMATION" || data.benchmark.status === "PERFORMANT" || data.benchmark.status === "NEUTRE" || data.benchmark.ratio_reel > 0)) {
-                    renderAudit(data.benchmark, data.identity.naf, data.kpis.volume_mwh, data.energy_type);
+                const surf = data.location.surface || 0;
+                // Si la surface existe, on force le calcul local
+                if (surf > 10) {
+                    calculateAndRender(data);
                 } else {
-                    // Si pas de benchmark (souvent à cause de surface manquante)
                     showSurfaceForm();
                 }
             } catch(e) { console.error(e); }
@@ -204,10 +198,9 @@
 
             const btn = document.querySelector('#surface-request button');
             const original = btn.innerText;
-            btn.innerText = "CALCUL EN COURS...";
+            btn.innerText = "CALCUL...";
 
             try {
-                // PATCH: Appel de update_site (existant) au lieu de update_surface (inexistant)
                 await fetch('/api/settings/update_site', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -216,9 +209,53 @@
                         location: { surface: parseFloat(surface) } 
                     })
                 });
-                await loadSiteContext();
+                
+                // MISE A JOUR LOCALE IMMEDIATE
+                CURRENT_SITE.location.surface = parseFloat(surface);
+                calculateAndRender(CURRENT_SITE);
+
             } catch(e) { alert("Erreur réseau"); }
             btn.innerText = original;
+        }
+
+        function calculateAndRender(data) {
+            document.getElementById('surface-request').classList.add('hidden');
+            document.getElementById('audit-results').classList.remove('hidden');
+
+            const surf = data.location.surface;
+            const volMwh = data.kpis.volume_mwh;
+            const volKwh = volMwh * 1000;
+            const naf = data.identity.naf || "NA";
+            const nafKey = naf.substring(0, 2);
+            
+            // CALCUL IPE
+            const ipe = Math.round(volKwh / surf);
+            const ref = NAF_REF[nafKey] || NAF_REF["DEFAULT"];
+            
+            // RENDER
+            document.getElementById('val-ipe').innerText = ipe;
+            document.getElementById('val-ref').innerText = ref;
+            document.getElementById('val-naf').innerText = naf;
+
+            // DPE BAR
+            document.querySelectorAll('.dpe-bar').forEach(el => el.classList.remove('active'));
+            const grade = getGrade(ipe);
+            document.getElementById(`bar-${grade}`).classList.add('active');
+
+            // ANALYSE
+            const delta = ((ipe - ref) / ref) * 100;
+            const txtComp = document.getElementById('txt-comparison');
+            if(delta < 0) {
+                txtComp.innerHTML = `👏 <span class="text-eco font-bold">Excellent !</span> Vous consommez ${Math.abs(Math.round(delta))}% de moins que la moyenne.`;
+            } else {
+                txtComp.innerHTML = `⚠️ <span class="text-bad font-bold">Attention !</span> Surconsommation de ${Math.round(delta)}% détectée.`;
+            }
+
+            // IMPACT
+            const factor = data.energy_type === 'gaz' ? 0.227 : 0.052;
+            const co2 = (volKwh * factor) / 1000; // Tonnes
+            document.getElementById('val-co2').innerText = co2.toFixed(1) + " t";
+            document.getElementById('val-trees').innerText = Math.round(co2 * 40);
         }
 
         function getGrade(ipe) {
@@ -229,46 +266,6 @@
             if(ipe < 330) return 'E';
             if(ipe < 420) return 'F';
             return 'G';
-        }
-
-        function renderAudit(bench, naf, volume, energyType) {
-            document.getElementById('surface-request').classList.add('hidden');
-            document.getElementById('audit-results').classList.remove('hidden');
-
-            // 1. DPE
-            document.querySelectorAll('.dpe-bar').forEach(el => el.classList.remove('active'));
-            const ipe = bench.ratio_reel || 0;
-            const grade = getGrade(ipe);
-            const activeBar = document.getElementById(`bar-${grade}`);
-            if(activeBar) activeBar.classList.add('active');
-
-            // 2. Chiffres
-            document.getElementById('val-ipe').innerText = ipe;
-            document.getElementById('val-ref').innerText = bench.ratio_ref || "--";
-            document.getElementById('val-naf').innerText = naf || "Non défini";
-
-            // 3. Texte Analyse
-            const diff = bench.delta || 0;
-            let perfText = "";
-            let colorClass = "";
-            if (diff < 0) {
-                perfText = `👏 Excellent ! Vous consommez ${Math.abs(Math.round(diff))}% de moins que la moyenne.`;
-                colorClass = "text-eco";
-            } else {
-                perfText = `⚠️ Attention : Surconsommation de ${Math.round(diff)}% par rapport au secteur.`;
-                colorClass = "text-bad";
-            }
-            const txtComp = document.getElementById('txt-comparison');
-            txtComp.innerText = perfText;
-            txtComp.className = `text-sm mt-2 font-bold ${colorClass}`;
-
-            // 4. Impact (Calcul JS car non renvoyé par benchmark API)
-            // Facteurs : Gaz 0.227 kg/kWh, Elec 0.052 kg/kWh
-            const factor = (energyType === 'gaz') ? 0.227 : 0.052;
-            const co2Tonnes = (volume * 1000 * factor) / 1000; // MWh -> kWh -> kg -> Tonnes
-            
-            document.getElementById('val-co2').innerText = co2Tonnes.toFixed(1) + " t";
-            document.getElementById('val-trees').innerText = Math.round(co2Tonnes * 40); // ~40 arbres pour 1 tonne
         }
 
         function editSurface() {
