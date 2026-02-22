@@ -344,7 +344,6 @@ async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
     res = cortex.analyze_load_curve(content, file.filename)
     return JSONResponse(json_compliant(res))
 
-# --- GENERATE TENDER PRO (BPU DETAILLÉ) ---
 @app.post("/api/ops/generate_tender")
 async def generate_tender(request: Request):
     if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
