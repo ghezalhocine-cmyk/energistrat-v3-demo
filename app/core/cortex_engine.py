@@ -10,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V1100")
+logger = logging.getLogger("CORTEX_ENGINE_V1101")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "1100.0 (Diamond Logic)"
+        self.version = "1101.0 (Fix: Prices & Gas Badge)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.025}, "gas": {"price": 0.06, "tax": 0.008}}
         self.OPTIMAL_PRICE = {"elec": 0.12, "gas": 0.045} 
 
@@ -42,17 +42,30 @@ class CortexEngine:
         if not site_label or site_label == "Site Inconnu":
             site_label = f"{loc.get('city', 'Site')} ({str(contract.get('pdl', ''))[-4:]})"
         
-        energy_type = contract.get('energy_type', 'elec').lower()
-        is_gas = 'gaz' in energy_type or 'gas' in energy_type
+        # --- DÉTECTION ROBUSTE GAZ/ELEC ---
+        energy_type_str = contract.get('energy_type', 'elec').lower()
+        segment = str(contract.get('segment', '')).upper()
+        grd = str(contract.get('grd', '')).upper()
+        pdl = str(contract.get('pdl', ''))
+
+        is_gas = False
+        # 1. Check explicite string
+        if 'gaz' in energy_type_str or 'gas' in energy_type_str: is_gas = True
+        # 2. Check Segment (Force Gaz pour T1-T5)
+        elif segment in ['T1', 'T2', 'T3', 'T4', 'TP']: is_gas = True
+        # 3. Check GRD
+        elif 'GRDF' in grd: is_gas = True
+        # 4. Check Format PDL (PCE souvent court ou spécifique, mais moins fiable)
         
+        # --- VOLUMETRIE ---
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
         
         # --- NORMALISATION PRIX (TOUT EN €/kWh POUR CALCUL) ---
         raw_price = self._safe_float(pricing.get('hph'))
         unit_price = raw_price
         
-        # Double sécurité (si Ingest a raté)
-        if is_gas and raw_price > 1.0: unit_price = raw_price / 1000.0
+        # Règle de sécurité Unités
+        if is_gas and raw_price > 2.0: unit_price = raw_price / 1000.0
         elif not is_gas and raw_price > 5.0: unit_price = raw_price / 1000.0
             
         is_estimated = False
@@ -63,10 +76,9 @@ class CortexEngine:
         fixe = self._safe_float(pricing.get('fix'))
         commodity = vol_kwh * unit_price
         
-        # Taxes & Stockage : Souvent en €/MWh dans l'Excel -> Convertir en €/kWh
+        # Taxes & Stockage
         raw_tax = self._safe_float(pricing.get('tax'))
         if raw_tax > 0.5: raw_tax /= 1000.0 
-        
         taxes = (vol_kwh * raw_tax) if raw_tax > 0 else (vol_kwh * self.MARKET_DEFAULTS['gas' if is_gas else 'elec']['tax'])
         
         raw_stock = self._safe_float(pricing.get('storage'))
@@ -77,9 +89,20 @@ class CortexEngine:
         landing = budget_ttc * 1.02
         pmc_mwh = self._safe_div(budget_ttc, (vol_kwh / 1000))
         
-        # Calcul du "Gaspillage" (Ghost Savings)
+        # Calcul du "Gaspillage"
         optimal = self.OPTIMAL_PRICE['gas'] if is_gas else self.OPTIMAL_PRICE['elec']
         ghost = max(0, (unit_price - optimal) * vol_kwh)
+
+        # --- RECUPERATION DES PRIX SECONDAIRES (FIX BUG 0) ---
+        p_hch = self._safe_float(pricing.get('hch'))
+        p_hpe = self._safe_float(pricing.get('hpe'))
+        p_hce = self._safe_float(pricing.get('hce'))
+        
+        # Si Elec et prix > 5, on convertit aussi les heures creuses/pleines
+        if not is_gas:
+            if p_hch > 5.0: p_hch /= 1000.0
+            if p_hpe > 5.0: p_hpe /= 1000.0
+            if p_hce > 5.0: p_hce /= 1000.0
 
         return {
             "meta": {
@@ -107,7 +130,10 @@ class CortexEngine:
                 "ghost_savings": self._sanitize(round(ghost, 2))
             },
             "pricing_details": {
-                "hph": unit_price, # Renvoie en kWh pour cohérence
+                "hph": unit_price,
+                "hch": p_hch, # FIX: On renvoie la valeur
+                "hpe": p_hpe, # FIX: On renvoie la valeur
+                "hce": p_hce, # FIX: On renvoie la valeur
                 "fix": fixe,
                 "tax": taxes,
                 "storage": storage_cost
@@ -178,9 +204,7 @@ class CortexEngine:
             except: continue
             
         valid = [s for s in processed if s['budget'] > 100]
-        # Tri par PMC croissant (Meilleurs)
         sorted_sites = sorted(valid, key=lambda x: x['pmc'])
-        # Tri par PMC décroissant (Cancres)
         cancres = sorted(valid, key=lambda x: x['pmc'], reverse=True)[:5]
         
         return {
@@ -212,7 +236,6 @@ class CortexEngine:
         if offer_price > 2.0: offer_price /= 1000.0
         total_savings = 0
         details = []
-        
         total_current = 0
         total_sim = 0
         
@@ -220,12 +243,11 @@ class CortexEngine:
             fin = self.enrich_site_financials(s)
             if fin['meta']['is_gas'] == is_gaz:
                 vol = fin['volume_kwh']
-                current_b = fin['details']['commodity'] # On compare la part molécule
+                current_b = fin['details']['commodity']
                 new_cost = vol * offer_price
                 delta = current_b - new_cost
                 
                 total_current += fin['budget_annual']
-                # On recalcule le budget total simulé (Abo + Taxes restent identiques)
                 sim_budget = fin['details']['fix'] + fin['details']['taxes'] + fin['details']['storage'] + new_cost
                 total_sim += sim_budget
                 
@@ -260,7 +282,6 @@ class CortexEngine:
             if is_gas: ref_price = float(market_ref.get('gaz', {}).get('peg_n1', 40))
             else: ref_price = float(market_ref.get('elec', {}).get('cal_n1', 90))
             
-            # Comparaison en €/MWh
             client_price_mwh = current_price
             if client_price_mwh < 2.0: client_price_mwh *= 1000.0
             
