@@ -199,18 +199,32 @@
             } catch(e) { console.error(e); }
         }
 
-        // 2. CONTEXTE SITE
-        function loadSiteContext() {
+        // 2. CONTEXTE SITE (AVEC APPEL DETAIL POUR PRIX PRECIS)
+        async function loadSiteContext() {
             const id = document.getElementById('site-selector').value;
             if(!id) return;
-            CURRENT_SITE = FLEET_DATA.find(s => s.id === id);
             
-            // Calcul Prix Moyen (Budget / Volume)
-            const price = CURRENT_SITE.volume > 0 ? Math.round(CURRENT_SITE.budget / CURRENT_SITE.volume) : 0.20 * 1000; // Fallback
-            
-            document.getElementById('kpi-price').innerText = `${price} €/MWh`;
-            document.getElementById('pre-kpis').classList.remove('opacity-50');
-            updateCalculs();
+            // On appelle le détail complet pour avoir le prix exact nettoyé par le backend
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                const data = await res.json();
+                CURRENT_SITE = data; // On stocke l'objet complet
+                
+                // Récupération prix sécurisée
+                let priceKwh = data.electricity_price || 0.20;
+                // Si le prix est > 10, c'est du MWh, on divise
+                if(priceKwh > 10) priceKwh /= 1000;
+                
+                document.getElementById('kpi-price').innerText = `${(priceKwh * 1000).toFixed(2)} €/MWh`;
+                document.getElementById('pre-kpis').classList.remove('opacity-50');
+                
+                // Si une surface est définie dans le site, on met à jour le slider
+                if(data.location && data.location.surface && data.location.surface > 10) {
+                    document.getElementById('rng-surface').value = data.location.surface;
+                }
+                
+                updateCalculs();
+            } catch(e) { console.error(e); }
         }
 
         // 3. MISE A JOUR UI SLIDERS
@@ -244,11 +258,13 @@
             document.getElementById('results-dashboard').classList.add('hidden');
 
             const surface = document.getElementById('rng-surface').value;
-            // Prix en €/kWh pour le moteur physics (donc division par 1000 si MWh)
-            const priceKwh = (CURRENT_SITE.budget / CURRENT_SITE.volume) / 1000 || 0.20;
+            
+            // Prix en €/kWh pour le moteur physics
+            let priceKwh = CURRENT_SITE.electricity_price || 0.20;
+            if(priceKwh > 10) priceKwh /= 1000;
 
             const payload = {
-                address: CURRENT_SITE.city, // On utilise la ville pour le geocodage backend
+                address: CURRENT_SITE.location.city || "Paris", 
                 surface_roof: parseFloat(surface),
                 electricity_price: priceKwh
             };
@@ -264,7 +280,7 @@
                 if(data.success) {
                     renderResults(data);
                 } else {
-                    alert("Erreur Simulation : " + data.error);
+                    alert("Erreur Simulation : " + (data.error || "Inconnue"));
                     document.getElementById('blank-state').classList.remove('hidden');
                 }
             } catch(e) {
@@ -282,19 +298,22 @@
             
             // KPIs
             document.getElementById('res-prod').innerText = data.production_annual_mwh + " MWh";
-            document.getElementById('res-gain').innerText = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(data.financials.annual_savings);
+            // PATCH CLE : savings_year (Backend) vs annual_savings (Frontend)
+            const gain = data.financials.savings_year || 0;
+            document.getElementById('res-gain').innerText = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(gain);
             document.getElementById('res-roi').innerText = data.financials.roi_years + " Ans";
             
             // Impact
-            document.getElementById('impact-trees').innerText = Math.round(data.production_annual_mwh * 12); // Ratio approx
-            document.getElementById('impact-km').innerText = Math.round(data.production_annual_mwh * 1000 / 0.15).toLocaleString(); // 15kWh/100km
+            document.getElementById('impact-trees').innerText = Math.round(data.production_annual_mwh * 12); 
+            document.getElementById('impact-km').innerText = Math.round(data.production_annual_mwh * 1000 / 0.15).toLocaleString(); 
 
             // Chart
             const ctx = document.getElementById('solarChart').getContext('2d');
             if(chartInstance) chartInstance.destroy();
             
             // Mock Conso Mensuelle (Lissage Annuel / 12)
-            const monthlyConso = Array(12).fill(CURRENT_SITE.volume / 12);
+            const annualVol = CURRENT_SITE.kpis ? CURRENT_SITE.kpis.volume_mwh : (CURRENT_SITE.volume || 100);
+            const monthlyConso = Array(12).fill(annualVol / 12);
             
             chartInstance = new Chart(ctx, {
                 type: 'bar',
