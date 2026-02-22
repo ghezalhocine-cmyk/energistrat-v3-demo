@@ -32,7 +32,7 @@ except ImportError:
         import cortex_physics as physics
     except: pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1102")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1103")
 
 app.add_middleware(
     CORSMiddleware,
@@ -148,11 +148,7 @@ async def api_import_csv(file: UploadFile = File(...)):
 
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data(response: Response):
-    # FIX UX: NO CACHE POUR FORCER LE REFRESH
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    
     raw_sites = []
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     for p in files:
@@ -220,14 +216,17 @@ async def get_dashboard_data(client_id: str, response: Response):
     contract = data.get('contract', {})
     pricing = financials['pricing_details']
     
+    # OVERRIDE POUR AFFICHAGE HACKÉ (NAF/INSEE dans le segment)
+    display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
+
     response_data = {
         "energy_type": "gaz" if is_gas else "elec",
         "identity": data.get('identity', {}),
         "location": data.get('location', {}),
         "contract": {
             "pdl": contract.get('pdl'),
-            "provider": financials['meta'].get('provider'), # PROVENANCE ENGINE
-            "segment": contract.get('segment'),
+            "provider": financials['meta'].get('provider'),
+            "segment": display_segment, # ICI ON PASSE LE HACK
             "start_date": contract.get('start_date'),
             "end_date": contract.get('end_date'),
             "power": contract.get('power'),
@@ -283,7 +282,6 @@ async def download_template(template_type: str):
     try:
         with pd.ExcelWriter(stream, engine='openpyxl') as writer:
             if "import" in template_type:
-                # TEMPLATE ENRICHI
                 df = pd.DataFrame(columns=[
                     "PDL", "NOM_SITE", "ADRESSE", "CP", "VILLE", 
                     "VOLUME_ANNUEL", "PUISSANCE", "PRIX_HPH", "ABONNEMENT",
@@ -302,6 +300,16 @@ async def download_template(template_type: str):
         stream = io.StringIO()
         pd.DataFrame().to_csv(stream)
         return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
+
+# --- FIX ROUTE ALIAS POUR LE BOUTON SETTINGS ---
+@app.get("/api/settings/template_csv")
+async def fix_template_link_csv():
+    return await download_template("import")
+
+@app.get("/api/settings/template_xls")
+async def fix_template_link_xls():
+    return await download_template("import")
+# ------------------------------------------------
 
 @app.get("/app/assets/{filename}")
 async def get_static_asset(filename: str):
