@@ -32,7 +32,7 @@ except ImportError:
         import cortex_physics as physics
     except: pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1103")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1104")
 
 app.add_middleware(
     CORSMiddleware,
@@ -216,7 +216,6 @@ async def get_dashboard_data(client_id: str, response: Response):
     contract = data.get('contract', {})
     pricing = financials['pricing_details']
     
-    # OVERRIDE POUR AFFICHAGE HACKÉ (NAF/INSEE dans le segment)
     display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
 
     response_data = {
@@ -226,7 +225,7 @@ async def get_dashboard_data(client_id: str, response: Response):
         "contract": {
             "pdl": contract.get('pdl'),
             "provider": financials['meta'].get('provider'),
-            "segment": display_segment, # ICI ON PASSE LE HACK
+            "segment": display_segment,
             "start_date": contract.get('start_date'),
             "end_date": contract.get('end_date'),
             "power": contract.get('power'),
@@ -281,39 +280,59 @@ async def download_template(template_type: str):
     stream = io.BytesIO()
     try:
         with pd.ExcelWriter(stream, engine='openpyxl') as writer:
-            if "import" in template_type:
+            
+            # --- TEMPLATE ELEC COMPLET ---
+            if "import_elec" in template_type or "template_csv" == template_type:
                 df = pd.DataFrame(columns=[
-                    "PDL", "NOM_SITE", "ADRESSE", "CP", "VILLE", 
-                    "VOLUME_ANNUEL", "PUISSANCE", "PRIX_HPH", "ABONNEMENT",
-                    "SURFACE_M2", "CODE_NAF", "CODE_INSEE", "FOURNISSEUR"
+                    "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "REF_COPRO", 
+                    "NAF", "CEE_ELIGIBLE", "GO_PERCENT", "COMPTEUR_PRODUCTION", "PDL", "SEGMENT", "FTA", "GRD", 
+                    "TYPOLOGIE", "PUISSANCE_SOUSCRITE", "POINTE_MAX", 
+                    "PS_HPH", "PS_HCH", "PS_HPE", "PS_HCE", 
+                    "CONSO_HPH", "CONSO_HCH", "CONSO_HPE", "CONSO_HCE", 
+                    "VOLUME_ANNUEL", "COMMENTAIRE", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", 
+                    "ABONNEMENT", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES", 
+                    "SURFACE_M2", "CODE_INSEE"
                 ])
                 df.to_excel(writer, index=False)
+                
+            # --- TEMPLATE GAZ COMPLET ---
+            elif "import_gaz" in template_type or "template_csv_gaz" == template_type:
+                df = pd.DataFrame(columns=[
+                    "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "NAF", 
+                    "CEE_ELIGIBLE", "PCE", "CAR_MWH", "CJA_MWH_J", "SEGMENT_GAZ", "PROFIL", 
+                    "TARIF_ACHEM", "GRD", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", 
+                    "ABONNEMENT", "PRIX_MOLECULE", "TERME_STOCK", "TAXES", "INSEE", "SURFACE_M2"
+                ])
+                df.to_excel(writer, index=False)
+                
             elif "bpu" in template_type:
                 df = pd.DataFrame(columns=["PRIX_HPH", "ABONNEMENT"])
                 df.to_excel(writer, index=False)
             else:
                 df = pd.DataFrame(columns=["A", "B"])
                 df.to_excel(writer, index=False)
+                
         stream.seek(0)
-        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=template_{template_type}.xlsx"})
+        filename = "Template_Import_GAZ.xlsx" if "gaz" in template_type else "Template_Import_ELEC.xlsx"
+        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename={filename}"})
     except:
         stream = io.StringIO()
         pd.DataFrame().to_csv(stream)
         return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
 
-# --- FIX ROUTE ALIAS POUR LE BOUTON SETTINGS ---
+# --- ROUTES SPÉCIFIQUES POUR LE FRONTEND ---
 @app.get("/api/settings/template_csv")
-async def fix_template_link_csv():
-    return await download_template("import")
+async def route_template_elec():
+    return await download_template("import_elec")
 
-@app.get("/api/settings/template_xls")
-async def fix_template_link_xls():
-    return await download_template("import")
-# ------------------------------------------------
+@app.get("/api/settings/template_csv_gaz")
+async def route_template_gaz():
+    return await download_template("import_gaz")
+# -------------------------------------------
 
 @app.get("/app/assets/{filename}")
 async def get_static_asset(filename: str):
-    if "template" in filename: return await download_template("import")
+    if "template" in filename: return await download_template("import_elec")
     if "bpu" in filename: return await download_template("bpu")
     return JSONResponse({"error": "File not found"}, 404)
 
