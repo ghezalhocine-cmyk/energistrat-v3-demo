@@ -32,7 +32,7 @@ except ImportError:
         import cortex_physics as physics
     except: pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1112")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1113")
 
 app.add_middleware(
     CORSMiddleware,
@@ -106,22 +106,15 @@ async def api_save_client(request: Request):
         safe_id = get_safe_id(raw_id)
         file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
         
-        # LOGIQUE DE FUSION (MERGE) POUR NE PAS ECRASE
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
-            
-            # Merge Deep pour technical et location
             if 'technical' in data:
                 if 'technical' not in existing_data: existing_data['technical'] = {}
                 existing_data['technical'].update(data['technical'])
-            
             if 'location' in data:
                 if 'location' not in existing_data: existing_data['location'] = {}
                 existing_data['location'].update(data['location'])
-                
-            # Update root fields if present
             if 'identity' in data: existing_data['identity'].update(data['identity'])
-            
             final_data = existing_data
         else:
             final_data = data
@@ -161,23 +154,18 @@ async def api_import_csv(file: UploadFile = File(...)):
                 safe_id = get_safe_id(raw_id)
                 file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
                 
-                # LOGIQUE MERGE INTELLIGENTE (Si import partiel patrimoine)
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f: existing = json.load(f)
-                    
-                    # On met à jour seulement si la nouvelle donnée n'est pas vide
                     new_tech = s.get('technical', {})
                     old_tech = existing.get('technical', {})
                     for k, v in new_tech.items():
                         if v: old_tech[k] = v
                     existing['technical'] = old_tech
-                    
                     new_loc = s.get('location', {})
                     old_loc = existing.get('location', {})
                     for k, v in new_loc.items():
                         if v: old_loc[k] = v
                     existing['location'] = old_loc
-                    
                     final_s = existing
                 else:
                     final_s = s
@@ -265,7 +253,7 @@ async def get_dashboard_data(client_id: str, response: Response):
         "energy_type": "gaz" if is_gas else "elec",
         "identity": data.get('identity', {}),
         "location": data.get('location', {}),
-        "technical": data.get('technical', {}), # AJOUT CRITIQUE POUR MAIRIE.HTML
+        "technical": data.get('technical', {}),
         "contract": {
             "pdl": contract.get('pdl'),
             "provider": financials['meta'].get('provider'),
@@ -347,9 +335,20 @@ async def download_template(template_type: str):
                 ])
                 df.to_excel(writer, index=False)
             elif "import_patrimoine" in template_type:
-                # NOUVEAU TEMPLATE PATRIMOINE
+                # TEMPLATE PATRIMOINE AVEC NOTICE
                 df = pd.DataFrame(columns=["PDL", "NOM_SITE", "SURFACE_M2", "CHAUFFAGE", "ISOLATION", "REGULATION"])
-                df.to_excel(writer, index=False)
+                df.to_excel(writer, index=False, sheet_name="DATA")
+                
+                df_notice = pd.DataFrame({
+                    "CHAMP": ["CHAUFFAGE", "ISOLATION", "REGULATION"],
+                    "VALEURS_AUTORISEES": [
+                        "Gaz Condensation, Fioul, Élec Direct, PAC, Réseau Chaleur",
+                        "Non Isolé, Double Vitrage, ITE Complète",
+                        "Aucune, Thermostat Simple, GTB/GTC, Horloge"
+                    ]
+                })
+                df_notice.to_excel(writer, index=False, sheet_name="MODE_EMPLOI")
+                
             elif "bpu" in template_type:
                 df = pd.DataFrame(columns=["PRIX_HPH", "ABONNEMENT"])
                 df.to_excel(writer, index=False)
@@ -414,7 +413,6 @@ async def generate_tender(request: Request):
         df_elec = df_dqe[df_dqe['Type'] == 'ELEC']
         df_gaz = df_dqe[df_dqe['Type'] == 'GAZ']
         
-        # BPU ELEC PRO (Reprise des sites)
         if not df_elec.empty:
             df_bpu_elec = df_elec[["PDL", "Nom du site", "CP", "Ville", "Segment", "Vol. Annuel"]].copy()
             df_bpu_elec["OFFRE_NOM"] = ""
@@ -426,7 +424,6 @@ async def generate_tender(request: Request):
         else:
             df_bpu_elec = pd.DataFrame()
 
-        # BPU GAZ PRO (Reprise des sites)
         if not df_gaz.empty:
             df_bpu_gaz = df_gaz[["PDL", "Nom du site", "CP", "Ville", "Vol. Annuel"]].copy()
             df_bpu_gaz = df_bpu_gaz.rename(columns={"PDL": "PCE"})
@@ -464,6 +461,7 @@ async def view_processing(request: Request): return templates.TemplateResponse("
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str):
     if profile == "retail": return templates.TemplateResponse("retail.html", {"request": request})
+    if profile == "mairie": return templates.TemplateResponse("mairie.html", {"request": request})
     t = f"{profile}.html"
     if os.path.exists(os.path.join(TEMPLATE_DIR, t)): return templates.TemplateResponse(t, {"request": request, "profile": profile})
     return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
