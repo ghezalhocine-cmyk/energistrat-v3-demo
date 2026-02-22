@@ -10,12 +10,13 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V1102")
+logger = logging.getLogger("CORTEX_ENGINE_V1103")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "1102.0 (Diamond V2: Gas Taxes Fix)"
-        self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.025}, "gas": {"price": 0.06, "tax": 0.008}}
+        self.version = "1103.0 (Anti-Zero Logic & UX Hack)"
+        # Default Taxes: Elec ~25€/MWh, Gaz ~8.44€/MWh
+        self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.025}, "gas": {"price": 0.045, "tax": 0.00844}}
         self.OPTIMAL_PRICE = {"elec": 0.12, "gas": 0.045} 
 
     def _safe_float(self, value, default=0.0):
@@ -46,8 +47,7 @@ class CortexEngine:
         energy_type_str = contract.get('energy_type', 'elec').lower()
         segment = str(contract.get('segment', '')).upper()
         grd = str(contract.get('grd', '')).upper()
-        pdl = str(contract.get('pdl', ''))
-
+        
         is_gas = False
         if 'gaz' in energy_type_str or 'gas' in energy_type_str: is_gas = True
         elif segment in ['T1', 'T2', 'T3', 'T4', 'TP']: is_gas = True
@@ -56,10 +56,11 @@ class CortexEngine:
         # --- VOLUMETRIE ---
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
         
-        # --- NORMALISATION PRIX (TOUT EN €/kWh POUR CALCUL) ---
+        # --- PRIX UNITAIRE ---
         raw_price = self._safe_float(pricing.get('hph'))
         unit_price = raw_price
         
+        # Règle MWh -> kWh
         if is_gas and raw_price > 2.0: unit_price = raw_price / 1000.0
         elif not is_gas and raw_price > 5.0: unit_price = raw_price / 1000.0
             
@@ -71,20 +72,30 @@ class CortexEngine:
         fixe = self._safe_float(pricing.get('fix'))
         commodity = vol_kwh * unit_price
         
-        # --- CORRECTION TAXES & STOCKAGE GAZ ---
+        # --- LOGIQUE DE PROTECTION TAXES & STOCKAGE (ANTI-ZERO) ---
+        # Problème : Le JS sauvegarde 0 quand on édite la surface.
+        # Solution : Si c'est du Gaz et que c'est 0, on remet la valeur par défaut.
+        
         raw_tax = self._safe_float(pricing.get('tax'))
-        # Si la taxe est > 0.5, c'est probablement du €/MWh -> conversion en €/kWh
         if raw_tax > 0.5: raw_tax_kwh = raw_tax / 1000.0
         else: raw_tax_kwh = raw_tax
         
-        # Si pas de taxe dans le fichier, on met un défaut
-        if raw_tax_kwh == 0: raw_tax_kwh = self.MARKET_DEFAULTS['gas' if is_gas else 'elec']['tax']
-        
+        # FORCE DEFAULT IF ZERO FOR GAS
+        if is_gas and raw_tax_kwh < 0.001: 
+            raw_tax_kwh = self.MARKET_DEFAULTS['gas']['tax']
+        elif not is_gas and raw_tax_kwh < 0.001:
+            raw_tax_kwh = self.MARKET_DEFAULTS['elec']['tax']
+
         taxes_total = vol_kwh * raw_tax_kwh
         
         raw_stock = self._safe_float(pricing.get('storage'))
         if raw_stock > 0.5: raw_stock_kwh = raw_stock / 1000.0
         else: raw_stock_kwh = raw_stock
+        
+        # FORCE DEFAULT STOCKAGE IF ZERO FOR GAS (Approx 0.7 €/MWh -> 0.0007 €/kWh)
+        if is_gas and raw_stock_kwh < 0.0001:
+            raw_stock_kwh = 0.0007
+
         storage_total = vol_kwh * raw_stock_kwh
         
         budget_ttc = commodity + fixe + taxes_total + storage_total
@@ -103,15 +114,27 @@ class CortexEngine:
             if p_hpe > 5.0: p_hpe /= 1000.0
             if p_hce > 5.0: p_hce /= 1000.0
 
+        # --- UX HACK : INJECTION NAF/INSEE DANS CHAMPS EXISTANTS ---
+        # Puisque le HTML est figé, on concatène les infos dans 'segment' ou 'provider'
+        naf_code = ident.get('naf', '')
+        insee_code = ident.get('insee', '')
+        
+        display_segment = segment
+        if naf_code or insee_code:
+            extras = []
+            if naf_code: extras.append(f"NAF:{naf_code}")
+            if insee_code: extras.append(f"INSEE:{insee_code}")
+            display_segment = f"{segment} | {' '.join(extras)}"
+
         return {
             "meta": {
                 "site_label": str(site_label).upper(),
                 "city": loc.get('city', ''),
                 "energy_type": "Gaz" if is_gas else "Électricité",
                 "is_gas": is_gas,
-                "provider": contract.get('provider', 'Inconnu'), # PASSAGE FOURNISSEUR
-                "naf": ident.get('naf', ''), # PASSAGE NAF
-                "insee": ident.get('insee', '') # PASSAGE INSEE
+                "provider": contract.get('provider', 'Inconnu'),
+                "naf": naf_code,
+                "insee": insee_code
             },
             "volume_kwh": self._sanitize(round(vol_kwh, 0)),
             "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)),
@@ -137,8 +160,11 @@ class CortexEngine:
                 "hpe": p_hpe,
                 "hce": p_hce,
                 "fix": fixe,
-                "tax": taxes_total, # On renvoie le TOTAL ANNUEL (Attendu par Retail.html)
-                "storage": storage_total # On renvoie le TOTAL ANNUEL (Attendu par Retail.html)
+                "tax": taxes_total,
+                "storage": storage_total
+            },
+            "display_overrides": {
+                "segment": display_segment
             }
         }
 
@@ -178,8 +204,8 @@ class CortexEngine:
                 "Conso HPE": con_det.get('hpe', 0), "Conso HCE": con_det.get('hce', 0),
                 "Vol. Annuel": vol_annuel,
                 "SIRET": ident.get('siret', ''),
-                "NAF": ident.get('naf', ''), # AJOUT DQE
-                "INSEE": ident.get('insee', '') # AJOUT DQE
+                "NAF": ident.get('naf', ''),
+                "INSEE": ident.get('insee', '')
             }
             rows.append(row)
         return pd.DataFrame(rows)
