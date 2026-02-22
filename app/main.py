@@ -8,7 +8,7 @@ import traceback
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException, Response
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -21,20 +21,18 @@ try:
 except ImportError:
     PANDAS_READY = False
 
-# IMPORT ROBUSTE
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
 except ImportError:
-    # Fallback pour déploiement plat
     try:
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
     except: pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1100")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1102")
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,7 +72,6 @@ def find_site_file(target_id):
     safe_target = get_safe_id(target_id)
     direct_path = os.path.join(DATA_DIR, f"{safe_target}.json")
     if os.path.exists(direct_path): return direct_path
-    # Fallback recherche
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     for p in files:
         try:
@@ -105,12 +102,9 @@ async def api_save_client(request: Request):
     try:
         data = await request.json()
         raw_id = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
-        data["identity"]["id"] = raw_id # On garde l'ID original dans le JSON
-        
-        # FIX PERSISTANCE : On utilise le safe_id pour le nom de fichier
+        data["identity"]["id"] = raw_id
         safe_id = get_safe_id(raw_id)
         file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
-        
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "id": raw_id})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
@@ -125,7 +119,6 @@ async def api_update_site(request: Request):
         if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
         with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
         
-        # Merge intelligent
         if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
         if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
         
@@ -154,7 +147,12 @@ async def api_import_csv(file: UploadFile = File(...)):
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.get("/api/dashboard/fleet")
-async def get_fleet_data():
+async def get_fleet_data(response: Response):
+    # FIX UX: NO CACHE POUR FORCER LE REFRESH
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
     raw_sites = []
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     for p in files:
@@ -177,12 +175,11 @@ async def get_fleet_data():
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         
-        # IMPORTANT : On renvoie l'ID Safe pour que le lien fonctionne
         raw_id = s.get('identity',{}).get('id')
         safe_id = get_safe_id(raw_id)
         
         fleet_list.append({
-            "id": safe_id, # C'est cet ID que le JS utilisera pour appeler /dashboard/data/{id}
+            "id": safe_id,
             "name": fin['meta']['site_label'],
             "city": city,
             "zip": s.get('location', {}).get('zip_code', ''),
@@ -192,19 +189,21 @@ async def get_fleet_data():
             "provider": prov,
             "budget": fin['budget_annual'],
             "landing": fin['landing_forecast'],
-            "alert": fin['kpis']['pmc_eur_mwh'] > 300, # Alerte si > 300€/MWh
+            "alert": fin['kpis']['pmc_eur_mwh'] > 300,
             "ghost_savings": fin['kpis']['ghost_savings']
         })
-    response = {
+    response_data = {
         "fleet": fleet_list, "count": len(fleet_list),
         "green_league": analysis.get('green_league'),
         "global_kpis": analysis.get('global'),
         "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments": ["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots": ["Lot 1", "Lot 2"] }
     }
-    return JSONResponse(json_compliant(response))
+    return JSONResponse(json_compliant(response_data))
 
 @app.get("/api/dashboard/data/{client_id}")
-async def get_dashboard_data(client_id: str):
+async def get_dashboard_data(client_id: str, response: Response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    
     file_path = find_site_file(client_id)
     if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
     with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
@@ -214,14 +213,12 @@ async def get_dashboard_data(client_id: str):
     
     is_gas = financials['meta']['is_gas']
     market_analysis = cortex.analyze_market_position(
-        financials['kpis']['unit_price_kwh'], # On passe le prix en kWh pour analyse
+        financials['kpis']['unit_price_kwh'],
         market_ref,
         is_gas
     )
-    
-    # RECONSTRUCTION STRICTE DE LA STRUCTURE ATTENDUE PAR RETAIL.HTML
     contract = data.get('contract', {})
-    pricing = financials['pricing_details'] # On prend les prix nettoyés par l'engine
+    pricing = financials['pricing_details']
     
     response_data = {
         "energy_type": "gaz" if is_gas else "elec",
@@ -229,7 +226,7 @@ async def get_dashboard_data(client_id: str):
         "location": data.get('location', {}),
         "contract": {
             "pdl": contract.get('pdl'),
-            "provider": contract.get('provider'),
+            "provider": financials['meta'].get('provider'), # PROVENANCE ENGINE
             "segment": contract.get('segment'),
             "start_date": contract.get('start_date'),
             "end_date": contract.get('end_date'),
@@ -237,23 +234,12 @@ async def get_dashboard_data(client_id: str):
             "p_max": contract.get('p_max'),
             "fta": contract.get('fta'),
             "grd": contract.get('grd'),
-            # GAZ
             "cja": contract.get('cja'),
             "profil": contract.get('profil'),
             "tarif_acheminement": contract.get('tarif_acheminement'),
-            # ELEC DETAILS
             "power_details": contract.get('power_details', {})
         },
-        "pricing": {
-            # Le Frontend affiche brut, on peut renvoyer MWh si on veut, mais ici on renvoie ce que l'engine a calculé
-            "hph": pricing.get('hph', 0), 
-            "fix": pricing.get('fix', 0),
-            "tax": pricing.get('tax', 0),
-            "storage": pricing.get('storage', 0),
-            "hch": pricing.get('hch', 0),
-            "hpe": pricing.get('hpe', 0),
-            "hce": pricing.get('hce', 0)
-        },
+        "pricing": pricing,
         "kpis": {
             "volume_mwh": financials['volume_mwh'],
             "budget": financials['budget_annual'],
@@ -264,7 +250,6 @@ async def get_dashboard_data(client_id: str):
             "conseil": "Prix optimisé." if market_analysis['status'] == 'OPTIMISÉ' else "Surveillez ce contrat."
         },
         "market_analysis": market_analysis,
-        # POUR SOLAR STUDIO
         "electricity_price": financials['kpis']['unit_price_kwh']
     }
     
@@ -298,7 +283,12 @@ async def download_template(template_type: str):
     try:
         with pd.ExcelWriter(stream, engine='openpyxl') as writer:
             if "import" in template_type:
-                df = pd.DataFrame(columns=["PDL", "NOM_SITE", "ADRESSE", "CP", "VILLE", "VOLUME_ANNUEL", "PUISSANCE", "PRIX_HPH", "ABONNEMENT"])
+                # TEMPLATE ENRICHI
+                df = pd.DataFrame(columns=[
+                    "PDL", "NOM_SITE", "ADRESSE", "CP", "VILLE", 
+                    "VOLUME_ANNUEL", "PUISSANCE", "PRIX_HPH", "ABONNEMENT",
+                    "SURFACE_M2", "CODE_NAF", "CODE_INSEE", "FOURNISSEUR"
+                ])
                 df.to_excel(writer, index=False)
             elif "bpu" in template_type:
                 df = pd.DataFrame(columns=["PRIX_HPH", "ABONNEMENT"])
@@ -374,7 +364,6 @@ async def view_onboarding(request: Request): return templates.TemplateResponse("
 async def view_processing(request: Request): return templates.TemplateResponse("processing.html", {"request": request})
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str):
-    # Si le profil est "retail", on sert retail.html, sinon le dashboard générique
     if profile == "retail": return templates.TemplateResponse("retail.html", {"request": request})
     t = f"{profile}.html"
     if os.path.exists(os.path.join(TEMPLATE_DIR, t)): return templates.TemplateResponse(t, {"request": request, "profile": profile})
