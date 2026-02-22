@@ -8,11 +8,12 @@ import traceback
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 try:
     import pandas as pd
@@ -27,7 +28,7 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V900-PERSISTENCE")
+app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V1000-INTEGRAL")
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,6 +47,12 @@ templates = Jinja2Templates(directory=TEMPLATE_DIR)
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+class MarketUpdateModel(BaseModel):
+    elec: Dict[str, Any]
+    gaz: Dict[str, Any]
+    trve: Optional[Dict[str, Any]] = None
+    targets: Optional[Dict[str, Any]] = None
 
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
@@ -72,6 +79,18 @@ def find_site_file(target_id):
         except: continue
     return None
 
+def get_market_ref():
+    path = os.path.join(DATA_DIR, "market_ref.json")
+    if os.path.exists(path):
+        try:
+            with open(path, 'r') as f: return json.load(f)
+        except: pass
+    return {
+        "updated_at": datetime.now().isoformat(),
+        "elec": { "cal_n1": 85.0 }, "gaz": { "peg_n1": 35.0 },
+        "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 }
+    }
+
 # --- API ---
 
 @app.post("/api/settings/save_client")
@@ -81,20 +100,25 @@ async def api_save_client(request: Request):
         cid = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
         if "identity" not in data: data["identity"] = {}
         data["identity"]["id"] = cid
-        
-        file_path = find_site_file(cid)
-        if not file_path:
-            file_path = os.path.join(DATA_DIR, f"{get_safe_id(cid)}.json")
-            
-        with open(file_path, 'w', encoding='utf-8') as f: 
-            json.dump(data, f, indent=4, ensure_ascii=False)
-            
+        file_path = os.path.join(DATA_DIR, f"{get_safe_id(cid)}.json")
+        with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "id": cid})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/settings/update_site")
 async def api_update_site(request: Request):
-    return await api_save_client(request)
+    try:
+        payload = await request.json()
+        site_id = payload.get('id')
+        if not site_id: return JSONResponse({"error": "ID manquant"}, 400)
+        file_path = find_site_file(site_id)
+        if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
+        with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
+        if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
+        if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
+        with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
+        return JSONResponse({"success": True, "message": "Sauvegardé"})
+    except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.post("/api/settings/import_csv")
 async def api_import_csv(file: UploadFile = File(...)):
@@ -139,8 +163,10 @@ async def get_fleet_data():
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         
+        safe_id = get_safe_id(s.get('identity',{}).get('id'))
+        
         fleet_list.append({
-            "id": get_safe_id(s.get('identity',{}).get('id')),
+            "id": safe_id,
             "name": fin['meta']['site_label'],
             "city": city,
             "volume": fin['volume_mwh'],
@@ -166,46 +192,68 @@ async def get_dashboard_data(client_id: str):
     with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
     
     financials = cortex.enrich_site_financials(data)
+    market_ref = get_market_ref()
     
-    # PRIORITÉ SURFACE : On prend celle du fichier (sauvegardée) si elle existe
-    saved_surface = data.get('location', {}).get('surface', 0)
+    market_analysis = cortex.analyze_market_position(
+        financials['pricing_details']['hph'], 
+        market_ref,
+        financials['meta']['is_gas']
+    )
     
+    # --- MIROIR DE DONNÉES (POUR QUE LE FRONTEND S'Y RETROUVE) ---
     merged_data = {
         **data,
         **financials,
         "kpis": financials['kpis'],
         "budget": financials['budget_annual'],
         "volume_mwh": financials['volume_mwh'],
-        
-        # ICI : ON FORCE LA SURFACE SAUVEGARDÉE
-        "surface": saved_surface,
-        
+        "surface": data.get('location', {}).get('surface', 0),
         "electricity_price": financials['kpis']['unit_price_kwh'],
         
+        # CHAMPS GAZ & ELEC
+        "fta": data.get('contract', {}).get('fta', '-'),
+        "grd": data.get('contract', {}).get('grd', '-'),
+        "start_date": data.get('contract', {}).get('start_date', '-'),
+        "end_date": data.get('contract', {}).get('end_date', '-'),
+        "p_max": data.get('contract', {}).get('p_max', '-'),
         "cja": data.get('contract', {}).get('cja', '-'),
         "profil": data.get('contract', {}).get('profil', '-'),
         "tarif_acheminement": data.get('contract', {}).get('tarif_acheminement', '-'),
         
+        # PRIX DÉTAILLÉS (BRUTS)
         "hph": financials['pricing_details'].get('hph', 0),
         "hch": financials['pricing_details'].get('hch', 0),
         "hpe": financials['pricing_details'].get('hpe', 0),
         "hce": financials['pricing_details'].get('hce', 0),
         
+        # PUISSANCES & CONSOS DÉTAILLÉES
         "ps_hph": data.get('contract', {}).get('power_details', {}).get('hph', 0),
         "ps_hch": data.get('contract', {}).get('power_details', {}).get('hch', 0),
         "ps_hpe": data.get('contract', {}).get('power_details', {}).get('hpe', 0),
         "ps_hce": data.get('contract', {}).get('power_details', {}).get('hce', 0),
+        "conso_hph": data.get('contract', {}).get('consumption_details', {}).get('hph', 0),
         
         "cortex_insight": {"message": "Analyse active.", "conseil": "RAS.", "status": "OK", "color": "green"},
-        "market_analysis": {"status": "NEUTRE", "action": "-", "color": "gray"},
+        "market_analysis": market_analysis,
     }
     
-    if "location" in data:
+    if "location" in data and "surface" in data["location"]:
         naf = data.get("identity", {}).get("naf", "")
-        # On utilise la surface sauvegardée pour le benchmark
-        merged_data["benchmark"] = cortex.calculate_benchmark(naf, saved_surface, financials['volume_mwh'])
+        surf = data["location"]["surface"]
+        vol = financials['volume_mwh']
+        merged_data["benchmark"] = cortex.calculate_benchmark(naf, surf, vol)
     
     return JSONResponse(json_compliant(merged_data))
+
+@app.post("/api/ops/market/update")
+async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header(None)):
+    try:
+        new_payload = data.dict()
+        new_payload["updated_at"] = datetime.now().isoformat()
+        ref_path = os.path.join(DATA_DIR, "market_ref.json")
+        with open(ref_path, "w") as f: json.dump(new_payload, f, indent=4)
+        return JSONResponse({"success": True})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/physics/solar")
 async def api_solar_sim(request: Request):
@@ -312,6 +360,8 @@ async def view_settings(request: Request): return templates.TemplateResponse("se
 async def view_partner_settings(request: Request):
     if "supplier" in request.headers.get("referer", ""): return templates.TemplateResponse("settings_partner.html", {"request": request})
     return templates.TemplateResponse("settings.html", {"request": request})
+@app.get("/ops/market")
+async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str):
     if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
