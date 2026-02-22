@@ -21,14 +21,20 @@ try:
 except ImportError:
     PANDAS_READY = False
 
+# IMPORT ROBUSTE
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
 except ImportError:
-    pass
+    # Fallback pour déploiement plat
+    try:
+        import cortex_ingest as ingest
+        import cortex_engine as cortex
+        import cortex_physics as physics
+    except: pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="STABLE-V1100-FINAL")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1100")
 
 app.add_middleware(
     CORSMiddleware,
@@ -68,13 +74,14 @@ def find_site_file(target_id):
     safe_target = get_safe_id(target_id)
     direct_path = os.path.join(DATA_DIR, f"{safe_target}.json")
     if os.path.exists(direct_path): return direct_path
+    # Fallback recherche
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     for p in files:
         try:
             with open(p, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 stored_id = str(data.get('identity', {}).get('id', ''))
-                if stored_id == str(target_id) or get_safe_id(stored_id) == safe_target:
+                if get_safe_id(stored_id) == safe_target:
                     return p
         except: continue
     return None
@@ -97,12 +104,15 @@ def get_market_ref():
 async def api_save_client(request: Request):
     try:
         data = await request.json()
-        cid = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
-        if "identity" not in data: data["identity"] = {}
-        data["identity"]["id"] = cid
-        file_path = os.path.join(DATA_DIR, f"{get_safe_id(cid)}.json")
+        raw_id = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
+        data["identity"]["id"] = raw_id # On garde l'ID original dans le JSON
+        
+        # FIX PERSISTANCE : On utilise le safe_id pour le nom de fichier
+        safe_id = get_safe_id(raw_id)
+        file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
+        
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
-        return JSONResponse({"success": True, "id": cid})
+        return JSONResponse({"success": True, "id": raw_id})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/settings/update_site")
@@ -114,8 +124,11 @@ async def api_update_site(request: Request):
         file_path = find_site_file(site_id)
         if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
         with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
+        
+        # Merge intelligent
         if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
         if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
+        
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "message": "Sauvegardé"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
@@ -129,9 +142,10 @@ async def api_import_csv(file: UploadFile = File(...)):
         saved = 0
         for s in sites:
             try:
-                cid = s.get('identity', {}).get('id') or f"GEN_{uuid.uuid4().hex[:8]}"
-                s['identity']['id'] = cid
-                file_path = os.path.join(DATA_DIR, f"{get_safe_id(cid)}.json")
+                raw_id = s.get('identity', {}).get('id') or f"GEN_{uuid.uuid4().hex[:8]}"
+                s['identity']['id'] = raw_id
+                safe_id = get_safe_id(raw_id)
+                file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
                 with open(file_path, 'w', encoding='utf-8') as f: json.dump(s, f, indent=4, ensure_ascii=False)
                 saved += 1
             except: pass
@@ -163,25 +177,29 @@ async def get_fleet_data():
         if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         
-        safe_id = get_safe_id(s.get('identity',{}).get('id'))
+        # IMPORTANT : On renvoie l'ID Safe pour que le lien fonctionne
+        raw_id = s.get('identity',{}).get('id')
+        safe_id = get_safe_id(raw_id)
         
         fleet_list.append({
-            "id": safe_id,
+            "id": safe_id, # C'est cet ID que le JS utilisera pour appeler /dashboard/data/{id}
             "name": fin['meta']['site_label'],
             "city": city,
+            "zip": s.get('location', {}).get('zip_code', ''),
             "volume": fin['volume_mwh'],
-            "energy": "gaz" if "Gaz" in fin['meta']['energy_type'] else "elec",
+            "energy": "gaz" if fin['meta']['is_gas'] else "elec",
             "segment": contract.get('segment', '-'),
             "provider": prov,
             "budget": fin['budget_annual'],
-            "ratio": fin['kpis']['pmc_eur_mwh'],
-            "landing": fin['landing_forecast']
+            "landing": fin['landing_forecast'],
+            "alert": fin['kpis']['pmc_eur_mwh'] > 300, # Alerte si > 300€/MWh
+            "ghost_savings": fin['kpis']['ghost_savings']
         })
     response = {
         "fleet": fleet_list, "count": len(fleet_list),
         "green_league": analysis.get('green_league'),
         "global_kpis": analysis.get('global'),
-        "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)) }
+        "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments": ["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots": ["Lot 1", "Lot 2"] }
     }
     return JSONResponse(json_compliant(response))
 
@@ -194,54 +212,63 @@ async def get_dashboard_data(client_id: str):
     financials = cortex.enrich_site_financials(data)
     market_ref = get_market_ref()
     
+    is_gas = financials['meta']['is_gas']
     market_analysis = cortex.analyze_market_position(
-        financials['pricing_details']['hph'], 
+        financials['kpis']['unit_price_kwh'], # On passe le prix en kWh pour analyse
         market_ref,
-        financials['meta']['is_gas']
+        is_gas
     )
     
-    merged_data = {
-        **data,
-        **financials,
-        "kpis": financials['kpis'],
-        "budget": financials['budget_annual'],
-        "volume_mwh": financials['volume_mwh'],
-        "surface": data.get('location', {}).get('surface', 0),
-        "electricity_price": financials['kpis']['unit_price_kwh'],
-        
-        # FIX DU CLIC : ON INJECTE L'OBJET PRICING COMPLET
-        "pricing": financials['pricing_details'],
-        
-        "fta": data.get('contract', {}).get('fta', '-'),
-        "grd": data.get('contract', {}).get('grd', '-'),
-        "start_date": data.get('contract', {}).get('start_date', '-'),
-        "end_date": data.get('contract', {}).get('end_date', '-'),
-        "p_max": data.get('contract', {}).get('p_max', '-'),
-        "cja": data.get('contract', {}).get('cja', '-'),
-        "profil": data.get('contract', {}).get('profil', '-'),
-        "tarif_acheminement": data.get('contract', {}).get('tarif_acheminement', '-'),
-        
-        "hph": financials['pricing_details'].get('hph', 0),
-        "hch": financials['pricing_details'].get('hch', 0),
-        "hpe": financials['pricing_details'].get('hpe', 0),
-        "hce": financials['pricing_details'].get('hce', 0),
-        
-        "ps_hph": data.get('contract', {}).get('power_details', {}).get('hph', 0),
-        "ps_hch": data.get('contract', {}).get('power_details', {}).get('hch', 0),
-        "ps_hpe": data.get('contract', {}).get('power_details', {}).get('hpe', 0),
-        "ps_hce": data.get('contract', {}).get('power_details', {}).get('hce', 0),
-        
-        "cortex_insight": {"message": "Analyse active.", "conseil": "RAS.", "status": "OK", "color": "green"},
+    # RECONSTRUCTION STRICTE DE LA STRUCTURE ATTENDUE PAR RETAIL.HTML
+    contract = data.get('contract', {})
+    pricing = financials['pricing_details'] # On prend les prix nettoyés par l'engine
+    
+    response_data = {
+        "energy_type": "gaz" if is_gas else "elec",
+        "identity": data.get('identity', {}),
+        "location": data.get('location', {}),
+        "contract": {
+            "pdl": contract.get('pdl'),
+            "provider": contract.get('provider'),
+            "segment": contract.get('segment'),
+            "start_date": contract.get('start_date'),
+            "end_date": contract.get('end_date'),
+            "power": contract.get('power'),
+            "p_max": contract.get('p_max'),
+            "fta": contract.get('fta'),
+            "grd": contract.get('grd'),
+            # GAZ
+            "cja": contract.get('cja'),
+            "profil": contract.get('profil'),
+            "tarif_acheminement": contract.get('tarif_acheminement'),
+            # ELEC DETAILS
+            "power_details": contract.get('power_details', {})
+        },
+        "pricing": {
+            # Le Frontend affiche brut, on peut renvoyer MWh si on veut, mais ici on renvoie ce que l'engine a calculé
+            "hph": pricing.get('hph', 0), 
+            "fix": pricing.get('fix', 0),
+            "tax": pricing.get('tax', 0),
+            "storage": pricing.get('storage', 0),
+            "hch": pricing.get('hch', 0),
+            "hpe": pricing.get('hpe', 0),
+            "hce": pricing.get('hce', 0)
+        },
+        "kpis": {
+            "volume_mwh": financials['volume_mwh'],
+            "budget": financials['budget_annual'],
+            "pmc": financials['kpis']['pmc_eur_mwh']
+        },
+        "cortex_insight": {
+            "message": "Analyse CORTEX terminée.",
+            "conseil": "Prix optimisé." if market_analysis['status'] == 'OPTIMISÉ' else "Surveillez ce contrat."
+        },
         "market_analysis": market_analysis,
+        # POUR SOLAR STUDIO
+        "electricity_price": financials['kpis']['unit_price_kwh']
     }
     
-    if "location" in data and "surface" in data["location"]:
-        naf = data.get("identity", {}).get("naf", "")
-        surf = data["location"]["surface"]
-        vol = financials['volume_mwh']
-        merged_data["benchmark"] = cortex.calculate_benchmark(naf, surf, vol)
-    
-    return JSONResponse(json_compliant(merged_data))
+    return JSONResponse(json_compliant(response_data))
 
 @app.post("/api/ops/market/update")
 async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header(None)):
@@ -259,9 +286,7 @@ async def api_solar_sim(request: Request):
         payload = await request.json()
         address = payload.get('address', '')
         surface = float(payload.get('surface_roof', 0))
-        price_raw = float(payload.get('electricity_price', 0.20))
-        price = price_raw / 1000.0 if price_raw > 2.0 else price_raw
-        if price == 0: price = 0.20
+        price = float(payload.get('electricity_price', 0.20))
         lat, lon = physics.get_coordinates_from_address(address)
         return JSONResponse(physics.simulate_solar_roi(lat, lon, surface, price))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
@@ -349,6 +374,8 @@ async def view_onboarding(request: Request): return templates.TemplateResponse("
 async def view_processing(request: Request): return templates.TemplateResponse("processing.html", {"request": request})
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str):
+    # Si le profil est "retail", on sert retail.html, sinon le dashboard générique
+    if profile == "retail": return templates.TemplateResponse("retail.html", {"request": request})
     t = f"{profile}.html"
     if os.path.exists(os.path.join(TEMPLATE_DIR, t)): return templates.TemplateResponse(t, {"request": request, "profile": profile})
     return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
