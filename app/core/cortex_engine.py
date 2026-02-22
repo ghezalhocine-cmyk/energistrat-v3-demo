@@ -10,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V1000_TITANIUM")
+logger = logging.getLogger("CORTEX_ENGINE_V1100")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "1000.0 (Integral: All Logic)"
+        self.version = "1100.0 (Final Logic)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.05}, "gas": {"price": 0.08, "tax": 0.02}}
 
     def _safe_float(self, value, default=0.0):
@@ -37,7 +37,6 @@ class CortexEngine:
         pricing = site_data.get('pricing', {})
         loc = site_data.get('location', {})
         
-        # 1. NOMMAGE
         site_label = ident.get('site_name', 'Site Inconnu')
         if not site_label or site_label == "Site Inconnu":
             site_label = f"{loc.get('city', 'Site')} ({str(contract.get('pdl', ''))[-4:]})"
@@ -47,12 +46,16 @@ class CortexEngine:
         
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
         
-        # 2. PRIX (DISOCIATION AFFICHAGE / CALCUL)
+        # --- FIX PRIX ---
         raw_price = self._safe_float(pricing.get('hph'))
-        
-        # Pour le calcul, on divise par 1000 si le prix est en MWh (> 2.0)
         unit_price = raw_price
-        if unit_price > 2.0: unit_price /= 1000.0
+        
+        # Si Gaz et Prix > 1.0 (ex: 45.50), c'est du €/MWh -> on divise par 1000
+        if is_gas and raw_price > 1.0:
+            unit_price = raw_price / 1000.0
+        # Si Elec et Prix > 5.0 (ex: 150), c'est du €/MWh -> on divise par 1000
+        elif not is_gas and raw_price > 5.0:
+            unit_price = raw_price / 1000.0
             
         is_estimated = False
         if unit_price <= 0.001:
@@ -62,21 +65,17 @@ class CortexEngine:
         fixe = self._safe_float(pricing.get('fix'))
         commodity = vol_kwh * unit_price
         
-        # 3. TAXES & STOCKAGE
         raw_tax = self._safe_float(pricing.get('tax'))
         if raw_tax > 1.0: raw_tax /= 1000.0
         taxes = (vol_kwh * raw_tax) if raw_tax > 0 else (vol_kwh * self.MARKET_DEFAULTS['gas' if is_gas else 'elec']['tax'])
         
         raw_stock = self._safe_float(pricing.get('storage'))
-        stock_unit = raw_stock if raw_stock < 2.0 else raw_stock / 1000.0
-        storage_cost = vol_kwh * stock_unit
+        if raw_stock > 1.0: raw_stock /= 1000.0
+        storage_cost = vol_kwh * raw_stock
         
         budget_ttc = commodity + fixe + taxes + storage_cost
         landing = budget_ttc * 1.02
         pmc_mwh = self._safe_div(budget_ttc, (vol_kwh / 1000))
-        
-        # Calcul Gaspillage pour Legacy
-        ghost_savings = budget_ttc * 0.15
 
         return {
             "meta": {
@@ -99,25 +98,17 @@ class CortexEngine:
                 "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)),
                 "pmc_eur_mwh": self._sanitize(round(pmc_mwh, 2)),
                 "unit_price_kwh": unit_price,
-                "is_estimated_price": is_estimated,
-                "ghost_savings": self._sanitize(round(ghost_savings, 2))
+                "is_estimated_price": is_estimated
             },
-            # PRIX BRUTS POUR L'AFFICHAGE
-            "pricing_details": {
-                "hph": raw_price, 
-                "hch": self._safe_float(pricing.get('hch')),
-                "hpe": self._safe_float(pricing.get('hpe')),
-                "hce": self._safe_float(pricing.get('hce')),
-                "fix": fixe,
-                "tax": self._safe_float(pricing.get('tax')),
-                "storage": raw_stock
-            }
+            "pricing_details": pricing
         }
 
+    # --- FIX DQE : SOMME MATHEMATIQUE FORCEE ---
     def generate_dqe_structure(self, sites_data):
         rows = []
         for s in sites_data:
             if s.get('identity',{}).get('id') == "new_client": continue
+            
             ident = s.get('identity', {})
             loc = s.get('location', {})
             con = s.get('contract', {})
@@ -125,9 +116,16 @@ class CortexEngine:
             con_det = con.get('consumption_details', {})
             energy = con.get('energy_type', 'elec')
             
-            vol_annuel = con.get('annual_volume_estimated', 0)
-            if vol_annuel == 0:
-                vol_annuel = (con_det.get('hph', 0) + con_det.get('hch', 0) + con_det.get('hpe', 0) + con_det.get('hce', 0))
+            # CALCUL DE LA SOMME REELLE
+            sum_conso = (
+                self._safe_float(con_det.get('hph')) + 
+                self._safe_float(con_det.get('hch')) + 
+                self._safe_float(con_det.get('hpe')) + 
+                self._safe_float(con_det.get('hce'))
+            )
+            
+            # Si la somme est > 0, on l'utilise. Sinon on prend le volume global estimé
+            vol_annuel = sum_conso if sum_conso > 0 else self._safe_float(con.get('annual_volume_estimated'))
 
             row = {
                 "Type": "GAZ" if "gaz" in energy else "ELEC",
@@ -144,12 +142,14 @@ class CortexEngine:
                 "PS HPE": pow_det.get('hpe', 0), "PS HCE": pow_det.get('hce', 0),
                 "Conso HPH": con_det.get('hph', 0), "Conso HCH": con_det.get('hch', 0), 
                 "Conso HPE": con_det.get('hpe', 0), "Conso HCE": con_det.get('hce', 0),
+                # ICI : ON MET LA SOMME CALCULÉE
                 "Vol. Annuel": vol_annuel,
                 "SIRET": ident.get('siret', '')
             }
             rows.append(row)
         return pd.DataFrame(rows)
 
+    # ... (Reste inchangé) ...
     def analyze_portfolio(self, raw_sites_data):
         if not raw_sites_data: return {"global": {}, "green_league": []}
         processed = []
@@ -168,8 +168,7 @@ class CortexEngine:
                     "name": fin['meta']['site_label'],
                     "ratio_pmc": fin['kpis']['pmc_eur_mwh'],
                     "conso_mwh": fin['volume_mwh'],
-                    "budget": fin['budget_annual'],
-                    "ghost_savings": fin['kpis']['ghost_savings']
+                    "budget": fin['budget_annual']
                 })
             except: continue
         valid = [s for s in processed if s['conso_mwh'] > 0.1]
