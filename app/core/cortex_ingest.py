@@ -4,15 +4,13 @@ import io
 import logging
 import chardet
 import re
-import urllib.request
-import json
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V1102")
+logger = logging.getLogger("CORTEX_INGEST_V1103")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "1102.0 (Full Data & Template)"
+        self.version = "1103.0"
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
@@ -22,9 +20,9 @@ class CortexIngest:
             "ville": ["VILLE", "COMMUNE", "CITY", "TOWN"],
             "cp": ["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
             "siret": ["SIRET", "SIRET_SITE", "SIREN"],
-            "naf": ["NAF", "CODE_NAF", "APE", "CODE_APE"], # NOUVEAU
-            "insee": ["INSEE", "CODE_INSEE", "CODE_COMMUNE"], # NOUVEAU
-            "surface": ["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER"], # RENFORCÉ
+            "naf": ["NAF", "CODE_NAF", "APE", "CODE_APE"], 
+            "insee": ["INSEE", "CODE_INSEE", "CODE_COMMUNE"], 
+            "surface": ["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER"],
             "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL", "CJA"],
             "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)"],
             "p_max": ["POINTE_MAX", "P_MAX", "PUISSANCE_ATTEINTE", "MAX_ATTEINTE"],
@@ -45,13 +43,13 @@ class CortexIngest:
             "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE", "CONSO_HCH"],
             "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE", "CONSO_HPE"],
             "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE", "CONSO_HCE"],
-            "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX", "PRIX_MOLECULE_EUR_MWH"],
+            "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
             "prix_hch": ["PRIX_HCH", "HCH"],
             "prix_hpe": ["PRIX_HPE", "HPE"],
             "prix_hce": ["PRIX_HCE", "HCE"],
             "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE", "PART_FIXE"],
             "taxes": ["TAXES", "CSPE", "TICGN", "CTA"],
-            "stockage": ["TERME_STOCK", "STOCKAGE", "TERME_STOCKAGE", "TERME_STOC"]
+            "stockage": ["TERME_STOCK", "STOCKAGE", "TERME_STOCKAGE"]
         }
         self.NAME_BLACKLIST = ["CLIENT", "SITE", "INCONNU", "NAN", "NONE", "NOM_SITE", "0", ".", "COMMUNE", "MAIRIE", "SOCIETE"]
 
@@ -83,13 +81,6 @@ class CortexIngest:
             if '.' in s: return str(int(float(s)))
             return s.strip()
         except: return str(val).strip()
-    
-    # TENTATIVE API INSEE (Light)
-    def _fetch_insee(self, address, city, zip_code):
-        # Pour ne pas ralentir l'import massif, on ne fait pas d'appel API synchrone ici
-        # On pourrait le faire, mais risque de timeout Cloud Run si 500 lignes.
-        # On se base sur l'import Excel ou on laisse vide pour le moment.
-        return ""
 
     def parse_mass_import_unified(self, file_content):
         sites = []
@@ -114,15 +105,14 @@ class CortexIngest:
         c_pdl = self._find_col(cols, "pdl")
         if not c_pdl: return []
 
-        # Mapping Champs
         c_nom = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
         c_cp = self._find_col(cols, "cp")
         c_ville = self._find_col(cols, "ville")
         c_siret = self._find_col(cols, "siret")
-        c_naf = self._find_col(cols, "naf") # NOUVEAU
-        c_insee = self._find_col(cols, "insee") # NOUVEAU
+        c_naf = self._find_col(cols, "naf") 
+        c_insee = self._find_col(cols, "insee") 
         c_surface = self._find_col(cols, "surface") 
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
@@ -192,14 +182,14 @@ class CortexIngest:
                         "site_name": final_name, 
                         "entity_name": entite_brut, 
                         "siret": self._safe_str_clean(row.get(c_siret)),
-                        "naf": self._safe_str_clean(row.get(c_naf)), # MAPPE
-                        "insee": self._safe_str_clean(row.get(c_insee)) # MAPPE
+                        "naf": self._safe_str_clean(row.get(c_naf)), 
+                        "insee": self._safe_str_clean(row.get(c_insee)) 
                     },
                     "location": { 
                         "address": str(row.get(c_addr, "")), 
                         "zip_code": self._safe_str_clean(row.get(c_cp, "")), 
                         "city": ville,
-                        "surface": self._safe_float(row.get(c_surface)) # MAPPE
+                        "surface": self._safe_float(row.get(c_surface)) 
                     },
                     "contract": {
                         "pdl": pdl, 
