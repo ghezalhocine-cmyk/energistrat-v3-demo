@@ -6,12 +6,12 @@ import chardet
 import re
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V1107")
+logger = logging.getLogger("CORTEX_INGEST_V1107_FULL")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "1107.0 (Pro BPU Multi-Lines)"
-        # ... (Mapping Colonnes Identique V1106) ...
+        self.version = "1107.0 (Full Integral)"
+        
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
             "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM"],
@@ -86,7 +86,6 @@ class CortexIngest:
         except: return str(val).strip()
 
     def parse_mass_import_unified(self, file_content):
-        # ... (Code existant identique V1106) ...
         sites = []
         df = None
         buffer = io.BytesIO(file_content)
@@ -234,7 +233,6 @@ class CortexIngest:
             buffer = io.BytesIO(file_content)
             xl = pd.ExcelFile(buffer, engine='openpyxl')
             
-            # 1. RECHERCHE ONGLET REPONSE
             sheet_name = None
             for s in xl.sheet_names:
                 if "REPONSE" in s.upper():
@@ -243,14 +241,12 @@ class CortexIngest:
             
             df = pd.read_excel(xl, sheet_name=sheet_name if sheet_name else 0, dtype=str)
             
-            # 2. DETECTION COLONNES
             cols = [str(c).upper() for c in df.columns]
             
             c_pdl = next((c for c in cols if "PDL" in c or "PCE" in c), None)
             c_hph = next((c for c in cols if "PRIX_HPH" in c or "HPH" in c or "MOLECULE" in c), None)
             c_abo = next((c for c in cols if "ABONNEMENT" in c), None)
             
-            # 3. EXTRACTION EN DICTIONNAIRE {PDL: {PRIX}}
             price_map = {}
             is_gaz = False
             if c_hph and "MOLECULE" in c_hph: is_gaz = True
@@ -264,7 +260,6 @@ class CortexIngest:
                     if pdl and price > 0:
                         price_map[pdl] = {"hph": price, "fix": fix}
             
-            # Fallback si vide ou format simple : On prend la première ligne valide
             if not price_map and c_hph:
                 val = self._safe_float(df.iloc[0].get(c_hph))
                 if val > 0:
