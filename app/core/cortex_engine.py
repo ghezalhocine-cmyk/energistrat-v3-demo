@@ -10,12 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V1103")
+logger = logging.getLogger("CORTEX_ENGINE_V1104")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "1103.0 (Anti-Zero Logic & UX Hack)"
-        # Default Taxes: Elec ~25€/MWh, Gaz ~8.44€/MWh
+        self.version = "1104.0 (UX Hack Extended)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.025}, "gas": {"price": 0.045, "tax": 0.00844}}
         self.OPTIMAL_PRICE = {"elec": 0.12, "gas": 0.045} 
 
@@ -60,7 +59,6 @@ class CortexEngine:
         raw_price = self._safe_float(pricing.get('hph'))
         unit_price = raw_price
         
-        # Règle MWh -> kWh
         if is_gas and raw_price > 2.0: unit_price = raw_price / 1000.0
         elif not is_gas and raw_price > 5.0: unit_price = raw_price / 1000.0
             
@@ -73,18 +71,12 @@ class CortexEngine:
         commodity = vol_kwh * unit_price
         
         # --- LOGIQUE DE PROTECTION TAXES & STOCKAGE (ANTI-ZERO) ---
-        # Problème : Le JS sauvegarde 0 quand on édite la surface.
-        # Solution : Si c'est du Gaz et que c'est 0, on remet la valeur par défaut.
-        
         raw_tax = self._safe_float(pricing.get('tax'))
         if raw_tax > 0.5: raw_tax_kwh = raw_tax / 1000.0
         else: raw_tax_kwh = raw_tax
         
-        # FORCE DEFAULT IF ZERO FOR GAS
-        if is_gas and raw_tax_kwh < 0.001: 
-            raw_tax_kwh = self.MARKET_DEFAULTS['gas']['tax']
-        elif not is_gas and raw_tax_kwh < 0.001:
-            raw_tax_kwh = self.MARKET_DEFAULTS['elec']['tax']
+        if is_gas and raw_tax_kwh < 0.001: raw_tax_kwh = self.MARKET_DEFAULTS['gas']['tax']
+        elif not is_gas and raw_tax_kwh < 0.001: raw_tax_kwh = self.MARKET_DEFAULTS['elec']['tax']
 
         taxes_total = vol_kwh * raw_tax_kwh
         
@@ -92,9 +84,7 @@ class CortexEngine:
         if raw_stock > 0.5: raw_stock_kwh = raw_stock / 1000.0
         else: raw_stock_kwh = raw_stock
         
-        # FORCE DEFAULT STOCKAGE IF ZERO FOR GAS (Approx 0.7 €/MWh -> 0.0007 €/kWh)
-        if is_gas and raw_stock_kwh < 0.0001:
-            raw_stock_kwh = 0.0007
+        if is_gas and raw_stock_kwh < 0.0001: raw_stock_kwh = 0.0007
 
         storage_total = vol_kwh * raw_stock_kwh
         
@@ -105,7 +95,6 @@ class CortexEngine:
         optimal = self.OPTIMAL_PRICE['gas'] if is_gas else self.OPTIMAL_PRICE['elec']
         ghost = max(0, (unit_price - optimal) * vol_kwh)
 
-        # FIX PRIX SECONDAIRES ELEC
         p_hch = self._safe_float(pricing.get('hch'))
         p_hpe = self._safe_float(pricing.get('hpe'))
         p_hce = self._safe_float(pricing.get('hce'))
@@ -114,16 +103,17 @@ class CortexEngine:
             if p_hpe > 5.0: p_hpe /= 1000.0
             if p_hce > 5.0: p_hce /= 1000.0
 
-        # --- UX HACK : INJECTION NAF/INSEE DANS CHAMPS EXISTANTS ---
-        # Puisque le HTML est figé, on concatène les infos dans 'segment' ou 'provider'
+        # --- UX HACK EXTENDED: NAF/INSEE/COPRO ---
         naf_code = ident.get('naf', '')
         insee_code = ident.get('insee', '')
+        ref_copro = ident.get('ref_copro', '') # NOUVEAU
         
         display_segment = segment
-        if naf_code or insee_code:
+        if naf_code or insee_code or ref_copro:
             extras = []
             if naf_code: extras.append(f"NAF:{naf_code}")
             if insee_code: extras.append(f"INSEE:{insee_code}")
+            if ref_copro: extras.append(f"COPRO:{ref_copro}") # NOUVEAU
             display_segment = f"{segment} | {' '.join(extras)}"
 
         return {
@@ -134,7 +124,8 @@ class CortexEngine:
                 "is_gas": is_gas,
                 "provider": contract.get('provider', 'Inconnu'),
                 "naf": naf_code,
-                "insee": insee_code
+                "insee": insee_code,
+                "ref_copro": ref_copro
             },
             "volume_kwh": self._sanitize(round(vol_kwh, 0)),
             "volume_mwh": self._sanitize(round(vol_kwh / 1000, 2)),
@@ -205,7 +196,8 @@ class CortexEngine:
                 "Vol. Annuel": vol_annuel,
                 "SIRET": ident.get('siret', ''),
                 "NAF": ident.get('naf', ''),
-                "INSEE": ident.get('insee', '')
+                "INSEE": ident.get('insee', ''),
+                "REF_COPRO": ident.get('ref_copro', '') # AJOUT DQE
             }
             rows.append(row)
         return pd.DataFrame(rows)
