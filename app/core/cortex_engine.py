@@ -10,11 +10,11 @@ except ImportError:
     physics = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_ENGINE_V1107_FULL")
+logger = logging.getLogger("CORTEX_ENGINE_V1108")
 
 class CortexEngine:
     def __init__(self):
-        self.version = "1107.0 (Full Integral)"
+        self.version = "1108.0 (Dual Stream Simulation)"
         self.MARKET_DEFAULTS = {"elec": {"price": 0.18, "tax": 0.025}, "gas": {"price": 0.045, "tax": 0.00844}}
         self.OPTIMAL_PRICE = {"elec": 0.12, "gas": 0.045} 
 
@@ -264,10 +264,12 @@ class CortexEngine:
     def simulate_budget_from_bpu(self, bpu_content, current_sites):
         if not ingest: return {"error": "Ingest missing"}
         
-        # MAP PDL
-        price_map, is_gaz = ingest.parse_bpu_excel(bpu_content)
+        # 1. LECTURE DES MAPS DE PRIX (GAZ ET ELEC SEPARES)
+        bpu_data = ingest.parse_bpu_excel(bpu_content)
+        elec_map = bpu_data.get("elec", {})
+        gas_map = bpu_data.get("gas", {})
         
-        if not price_map: return {"error": "BPU Illisible ou vide"}
+        if not elec_map and not gas_map: return {"error": "BPU Vide"}
         
         total_savings = 0
         details = []
@@ -276,40 +278,80 @@ class CortexEngine:
         
         for s in current_sites:
             fin = self.enrich_site_financials(s)
-            
-            if fin['meta']['is_gas'] != is_gaz: continue
-            
             pdl = str(s.get('identity', {}).get('id', ''))
+            is_gas = fin['meta']['is_gas']
             
-            offer_data = price_map.get(pdl)
-            if not offer_data:
-                offer_data = price_map.get("default")
+            # SELECTION MAP
+            target_map = gas_map if is_gas else elec_map
             
-            if not offer_data: continue
+            # RECUPERATION PRIX
+            offer = target_map.get(pdl)
+            if not offer: continue # Pas de prix pour ce site dans le BPU
             
-            offer_price = offer_data['hph']
-            offer_fix = offer_data['fix']
+            # CALCUL COUT SIMULE
+            if is_gas:
+                # GAZ : PRIX UNIQUE MOLECULE
+                p_mol = offer['hph']
+                # Règle MWh -> kWh
+                if p_mol > 2.0: p_mol /= 1000.0
+                
+                vol = fin['volume_kwh']
+                new_commodity = vol * p_mol
             
-            if offer_price > 2.0: offer_price /= 1000.0
+            else:
+                # ELEC : 4 POSTES (Si dispos, sinon HPH partout)
+                p_hph = offer['hph']
+                p_hch = offer.get('hch', p_hph)
+                p_hpe = offer.get('hpe', p_hph)
+                p_hce = offer.get('hce', p_hph)
+                
+                # Règle MWh -> kWh
+                if p_hph > 2.0: p_hph /= 1000.0
+                if p_hch > 2.0: p_hch /= 1000.0
+                if p_hpe > 2.0: p_hpe /= 1000.0
+                if p_hce > 2.0: p_hce /= 1000.0
+                
+                # Volumes par poste
+                consos = s.get('contract', {}).get('consumption_details', {})
+                v_hph = self._safe_float(consos.get('hph', 0))
+                v_hch = self._safe_float(consos.get('hch', 0))
+                v_hpe = self._safe_float(consos.get('hpe', 0))
+                v_hce = self._safe_float(consos.get('hce', 0))
+                
+                # Si pas de détail, tout en HPH
+                if (v_hph + v_hch + v_hpe + v_hce) == 0:
+                    v_hph = fin['volume_kwh']
+                
+                new_commodity = (v_hph * p_hph) + (v_hch * p_hch) + (v_hpe * p_hpe) + (v_hce * p_hce)
+
+            # Abo & Stockage (Si fourni, sinon actuel)
+            new_fix = offer['fix'] if offer['fix'] > 0 else fin['details']['fix']
+            new_stock = offer.get('stock', 0)
+            if new_stock > 0:
+                # Si Gaz et Stock > 0.5, conversion probable MWh -> kWh
+                if is_gas and new_stock > 0.5: new_stock /= 1000.0
+                cost_stock = fin['volume_kwh'] * new_stock
+            else:
+                cost_stock = fin['details']['storage']
+
+            # BUDGET TOTAL SIMULE
+            sim_budget = new_fix + fin['details']['taxes'] + cost_stock + new_commodity
             
-            vol = fin['volume_kwh']
-            current_b = fin['details']['commodity']
-            new_cost = vol * offer_price
+            # DELTA
+            current_budget = fin['budget_annual']
+            delta = current_budget - sim_budget
             
-            delta = current_b - new_cost
-            
-            total_current += fin['budget_annual']
-            sim_budget = offer_fix + fin['details']['taxes'] + fin['details']['storage'] + new_cost
+            total_current += current_budget
             total_sim += sim_budget
-            
             total_savings += delta
+            
             details.append({
                 "site_name": fin['meta']['site_label'],
                 "volume": fin['volume_mwh'],
-                "current_budget": fin['budget_annual'],
+                "current_budget": current_budget,
                 "simulated_budget": sim_budget,
                 "delta_euro": delta,
-                "delta_pct": round((delta / fin['budget_annual']) * 100, 1) if fin['budget_annual'] > 0 else 0
+                "delta_pct": round((delta / current_budget) * 100, 1) if current_budget > 0 else 0
             })
                 
         return {
