@@ -6,43 +6,61 @@ import chardet
 import re
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V1103")
+logger = logging.getLogger("CORTEX_INGEST_V1104")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "1103.0"
+        self.version = "1104.0 (Copro & Typology Support)"
         
         self.COLUMN_MAPPING = {
+            # IDENTIFICATION
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
             "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM"],
             "entity": ["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT", "SOCIETE"],
+            "siret": ["SIRET", "SIRET_SITE", "SIREN"],
+            "ref_copro": ["REF_COPRO", "IMMATRICULATION", "REGISTRE_COPRO", "MATRICULE"], # NOUVEAU
+            "naf": ["NAF", "CODE_NAF", "APE", "CODE_APE"], 
+            "insee": ["INSEE", "CODE_INSEE", "CODE_COMMUNE"], 
+            
+            # LOCALISATION
             "adresse": ["ADRESSE_SITE", "ADRESSE", "RUE", "LIGNE_ADRESSE"],
             "ville": ["VILLE", "COMMUNE", "CITY", "TOWN"],
             "cp": ["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
-            "siret": ["SIRET", "SIRET_SITE", "SIREN"],
-            "naf": ["NAF", "CODE_NAF", "APE", "CODE_APE"], 
-            "insee": ["INSEE", "CODE_INSEE", "CODE_COMMUNE"], 
             "surface": ["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER"],
-            "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL", "CJA"],
-            "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)"],
+            "typologie": ["TYPOLOGIE", "USAGE", "TYPE_BATIMENT", "ACTIVITE"], # NOUVEAU
+            
+            # TECHNIQUE ELEC
+            "compteur_prod": ["COMPTEUR_PRODUCTION", "PRODUCTEUR", "INJECTION", "COMPTEUR_PROD"], # NOUVEAU
+            "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)", "PUISSANCE_SOUSCRITE"],
             "p_max": ["POINTE_MAX", "P_MAX", "PUISSANCE_ATTEINTE", "MAX_ATTEINTE"],
-            "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF", "CATEGORIE"],
-            "fournisseur": ["FOURNISSEUR", "TITULAIRE", "PROVIDER", "MARCHE"],
             "fta": ["FTA", "FORMULE_TARIFAIRE", "OPTION"],
-            "grd": ["GRD", "GESTIONNAIRE", "DISTRIBUTEUR"],
-            "date_debut": ["DATE_DEBUT", "DEBUT_CONTRAT", "START_DATE"],
-            "date_fin": ["DATE_FIN", "ECHEANCE", "FIN_CONTRAT", "END_DATE"],
+            
+            # TECHNIQUE GAZ
             "cja": ["CJA", "CJA_MWH_J", "CAPACITE_JOURNALIERE"],
             "profil": ["PROFIL", "PROFIL_GAZ"],
             "tarif_ach": ["TARIF_ACHEM", "TARIF_ACHEMINEMENT", "ATRT"],
-            "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH", "PS_HPH"],
-            "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH", "PS_HCH"],
-            "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE", "PS_HPE"],
-            "ps_hce": ["PS HCE", "PUISSANCE HCE", "P_HCE", "PS_HCE"],
+            
+            # COMMUN
+            "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL", "CJA"],
+            "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF", "CATEGORIE"],
+            "fournisseur": ["FOURNISSEUR", "TITULAIRE", "PROVIDER", "MARCHE"],
+            "grd": ["GRD", "GESTIONNAIRE", "DISTRIBUTEUR"],
+            "date_debut": ["DATE_DEBUT", "DEBUT_CONTRAT", "START_DATE"],
+            "date_fin": ["DATE_FIN", "ECHEANCE", "FIN_CONTRAT", "END_DATE"],
+            
+            # DETAILS PUISSANCE 4 POSTES
+            "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH", "PS_HPH", "PS_HPH"],
+            "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH", "PS_HCH", "PS_HCH"],
+            "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE", "PS_HPE", "PS_HPE"],
+            "ps_hce": ["PS HCE", "PUISSANCE HCE", "P_HCE", "PS_HCE", "PS_HCE"],
+            
+            # DETAILS CONSO 4 POSTES
             "conso_hph": ["CONSO HPH", "C_HPH", "HP HAUTE", "CONSO_HPH"],
             "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE", "CONSO_HCH"],
             "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE", "CONSO_HPE"],
             "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE", "CONSO_HCE"],
+            
+            # PRIX
             "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
             "prix_hch": ["PRIX_HCH", "HCH"],
             "prix_hpe": ["PRIX_HPE", "HPE"],
@@ -61,6 +79,7 @@ class CortexIngest:
         for col in df_cols:
             clean = self._clean_header(col)
             if clean in candidates: return col
+            # Match partiel prudent
             if len(key) > 3 and key not in ["prix_hph", "prix_hch", "prix_hpe", "prix_hce"]: 
                 for cand in candidates:
                     if cand in clean: return col
@@ -105,18 +124,24 @@ class CortexIngest:
         c_pdl = self._find_col(cols, "pdl")
         if not c_pdl: return []
 
+        # Mapping Champs
         c_nom = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
         c_cp = self._find_col(cols, "cp")
         c_ville = self._find_col(cols, "ville")
         c_siret = self._find_col(cols, "siret")
+        c_ref_copro = self._find_col(cols, "ref_copro") # NOUVEAU
         c_naf = self._find_col(cols, "naf") 
         c_insee = self._find_col(cols, "insee") 
-        c_surface = self._find_col(cols, "surface") 
+        c_surface = self._find_col(cols, "surface")
+        c_typologie = self._find_col(cols, "typologie") # NOUVEAU
+        
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
         c_pmax = self._find_col(cols, "p_max")
+        c_compteur_prod = self._find_col(cols, "compteur_prod") # NOUVEAU
+        
         c_seg = self._find_col(cols, "segment")
         c_fourn = self._find_col(cols, "fournisseur")
         c_fta = self._find_col(cols, "fta")
@@ -126,6 +151,7 @@ class CortexIngest:
         c_cja = self._find_col(cols, "cja")
         c_profil = self._find_col(cols, "profil")
         c_tarif_ach = self._find_col(cols, "tarif_ach")
+        
         c_ps_hph = self._find_col(cols, "ps_hph")
         c_ps_hch = self._find_col(cols, "ps_hch")
         c_ps_hpe = self._find_col(cols, "ps_hpe")
@@ -172,8 +198,6 @@ class CortexIngest:
                 # REGLE DE FER GAZ (PRIX)
                 p_hph = self._safe_float(row.get(c_p_hph))
                 if is_gas and p_hph > 2.0: p_hph /= 1000.0
-                
-                # REGLE DE FER ELEC (PRIX)
                 if not is_gas and p_hph > 5.0: p_hph /= 1000.0
 
                 site = {
@@ -182,6 +206,7 @@ class CortexIngest:
                         "site_name": final_name, 
                         "entity_name": entite_brut, 
                         "siret": self._safe_str_clean(row.get(c_siret)),
+                        "ref_copro": self._safe_str_clean(row.get(c_ref_copro)), # MAPPE
                         "naf": self._safe_str_clean(row.get(c_naf)), 
                         "insee": self._safe_str_clean(row.get(c_insee)) 
                     },
@@ -189,7 +214,8 @@ class CortexIngest:
                         "address": str(row.get(c_addr, "")), 
                         "zip_code": self._safe_str_clean(row.get(c_cp, "")), 
                         "city": ville,
-                        "surface": self._safe_float(row.get(c_surface)) 
+                        "surface": self._safe_float(row.get(c_surface)),
+                        "typologie": self._safe_str_clean(row.get(c_typologie)) # MAPPE
                     },
                     "contract": {
                         "pdl": pdl, 
@@ -206,6 +232,7 @@ class CortexIngest:
                         "cja": self._safe_float(row.get(c_cja)),
                         "profil": str(row.get(c_profil, "")),
                         "tarif_acheminement": str(row.get(c_tarif_ach, "")),
+                        "compteur_prod": self._safe_str_clean(row.get(c_compteur_prod)), # MAPPE
                         "power_details": {
                             "hph": self._safe_float(row.get(c_ps_hph)), "hch": self._safe_float(row.get(c_ps_hch)),
                             "hpe": self._safe_float(row.get(c_ps_hpe)), "hce": self._safe_float(row.get(c_ps_hce))
