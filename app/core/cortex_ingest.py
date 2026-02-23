@@ -6,15 +6,15 @@ import chardet
 import re
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V1113")
+logger = logging.getLogger("CORTEX_INGEST_V1115")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "1113.0 (Provider Fix & Wide Mapping)"
+        self.version = "1115.0 (Provider Overwrite)"
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
-            "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM", "BATIMENT"],
+            "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM"],
             "entity": ["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT", "SOCIETE"],
             "siret": ["SIRET", "SIRET_SITE", "SIREN"],
             "ref_copro": ["REF_COPRO", "IMMATRICULATION", "REGISTRE_COPRO", "MATRICULE"],
@@ -23,16 +23,12 @@ class CortexIngest:
             "adresse": ["ADRESSE_SITE", "ADRESSE", "RUE", "LIGNE_ADRESSE"],
             "ville": ["VILLE", "COMMUNE", "CITY", "TOWN"],
             "cp": ["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
-            "surface": ["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER", "SHON"],
-            "typologie": ["TYPOLOGIE", "USAGE", "TYPE_BATIMENT", "ACTIVITE", "CATEGORIE"],
-            
-            # MAPPING ELARGI FOURNISSEUR
-            "fournisseur": ["FOURNISSEUR", "TITULAIRE", "PROVIDER", "MARCHE", "TITULAIRE_MARCHE", "NOM_FOURNISSEUR"],
-            
+            "surface": ["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER"],
+            "typologie": ["TYPOLOGIE", "USAGE", "TYPE_BATIMENT", "ACTIVITE"],
+            "fournisseur": ["FOURNISSEUR", "TITULAIRE", "PROVIDER", "MARCHE", "NOM_FOURNISSEUR"],
             "chauffage": ["CHAUFFAGE", "TYPE_CHAUFFAGE", "ENERGIE_CHAUFFAGE", "SYSTEME_CVC"],
             "isolation": ["ISOLATION", "TYPE_ISOLATION", "VITRAGE", "PERFORMANCE_ENVELOPPE"],
             "regulation": ["REGULATION", "GTB", "GTC", "PILOTAGE"],
-
             "compteur_prod": ["COMPTEUR_PRODUCTION", "PRODUCTEUR", "INJECTION", "COMPTEUR_PROD"],
             "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)", "PUISSANCE_SOUSCRITE"],
             "p_max": ["POINTE_MAX", "P_MAX", "PUISSANCE_ATTEINTE", "MAX_ATTEINTE"],
@@ -120,15 +116,20 @@ class CortexIngest:
         c_insee = self._find_col(cols, "insee") 
         c_surface = self._find_col(cols, "surface")
         c_typologie = self._find_col(cols, "typologie")
+        
+        # TECH
         c_chauff = self._find_col(cols, "chauffage")
         c_isol = self._find_col(cols, "isolation")
         c_regul = self._find_col(cols, "regulation")
+        
+        # CONTRACT
+        c_fourn = self._find_col(cols, "fournisseur")
+
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
         c_pmax = self._find_col(cols, "p_max")
         c_compteur_prod = self._find_col(cols, "compteur_prod")
         c_seg = self._find_col(cols, "segment")
-        c_fourn = self._find_col(cols, "fournisseur")
         c_fta = self._find_col(cols, "fta")
         c_grd = self._find_col(cols, "grd")
         c_start = self._find_col(cols, "date_debut")
@@ -178,9 +179,9 @@ class CortexIngest:
                 if is_gas and p_hph > 2.0: p_hph /= 1000.0
                 if not is_gas and p_hph > 5.0: p_hph /= 1000.0
                 
-                # FOURNISSEUR FIX : On récupère brut et on nettoie
-                provider_raw = self._safe_str_clean(row.get(c_fourn, "Inconnu"))
-                if not provider_raw or provider_raw == "0": provider_raw = "Inconnu"
+                # FOURNISSEUR FIX : PRIORITE EXCEL
+                provider_excel = self._safe_str_clean(row.get(c_fourn, ""))
+                if not provider_excel or provider_excel == "0": provider_excel = "Inconnu"
 
                 site = {
                     "identity": { 
@@ -206,7 +207,7 @@ class CortexIngest:
                     },
                     "contract": {
                         "pdl": pdl, 
-                        "provider": provider_raw, # FIX
+                        "provider": provider_excel, # OVERWRITE
                         "segment": segment, 
                         "power": power_val,
                         "p_max": self._safe_float(row.get(c_pmax)),
@@ -247,15 +248,12 @@ class CortexIngest:
         try:
             buffer = io.BytesIO(file_content)
             xl = pd.ExcelFile(buffer, engine='openpyxl')
-            
             sheet_name = None
             for s in xl.sheet_names:
                 if "REPONSE" in s.upper():
                     sheet_name = s
                     break
-            
             df = pd.read_excel(xl, sheet_name=sheet_name if sheet_name else 0, dtype=str)
-            
             cols = [str(c).upper() for c in df.columns]
             c_pdl = next((c for c in cols if "PDL" in c or "PCE" in c), None)
             c_hph = next((c for c in cols if "PRIX_HPH" in c or "HPH" in c or "MOLECULE" in c), None)
