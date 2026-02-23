@@ -25,14 +25,16 @@ try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
+    from app.core.cortex_forecast import forecast # NOUVEAU
 except ImportError:
     try:
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
+        import cortex_forecast as forecast # NOUVEAU
     except: pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1114")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1115")
 
 app.add_middleware(
     CORSMiddleware,
@@ -108,7 +110,6 @@ async def api_save_client(request: Request):
         
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
-            # Merge Deep pour technical et location
             if 'technical' in data:
                 if 'technical' not in existing_data: existing_data['technical'] = {}
                 existing_data['technical'].update(data['technical'])
@@ -116,7 +117,7 @@ async def api_save_client(request: Request):
                 if 'location' not in existing_data: existing_data['location'] = {}
                 existing_data['location'].update(data['location'])
             if 'identity' in data: existing_data['identity'].update(data['identity'])
-            if 'contract' in data: existing_data['contract'].update(data['contract']) # Force update contract
+            if 'contract' in data: existing_data['contract'].update(data['contract'])
             final_data = existing_data
         else:
             final_data = data
@@ -159,13 +160,10 @@ async def api_import_csv(file: UploadFile = File(...)):
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f: existing = json.load(f)
                     
-                    # LOGIQUE V14 : L'IMPORT EXCEL EST MAÎTRE SUR LE CONTRAT ET L'IDENTITÉ
-                    # On met à jour Contract, Pricing, Identity avec les nouvelles données
                     if 'contract' in s: existing['contract'].update(s['contract'])
-                    if 'pricing' in s: existing['pricing'] = s['pricing'] # Replace pricing entirely to avoid mix
+                    if 'pricing' in s: existing['pricing'] = s['pricing']
                     if 'identity' in s: existing['identity'].update(s['identity'])
                     
-                    # Pour Technical et Location, on merge (pour garder les saisies manuelles non présentes dans l'excel)
                     new_tech = s.get('technical', {})
                     old_tech = existing.get('technical', {})
                     for k, v in new_tech.items():
@@ -184,9 +182,7 @@ async def api_import_csv(file: UploadFile = File(...)):
 
                 with open(file_path, 'w', encoding='utf-8') as f: json.dump(final_s, f, indent=4, ensure_ascii=False)
                 saved += 1
-            except Exception as e: 
-                print(f"Error saving site {raw_id}: {e}")
-                pass
+            except Exception as e: pass
         return JSONResponse({"success": True, "imported": len(sites), "saved": saved})
     except ValueError as ve: return JSONResponse({"success": False, "error": str(ve)})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
@@ -299,6 +295,31 @@ async def get_dashboard_data(client_id: str, response: Response):
         "electricity_price": financials['kpis']['unit_price_kwh']
     }
     return JSONResponse(json_compliant(response_data))
+
+# --- NOUVELLE ROUTE PREVISIONNELLE (FORECAST) ---
+@app.get("/api/forecast/simulate/{client_id}")
+async def api_forecast_simulate(client_id: str):
+    file_path = find_site_file(client_id)
+    if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
+    with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
+    
+    fin = cortex.enrich_site_financials(data)
+    
+    vol = fin['volume_mwh']
+    typology = data.get('location', {}).get('typologie', '')
+    if not typology:
+        # Fallback intelligent si typologie vide
+        name = data.get('identity', {}).get('site_name', '').upper()
+        if "ECOLE" in name: typology = "ECOLE"
+        elif "ECLAIRAGE" in name: typology = "ECLAIRAGE"
+        elif "MAIRIE" in name: typology = "ADMIN"
+    
+    energy = "gaz" if fin['meta']['is_gas'] else "elec"
+    
+    # APPEL SATELLITE
+    res = forecast.generate_3_year_projection(vol, typology, energy)
+    return JSONResponse(json_compliant(res))
+# ------------------------------------------------
 
 @app.post("/api/ops/market/update")
 async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header(None)):
@@ -450,11 +471,9 @@ async def generate_tender(request: Request):
             if not df_elec.empty: 
                 df_elec.to_excel(writer, index=False, sheet_name="DATA_ELEC")
                 df_bpu_elec.to_excel(writer, index=False, sheet_name="REPONSE_ELEC")
-            
             if not df_gaz.empty: 
                 df_gaz.to_excel(writer, index=False, sheet_name="DATA_GAZ")
                 df_bpu_gaz.to_excel(writer, index=False, sheet_name="REPONSE_GAZ")
-            
             if df_elec.empty and df_gaz.empty: 
                 df_dqe.to_excel(writer, index=False, sheet_name="TOUT")
 
