@@ -6,11 +6,11 @@ import chardet
 import re
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V1115")
+logger = logging.getLogger("CORTEX_INGEST_V1116")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "1115.0 (Provider Overwrite)"
+        self.version = "1116.0 (Provider Fix)"
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
@@ -25,7 +25,10 @@ class CortexIngest:
             "cp": ["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
             "surface": ["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER"],
             "typologie": ["TYPOLOGIE", "USAGE", "TYPE_BATIMENT", "ACTIVITE"],
+            
+            # FOURNISSEUR (PRIORITAIRE)
             "fournisseur": ["FOURNISSEUR", "TITULAIRE", "PROVIDER", "MARCHE", "NOM_FOURNISSEUR"],
+            
             "chauffage": ["CHAUFFAGE", "TYPE_CHAUFFAGE", "ENERGIE_CHAUFFAGE", "SYSTEME_CVC"],
             "isolation": ["ISOLATION", "TYPE_ISOLATION", "VITRAGE", "PERFORMANCE_ENVELOPPE"],
             "regulation": ["REGULATION", "GTB", "GTC", "PILOTAGE"],
@@ -116,15 +119,11 @@ class CortexIngest:
         c_insee = self._find_col(cols, "insee") 
         c_surface = self._find_col(cols, "surface")
         c_typologie = self._find_col(cols, "typologie")
-        
-        # TECH
         c_chauff = self._find_col(cols, "chauffage")
         c_isol = self._find_col(cols, "isolation")
         c_regul = self._find_col(cols, "regulation")
+        c_fourn = self._find_col(cols, "fournisseur") # IMPORTANT
         
-        # CONTRACT
-        c_fourn = self._find_col(cols, "fournisseur")
-
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
         c_pmax = self._find_col(cols, "p_max")
@@ -179,7 +178,7 @@ class CortexIngest:
                 if is_gas and p_hph > 2.0: p_hph /= 1000.0
                 if not is_gas and p_hph > 5.0: p_hph /= 1000.0
                 
-                # FOURNISSEUR FIX : PRIORITE EXCEL
+                # FOURNISSEUR FIX : RECUPERATION BRUTE
                 provider_excel = self._safe_str_clean(row.get(c_fourn, ""))
                 if not provider_excel or provider_excel == "0": provider_excel = "Inconnu"
 
@@ -207,7 +206,7 @@ class CortexIngest:
                     },
                     "contract": {
                         "pdl": pdl, 
-                        "provider": provider_excel, # OVERWRITE
+                        "provider": provider_excel, # MAITRE
                         "segment": segment, 
                         "power": power_val,
                         "p_max": self._safe_float(row.get(c_pmax)),
@@ -258,11 +257,9 @@ class CortexIngest:
             c_pdl = next((c for c in cols if "PDL" in c or "PCE" in c), None)
             c_hph = next((c for c in cols if "PRIX_HPH" in c or "HPH" in c or "MOLECULE" in c), None)
             c_abo = next((c for c in cols if "ABONNEMENT" in c), None)
-            
             price_map = {}
             is_gaz = False
             if c_hph and "MOLECULE" in c_hph: is_gaz = True
-            
             if c_pdl and c_hph:
                 for idx, row in df.iterrows():
                     pdl = self._safe_str_clean(row.get(c_pdl))
@@ -270,12 +267,10 @@ class CortexIngest:
                     fix = self._safe_float(row.get(c_abo)) if c_abo else 0.0
                     if pdl and price > 0:
                         price_map[pdl] = {"hph": price, "fix": fix}
-            
             if not price_map and c_hph:
                 val = self._safe_float(df.iloc[0].get(c_hph))
                 if val > 0:
                     price_map["default"] = {"hph": val, "fix": self._safe_float(df.iloc[0].get(c_abo, 0))}
-
             return price_map, is_gaz
         except Exception as e: 
             logging.error(f"BPU Parse Error: {e}")
