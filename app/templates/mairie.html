@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V3 | Mairie.OS (Master Edition)</title>
+    <title>ENERGISTRAT V3 | Mairie.OS (Suite Complète)</title>
     
     <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -59,6 +59,9 @@
             </button>
             <button onclick="switchView('market')" id="nav-market" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
                 <i class="fa-solid fa-chart-line w-5 text-center text-cyan"></i> Stratégie Achat
+            </button>
+            <button onclick="switchView('comparator')" id="nav-comparator" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
+                <i class="fa-solid fa-scale-balanced w-5 text-center text-white"></i> Comparateur DQE
             </button>
             <button onclick="switchView('citizens')" id="nav-citizens" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition">
                 <i class="fa-solid fa-users-line w-5 text-center text-citizen"></i> Citoyens & Achat
@@ -224,6 +227,51 @@
                 </div>
             </div>
 
+            <!-- VUE 5 : COMPARATEUR (RESTAURÉ) -->
+            <div id="view-comparator" class="view-section hidden space-y-6">
+                <div class="text-center mb-8">
+                    <h2 class="text-3xl font-black text-white italic tracking-tight">ANALYSE <span class="text-white">OFFRES</span></h2>
+                    <p class="text-sm text-gray-500 mt-2">Uploadez les réponses BPU de vos candidats</p>
+                </div>
+                
+                <div class="max-w-2xl mx-auto mb-8 space-y-4">
+                    <div class="relative">
+                        <label class="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Nom du Candidat</label>
+                        <input type="text" id="offer-name" placeholder="Ex: TotalEnergies - Lot 1" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-cyan outline-none font-bold">
+                    </div>
+                    <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-cyan/30 border-dashed rounded-2xl cursor-pointer bg-white/5 hover:bg-white/10 transition group">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400 group-hover:text-cyan mb-2 transition"></i>
+                            <p class="text-sm text-gray-400"><span class="font-bold text-white">Cliquez pour uploader</span> le fichier BPU (Excel)</p>
+                        </div>
+                        <input type="file" id="offer-file" class="hidden" accept=".xlsx" onchange="window.triggerOfferScan(this)">
+                    </label>
+                </div>
+
+                <div id="sim-results" class="hidden space-y-6">
+                    <div class="grid grid-cols-3 gap-6">
+                        <div class="bento-card p-6 border-l-4 border-gray-500">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Budget Actuel</h3>
+                            <div class="text-2xl font-bold text-white" id="sim-current">-- €</div>
+                        </div>
+                        <div class="bento-card p-6 border-l-4 border-cyan">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Offre Candidat</h3>
+                            <div class="text-2xl font-bold text-cyan" id="sim-offer">-- €</div>
+                        </div>
+                        <div class="bento-card p-6 border-l-4 border-green-500">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Impact Budgétaire</h3>
+                            <div class="text-3xl font-black text-green-500" id="sim-delta">-- €</div>
+                        </div>
+                    </div>
+                    <div class="bento-card overflow-hidden">
+                        <table class="w-full text-left text-xs text-gray-300">
+                            <thead class="bg-white/5 text-[9px] uppercase text-gray-400 font-bold"><tr><th class="px-4 py-3">Site</th><th class="px-4 py-3 text-right">Vol.</th><th class="px-4 py-3 text-right">Actuel</th><th class="px-4 py-3 text-right">Offre</th><th class="px-4 py-3 text-right">Écart</th></tr></thead>
+                            <tbody class="divide-y divide-white/5" id="sim-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- VUE 3 : CITOYENS -->
             <div id="view-citizens" class="view-section hidden space-y-6">
                 <div class="flex justify-between items-end mb-4"><div><h2 class="text-3xl font-black text-white italic tracking-tight">ACHAT <span class="text-citizen">GROUPÉ</span></h2><p class="text-sm text-gray-500 mt-2">Mobilisez vos citoyens.</p></div><div class="flex items-center gap-4 bg-white/5 p-2 rounded-xl border border-white/10"><div class="text-right"><div class="text-[10px] text-gray-400 uppercase font-bold">Score Ville Verte</div><div class="text-xs text-success font-bold">Excellent</div></div><div class="w-12 h-12 rounded-full bg-success text-abysse font-black flex items-center justify-center text-xl border-4 border-abysse shadow-[0_0_20px_rgba(16,185,129,0.4)]">A+</div></div></div>
@@ -355,12 +403,19 @@
         let citizenChartInstance = null;
         let CURRENT_SITE = null;
 
+        // --- NAVIGATION ---
         window.switchView = function(viewName) {
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active', 'text-white'));
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
-            ['view-patrimoine', 'view-budget', 'view-citizens', 'view-market'].forEach(id => document.getElementById(id).classList.add('hidden'));
-            document.getElementById('view-' + viewName).classList.remove('hidden');
+            
+            ['view-patrimoine', 'view-budget', 'view-citizens', 'view-market', 'view-comparator'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.classList.add('hidden');
+            });
+            
+            const target = document.getElementById('view-' + viewName);
+            if(target) target.classList.remove('hidden');
             
             if(viewName !== 'patrimoine') document.getElementById('action-bar').classList.remove('visible');
             else updateActionBar();
@@ -370,6 +425,7 @@
             if(viewName === 'market') calculateMarketStrategy();
         }
 
+        // --- LOAD DATA ---
         async function loadFleet() {
             try {
                 const res = await fetch('/api/dashboard/fleet');
@@ -385,60 +441,36 @@
             } catch(e) { console.error(e); }
         }
 
-        // --- MARKET STRATEGY ---
-        function calculateMarketStrategy() {
-            let totalBudget = 0;
-            let totalVol = 0;
-            FLEET_DATA.forEach(s => { 
-                if(s.energy === 'elec') { totalBudget += s.budget; totalVol += s.volume; }
-            });
-            const avgPrice = totalVol > 0 ? (totalBudget / totalVol) : 0;
-            const marketN1 = 180; 
-            const trve = 220; 
-            
-            document.getElementById('price-user').innerText = Math.round(avgPrice) + " €";
-            document.getElementById('price-market').innerText = marketN1 + " €";
-            document.getElementById('price-trve').innerText = trve + " €";
-
-            const max = Math.max(avgPrice, marketN1, trve) * 1.1;
-            document.getElementById('bar-user').style.width = (avgPrice / max * 100) + "%";
-            document.getElementById('bar-market').style.width = (marketN1 / max * 100) + "%";
-            document.getElementById('bar-trve').style.width = (trve / max * 100) + "%";
-
-            const signalCircle = document.getElementById('signal-circle');
-            const signalIcon = document.getElementById('signal-icon');
-            const signalText = document.getElementById('signal-text');
-            const signalDesc = document.getElementById('signal-desc');
-            const advice = document.getElementById('market-advice');
-
-            if (avgPrice > marketN1 + 20) {
-                signalCircle.className = "w-24 h-24 rounded-full flex items-center justify-center text-4xl mb-4 shadow-[0_0_30px_rgba(16,185,129,0.5)] bg-success text-abysse animate-bounce";
-                signalIcon.className = "fa-solid fa-cart-shopping";
-                signalText.innerText = "ACHETER";
-                signalText.className = "text-2xl font-bold text-success";
-                signalDesc.innerText = "Le marché est significativement plus bas que votre contrat actuel.";
-                advice.innerText = "Lancez un appel d'offre immédiatement pour sécuriser les prix N+1.";
-            } else if (avgPrice < marketN1 - 10) {
-                signalCircle.className = "w-24 h-24 rounded-full flex items-center justify-center text-4xl mb-4 shadow-[0_0_30px_rgba(239,68,68,0.5)] bg-alert text-white";
-                signalIcon.className = "fa-solid fa-hand";
-                signalText.innerText = "ATTENDRE";
-                signalText.className = "text-2xl font-bold text-alert";
-                signalDesc.innerText = "Vous avez un excellent prix. Ne bougez pas.";
-                advice.innerText = "Votre contrat actuel est performant. Le marché est haussier.";
-            } else {
-                signalCircle.className = "w-24 h-24 rounded-full flex items-center justify-center text-4xl mb-4 shadow-[0_0_30px_rgba(59,130,246,0.5)] bg-mairie text-white";
-                signalIcon.className = "fa-solid fa-scale-balanced";
-                signalText.innerText = "SURVEILLER";
-                signalText.className = "text-2xl font-bold text-mairie";
-                signalDesc.innerText = "Les prix sont alignés avec votre contrat.";
-                advice.innerText = "Préparez le dossier DQE mais attendez une baisse technique.";
-            }
+        function updateLotSelect() {
+            const sel = document.getElementById('filter-lot');
+            sel.innerHTML = '<option value="all">Tous les Lots</option>';
+            LOTS.forEach(l => { const opt = document.createElement('option'); opt.value = l; opt.innerText = l; sel.appendChild(opt); });
         }
 
-        function updateLotSelect() { const sel = document.getElementById('filter-lot'); sel.innerHTML = '<option value="all">Tous les Lots</option>'; LOTS.forEach(l => { const opt = document.createElement('option'); opt.value = l; opt.innerText = l; sel.appendChild(opt); }); }
-        window.filterEnergy = function(type) { CURRENT_ENERGY = type; ['elec', 'gaz', 'eau'].forEach(t => { const btn = document.getElementById('btn-' + t); if(t === type) { btn.classList.add('bg-white/10', 'text-white'); btn.classList.remove('text-gray-400'); if(t === 'elec') btn.classList.add('text-mairie'); if(t === 'gaz') btn.classList.add('text-gas'); if(t === 'eau') btn.classList.add('text-water'); } else { btn.className = "flex-1 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center gap-1"; } }); applyFilters(); }
-        window.filterWaste = function() { const term = document.getElementById('search-input'); term.value = "alert:waste"; applyFilters(); }
-        
+        // --- FILTERS ---
+        window.filterEnergy = function(type) {
+            CURRENT_ENERGY = type;
+            ['elec', 'gaz', 'eau'].forEach(t => {
+                const btn = document.getElementById('btn-' + t);
+                if(t === type) {
+                    btn.classList.add('bg-white/10', 'text-white');
+                    btn.classList.remove('text-gray-400');
+                    if(t === 'elec') btn.classList.add('text-mairie');
+                    if(t === 'gaz') btn.classList.add('text-gas');
+                    if(t === 'eau') btn.classList.add('text-water');
+                } else {
+                    btn.className = "flex-1 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center gap-1";
+                }
+            });
+            applyFilters();
+        }
+
+        window.filterWaste = function() {
+            const term = document.getElementById('search-input');
+            term.value = "alert:waste";
+            applyFilters();
+        }
+
         function applyFilters() {
             const term = document.getElementById('search-input').value.toLowerCase();
             const typeFilter = document.getElementById('filter-type').value;
@@ -446,12 +478,18 @@
 
             const filtered = FLEET_DATA.filter(s => {
                 if(CURRENT_ENERGY !== 'all' && s.energy !== CURRENT_ENERGY) return false;
+                
                 if(term === "alert:waste") return s.ghost_savings > 100;
+
                 let type = 'admin';
                 const n = s.name.toLowerCase();
-                if(n.includes('ecole') || n.includes('scolaire')) type = 'ecole'; else if(n.includes('gymnase') || n.includes('stade') || n.includes('sport')) type = 'sport'; else if(n.includes('eclairage') || n.includes('ep ')) type = 'ep';
+                if(n.includes('ecole') || n.includes('scolaire')) type = 'ecole';
+                else if(n.includes('gymnase') || n.includes('stade') || n.includes('sport')) type = 'sport';
+                else if(n.includes('eclairage') || n.includes('ep ')) type = 'ep';
+                
                 if(typeFilter !== 'all' && type !== typeFilter) return false;
                 if(lotFilter !== 'all' && (!s.segment || !s.segment.includes(lotFilter))) return false;
+                
                 return s.name.toLowerCase().includes(term) || s.city.toLowerCase().includes(term) || s.id.includes(term);
             });
             renderTable(filtered);
@@ -501,7 +539,11 @@
             let totalBudget = 0;
             let totalWaste = 0;
             let countAlerts = 0;
-            FLEET_DATA.forEach(s => { totalBudget += s.budget; totalWaste += s.ghost_savings; if(s.ghost_savings > 100) countAlerts++; });
+            FLEET_DATA.forEach(s => { 
+                totalBudget += s.budget; 
+                totalWaste += s.ghost_savings; 
+                if(s.ghost_savings > 100) countAlerts++; 
+            });
             document.getElementById('header-budget').innerText = Math.round(totalBudget).toLocaleString() + " €";
             document.getElementById('kpi-waste').innerText = Math.round(totalWaste).toLocaleString() + " €";
             document.getElementById('kpi-sites').innerText = FLEET_DATA.length;
@@ -510,44 +552,90 @@
             else document.getElementById('sobriety-badge').classList.add('hidden');
         }
 
-        // --- CHART MODAL SWITCH (FORECAST) ---
-        async function updateModalChart(mode) {
-            if(!CURRENT_SITE) return;
-            const ctx = document.getElementById('modalChart').getContext('2d');
-            if(modalChartInstance) modalChartInstance.destroy();
+        // --- MARKET WATCH ---
+        function calculateMarketStrategy() {
+            let totalBudget = 0;
+            let totalVol = 0;
+            FLEET_DATA.forEach(s => { 
+                if(s.energy === 'elec') { totalBudget += s.budget; totalVol += s.volume; }
+            });
+            const avgPrice = totalVol > 0 ? (totalBudget / totalVol) : 0;
+            const marketN1 = 180; 
+            const trve = 220; 
             
-            if(mode === '24h') {
-                const labels = Array.from({length: 24}, (_, i) => i + 'h');
-                const dataPoints = Array.from({length: 24}, (_, i) => (i>22 || i<6) ? 20 : 80);
-                const isGaz = CURRENT_SITE.energy_type === 'gaz';
-                const color = isGaz ? '#EF4444' : '#3B82F6';
-                const bg = isGaz ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)';
-                modalChartInstance = new Chart(ctx, { type: 'line', data: { labels: labels, datasets: [{ label: isGaz ? 'Conso (kWh)' : 'Puissance (kW)', data: dataPoints, borderColor: color, backgroundColor: bg, fill: true, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } });
+            document.getElementById('price-user').innerText = Math.round(avgPrice) + " €";
+            document.getElementById('price-market').innerText = marketN1 + " €";
+            document.getElementById('price-trve').innerText = trve + " €";
+
+            const max = Math.max(avgPrice, marketN1, trve) * 1.1;
+            document.getElementById('bar-user').style.width = (avgPrice / max * 100) + "%";
+            document.getElementById('bar-market').style.width = (marketN1 / max * 100) + "%";
+            document.getElementById('bar-trve').style.width = (trve / max * 100) + "%";
+
+            const signalCircle = document.getElementById('signal-circle');
+            const signalIcon = document.getElementById('signal-icon');
+            const signalText = document.getElementById('signal-text');
+            const signalDesc = document.getElementById('signal-desc');
+            const advice = document.getElementById('market-advice');
+
+            if (avgPrice > marketN1 + 20) {
+                signalCircle.className = "w-24 h-24 rounded-full flex items-center justify-center text-4xl mb-4 shadow-[0_0_30px_rgba(16,185,129,0.5)] bg-success text-abysse animate-bounce";
+                signalIcon.className = "fa-solid fa-cart-shopping";
+                signalText.innerText = "ACHETER";
+                signalText.className = "text-2xl font-bold text-success";
+                signalDesc.innerText = "Le marché est significativement plus bas que votre contrat actuel.";
+                advice.innerText = "Lancez un appel d'offre immédiatement pour sécuriser les prix N+1.";
+            } else if (avgPrice < marketN1 - 10) {
+                signalCircle.className = "w-24 h-24 rounded-full flex items-center justify-center text-4xl mb-4 shadow-[0_0_30px_rgba(239,68,68,0.5)] bg-alert text-white";
+                signalIcon.className = "fa-solid fa-hand";
+                signalText.innerText = "ATTENDRE";
+                signalText.className = "text-2xl font-bold text-alert";
+                signalDesc.innerText = "Vous avez un excellent prix. Ne bougez pas.";
+                advice.innerText = "Votre contrat actuel est performant. Le marché est haussier.";
             } else {
-                try {
-                    const res = await fetch(`/api/forecast/simulate/${CURRENT_SITE.identity.id}`);
-                    const data = await res.json();
-                    if(data.error) return alert("Erreur Forecast: " + data.error);
-                    modalChartInstance = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: data.labels,
-                            datasets: [
-                                { label: 'Tendanciel (MWh)', data: data.dataset_trend, borderColor: '#94A3B8', borderDash: [5,5], tension: 0.4 },
-                                { label: 'Sobriété (MWh)', data: data.dataset_sobriety, borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4 }
-                            ]
-                        },
-                        options: { 
-                            responsive: true, maintainAspectRatio: false,
-                            plugins: { title: { display: true, text: `Potentiel Gain 3 Ans: ${data.gain_potential_mwh} MWh` } },
-                            scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } }
-                        }
-                    });
-                } catch(e) { console.error(e); }
+                signalCircle.className = "w-24 h-24 rounded-full flex items-center justify-center text-4xl mb-4 shadow-[0_0_30px_rgba(59,130,246,0.5)] bg-mairie text-white";
+                signalIcon.className = "fa-solid fa-scale-balanced";
+                signalText.innerText = "SURVEILLER";
+                signalText.className = "text-2xl font-bold text-mairie";
+                signalDesc.innerText = "Les prix sont alignés avec votre contrat.";
+                advice.innerText = "Préparez le dossier DQE mais attendez une baisse technique.";
             }
         }
 
-        // --- DETAIL MODAL ---
+        // --- COMPARATEUR DQE ---
+        async function triggerOfferScan(input) {
+            if(!input.files || input.files.length === 0) return;
+            const file = input.files[0];
+            const name = document.getElementById('offer-name').value || "Offre Inconnue";
+            
+            const formData = new FormData();
+            formData.append("file", file);
+            
+            try {
+                const res = await fetch('/api/ops/simulate_offer', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                if(data.success && data.summary) {
+                    document.getElementById('sim-results').classList.remove('hidden');
+                    document.getElementById('sim-current').innerText = Math.round(data.summary.total_current).toLocaleString() + " €";
+                    document.getElementById('sim-offer').innerText = Math.round(data.summary.total_simulated).toLocaleString() + " €";
+                    const delta = data.summary.savings_euro;
+                    document.getElementById('sim-delta').innerText = (delta > 0 ? "+" : "") + Math.round(delta).toLocaleString() + " €";
+                    document.getElementById('sim-delta').className = delta > 0 ? "text-3xl font-black text-success" : "text-3xl font-black text-alert";
+                    
+                    const tbody = document.getElementById('sim-table-body');
+                    tbody.innerHTML = '';
+                    data.details.forEach(row => {
+                        const col = row.delta_euro < 0 ? 'text-success' : 'text-alert';
+                        tbody.innerHTML += `<tr class="border-b border-white/5"><td class="px-4 py-2 text-white">${row.site_name}</td><td class="px-4 py-2 text-right text-gray-400">${Math.round(row.volume)} MWh</td><td class="px-4 py-2 text-right text-gray-300">${Math.round(row.current_budget)}</td><td class="px-4 py-2 text-right text-cyan">${Math.round(row.simulated_budget)}</td><td class="px-4 py-2 text-right ${col} font-bold">${Math.round(row.delta_euro)}</td></tr>`;
+                    });
+                } else {
+                    alert("Erreur Simulation : " + (data.error || "Inconnue"));
+                }
+            } catch(e) { console.error(e); alert("Erreur réseau"); }
+        }
+
+        // --- DETAIL MODAL & FORECAST ---
         async function openDetail(id) {
             try {
                 const res = await fetch(`/api/dashboard/data/${id}`);
@@ -596,6 +684,42 @@
         }
         window.closeDetail = function() { document.getElementById('detail-modal').classList.add('hidden'); }
 
+        async function updateModalChart(mode) {
+            if(!CURRENT_SITE) return;
+            const ctx = document.getElementById('modalChart').getContext('2d');
+            if(modalChartInstance) modalChartInstance.destroy();
+            
+            if(mode === '24h') {
+                const labels = Array.from({length: 24}, (_, i) => i + 'h');
+                const dataPoints = Array.from({length: 24}, (_, i) => (i>22 || i<6) ? 20 : 80);
+                const isGaz = CURRENT_SITE.energy_type === 'gaz';
+                const color = isGaz ? '#EF4444' : '#3B82F6';
+                const bg = isGaz ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)';
+                modalChartInstance = new Chart(ctx, { type: 'line', data: { labels: labels, datasets: [{ label: isGaz ? 'Conso (kWh)' : 'Puissance (kW)', data: dataPoints, borderColor: color, backgroundColor: bg, fill: true, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } });
+            } else {
+                try {
+                    const res = await fetch(`/api/forecast/simulate/${CURRENT_SITE.identity.id}`);
+                    const data = await res.json();
+                    if(data.error) return alert("Erreur Forecast: " + data.error);
+                    modalChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [
+                                { label: 'Tendanciel (MWh)', data: data.dataset_trend, borderColor: '#94A3B8', borderDash: [5,5], tension: 0.4 },
+                                { label: 'Sobriété (MWh)', data: data.dataset_sobriety, borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4 }
+                            ]
+                        },
+                        options: { 
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { title: { display: true, text: `Potentiel Gain 3 Ans: ${data.gain_potential_mwh} MWh` } },
+                            scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } }
+                        }
+                    });
+                } catch(e) { console.error(e); }
+            }
+        }
+
         // --- EDIT MODE ---
         function openEditMode() {
             if(!CURRENT_SITE) return;
@@ -611,51 +735,39 @@
 
         async function saveMairieData() {
             if(!CURRENT_SITE) return;
-            
             const original = CURRENT_SITE;
             original.identity.site_name = document.getElementById('edit-name').value;
-            
             if(!original.location) original.location = {};
             original.location.surface = parseFloat(document.getElementById('edit-surface').value) || 0;
-            
             if(!original.technical) original.technical = {};
             original.technical.chauffage = document.getElementById('edit-chauffage').value;
             original.technical.regulation = document.getElementById('edit-regulation').value;
             original.technical.isolation = document.getElementById('edit-isolation').value;
 
             try {
-                const res = await fetch('/api/settings/save_client', { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify(original) 
-                });
-                
+                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
                 if((await res.json()).success) { 
                     document.getElementById('edit-modal').classList.add('hidden'); 
                     alert("Patrimoine mis à jour !"); 
-                    loadFleet(); 
-                    openDetail(original.identity.id); 
+                    loadFleet(); openDetail(original.identity.id); 
                 } else alert("Erreur sauvegarde");
             } catch(e) { alert("Erreur réseau"); }
         }
 
+        // --- MASS ACTIONS & CHARTS ---
         async function uploadPatrimoine(input) {
             if(!input.files || input.files.length === 0) return;
             const file = input.files[0];
             const formData = new FormData();
             formData.append("file", file);
-            
             const btn = document.querySelector('label[for="mass-file"]');
             const originalText = btn.innerText;
             btn.innerText = "IMPORTATION EN COURS...";
-            
             try {
                 const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData });
                 const data = await res.json();
-                if(data.success) {
-                    alert(`${data.saved} sites mis à jour avec les données techniques.`);
-                    loadFleet();
-                } else alert("Erreur Import: " + data.error);
+                if(data.success) { alert(`${data.saved} sites mis à jour.`); loadFleet(); } 
+                else alert("Erreur Import: " + data.error);
             } catch(e) { alert("Erreur réseau"); }
             btn.innerText = originalText;
         }
@@ -696,8 +808,44 @@
             const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: ids }) });
             if(res.ok) { const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `DQE_Mairie_${ids.length}_sites.xlsx`; document.body.appendChild(a); a.click(); a.remove(); } else alert("Erreur génération");
         }
-        function loadCitizenChart() { if(citizenChartInstance) return; const ctx = document.getElementById('citizenChart').getContext('2d'); citizenChartInstance = new Chart(ctx, { type: 'line', data: { labels: Array.from({length: 30}, (_, i) => `J-${30-i}`), datasets: [{ label: 'Inscriptions Citoyennes', data: Array.from({length: 30}, (_, i) => Math.floor(100 + i * 40 + Math.random() * 50)), borderColor: '#8B5CF6', backgroundColor: 'rgba(139, 92, 246, 0.1)', fill: true, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } } }); }
-        function updateBudgetCharts() { if(landingChartInstance) return; const ctx1 = document.getElementById('landingChart').getContext('2d'); landingChartInstance = new Chart(ctx1, { type: 'line', data: { labels: ['J','F','M','A','M','J','J','A','S','O','N','D'], datasets: [ { label: 'Réel', data: [10,22,35,null,null,null,null,null,null,null,null,null], borderColor: '#3B82F6', tension: 0.1 }, { label: 'Projection', data: [10,22,35,45,52,60,65,70,78,88,98,110], borderColor: '#94A3B8', borderDash: [5,5], tension: 0.1 } ] }, options: { responsive: true, maintainAspectRatio: false } }); const ctx2 = document.getElementById('budgetChart').getContext('2d'); budgetChartInstance = new Chart(ctx2, { type: 'doughnut', data: { labels: ['Écoles', 'Sport', 'Éclairage', 'Admin', 'Autres'], datasets: [{ data: [40, 25, 20, 10, 5], backgroundColor: ['#3B82F6', '#F59E0B', '#10B981', '#64748B', '#94A3B8'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } } }); }
+
+        function loadCitizenChart() {
+            if(citizenChartInstance) return;
+            const ctx = document.getElementById('citizenChart').getContext('2d');
+            citizenChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 30}, (_, i) => `J-${30-i}`),
+                    datasets: [{ label: 'Inscriptions Citoyennes', data: Array.from({length: 30}, (_, i) => Math.floor(100 + i * 40 + Math.random() * 50)), borderColor: '#8B5CF6', backgroundColor: 'rgba(139, 92, 246, 0.1)', fill: true, tension: 0.4 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            });
+        }
+
+        function updateBudgetCharts() {
+            if(landingChartInstance) return; 
+            const ctx1 = document.getElementById('landingChart').getContext('2d');
+            landingChartInstance = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: ['J','F','M','A','M','J','J','A','S','O','N','D'],
+                    datasets: [
+                        { label: 'Réel', data: [10,22,35,null,null,null,null,null,null,null,null,null], borderColor: '#3B82F6', tension: 0.1 },
+                        { label: 'Projection', data: [10,22,35,45,52,60,65,70,78,88,98,110], borderColor: '#94A3B8', borderDash: [5,5], tension: 0.1 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+            const ctx2 = document.getElementById('budgetChart').getContext('2d');
+            budgetChartInstance = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Écoles', 'Sport', 'Éclairage', 'Admin', 'Autres'],
+                    datasets: [{ data: [40, 25, 20, 10, 5], backgroundColor: ['#3B82F6', '#F59E0B', '#10B981', '#64748B', '#94A3B8'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+            });
+        }
 
         document.addEventListener('DOMContentLoaded', loadFleet);
     </script>
