@@ -25,16 +25,16 @@ try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
-    from app.core.cortex_forecast import forecast # NOUVEAU
+    from app.core.cortex_forecast import forecast
 except ImportError:
     try:
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
-        import cortex_forecast as forecast # NOUVEAU
+        import cortex_forecast as forecast
     except: pass
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1115")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1116")
 
 app.add_middleware(
     CORSMiddleware,
@@ -160,6 +160,7 @@ async def api_import_csv(file: UploadFile = File(...)):
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f: existing = json.load(f)
                     
+                    # FORCE OVERWRITE CONTRACT & IDENTITY FROM EXCEL
                     if 'contract' in s: existing['contract'].update(s['contract'])
                     if 'pricing' in s: existing['pricing'] = s['pricing']
                     if 'identity' in s: existing['identity'].update(s['identity'])
@@ -296,7 +297,7 @@ async def get_dashboard_data(client_id: str, response: Response):
     }
     return JSONResponse(json_compliant(response_data))
 
-# --- NOUVELLE ROUTE PREVISIONNELLE (FORECAST) ---
+# --- ROUTE FORECAST ---
 @app.get("/api/forecast/simulate/{client_id}")
 async def api_forecast_simulate(client_id: str):
     file_path = find_site_file(client_id)
@@ -308,7 +309,6 @@ async def api_forecast_simulate(client_id: str):
     vol = fin['volume_mwh']
     typology = data.get('location', {}).get('typologie', '')
     if not typology:
-        # Fallback intelligent si typologie vide
         name = data.get('identity', {}).get('site_name', '').upper()
         if "ECOLE" in name: typology = "ECOLE"
         elif "ECLAIRAGE" in name: typology = "ECLAIRAGE"
@@ -316,10 +316,8 @@ async def api_forecast_simulate(client_id: str):
     
     energy = "gaz" if fin['meta']['is_gas'] else "elec"
     
-    # APPEL SATELLITE
     res = forecast.generate_3_year_projection(vol, typology, energy)
     return JSONResponse(json_compliant(res))
-# ------------------------------------------------
 
 @app.post("/api/ops/market/update")
 async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header(None)):
@@ -492,6 +490,7 @@ async def view_processing(request: Request): return templates.TemplateResponse("
 async def view_dashboard(request: Request, profile: str):
     if profile == "retail": return templates.TemplateResponse("retail.html", {"request": request})
     if profile == "mairie": return templates.TemplateResponse("mairie.html", {"request": request})
+    if profile == "forecast": return templates.TemplateResponse("forecast.html", {"request": request}) # NOUVELLE ROUTE
     t = f"{profile}.html"
     if os.path.exists(os.path.join(TEMPLATE_DIR, t)): return templates.TemplateResponse(t, {"request": request, "profile": profile})
     return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
