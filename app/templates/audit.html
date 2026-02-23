@@ -22,6 +22,7 @@
         .input-bento { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px; border-radius: 8px; width: 100%; text-align: center; font-family: 'JetBrains Mono'; font-size: 1.2rem; }
         .input-bento:focus { border-color: #10B981; outline: none; }
         
+        /* DPE BARS */
         .dpe-bar { height: 30px; margin-bottom: 8px; border-radius: 4px; position: relative; clip-path: polygon(0% 0%, 95% 0%, 100% 50%, 95% 100%, 0% 100%); display: flex; align-items: center; padding-left: 15px; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5); opacity: 0.3; transition: all 0.3s; }
         .dpe-bar.active { opacity: 1; transform: scale(1.02); box-shadow: 0 0 20px rgba(255,255,255,0.2); border: 2px solid white; z-index: 10; }
         .dpe-A { background: #009C3D; width: 30%; }
@@ -36,7 +37,7 @@
 <body class="flex h-screen w-screen overflow-hidden">
 
     <aside class="w-20 bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-50">
-        <a href="/dashboard/retail" class="w-10 h-10 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8" title="Retour Dashboard">
+        <a href="/dashboard/retail" id="btn-back" class="w-10 h-10 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8" title="Retour Dashboard">
             <i class="fa-solid fa-arrow-left"></i>
         </a>
         <div class="w-10 h-10 rounded-xl bg-eco/20 text-eco flex items-center justify-center font-bold mb-4 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
@@ -79,6 +80,7 @@
             </div>
 
             <div id="audit-results" class="hidden grid grid-cols-12 gap-8 h-full">
+                
                 <div class="col-span-5 bento-card p-8 border-l-4 border-eco flex flex-col">
                     <h3 class="text-sm font-bold text-gray-400 uppercase mb-6">Performance Énergétique</h3>
                     <div class="flex-1 flex flex-col justify-center space-y-2" id="dpe-scale">
@@ -137,8 +139,22 @@
         let FLEET_DATA = [];
         let CURRENT_SITE = null;
         
-        // REFERENTIEL NAF LOCAL (Secours)
         const NAF_REF = { "10": 450, "47": 250, "84": 140, "85": 110, "52": 160, "93": 220, "68": 180, "46": 130, "43": 90, "DEFAULT": 180 };
+
+        // --- NAVIGATION INTELLIGENTE ---
+        function checkOrigin() {
+            const params = new URLSearchParams(window.location.search);
+            const origin = params.get('origin');
+            const btn = document.getElementById('btn-back');
+            
+            if (origin === 'mairie') {
+                btn.href = '/dashboard/mairie';
+                btn.title = "Retour Mairie";
+            } else {
+                btn.href = '/dashboard/retail';
+                btn.title = "Retour Retail";
+            }
+        }
 
         async function loadSites() {
             try {
@@ -173,7 +189,6 @@
                 document.getElementById('blank-state').classList.add('hidden');
 
                 const surf = data.location.surface || 0;
-                // Si la surface existe, on force le calcul local
                 if (surf > 10) {
                     calculateAndRender(data);
                 } else {
@@ -210,7 +225,6 @@
                     })
                 });
                 
-                // MISE A JOUR LOCALE IMMEDIATE
                 CURRENT_SITE.location.surface = parseFloat(surface);
                 calculateAndRender(CURRENT_SITE);
 
@@ -228,21 +242,17 @@
             const naf = data.identity.naf || "NA";
             const nafKey = naf.substring(0, 2);
             
-            // CALCUL IPE
             const ipe = Math.round(volKwh / surf);
             const ref = NAF_REF[nafKey] || NAF_REF["DEFAULT"];
             
-            // RENDER
             document.getElementById('val-ipe').innerText = ipe;
             document.getElementById('val-ref').innerText = ref;
             document.getElementById('val-naf').innerText = naf;
 
-            // DPE BAR
             document.querySelectorAll('.dpe-bar').forEach(el => el.classList.remove('active'));
             const grade = getGrade(ipe);
             document.getElementById(`bar-${grade}`).classList.add('active');
 
-            // ANALYSE
             const delta = ((ipe - ref) / ref) * 100;
             const txtComp = document.getElementById('txt-comparison');
             if(delta < 0) {
@@ -251,9 +261,8 @@
                 txtComp.innerHTML = `⚠️ <span class="text-bad font-bold">Attention !</span> Surconsommation de ${Math.round(delta)}% détectée.`;
             }
 
-            // IMPACT
             const factor = data.energy_type === 'gaz' ? 0.227 : 0.052;
-            const co2 = (volKwh * factor) / 1000; // Tonnes
+            const co2 = (volKwh * factor) / 1000; 
             document.getElementById('val-co2').innerText = co2.toFixed(1) + " t";
             document.getElementById('val-trees').innerText = Math.round(co2 * 40);
         }
@@ -272,6 +281,8 @@
             showSurfaceForm();
         }
 
+        // Init
+        checkOrigin();
         loadSites();
     </script>
 </body>
