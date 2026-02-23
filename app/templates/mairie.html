@@ -73,9 +73,10 @@
 
         <div class="px-4 mt-4">
             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-2 px-2">Outils Experts</div>
-            <a href="/dashboard/forecast?origin=mairie" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition">
+            <!-- FORECAST INTEGRE -->
+            <button onclick="switchView('forecast')" id="nav-forecast" class="nav-item w-full flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white transition">
                 <i class="fa-solid fa-crystal-ball w-4 text-future"></i> Projection 3 Ans
-            </a>
+            </button>
             <a href="/audit?origin=mairie" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition">
                 <i class="fa-solid fa-stethoscope w-4 text-green-500"></i> Audit Décret Tertiaire
             </a>
@@ -124,7 +125,6 @@
                         <div class="text-xs font-bold text-gray-400 uppercase mb-1">Total Sites</div>
                         <div class="text-3xl font-bold text-white" id="kpi-sites">0</div>
                     </div>
-                    <!-- KPI INTERACTIF TALON -->
                     <div class="bento-card p-6 border-l-4 border-alert cursor-pointer hover:bg-white/5 transition" onclick="filterWaste()">
                         <div class="flex justify-between items-start">
                             <div>
@@ -140,7 +140,6 @@
                         <div class="text-3xl font-bold text-white" id="kpi-alerts">0</div>
                         <div class="text-[10px] text-gray-500">Surconsommation détectée</div>
                     </div>
-                    <!-- SELECTEUR ENERGIE -->
                     <div class="bento-card p-1 flex bg-black/40">
                         <button onclick="filterEnergy('elec')" id="btn-elec" class="flex-1 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center gap-1 active-energy">
                             <i class="fa-solid fa-bolt text-lg"></i> Élec
@@ -198,7 +197,7 @@
                 </div>
             </div>
 
-            <!-- VUE 2 : SALLE DES MARCHES (MARKET WATCH) -->
+            <!-- VUE 2 : SALLE DES MARCHES -->
             <div id="view-market" class="view-section hidden space-y-6">
                 <div class="text-center mb-8">
                     <h2 class="text-3xl font-black text-white italic tracking-tight">STRATÉGIE <span class="text-cyan">ACHAT</span></h2>
@@ -226,7 +225,7 @@
                     </div>
                 </div>
             </div>
-
+            
             <!-- VUE 5 : COMPARATEUR (RESTAURÉ) -->
             <div id="view-comparator" class="view-section hidden space-y-6">
                 <div class="text-center mb-8">
@@ -272,8 +271,33 @@
                 </div>
             </div>
 
+            <!-- VUE 6 : FORECAST (INTEGRÉ) -->
+            <div id="view-forecast" class="view-section hidden space-y-6">
+                <div class="text-center mb-8">
+                    <h2 class="text-3xl font-black text-white italic tracking-tight">PROJECTION <span class="text-future">3 ANS</span></h2>
+                    <p class="text-sm text-gray-500 mt-2">Simulateur de trajectoire énergétique (Tendanciel vs Sobriété)</p>
+                </div>
+                
+                <div class="max-w-xl mx-auto mb-8">
+                     <select id="forecast-site-select" onchange="runForecast()" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-future">
+                        <option value="">-- Sélectionner un site --</option>
+                     </select>
+                </div>
+
+                <div id="forecast-results" class="hidden space-y-6">
+                    <div class="grid grid-cols-4 gap-6">
+                        <div class="bento-card p-6 border-l-4 border-future"><div class="text-[10px] uppercase text-gray-500 font-bold mb-1">Profil Appliqué</div><div class="text-xl font-bold text-white" id="fc-profile">--</div></div>
+                        <div class="bento-card p-6 border-l-4 border-gray-500"><div class="text-[10px] uppercase text-gray-500 font-bold mb-1">Tendanciel (3 Ans)</div><div class="text-xl font-bold text-white" id="fc-trend">-- MWh</div></div>
+                        <div class="bento-card p-6 border-l-4 border-success"><div class="text-[10px] uppercase text-gray-500 font-bold mb-1">Sobriété (3 Ans)</div><div class="text-xl font-bold text-white" id="fc-sobriety">-- MWh</div></div>
+                        <div class="bento-card p-6 bg-success/10 border border-success/20 flex flex-col justify-center items-center"><div class="text-xs font-bold text-success uppercase mb-1">Gain Potentiel</div><div class="text-3xl font-black text-white" id="fc-gain">-- MWh</div></div>
+                    </div>
+                    <div class="bento-card p-6 h-[400px] relative"><canvas id="forecastChartMain"></canvas></div>
+                </div>
+            </div>
+
             <!-- VUE 3 : CITOYENS -->
             <div id="view-citizens" class="view-section hidden space-y-6">
+                <!-- ... Code identique V14 ... -->
                 <div class="flex justify-between items-end mb-4"><div><h2 class="text-3xl font-black text-white italic tracking-tight">ACHAT <span class="text-citizen">GROUPÉ</span></h2><p class="text-sm text-gray-500 mt-2">Mobilisez vos citoyens.</p></div><div class="flex items-center gap-4 bg-white/5 p-2 rounded-xl border border-white/10"><div class="text-right"><div class="text-[10px] text-gray-400 uppercase font-bold">Score Ville Verte</div><div class="text-xs text-success font-bold">Excellent</div></div><div class="w-12 h-12 rounded-full bg-success text-abysse font-black flex items-center justify-center text-xl border-4 border-abysse shadow-[0_0_20px_rgba(16,185,129,0.4)]">A+</div></div></div>
                 <div class="grid grid-cols-3 gap-6"><div class="bento-card p-6 border-l-4 border-citizen flex flex-col justify-between"><div><div class="text-xs font-bold text-gray-400 uppercase mb-1">Citoyens Inscrits</div><div class="text-4xl font-black text-white">1 248</div></div><div class="mt-4 w-full bg-white/10 h-1 rounded overflow-hidden"><div class="h-full bg-citizen" style="width: 65%"></div></div><div class="text-[10px] text-citizen mt-1">Objectif: 2000 foyers</div></div><div class="bento-card p-6 border-l-4 border-cyan flex flex-col justify-between"><div><div class="text-xs font-bold text-gray-400 uppercase mb-1">Volume Négociable</div><div class="text-4xl font-black text-white">5.2 <span class="text-lg text-gray-500 font-normal">GWh</span></div></div><div class="mt-2 text-xs text-gray-400 flex items-center gap-2"><i class="fa-solid fa-users"></i> Puissance d'achat équivalente à 20 Stades</div></div><div class="bento-card p-6 bg-gradient-to-br from-card to-citizen/10 flex flex-col justify-center items-center text-center"><div class="mb-3 text-white font-bold text-sm">Affichez votre score !</div><div class="bg-abysse p-3 rounded text-[10px] font-mono text-gray-400 w-full mb-3 select-all">&lt;iframe src="energistrat.com/widget/ville/score"&gt;&lt;/iframe&gt;</div><button class="bg-white text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-gray-200 transition flex items-center gap-2"><i class="fa-solid fa-copy"></i> Copier le code Widget</button></div></div>
                 <div class="bento-card p-6"><h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Dynamique d'Inscription (30 jours)</h3><div class="h-64 w-full relative"><canvas id="citizenChart"></canvas></div></div>
@@ -296,99 +320,10 @@
             <button onclick="exportDQE()" class="flex items-center gap-2 hover:text-mairie font-bold text-sm transition"><i class="fa-solid fa-file-excel"></i> Exporter DQE</button>
         </div>
 
-        <!-- MODAL DETAIL -->
-        <div id="detail-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center p-8 backdrop-blur-sm">
-            <div class="bento-card w-full max-w-5xl h-full max-h-[90vh] overflow-y-auto relative flex flex-col">
-                <button onclick="closeDetail()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
-                <div class="p-8 border-b border-white/5 flex justify-between items-start">
-                    <div>
-                        <h2 class="text-3xl font-bold text-white" id="modal-title">--</h2>
-                        <div class="flex gap-4 mt-2 text-sm text-gray-400">
-                            <span id="modal-address"><i class="fa-solid fa-location-dot mr-1"></i> --</span>
-                            <span id="modal-surface" class="text-cyan font-mono"><i class="fa-solid fa-ruler-combined mr-1"></i> -- m²</span>
-                            <span id="modal-type" class="px-2 py-0.5 rounded text-[10px] font-bold">--</span>
-                        </div>
-                    </div>
-                    <button onclick="openEditMode()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2"><i class="fa-solid fa-pen-to-square"></i> Modifier Fiche</button>
-                </div>
-                <div class="p-8 grid grid-cols-3 gap-8 flex-1">
-                    <div class="col-span-2 space-y-6">
-                        <div class="bento-card p-6 border-l-4 border-mairie bg-white/5">
-                            <h3 class="text-sm font-bold text-white mb-4">Données Techniques</h3>
-                            <div class="grid grid-cols-2 gap-4 text-xs" id="modal-tech-grid"></div>
-                            <div class="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-4 text-xs">
-                                <div><span class="text-gray-500 block">Chauffage</span><span class="text-white" id="disp-chauffage">--</span></div>
-                                <div><span class="text-gray-500 block">Isolation</span><span class="text-white" id="disp-isolation">--</span></div>
-                                <div><span class="text-gray-500 block">Régulation</span><span class="text-white" id="disp-regulation">--</span></div>
-                            </div>
-                        </div>
-                        <div class="h-64 bg-white/5 rounded-xl p-4 flex flex-col">
-                            <div class="flex justify-between items-center mb-2">
-                                <h3 class="text-xs font-bold text-gray-400">Analyse de Charge</h3>
-                                <div class="flex gap-2">
-                                    <button onclick="updateModalChart('24h')" class="text-[10px] bg-white/10 px-2 py-1 rounded text-white hover:bg-white/20">24h</button>
-                                    <button onclick="updateModalChart('3y')" class="text-[10px] bg-mairie px-2 py-1 rounded text-white hover:bg-blue-600">Projection 3 Ans</button>
-                                </div>
-                            </div>
-                            <div class="flex-1 relative"><canvas id="modalChart"></canvas></div>
-                        </div>
-                    </div>
-                    <div class="space-y-6">
-                        <div class="bento-card p-6 border-t-4 border-alert text-center">
-                            <div class="text-alert font-bold text-lg mb-1">ALERTE TALON</div>
-                            <div class="text-3xl font-bold text-white mb-2" id="modal-waste">-- €</div>
-                            <p class="text-[10px] text-gray-400">Consommation inutile estimée (Nuit/WE).</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL EDIT -->
-        <div id="edit-modal" class="fixed inset-0 bg-black/90 z-[110] hidden flex items-center justify-center backdrop-blur-sm">
-            <div class="bento-card p-8 rounded-2xl w-[500px] relative border border-mairie/30 shadow-[0_0_50px_rgba(59,130,246,0.1)]">
-                <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-mairie"></i> Mise à jour Patrimoine</h3>
-                <div class="space-y-4">
-                    <input type="hidden" id="edit-id">
-                    <div><label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Bâtiment</label><input type="text" id="edit-name" class="input-edit"></div>
-                    <div><label class="text-[10px] text-gray-500 uppercase font-bold text-cyan">Surface (m²)</label><input type="number" id="edit-surface" class="input-edit"></div>
-                    <div class="pt-4 border-t border-white/5"><span class="text-xs font-bold text-white">Carnet de Santé</span></div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold">Chauffage</label><select id="edit-chauffage" class="input-edit bg-abysse"><option value="Inconnu">Inconnu</option><option value="Gaz Condensation">Gaz Condensation</option><option value="Fioul">Fioul</option><option value="Élec Direct">Élec Direct</option><option value="PAC">PAC</option><option value="Réseau Chaleur">Réseau Chaleur</option></select></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold">Régulation</label><select id="edit-regulation" class="input-edit bg-abysse"><option value="Aucune">Aucune</option><option value="Thermostat Simple">Thermostat Simple</option><option value="GTB/GTC">GTB/GTC</option><option value="Horloge">Horloge</option></select></div>
-                    </div>
-                    <div><label class="text-[10px] text-gray-500 uppercase font-bold">Isolation</label><select id="edit-isolation" class="input-edit bg-abysse"><option value="Inconnue">Inconnue</option><option value="Non Isolé">Non Isolé</option><option value="Double Vitrage">Double Vitrage</option><option value="ITE Complète">ITE Complète</option></select></div>
-                </div>
-                <div class="flex justify-end gap-3 mt-8">
-                    <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button>
-                    <button onclick="saveMairieData()" class="bg-mairie text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 transition shadow-lg">ENREGISTRER</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MASS EDIT -->
-        <div id="mass-edit-modal" class="fixed inset-0 bg-black/90 z-[80] hidden flex items-center justify-center backdrop-blur-sm">
-            <div class="bento-card p-8 rounded-2xl w-[500px] relative border border-gold/30 shadow-[0_0_50px_rgba(245,158,11,0.1)]">
-                <div class="flex items-center gap-3 mb-6"><div class="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center text-gold text-xl"><i class="fa-solid fa-layer-group"></i></div><div><h3 class="text-lg font-bold text-white">Mise à jour Groupée</h3><p class="text-xs text-gray-400"><span id="mass-count">0</span> sites sélectionnés</p></div></div>
-                <div class="bg-white/5 p-4 rounded-xl mb-4 border border-white/10 hover:border-gold/50 transition">
-                    <div class="flex justify-between items-center mb-2"><span class="text-xs font-bold text-white">Import Excel Patrimoine</span><a href="/api/settings/template_patrimoine" class="text-[10px] text-gold underline"><i class="fa-solid fa-download"></i> Modèle</a></div>
-                    <input type="file" id="mass-file" class="hidden" accept=".xlsx,.csv" onchange="uploadPatrimoine(this)">
-                    <label for="mass-file" class="block w-full text-center py-2 border border-dashed border-gray-600 rounded cursor-pointer hover:bg-white/5 text-[10px] text-gray-400">Cliquez pour uploader (PDL + Chauffage + Isolation)</label>
-                </div>
-                <div class="space-y-4 bg-white/5 p-4 rounded-xl">
-                    <div><label class="text-[10px] text-gray-500 uppercase font-bold">Affecter au Lot</label><input type="text" id="mass-lot-input" placeholder="Ex: Lot 1 - Ecoles" class="input-edit bg-abysse w-full"></div>
-                    <div class="h-px bg-white/10 my-2"></div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold">Typologie</label><select id="mass-type" class="input-edit bg-abysse"><option value="">-- Ne pas modifier --</option><option value="Ecole">École</option><option value="Sport">Sport / Gymnase</option><option value="Admin">Administratif</option><option value="Eclairage">Éclairage Public</option></select></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold">Chauffage</label><select id="mass-chauffage" class="input-edit bg-abysse"><option value="">-- Ne pas modifier --</option><option value="Gaz">Gaz</option><option value="Elec">Élec</option><option value="Fioul">Fioul</option></select></div>
-                    </div>
-                </div>
-                <div class="flex justify-end gap-3 mt-8">
-                    <button onclick="document.getElementById('mass-edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button>
-                    <button onclick="applyMassUpdate()" class="bg-gold text-black px-6 py-2 rounded-lg text-xs font-bold hover:bg-yellow-500 transition shadow-lg">APPLIQUER</button>
-                </div>
-            </div>
-        </div>
+        <!-- MODALS (Detail, Edit, Mass Edit - Same as V16) -->
+        <div id="detail-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center p-8 backdrop-blur-sm"><div class="bento-card w-full max-w-5xl h-full max-h-[90vh] overflow-y-auto relative flex flex-col"><button onclick="closeDetail()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button><div class="p-8 border-b border-white/5 flex justify-between items-start"><div><h2 class="text-3xl font-bold text-white" id="modal-title">--</h2><div class="flex gap-4 mt-2 text-sm text-gray-400"><span id="modal-address"><i class="fa-solid fa-location-dot mr-1"></i> --</span><span id="modal-surface" class="text-cyan font-mono"><i class="fa-solid fa-ruler-combined mr-1"></i> -- m²</span><span id="modal-type" class="px-2 py-0.5 rounded text-[10px] font-bold">--</span></div></div><button onclick="openEditMode()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2"><i class="fa-solid fa-pen-to-square"></i> Modifier Fiche</button></div><div class="p-8 grid grid-cols-3 gap-8 flex-1"><div class="col-span-2 space-y-6"><div class="bento-card p-6 border-l-4 border-mairie bg-white/5"><h3 class="text-sm font-bold text-white mb-4">Données Techniques</h3><div class="grid grid-cols-2 gap-4 text-xs" id="modal-tech-grid"></div><div class="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-4 text-xs"><div><span class="text-gray-500 block">Chauffage</span><span class="text-white" id="disp-chauffage">--</span></div><div><span class="text-gray-500 block">Isolation</span><span class="text-white" id="disp-isolation">--</span></div><div><span class="text-gray-500 block">Régulation</span><span class="text-white" id="disp-regulation">--</span></div></div></div><div class="h-64 bg-white/5 rounded-xl p-4 flex flex-col"><div class="flex justify-between items-center mb-2"><h3 class="text-xs font-bold text-gray-400">Analyse de Charge</h3><div class="flex gap-2"><button onclick="updateModalChart('24h')" class="text-[10px] bg-white/10 px-2 py-1 rounded text-white hover:bg-white/20">24h</button><button onclick="updateModalChart('3y')" class="text-[10px] bg-mairie px-2 py-1 rounded text-white hover:bg-blue-600">Projection 3 Ans</button></div></div><div class="flex-1 relative"><canvas id="modalChart"></canvas></div></div></div><div class="space-y-6"><div class="bento-card p-6 border-t-4 border-alert text-center"><div class="text-alert font-bold text-lg mb-1">ALERTE TALON</div><div class="text-3xl font-bold text-white mb-2" id="modal-waste">-- €</div><p class="text-[10px] text-gray-400">Consommation inutile estimée (Nuit/WE).</p></div></div></div></div></div>
+        <div id="edit-modal" class="fixed inset-0 bg-black/90 z-[110] hidden flex items-center justify-center backdrop-blur-sm"><div class="bento-card p-8 rounded-2xl w-[500px] relative border border-mairie/30 shadow-[0_0_50px_rgba(59,130,246,0.1)]"><h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-mairie"></i> Mise à jour Patrimoine</h3><div class="space-y-4"><input type="hidden" id="edit-id"><div><label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Bâtiment</label><input type="text" id="edit-name" class="input-edit"></div><div><label class="text-[10px] text-gray-500 uppercase font-bold text-cyan">Surface (m²)</label><input type="number" id="edit-surface" class="input-edit"></div><div class="pt-4 border-t border-white/5"><span class="text-xs font-bold text-white">Carnet de Santé</span></div><div class="grid grid-cols-2 gap-4"><div><label class="text-[10px] text-gray-500 uppercase font-bold">Chauffage</label><select id="edit-chauffage" class="input-edit bg-abysse"><option value="Inconnu">Inconnu</option><option value="Gaz Condensation">Gaz Condensation</option><option value="Fioul">Fioul</option><option value="Élec Direct">Élec Direct</option><option value="PAC">PAC</option><option value="Réseau Chaleur">Réseau Chaleur</option></select></div><div><label class="text-[10px] text-gray-500 uppercase font-bold">Régulation</label><select id="edit-regulation" class="input-edit bg-abysse"><option value="Aucune">Aucune</option><option value="Thermostat Simple">Thermostat Simple</option><option value="GTB/GTC">GTB/GTC</option><option value="Horloge">Horloge</option></select></div></div><div><label class="text-[10px] text-gray-500 uppercase font-bold">Isolation</label><select id="edit-isolation" class="input-edit bg-abysse"><option value="Inconnue">Inconnue</option><option value="Non Isolé">Non Isolé</option><option value="Double Vitrage">Double Vitrage</option><option value="ITE Complète">ITE Complète</option></select></div></div><div class="flex justify-end gap-3 mt-8"><button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button><button onclick="saveMairieData()" class="bg-mairie text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 transition shadow-lg">ENREGISTRER</button></div></div></div>
+        <div id="mass-edit-modal" class="fixed inset-0 bg-black/90 z-[80] hidden flex items-center justify-center backdrop-blur-sm"><div class="bento-card p-8 rounded-2xl w-[500px] relative border border-gold/30 shadow-[0_0_50px_rgba(245,158,11,0.1)]"><div class="flex items-center gap-3 mb-6"><div class="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center text-gold text-xl"><i class="fa-solid fa-layer-group"></i></div><div><h3 class="text-lg font-bold text-white">Mise à jour Groupée</h3><p class="text-xs text-gray-400"><span id="mass-count">0</span> sites sélectionnés</p></div></div><div class="bg-white/5 p-4 rounded-xl mb-4 border border-white/10 hover:border-gold/50 transition"><div class="flex justify-between items-center mb-2"><span class="text-xs font-bold text-white">Import Excel Patrimoine</span><a href="/api/settings/template_patrimoine" class="text-[10px] text-gold underline"><i class="fa-solid fa-download"></i> Modèle</a></div><input type="file" id="mass-file" class="hidden" accept=".xlsx,.csv" onchange="uploadPatrimoine(this)"><label for="mass-file" class="block w-full text-center py-2 border border-dashed border-gray-600 rounded cursor-pointer hover:bg-white/5 text-[10px] text-gray-400">Cliquez pour uploader (PDL + Chauffage + Isolation)</label></div><div class="space-y-4 bg-white/5 p-4 rounded-xl"><div><label class="text-[10px] text-gray-500 uppercase font-bold">Affecter au Lot</label><input type="text" id="mass-lot-input" placeholder="Ex: Lot 1 - Ecoles" class="input-edit bg-abysse w-full"></div><div class="h-px bg-white/10 my-2"></div><div class="grid grid-cols-2 gap-4"><div><label class="text-[10px] text-gray-500 uppercase font-bold">Typologie</label><select id="mass-type" class="input-edit bg-abysse"><option value="">-- Ne pas modifier --</option><option value="Ecole">École</option><option value="Sport">Sport / Gymnase</option><option value="Admin">Administratif</option><option value="Eclairage">Éclairage Public</option></select></div><div><label class="text-[10px] text-gray-500 uppercase font-bold">Chauffage</label><select id="mass-chauffage" class="input-edit bg-abysse"><option value="">-- Ne pas modifier --</option><option value="Gaz">Gaz</option><option value="Elec">Élec</option><option value="Fioul">Fioul</option></select></div></div></div><div class="flex justify-end gap-3 mt-8"><button onclick="document.getElementById('mass-edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button><button onclick="applyMassUpdate()" class="bg-gold text-black px-6 py-2 rounded-lg text-xs font-bold hover:bg-yellow-500 transition shadow-lg">APPLIQUER</button></div></div></div>
 
     </main>
 
@@ -401,6 +336,7 @@
         let budgetChartInstance = null;
         let modalChartInstance = null;
         let citizenChartInstance = null;
+        let forecastChartInstance = null;
         let CURRENT_SITE = null;
 
         // --- NAVIGATION ---
@@ -408,14 +344,8 @@
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active', 'text-white'));
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
-            
-            ['view-patrimoine', 'view-budget', 'view-citizens', 'view-market', 'view-comparator'].forEach(id => {
-                const el = document.getElementById(id);
-                if(el) el.classList.add('hidden');
-            });
-            
-            const target = document.getElementById('view-' + viewName);
-            if(target) target.classList.remove('hidden');
+            ['view-patrimoine', 'view-budget', 'view-citizens', 'view-market', 'view-comparator', 'view-forecast'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.getElementById('view-' + viewName).classList.remove('hidden');
             
             if(viewName !== 'patrimoine') document.getElementById('action-bar').classList.remove('visible');
             else updateActionBar();
@@ -423,9 +353,9 @@
             if(viewName === 'citizens') loadCitizenChart();
             if(viewName === 'budget') updateBudgetCharts();
             if(viewName === 'market') calculateMarketStrategy();
+            if(viewName === 'forecast') initForecast();
         }
 
-        // --- LOAD DATA ---
         async function loadFleet() {
             try {
                 const res = await fetch('/api/dashboard/fleet');
@@ -441,118 +371,53 @@
             } catch(e) { console.error(e); }
         }
 
-        function updateLotSelect() {
-            const sel = document.getElementById('filter-lot');
-            sel.innerHTML = '<option value="all">Tous les Lots</option>';
-            LOTS.forEach(l => { const opt = document.createElement('option'); opt.value = l; opt.innerText = l; sel.appendChild(opt); });
-        }
-
-        // --- FILTERS ---
-        window.filterEnergy = function(type) {
-            CURRENT_ENERGY = type;
-            ['elec', 'gaz', 'eau'].forEach(t => {
-                const btn = document.getElementById('btn-' + t);
-                if(t === type) {
-                    btn.classList.add('bg-white/10', 'text-white');
-                    btn.classList.remove('text-gray-400');
-                    if(t === 'elec') btn.classList.add('text-mairie');
-                    if(t === 'gaz') btn.classList.add('text-gas');
-                    if(t === 'eau') btn.classList.add('text-water');
-                } else {
-                    btn.className = "flex-1 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center gap-1";
-                }
-            });
-            applyFilters();
-        }
-
-        window.filterWaste = function() {
-            const term = document.getElementById('search-input');
-            term.value = "alert:waste";
-            applyFilters();
-        }
-
-        function applyFilters() {
-            const term = document.getElementById('search-input').value.toLowerCase();
-            const typeFilter = document.getElementById('filter-type').value;
-            const lotFilter = document.getElementById('filter-lot').value;
-
-            const filtered = FLEET_DATA.filter(s => {
-                if(CURRENT_ENERGY !== 'all' && s.energy !== CURRENT_ENERGY) return false;
-                
-                if(term === "alert:waste") return s.ghost_savings > 100;
-
-                let type = 'admin';
-                const n = s.name.toLowerCase();
-                if(n.includes('ecole') || n.includes('scolaire')) type = 'ecole';
-                else if(n.includes('gymnase') || n.includes('stade') || n.includes('sport')) type = 'sport';
-                else if(n.includes('eclairage') || n.includes('ep ')) type = 'ep';
-                
-                if(typeFilter !== 'all' && type !== typeFilter) return false;
-                if(lotFilter !== 'all' && (!s.segment || !s.segment.includes(lotFilter))) return false;
-                
-                return s.name.toLowerCase().includes(term) || s.city.toLowerCase().includes(term) || s.id.includes(term);
-            });
-            renderTable(filtered);
-            document.getElementById('visible-count').innerText = filtered.length;
-        }
-
-        function renderTable(data) {
-            const tbody = document.getElementById('fleet-table-body');
-            tbody.innerHTML = '';
-            const displayData = data.slice(0, 100); 
-            displayData.forEach(site => {
-                const isSelected = SELECTED_IDS.has(site.id);
-                const isGaz = site.energy === 'gaz';
-                const row = document.createElement('tr');
-                row.className = "site-row border-b border-white/5 hover:bg-white/5 cursor-pointer transition";
-                row.onclick = () => openDetail(site.id);
-                
-                let icon = '<i class="fa-solid fa-building"></i>';
-                let typeLabel = "Admin";
-                if(site.name.toLowerCase().includes('ecole')) { icon = '<i class="fa-solid fa-school"></i>'; typeLabel = "École"; }
-                if(site.name.toLowerCase().includes('sport') || site.name.toLowerCase().includes('stade')) { icon = '<i class="fa-solid fa-basketball"></i>'; typeLabel = "Sport"; }
-                if(site.name.toLowerCase().includes('eclairage')) { icon = '<i class="fa-solid fa-lightbulb"></i>'; typeLabel = "EP"; }
-                
-                let alertBadge = '<span class="text-success text-[10px]"><i class="fa-solid fa-check"></i> OK</span>';
-                if (site.ghost_savings > 100) {
-                    if (typeLabel === "École") alertBadge = '<span class="text-alert text-[10px] font-bold animate-pulse"><i class="fa-solid fa-triangle-exclamation"></i> VACANCES ?</span>';
-                    else alertBadge = '<span class="text-warning text-[10px] font-bold"><i class="fa-solid fa-clock"></i> TALON WE</span>';
-                }
-                
-                row.innerHTML = `
-                    <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
-                        <input type="checkbox" class="accent-mairie w-4 h-4 cursor-pointer" onchange="window.toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}>
-                    </td>
-                    <td class="px-4 py-3 font-bold text-white flex items-center gap-2"><span class="text-gray-500 w-5 text-center">${icon}</span> ${site.name}</td>
-                    <td class="px-4 py-3 text-gray-400 font-mono text-xs">${typeLabel}</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono text-xs">${site.id}</td>
-                    <td class="px-4 py-3 text-white text-xs">${site.segment || '-'}</td>
-                    <td class="px-4 py-3 text-right text-gray-300 font-mono text-xs">${Math.round(site.volume)}</td>
-                    <td class="px-4 py-3 text-right font-bold text-white">${Math.round(site.budget).toLocaleString()} €</td>
-                    <td class="px-4 py-3 text-center">${alertBadge}</td>
-                `;
-                tbody.appendChild(row);
+        // --- FORECAST LOGIC (NOUVEAU) ---
+        function initForecast() {
+            const sel = document.getElementById('forecast-site-select');
+            sel.innerHTML = '<option value="">-- Sélectionner un site --</option>';
+            FLEET_DATA.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.innerText = s.name;
+                sel.appendChild(opt);
             });
         }
 
-        function updateKPIs() {
-            let totalBudget = 0;
-            let totalWaste = 0;
-            let countAlerts = 0;
-            FLEET_DATA.forEach(s => { 
-                totalBudget += s.budget; 
-                totalWaste += s.ghost_savings; 
-                if(s.ghost_savings > 100) countAlerts++; 
-            });
-            document.getElementById('header-budget').innerText = Math.round(totalBudget).toLocaleString() + " €";
-            document.getElementById('kpi-waste').innerText = Math.round(totalWaste).toLocaleString() + " €";
-            document.getElementById('kpi-sites').innerText = FLEET_DATA.length;
-            document.getElementById('kpi-alerts').innerText = countAlerts;
-            if(countAlerts > 0) document.getElementById('sobriety-badge').classList.remove('hidden');
-            else document.getElementById('sobriety-badge').classList.add('hidden');
+        async function runForecast() {
+            const id = document.getElementById('forecast-site-select').value;
+            if(!id) return;
+            
+            document.getElementById('forecast-results').classList.remove('hidden');
+            
+            try {
+                const res = await fetch(`/api/forecast/simulate/${id}`);
+                const data = await res.json();
+                
+                if(data.error) return alert(data.error);
+                
+                document.getElementById('fc-profile').innerText = data.profile_used;
+                document.getElementById('fc-trend').innerText = data.total_trend + " MWh";
+                document.getElementById('fc-sobriety').innerText = data.total_sobriety + " MWh";
+                document.getElementById('fc-gain').innerText = "-" + data.gain_potential_mwh + " MWh";
+                
+                const ctx = document.getElementById('forecastChartMain').getContext('2d');
+                if(forecastChartInstance) forecastChartInstance.destroy();
+                
+                forecastChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [
+                            { label: 'Tendanciel', data: data.dataset_trend, borderColor: '#94A3B8', borderDash: [5,5], tension: 0.4 },
+                            { label: 'Objectif Sobriété', data: data.dataset_sobriety, borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4 }
+                        ]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            } catch(e) { console.error(e); }
         }
 
-        // --- MARKET WATCH ---
+        // --- MARKET STRATEGY ---
         function calculateMarketStrategy() {
             let totalBudget = 0;
             let totalVol = 0;
@@ -635,7 +500,59 @@
             } catch(e) { console.error(e); alert("Erreur réseau"); }
         }
 
-        // --- DETAIL MODAL & FORECAST ---
+        // --- FILTERS & TABLE (UNCHANGED) ---
+        function updateLotSelect() { const sel = document.getElementById('filter-lot'); sel.innerHTML = '<option value="all">Tous les Lots</option>'; LOTS.forEach(l => { const opt = document.createElement('option'); opt.value = l; opt.innerText = l; sel.appendChild(opt); }); }
+        window.filterEnergy = function(type) { CURRENT_ENERGY = type; ['elec', 'gaz', 'eau'].forEach(t => { const btn = document.getElementById('btn-' + t); if(t === type) { btn.classList.add('bg-white/10', 'text-white'); btn.classList.remove('text-gray-400'); if(t === 'elec') btn.classList.add('text-mairie'); if(t === 'gaz') btn.classList.add('text-gas'); if(t === 'eau') btn.classList.add('text-water'); } else { btn.className = "flex-1 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center gap-1"; } }); applyFilters(); }
+        window.filterWaste = function() { const term = document.getElementById('search-input'); term.value = "alert:waste"; applyFilters(); }
+        function applyFilters() {
+            const term = document.getElementById('search-input').value.toLowerCase();
+            const typeFilter = document.getElementById('filter-type').value;
+            const lotFilter = document.getElementById('filter-lot').value;
+            const filtered = FLEET_DATA.filter(s => {
+                if(CURRENT_ENERGY !== 'all' && s.energy !== CURRENT_ENERGY) return false;
+                if(term === "alert:waste") return s.ghost_savings > 100;
+                let type = 'admin';
+                const n = s.name.toLowerCase();
+                if(n.includes('ecole') || n.includes('scolaire')) type = 'ecole'; else if(n.includes('gymnase') || n.includes('stade') || n.includes('sport')) type = 'sport'; else if(n.includes('eclairage') || n.includes('ep ')) type = 'ep';
+                if(typeFilter !== 'all' && type !== typeFilter) return false;
+                if(lotFilter !== 'all' && (!s.segment || !s.segment.includes(lotFilter))) return false;
+                return s.name.toLowerCase().includes(term) || s.city.toLowerCase().includes(term) || s.id.includes(term);
+            });
+            renderTable(filtered);
+            document.getElementById('visible-count').innerText = filtered.length;
+        }
+        function renderTable(data) {
+            const tbody = document.getElementById('fleet-table-body');
+            tbody.innerHTML = '';
+            const displayData = data.slice(0, 100); 
+            displayData.forEach(site => {
+                const isSelected = SELECTED_IDS.has(site.id);
+                const isGaz = site.energy === 'gaz';
+                const row = document.createElement('tr');
+                row.className = "site-row border-b border-white/5 hover:bg-white/5 cursor-pointer transition";
+                row.onclick = () => openDetail(site.id);
+                let icon = '<i class="fa-solid fa-building"></i>';
+                let typeLabel = "Admin";
+                if(site.name.toLowerCase().includes('ecole')) { icon = '<i class="fa-solid fa-school"></i>'; typeLabel = "École"; }
+                if(site.name.toLowerCase().includes('sport') || site.name.toLowerCase().includes('stade')) { icon = '<i class="fa-solid fa-basketball"></i>'; typeLabel = "Sport"; }
+                if(site.name.toLowerCase().includes('eclairage')) { icon = '<i class="fa-solid fa-lightbulb"></i>'; typeLabel = "EP"; }
+                let alertBadge = '<span class="text-success text-[10px]"><i class="fa-solid fa-check"></i> OK</span>';
+                if (site.ghost_savings > 100) { if (typeLabel === "École") alertBadge = '<span class="text-alert text-[10px] font-bold animate-pulse"><i class="fa-solid fa-triangle-exclamation"></i> VACANCES ?</span>'; else alertBadge = '<span class="text-warning text-[10px] font-bold"><i class="fa-solid fa-clock"></i> TALON WE</span>'; }
+                row.innerHTML = `<td class="px-4 py-3 text-center" onclick="event.stopPropagation()"><input type="checkbox" class="accent-mairie w-4 h-4 cursor-pointer" onchange="window.toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}></td><td class="px-4 py-3 font-bold text-white flex items-center gap-2"><span class="text-gray-500 w-5 text-center">${icon}</span> ${site.name}</td><td class="px-4 py-3 text-gray-400 font-mono text-xs">${typeLabel}</td><td class="px-4 py-3 text-gray-500 font-mono text-xs">${site.id}</td><td class="px-4 py-3 text-white text-xs">${site.segment || '-'}</td><td class="px-4 py-3 text-right text-gray-300 font-mono text-xs">${Math.round(site.volume)}</td><td class="px-4 py-3 text-right font-bold text-white">${Math.round(site.budget).toLocaleString()} €</td><td class="px-4 py-3 text-center">${alertBadge}</td>`;
+                tbody.appendChild(row);
+            });
+        }
+        function updateKPIs() {
+            let totalBudget = 0; let totalWaste = 0; let countAlerts = 0;
+            FLEET_DATA.forEach(s => { totalBudget += s.budget; totalWaste += s.ghost_savings; if(s.ghost_savings > 100) countAlerts++; });
+            document.getElementById('header-budget').innerText = Math.round(totalBudget).toLocaleString() + " €";
+            document.getElementById('kpi-waste').innerText = Math.round(totalWaste).toLocaleString() + " €";
+            document.getElementById('kpi-sites').innerText = FLEET_DATA.length;
+            document.getElementById('kpi-alerts').innerText = countAlerts;
+            if(countAlerts > 0) document.getElementById('sobriety-badge').classList.remove('hidden'); else document.getElementById('sobriety-badge').classList.add('hidden');
+        }
+
+        // --- DETAIL MODAL & CHARTS ---
         async function openDetail(id) {
             try {
                 const res = await fetch(`/api/dashboard/data/${id}`);
@@ -663,19 +580,9 @@
                 const c = data.contract || {};
                 const grid = document.getElementById('modal-tech-grid');
                 if (isGaz) {
-                    grid.innerHTML = `
-                        <div><span class="text-gray-500 block">PCE</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div>
-                        <div><span class="text-gray-500 block">CAR</span><span class="text-white font-bold text-gas">${c.power || '-'} MWh</span></div>
-                        <div><span class="text-gray-500 block">Profil</span><span class="text-white">${c.profil || 'T1'}</span></div>
-                        <div><span class="text-gray-500 block">Fournisseur</span><span class="text-white">${c.provider || '-'}</span></div>
-                    `;
+                    grid.innerHTML = `<div><span class="text-gray-500 block">PCE</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block">CAR</span><span class="text-white font-bold text-gas">${c.power || '-'} MWh</span></div><div><span class="text-gray-500 block">Profil</span><span class="text-white">${c.profil || 'T1'}</span></div><div><span class="text-gray-500 block">Fournisseur</span><span class="text-white">${c.provider || '-'}</span></div>`;
                 } else {
-                    grid.innerHTML = `
-                        <div><span class="text-gray-500 block">PDL</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div>
-                        <div><span class="text-gray-500 block">Puissance</span><span class="text-white font-bold text-mairie">${c.power || '-'} kVA</span></div>
-                        <div><span class="text-gray-500 block">Segment</span><span class="text-white">${c.segment || '-'}</span></div>
-                        <div><span class="text-gray-500 block">Fournisseur</span><span class="text-white">${c.provider || '-'}</span></div>
-                    `;
+                    grid.innerHTML = `<div><span class="text-gray-500 block">PDL</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block">Puissance</span><span class="text-white font-bold text-mairie">${c.power || '-'} kVA</span></div><div><span class="text-gray-500 block">Segment</span><span class="text-white">${c.segment || '-'}</span></div><div><span class="text-gray-500 block">Fournisseur</span><span class="text-white">${c.provider || '-'}</span></div>`;
                 }
 
                 updateModalChart('24h');
@@ -743,109 +650,28 @@
             original.technical.chauffage = document.getElementById('edit-chauffage').value;
             original.technical.regulation = document.getElementById('edit-regulation').value;
             original.technical.isolation = document.getElementById('edit-isolation').value;
-
             try {
                 const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
                 if((await res.json()).success) { 
                     document.getElementById('edit-modal').classList.add('hidden'); 
                     alert("Patrimoine mis à jour !"); 
-                    loadFleet(); openDetail(original.identity.id); 
+                    loadFleet(); 
+                    openDetail(original.identity.id); 
                 } else alert("Erreur sauvegarde");
             } catch(e) { alert("Erreur réseau"); }
         }
 
-        // --- MASS ACTIONS & CHARTS ---
-        async function uploadPatrimoine(input) {
-            if(!input.files || input.files.length === 0) return;
-            const file = input.files[0];
-            const formData = new FormData();
-            formData.append("file", file);
-            const btn = document.querySelector('label[for="mass-file"]');
-            const originalText = btn.innerText;
-            btn.innerText = "IMPORTATION EN COURS...";
-            try {
-                const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData });
-                const data = await res.json();
-                if(data.success) { alert(`${data.saved} sites mis à jour.`); loadFleet(); } 
-                else alert("Erreur Import: " + data.error);
-            } catch(e) { alert("Erreur réseau"); }
-            btn.innerText = originalText;
-        }
-
+        // --- MASS ACTIONS ---
+        async function uploadPatrimoine(input) { if(!input.files || input.files.length === 0) return; const file = input.files[0]; const formData = new FormData(); formData.append("file", file); const btn = document.querySelector('label[for="mass-file"]'); const originalText = btn.innerText; btn.innerText = "IMPORTATION EN COURS..."; try { const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData }); const data = await res.json(); if(data.success) { alert(`${data.saved} sites mis à jour.`); loadFleet(); } else alert("Erreur Import: " + data.error); } catch(e) { alert("Erreur réseau"); } btn.innerText = originalText; }
         window.toggleAll = function(source) { if(source.checked) FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); else SELECTED_IDS.clear(); applyFilters(); updateActionBar(); }
         window.toggleSelection = function(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
         function updateActionBar() { const count = SELECTED_IDS.size; document.getElementById('selected-count').innerText = count; document.getElementById('mass-count').innerText = count; const bar = document.getElementById('action-bar'); if(bar) { bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; } }
         window.openMassEdit = function() { if(SELECTED_IDS.size === 0) return alert("Sélectionnez des sites."); document.getElementById('mass-edit-modal').classList.remove('hidden'); }
         window.assignLot = function() { if(SELECTED_IDS.size === 0) return alert("Sélectionnez des sites."); document.getElementById('mass-edit-modal').classList.remove('hidden'); document.getElementById('mass-lot-input').focus(); }
-        window.applyMassUpdate = async function() {
-            const lotName = document.getElementById('mass-lot-input').value;
-            const typeName = document.getElementById('mass-type').value;
-            const chauf = document.getElementById('mass-chauffage').value;
-            if(!lotName && !typeName && !chauf) return alert("Rien à modifier.");
-            const btn = document.querySelector('#mass-edit-modal button:last-child');
-            btn.innerText = "TRAITEMENT...";
-            let updatedCount = 0;
-            for (const id of SELECTED_IDS) {
-                try {
-                    const resGet = await fetch(`/api/dashboard/data/${id}`);
-                    const site = await resGet.json();
-                    if(site.error) continue;
-                    if(lotName) { if(!site.contract) site.contract = {}; let current = site.contract.segment || ""; if(current.includes("|")) site.contract.segment = lotName + " | " + current.split("|")[1].trim(); else site.contract.segment = lotName; }
-                    if(typeName) { if(!site.location) site.location = {}; site.location.typologie = typeName; }
-                    if(chauf) { if(!site.technical) site.technical = {}; site.technical.chauffage = chauf; }
-                    await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(site) });
-                    updatedCount++;
-                } catch(e) { console.error(e); }
-            }
-            alert(`${updatedCount} sites mis à jour.`);
-            document.getElementById('mass-edit-modal').classList.add('hidden');
-            btn.innerText = "APPLIQUER";
-            loadFleet();
-        }
-        window.exportDQE = async function() {
-            if(SELECTED_IDS.size === 0) return alert("Sélectionnez des sites.");
-            const ids = Array.from(SELECTED_IDS);
-            const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: ids }) });
-            if(res.ok) { const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `DQE_Mairie_${ids.length}_sites.xlsx`; document.body.appendChild(a); a.click(); a.remove(); } else alert("Erreur génération");
-        }
-
-        function loadCitizenChart() {
-            if(citizenChartInstance) return;
-            const ctx = document.getElementById('citizenChart').getContext('2d');
-            citizenChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: Array.from({length: 30}, (_, i) => `J-${30-i}`),
-                    datasets: [{ label: 'Inscriptions Citoyennes', data: Array.from({length: 30}, (_, i) => Math.floor(100 + i * 40 + Math.random() * 50)), borderColor: '#8B5CF6', backgroundColor: 'rgba(139, 92, 246, 0.1)', fill: true, tension: 0.4 }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
-            });
-        }
-
-        function updateBudgetCharts() {
-            if(landingChartInstance) return; 
-            const ctx1 = document.getElementById('landingChart').getContext('2d');
-            landingChartInstance = new Chart(ctx1, {
-                type: 'line',
-                data: {
-                    labels: ['J','F','M','A','M','J','J','A','S','O','N','D'],
-                    datasets: [
-                        { label: 'Réel', data: [10,22,35,null,null,null,null,null,null,null,null,null], borderColor: '#3B82F6', tension: 0.1 },
-                        { label: 'Projection', data: [10,22,35,45,52,60,65,70,78,88,98,110], borderColor: '#94A3B8', borderDash: [5,5], tension: 0.1 }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-            const ctx2 = document.getElementById('budgetChart').getContext('2d');
-            budgetChartInstance = new Chart(ctx2, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Écoles', 'Sport', 'Éclairage', 'Admin', 'Autres'],
-                    datasets: [{ data: [40, 25, 20, 10, 5], backgroundColor: ['#3B82F6', '#F59E0B', '#10B981', '#64748B', '#94A3B8'] }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
-            });
-        }
+        window.applyMassUpdate = async function() { const lotName = document.getElementById('mass-lot-input').value; const typeName = document.getElementById('mass-type').value; const chauf = document.getElementById('mass-chauffage').value; if(!lotName && !typeName && !chauf) return alert("Rien à modifier."); const btn = document.querySelector('#mass-edit-modal button:last-child'); btn.innerText = "TRAITEMENT..."; let updatedCount = 0; for (const id of SELECTED_IDS) { try { const resGet = await fetch(`/api/dashboard/data/${id}`); const site = await resGet.json(); if(site.error) continue; if(lotName) { if(!site.contract) site.contract = {}; let current = site.contract.segment || ""; if(current.includes("|")) site.contract.segment = lotName + " | " + current.split("|")[1].trim(); else site.contract.segment = lotName; } if(typeName) { if(!site.location) site.location = {}; site.location.typologie = typeName; } if(chauf) { if(!site.technical) site.technical = {}; site.technical.chauffage = chauf; } await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(site) }); updatedCount++; } catch(e) { console.error(e); } } alert(`${updatedCount} sites mis à jour.`); document.getElementById('mass-edit-modal').classList.add('hidden'); btn.innerText = "APPLIQUER"; loadFleet(); }
+        window.exportDQE = async function() { if(SELECTED_IDS.size === 0) return alert("Sélectionnez des sites."); const ids = Array.from(SELECTED_IDS); const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: ids }) }); if(res.ok) { const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `DQE_Mairie_${ids.length}_sites.xlsx`; document.body.appendChild(a); a.click(); a.remove(); } else alert("Erreur génération"); }
+        function loadCitizenChart() { if(citizenChartInstance) return; const ctx = document.getElementById('citizenChart').getContext('2d'); citizenChartInstance = new Chart(ctx, { type: 'line', data: { labels: Array.from({length: 30}, (_, i) => `J-${30-i}`), datasets: [{ label: 'Inscriptions Citoyennes', data: Array.from({length: 30}, (_, i) => Math.floor(100 + i * 40 + Math.random() * 50)), borderColor: '#8B5CF6', backgroundColor: 'rgba(139, 92, 246, 0.1)', fill: true, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } } }); }
+        function updateBudgetCharts() { if(landingChartInstance) return; const ctx1 = document.getElementById('landingChart').getContext('2d'); landingChartInstance = new Chart(ctx1, { type: 'line', data: { labels: ['J','F','M','A','M','J','J','A','S','O','N','D'], datasets: [ { label: 'Réel', data: [10,22,35,null,null,null,null,null,null,null,null,null], borderColor: '#3B82F6', tension: 0.1 }, { label: 'Projection', data: [10,22,35,45,52,60,65,70,78,88,98,110], borderColor: '#94A3B8', borderDash: [5,5], tension: 0.1 } ] }, options: { responsive: true, maintainAspectRatio: false } }); const ctx2 = document.getElementById('budgetChart').getContext('2d'); budgetChartInstance = new Chart(ctx2, { type: 'doughnut', data: { labels: ['Écoles', 'Sport', 'Éclairage', 'Admin', 'Autres'], datasets: [{ data: [40, 25, 20, 10, 5], backgroundColor: ['#3B82F6', '#F59E0B', '#10B981', '#64748B', '#94A3B8'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } } }); }
 
         document.addEventListener('DOMContentLoaded', loadFleet);
     </script>
