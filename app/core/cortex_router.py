@@ -8,99 +8,89 @@ from datetime import datetime
 
 class CortexRouter:
     """
-    CORTEX ROUTER V3 - DYNAMIC EDITION
-    Connecté en temps réel au dossier /data pour identifier les clients.
+    CORTEX ROUTER V4 - DEEP SCAN FIRST
+    Priorité absolue à l'analyse du contenu pour éviter les faux positifs (dates dans les noms de fichiers).
     """
 
     def __init__(self):
-        # Définition du chemin des données (compatible Cloud Run & Local)
         self.base_dir = os.getcwd()
         self.data_dir = os.path.join(self.base_dir, "data")
-        
-        # Base de connaissance dynamique
         self.pdl_mapping = {}
         self.refresh_database()
 
     def refresh_database(self):
-        """
-        Scanne tous les fichiers JSON du dossier /data pour construire
-        la table de correspondance PDL -> Client.
-        """
+        """Recharge la liste des clients depuis les fichiers JSON."""
         self.pdl_mapping = {}
-        
-        # Vérification de l'existence du dossier
-        if not os.path.exists(self.data_dir):
-            print(f"⚠️ Warning: Data dir not found at {self.data_dir}")
-            return
+        if not os.path.exists(self.data_dir): return
 
         json_files = glob.glob(os.path.join(self.data_dir, "*.json"))
         
         for file_path in json_files:
-            if "master" in file_path or "market" in file_path:
-                continue
+            if "master" in file_path or "market" in file_path: continue
                 
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    
-                    # Extraction des infos vitales
                     client_name = data.get('identity', {}).get('site_name', 'Client Inconnu')
-                    
-                    # On cherche le PDL ou le PCE
                     contract = data.get('contract', {})
-                    pdl = str(contract.get('pdl', '')).strip()
-                    pce = str(contract.get('pce', '')).strip()
                     
-                    # Détermination du profil (par défaut ou explicite)
-                    # Si le fichier s'appelle 'mairie.json' ou contient un tag, on l'utilise
-                    profile = "retail" # Défaut
+                    # Nettoyage des PDL/PCE (suppression des espaces)
+                    pdl = str(contract.get('pdl', '')).replace(' ', '').strip()
+                    pce = str(contract.get('pce', '')).replace(' ', '').strip()
+                    
+                    # Détection Profil
+                    profile = "retail"
                     typologie = data.get('location', {}).get('typologie', '').lower()
                     if "mairie" in typologie or "admin" in typologie: profile = "mairie"
                     if "usine" in typologie or "indus" in typologie: profile = "industrie"
                     if "residence" in typologie or "syndic" in typologie: profile = "syndic"
 
-                    # Enregistrement dans la mémoire vive du routeur
                     if pdl and len(pdl) > 5:
                         self.pdl_mapping[pdl] = {"client": client_name, "type": "ELEC", "profile": profile}
                     if pce and len(pce) > 5:
                         self.pdl_mapping[pce] = {"client": client_name, "type": "GAZ", "profile": profile}
                         
-            except Exception as e:
-                print(f"❌ Erreur lecture fichier {file_path}: {e}")
-
-        print(f"✅ CORTEX ROUTER: {len(self.pdl_mapping)} PDL/PCE chargés en mémoire.")
+            except Exception: pass
+        
+        print(f"✅ CORTEX ROUTER: {len(self.pdl_mapping)} PDL indexés.")
 
     def _extract_pdl_from_content(self, file_content: bytes, filename: str) -> str:
-        """Deep Inspection : Cherche le PDL à l'intérieur du fichier."""
+        """Scan intelligent du contenu."""
         try:
-            # CAS 1 : EXCEL (.xlsx)
+            # CAS 1 : EXCEL
             if filename.endswith('.xlsx'):
                 df = pd.read_excel(io.BytesIO(file_content), dtype=str)
+                # Recherche dans les en-têtes
                 for col in df.columns:
-                    if "Identifiant" in str(col) or "PRM" in str(col) or "PDL" in str(col):
+                    col_str = str(col).upper()
+                    if "IDENTIFIANT" in col_str or "PRM" in col_str or "PDL" in col_str:
                         first_val = str(df[col].iloc[0])
                         clean_val = re.sub(r'\D', '', first_val)
                         if len(clean_val) >= 14: return clean_val[:14]
-                # Scan brutal
+                # Recherche brute dans tout le fichier
                 text_dump = df.to_string()
                 match = re.search(r'\d{14}', text_dump)
                 if match: return match.group(0)
 
-            # CAS 2 : CSV (.csv)
+            # CAS 2 : CSV (SGE Enedis / GRDF)
             else:
                 try: text = file_content.decode('utf-8')
                 except: text = file_content.decode('latin-1')
 
-                # Recherche colonne intelligente
                 lines = text.splitlines()
                 pdl_col_index = -1
-                for i, line in enumerate(lines[:20]):
-                    if ("Identifiant" in line and "PRM" in line) or "Point de Livraison" in line:
+                
+                # Recherche de la colonne "Identifiant PRM" ou "Point de Livraison"
+                for i, line in enumerate(lines[:25]): # Scan des 25 premières lignes
+                    if ("Identifiant" in line and "PRM" in line) or "Point de Livraison" in line or "PCE" in line:
                         headers = line.split(';')
                         for idx, h in enumerate(headers):
-                            if "Identifiant" in h or "PRM" in h or "Point" in h:
+                            h_upper = h.upper()
+                            if "IDENTIFIANT" in h_upper or "PRM" in h_upper or "POINT" in h_upper or "PCE" in h_upper:
                                 pdl_col_index = idx
                                 break
+                        
+                        # Si colonne trouvée, on prend la valeur juste en dessous
                         if pdl_col_index != -1 and len(lines) > i+1:
                             data_row = lines[i+1].split(';')
                             if len(data_row) > pdl_col_index:
@@ -108,35 +98,41 @@ class CortexRouter:
                                 return re.sub(r'\D', '', raw_pdl)[:14]
                         break
                 
-                # Fallback Regex Brut
-                match = re.search(r'\d{14}', text[:3000])
-                if match: return match.group(0)
+                # Fallback : Si structure inconnue, on cherche 14 chiffres qui NE SONT PAS une date
+                # Regex qui exclut les dates commençant par 2024/2025/2026... c'est risqué mais utile
+                # Mieux : On cherche juste 14 chiffres, mais comme cette méthode est appelée AVANT le check filename,
+                # on a plus de chance de tomber sur le PDL dans le header SGE.
+                matches = re.findall(r'\d{14}', text[:5000])
+                for m in matches:
+                    # Filtre basique : Si ça ressemble trop à une date récente (ex: 2026...), on ignore
+                    if not m.startswith('202'): 
+                        return m
 
         except Exception as e:
-            print(f"[CORTEX ERROR] Deep Inspection failed: {e}")
-            return None
+            print(f"Deep Scan Error: {e}")
         return None
 
     def analyze_file_stream(self, file_content: bytes, filename: str):
         """
-        Analyse complète : Nom -> Contenu -> Matching BDD
+        ORDRE INVERSÉ : CONTENU D'ABORD, NOM FICHIER ENSUITE.
         """
-        # A chaque analyse, on rafraîchit la base pour voir les nouveaux clients créés
         self.refresh_database()
 
-        # 1. Nom du fichier
-        pdl = None
-        match_filename = re.search(r'\d{14}', filename)
-        if match_filename:
-            pdl = match_filename.group(0)
-        
-        # 2. Contenu (Deep Scan)
-        if not pdl:
-            pdl = self._extract_pdl_from_content(file_content, filename)
+        # 1. DEEP SCAN (Priorité absolue)
+        pdl = self._extract_pdl_from_content(file_content, filename)
 
-        # 3. Résultat
+        # 2. NOM DU FICHIER (Seulement si le Deep Scan a échoué)
+        if not pdl:
+            match_filename = re.search(r'\d{14}', filename)
+            if match_filename:
+                candidate = match_filename.group(0)
+                # Protection anti-date : si le nom contient une date type 2026..., on se méfie
+                if not candidate.startswith('202'):
+                    pdl = candidate
+
+        # 3. VERDICT
         status = "REJECTED"
-        message = "PDL introuvable."
+        message = "PDL introuvable (contenu illisible)."
         client_info = None
         
         if pdl:
@@ -146,7 +142,7 @@ class CortexRouter:
                 message = f"Données injectées -> {client_info['client']}"
             else:
                 status = "UNKNOWN_PDL"
-                message = f"PDL {pdl} détecté mais inconnu en base ({len(self.pdl_mapping)} sites actifs)."
+                message = f"PDL {pdl} détecté mais absent de la base."
         
         return {
             "filename": filename,
@@ -162,5 +158,4 @@ class CortexRouter:
             "adam_grdf": {"status": "ONLINE", "latency": "98ms"}
         }
 
-# Instanciation
 router = CortexRouter()
