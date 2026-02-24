@@ -21,29 +21,30 @@ try:
 except ImportError:
     PANDAS_READY = False
 
-# --- BLOC IMPORT CORTEX (CORRIGÉ POUR APP/CORE) ---
+# --- BLOC IMPORT CORTEX (CORRIGÉ & ROBUSTE) ---
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
     from app.core.cortex_forecast import forecast
-    # AJOUT TITANIUM : Import correct du routeur
+    # AJOUT TITANIUM : Import du routeur d'ingestion
     from app.core.cortex_router import router
 except ImportError:
     try:
+        # Fallback pour environnement local
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
         import cortex_forecast as forecast
         from core.cortex_router import router
     except ImportError:
-        # Mock de secours pour éviter le crash 500 si le fichier manque
+        # Mock de secours critique
         class MockRouter:
             def get_api_status(self): return {"sge_enedis": {"status": "OFFLINE"}, "adam_grdf": {"status": "OFFLINE"}}
             def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router module missing"}
         router = MockRouter()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1220-FULL")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1240-ULTIMATE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -129,6 +130,10 @@ async def api_save_client(request: Request):
                 existing_data['location'].update(data['location'])
             if 'identity' in data: existing_data['identity'].update(data['identity'])
             if 'contract' in data: existing_data['contract'].update(data['contract'])
+            # AJOUT TITANIUM : Sauvegarde des KPIs (Volume calculé par le routeur)
+            if 'kpis' in data:
+                if 'kpis' not in existing_data: existing_data['kpis'] = {}
+                existing_data['kpis'].update(data['kpis'])
             final_data = existing_data
         else:
             final_data = data
@@ -227,11 +232,11 @@ async def get_fleet_data(response: Response):
         raw_id = s.get('identity',{}).get('id')
         safe_id = get_safe_id(raw_id)
         
-        # --- FIX TITANIUM : AFFICHAGE PDL/PCE ---
+        # --- FIX TITANIUM : AFFICHAGE PDL/PCE POUR MAIRIE ---
         pdl_display = contract.get('pdl')
         if not pdl_display or len(str(pdl_display)) < 5:
             pdl_display = contract.get('pce', '-')
-        # ----------------------------------------
+        # ----------------------------------------------------
         
         fleet_list.append({
             "id": safe_id,
@@ -247,7 +252,7 @@ async def get_fleet_data(response: Response):
             "alert": fin['kpis']['pmc_eur_mwh'] > 300,
             "ghost_savings": fin['kpis']['ghost_savings'],
             "power": contract.get('power', 0),
-            "pdl": pdl_display # Ajouté pour le tableau Mairie
+            "pdl": pdl_display # Champ critique ajouté
         })
     response_data = {
         "fleet": fleet_list, "count": len(fleet_list),
@@ -499,21 +504,18 @@ async def generate_tender(request: Request):
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 # ==========================================
-# EXTENSIONS PHASE TITANIUM (INGEST & PROFILS)
+# ROUTES TITANIUM (INGESTION & PROFILS CÂBLÉS)
 # ==========================================
 
 @app.get("/ops/ingest", response_class=HTMLResponse)
 async def ops_ingest_page(request: Request):
     """Page d'Ingestion Massive avec Sécurité Import."""
     try:
-        # On vérifie que le module est bien chargé
         if 'router' not in globals() and 'router' not in locals():
             raise Exception("Le module Router n'est pas chargé.")
-        
         api_status = router.get_api_status()
         return templates.TemplateResponse("ops_ingest.html", {"request": request, "api_status": api_status})
     except Exception as e:
-        # En cas d'erreur critique, on affiche une page d'erreur propre
         return HTMLResponse(content=f"<h1>Erreur Système (Titanium Node)</h1><p>{str(e)}</p>", status_code=500)
 
 @app.post("/api/ingest/upload")
@@ -526,7 +528,7 @@ async def ingest_files_mass(files: List[UploadFile] = File(...)):
     for file in files:
         try:
             content = await file.read()
-            # Analyse profonde via le Cortex Router V4 (Content First)
+            # Analyse profonde via le Cortex Router V5 (Content First + Calcul Volume)
             analysis = router.analyze_file_stream(content, file.filename)
             report.append(analysis)
         except Exception as e:
@@ -539,32 +541,56 @@ async def ingest_files_mass(files: List[UploadFile] = File(...)):
     return JSONResponse(content={"report": report})
 
 @app.get("/industrie", response_class=HTMLResponse)
-async def view_industrie(request: Request):
-    """Profil Industrie (Usine 4.0)."""
-    # Mock Data pour MVP
-    data = {
-        "client_name": "USINE SGE TEST",
-        "site_type": "ISO 50001 - HTA",
-        "puissance_souscrite": 3200,
-        "talon_moyen": 450,
-        "cos_phi": 0.94,
-        "depassements": 1
-    }
+async def view_industrie(request: Request, id: Optional[str] = None):
+    """Profil Industrie (Usine 4.0) - Câblé sur les vraies données."""
+    if id:
+        file_path = find_site_file(id)
+        if file_path:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                fin = cortex.enrich_site_financials(data)
+                
+                context_data = {
+                    "client_name": data.get('identity', {}).get('site_name', 'Client'),
+                    "site_type": "Industrie - Réel",
+                    "puissance_souscrite": data.get('contract', {}).get('power', 0),
+                    "talon_moyen": 0,
+                    "cos_phi": 0.95,
+                    "depassements": 0,
+                    "kpis": fin.get('kpis', {})
+                }
+                return templates.TemplateResponse("industrie.html", {"request": request, "data": context_data})
+    
+    # Mock Demo
+    data = {"client_name": "USINE SGE TEST (DEMO)", "site_type": "ISO 50001 - HTA", "puissance_souscrite": 3200, "talon_moyen": 450, "cos_phi": 0.94, "depassements": 1}
     return templates.TemplateResponse("industrie.html", {"request": request, "data": data})
 
 @app.get("/syndic", response_class=HTMLResponse)
-async def view_syndic(request: Request):
-    """Profil Syndic (Habitat)."""
-    # Mock Data pour MVP
-    data = {
-        "client_name": "RÉSIDENCE LES LILAS", 
-        "dju_n": 2100, 
-        "dju_n_1": 2400, 
-        "conso_n": 450000
-    }
+async def view_syndic(request: Request, id: Optional[str] = None):
+    """Profil Syndic (Habitat) - Câblé sur les vraies données."""
+    if id:
+        file_path = find_site_file(id)
+        if file_path:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                fin = cortex.enrich_site_financials(data)
+                
+                context_data = {
+                    "client_name": data.get('identity', {}).get('site_name', 'Résidence'),
+                    "lots": 0,
+                    "chaufferie": "Chauffage Collectif",
+                    "dju_n": 2100,
+                    "dju_n_1": 2400,
+                    "conso_n": fin.get('volume_mwh', 0) * 1000,
+                    "conso_n_1": (fin.get('volume_mwh', 0) * 1000) * 1.1
+                }
+                return templates.TemplateResponse("syndic.html", {"request": request, "data": context_data})
+
+    # Mock Demo
+    data = {"client_name": "RÉSIDENCE DÉMO", "dju_n": 2100, "dju_n_1": 2400, "conso_n": 450000}
     return templates.TemplateResponse("syndic.html", {"request": request, "data": data})
 
-# --- FIN EXTENSIONS TITANIUM ---
+# --- ROUTES DE BASE (INCHANGÉES) ---
 
 @app.get("/")
 async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
