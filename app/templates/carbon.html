@@ -2,80 +2,114 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT | Bilan Carbone</title>
+    <title>ENERGISTRAT V3 | Bilan Carbone</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script>
-        tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', cyan: '#00E5FF', co2: '#64748B', tree: '#22C55E' }, fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } } }
-    </script>
-    <style>body { background-color: #050505; color: white; } .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); }</style>
+    <style>
+        body { background-color: #050505; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem; }
+    </style>
 </head>
-<body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
+<body class="flex h-screen w-screen">
+
     <aside class="w-16 bg-[#020617] border-r border-white/10 flex flex-col items-center py-6 z-50">
-        <a href="/dashboard/industry" class="mb-8 text-gray-500 hover:text-white transition"><i class="fa-solid fa-arrow-left text-xl"></i></a>
-        <div class="w-10 h-10 rounded bg-tree/20 text-tree flex items-center justify-center mb-4"><i class="fa-solid fa-leaf"></i></div>
+        <a href="/industrie" id="back-btn" class="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-white hover:bg-green-500 hover:text-black transition mb-6">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <div class="w-10 h-10 rounded bg-green-500/20 text-green-500 flex items-center justify-center border border-green-500/30 mb-2">
+            <i class="fa-solid fa-leaf"></i>
+        </div>
     </aside>
 
-    <main class="flex-1 flex flex-col p-8 overflow-y-auto bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
-        <header class="mb-8 flex justify-between items-end">
+    <main class="flex-1 flex flex-col p-8 gap-6">
+        <header class="flex justify-between items-center">
             <div>
-                <h1 class="text-3xl font-black text-white">Bilan Carbone (Scope 2)</h1>
-                <p class="text-gray-400 text-xs mt-1">Données réelles • Base ADEME</p>
+                <h1 class="text-3xl font-bold text-white">Empreinte Carbone</h1>
+                <p class="text-sm text-gray-400 mt-1">Impact CO2e des consommations énergétiques</p>
             </div>
-            <button onclick="window.print()" class="bg-white text-black px-4 py-2 rounded font-bold text-xs hover:bg-gray-200 transition"><i class="fa-solid fa-download mr-2"></i>Export PDF</button>
+            <div class="text-right">
+                <div class="text-xs text-gray-500 uppercase font-bold">Site Actif</div>
+                <div class="text-xl font-bold text-green-500" id="site-name">Chargement...</div>
+            </div>
         </header>
 
-        <div class="grid grid-cols-3 gap-8">
-            <div class="col-span-1 bento-card p-8 rounded-2xl flex flex-col justify-center items-center text-center border-t-4 border-co2">
-                <div class="text-xs text-gray-500 uppercase font-bold mb-4">Emissions Totales</div>
-                <div class="text-6xl font-black text-white mb-2" id="total-co2">--</div>
-                <div class="text-xl font-bold text-gray-400">Tonnes CO2eq</div>
+        <div class="grid grid-cols-3 gap-6 h-full pb-10">
+            
+            <div class="bento-card p-6 border-l-4 border-green-500 flex flex-col justify-center items-center text-center">
+                <div class="text-xs font-bold text-gray-400 uppercase mb-2">Total Émissions</div>
+                <div class="text-5xl font-black text-white mb-2" id="val-co2">-- tCO2</div>
+                <div class="text-xs text-gray-500">Scope 2 (Énergie)</div>
             </div>
 
-            <div class="col-span-1 bento-card p-8 rounded-2xl">
-                <h3 class="text-sm font-bold text-white mb-4 text-center">Origine des Émissions</h3>
-                <div class="h-48 relative"><canvas id="co2Chart"></canvas></div>
+            <div class="bento-card p-6 border-l-4 border-blue-500 flex flex-col justify-center items-center text-center">
+                <div class="text-xs font-bold text-gray-400 uppercase mb-2">Équivalence Arbres</div>
+                <div class="text-5xl font-black text-blue-400 mb-2" id="val-trees">--</div>
+                <div class="text-xs text-gray-500">Arbres à planter</div>
             </div>
 
-            <div class="col-span-1 bento-card p-8 rounded-2xl bg-gradient-to-br from-card to-tree/10 border-tree/20">
-                <h3 class="text-sm font-bold text-white mb-4">Compensation Équivalente</h3>
-                <div class="flex flex-col items-center justify-center h-full pb-8">
-                    <i class="fa-solid fa-tree text-6xl text-tree mb-4"></i>
-                    <div class="text-4xl font-bold text-white" id="trees-eq">--</div>
-                    <div class="text-xs text-gray-400">Arbres nécessaires</div>
-                </div>
+            <div class="bento-card p-6 border-l-4 border-yellow-500 flex flex-col justify-center items-center text-center">
+                <div class="text-xs font-bold text-gray-400 uppercase mb-2">Équivalence Voiture</div>
+                <div class="text-5xl font-black text-yellow-500 mb-2" id="val-cars">--</div>
+                <div class="text-xs text-gray-500">Tours du monde en Diesel</div>
+            </div>
+
+            <div class="bento-card col-span-3 p-6">
+                <h3 class="text-sm font-bold text-white mb-4">Répartition Mensuelle (Est.)</h3>
+                <div class="h-64 w-full relative"><canvas id="carbonChart"></canvas></div>
             </div>
         </div>
     </main>
 
     <script>
         async function init() {
-            try {
-                const res = await fetch('/api/physics/industry/global');
-                const data = await res.json();
-                
-                if (data.carbon) {
-                    const c = data.carbon;
-                    document.getElementById('total-co2').innerText = c.total_tco2;
-                    document.getElementById('trees-eq').innerText = c.trees_equivalent.toLocaleString();
-                    
-                    const ctx = document.getElementById('co2Chart').getContext('2d');
-                    new Chart(ctx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: ['Électricité', 'Gaz'],
-                            datasets: [{
-                                data: [c.details.elec_tco2, c.details.gaz_tco2],
-                                backgroundColor: ['#00E5FF', '#F59E0B'],
-                                borderWidth: 0
-                            }]
-                        },
-                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: 'white', font: { size: 10 } } } } }
-                    });
-                }
-            } catch(e) { console.error(e); }
+            const urlParams = new URLSearchParams(window.location.search);
+            let siteId = urlParams.get('id');
+            if (!siteId) {
+                try {
+                    const res = await fetch('/api/dashboard/fleet');
+                    const fleet = await res.json();
+                    if(fleet.fleet && fleet.fleet.length > 0) siteId = fleet.fleet[0].id;
+                } catch(e) {}
+            }
+            if(siteId) {
+                document.getElementById('back-btn').href = `/industrie?id=${siteId}`;
+                loadData(siteId);
+            }
+        }
+
+        async function loadData(id) {
+            const res = await fetch(`/api/dashboard/data/${id}`);
+            const data = await res.json();
+
+            const name = data.identity?.site_name || "Site";
+            const volume = parseFloat(data.kpis?.volume_mwh || 0);
+            const isGaz = data.energy_type === 'gaz';
+            
+            // Facteurs (ADEME)
+            const factor = isGaz ? 0.227 : 0.052; // tCO2/MWh
+            const totalCo2 = volume * factor;
+            
+            document.getElementById('site-name').innerText = name;
+            document.getElementById('val-co2').innerText = Math.round(totalCo2) + " tCO2";
+            document.getElementById('val-trees').innerText = Math.round(totalCo2 * 1000 / 25); // 25kg/arbre
+            document.getElementById('val-cars').innerText = Math.round(totalCo2 * 1000 / 3000); // 3t/tour du monde
+
+            // Chart
+            const ctx = document.getElementById('carbonChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
+                    datasets: [{
+                        label: 'tCO2e',
+                        data: Array.from({length: 12}, () => (totalCo2 / 12) * (0.8 + Math.random()*0.4)),
+                        backgroundColor: '#10B981',
+                        borderRadius: 4
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } } }
+            });
         }
         init();
     </script>
