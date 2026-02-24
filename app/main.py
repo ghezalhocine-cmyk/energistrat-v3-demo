@@ -21,20 +21,29 @@ try:
 except ImportError:
     PANDAS_READY = False
 
+# --- BLOC IMPORT CORTEX (MIS À JOUR TITANIUM) ---
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
     from app.core.cortex_forecast import forecast
+    from cortex_router import router  # NOUVEAU MODULE TITANIUM
 except ImportError:
     try:
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
         import cortex_forecast as forecast
-    except: pass
+        import cortex_router as router_module # Fallback
+        router = router_module.router # Instance
+    except: 
+        # Fallback critique si le routeur n'est pas encore créé
+        class MockRouter:
+            def get_api_status(self): return {"sge_enedis": {"status": "OFFLINE"}}
+            def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router missing"}
+        router = MockRouter()
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V1116")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1200")
 
 app.add_middleware(
     CORSMiddleware,
@@ -480,6 +489,64 @@ async def generate_tender(request: Request):
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_Energistrat_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
+# --- ROUTES TITANIUM (NOUVELLES) ---
+
+@app.get("/ops/ingest", response_class=HTMLResponse)
+async def ops_ingest_page(request: Request):
+    """Page d'Ingestion Massive (Data Center)."""
+    api_status = router.get_api_status()
+    return templates.TemplateResponse("ops_ingest.html", {"request": request, "api_status": api_status})
+
+@app.post("/api/ingest/upload")
+async def ingest_files_mass(files: List[UploadFile] = File(...)):
+    """
+    Ingestion Massive SGE/GRDF.
+    Lit le flux binaire, détecte le PDL (via Regex ou Deep Scan), et prépare l'injection.
+    """
+    report = []
+    for file in files:
+        try:
+            content = await file.read()
+            # Analyse profonde via le Cortex Router V2
+            analysis = router.analyze_file_stream(content, file.filename)
+            report.append(analysis)
+        except Exception as e:
+            report.append({
+                "filename": file.filename,
+                "status": "ERROR",
+                "message": str(e),
+                "pdl": "ERR"
+            })
+    return JSONResponse(content={"report": report})
+
+@app.get("/industrie", response_class=HTMLResponse)
+async def view_industrie(request: Request):
+    """Profil Industrie (Usine 4.0)."""
+    # Mock Data pour MVP
+    data = {
+        "client_name": "USINE SGE TEST",
+        "site_type": "ISO 50001 - HTA",
+        "puissance_souscrite": 3200,
+        "talon_moyen": 450,
+        "cos_phi": 0.94,
+        "depassements": 1
+    }
+    return templates.TemplateResponse("industrie.html", {"request": request, "data": data})
+
+@app.get("/syndic", response_class=HTMLResponse)
+async def view_syndic(request: Request):
+    """Profil Syndic (Habitat)."""
+    # Mock Data pour MVP
+    data = {
+        "client_name": "RÉSIDENCE LES LILAS", 
+        "dju_n": 2100, 
+        "dju_n_1": 2400, 
+        "conso_n": 450000
+    }
+    return templates.TemplateResponse("syndic.html", {"request": request, "data": data})
+
+# --- FIN ROUTES TITANIUM ---
+
 @app.get("/")
 async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
 @app.get("/onboarding")
@@ -490,7 +557,7 @@ async def view_processing(request: Request): return templates.TemplateResponse("
 async def view_dashboard(request: Request, profile: str):
     if profile == "retail": return templates.TemplateResponse("retail.html", {"request": request})
     if profile == "mairie": return templates.TemplateResponse("mairie.html", {"request": request})
-    if profile == "forecast": return templates.TemplateResponse("forecast.html", {"request": request}) # NOUVELLE ROUTE
+    if profile == "forecast": return templates.TemplateResponse("forecast.html", {"request": request}) 
     t = f"{profile}.html"
     if os.path.exists(os.path.join(TEMPLATE_DIR, t)): return templates.TemplateResponse(t, {"request": request, "profile": profile})
     return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
