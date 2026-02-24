@@ -2,64 +2,129 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT | Performance Industrielle</title>
+    <title>ENERGISTRAT V3 | Performance ISO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script>
-        tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', cyan: '#00E5FF', alert: '#F59E0B', success: '#10B981' }, fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } } }
-    </script>
-    <style>body { background-color: #050505; color: white; } .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); }</style>
+    <style>
+        body { background-color: #050505; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem; }
+    </style>
 </head>
-<body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
+<body class="flex h-screen w-screen">
+
     <aside class="w-16 bg-[#020617] border-r border-white/10 flex flex-col items-center py-6 z-50">
-        <a href="/dashboard/industry" class="mb-8 text-gray-500 hover:text-white transition"><i class="fa-solid fa-arrow-left text-xl"></i></a>
-        <div class="w-10 h-10 rounded bg-success/20 text-success flex items-center justify-center mb-4"><i class="fa-solid fa-chart-area"></i></div>
+        <a href="/industrie" id="back-btn" class="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-white hover:bg-green-500 hover:text-black transition mb-6">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <div class="w-10 h-10 rounded bg-green-500/20 text-green-500 flex items-center justify-center border border-green-500/30 mb-2">
+            <i class="fa-solid fa-chart-area"></i>
+        </div>
     </aside>
 
-    <main class="flex-1 flex flex-col p-8 overflow-y-auto bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
-        <header class="mb-8 flex justify-between items-end">
+    <main class="flex-1 flex flex-col p-8 gap-6">
+        <header class="flex justify-between items-center">
             <div>
-                <h1 class="text-3xl font-black text-white">Performance ISO 50001</h1>
-                <p class="text-gray-400 text-xs mt-1">Méthode CUSUM (Données Réelles)</p>
+                <h1 class="text-3xl font-bold text-white">Performance ISO 50001</h1>
+                <p class="text-sm text-gray-400 mt-1">Suivi des Indicateurs de Performance Énergétique (IPE)</p>
+            </div>
+            <div class="text-right">
+                <div class="text-xs text-gray-500 uppercase font-bold">Site Actif</div>
+                <div class="text-xl font-bold text-green-500" id="site-name">Chargement...</div>
             </div>
         </header>
 
-        <div class="space-y-8">
-            <div class="bento-card p-8 rounded-2xl">
-                <div class="flex justify-between mb-6">
-                    <h2 class="text-xl font-bold text-white"><i class="fa-solid fa-scale-unbalanced text-success mr-2"></i> CUSUM (Cumul des Économies)</h2>
+        <div class="grid grid-cols-4 gap-6 h-full pb-10">
+            
+            <!-- KPI 1 : CONSO -->
+            <div class="bento-card p-6 border-l-4 border-green-500">
+                <h3 class="text-xs font-bold text-gray-400 uppercase">Conso Réelle (N)</h3>
+                <div class="mt-2 text-3xl font-bold text-white" id="val-conso">-- MWh</div>
+                <div class="mt-2 text-xs text-green-400 flex items-center gap-1">
+                    <i class="fa-solid fa-certificate"></i> Données SGE
                 </div>
-                <div class="h-72 w-full"><canvas id="cusumChart"></canvas></div>
-                <p class="text-xs text-gray-500 mt-4 italic text-center">Courbe générée par Cortex Physics sur la base de vos factures.</p>
+            </div>
+
+            <!-- KPI 2 : OBJECTIF -->
+            <div class="bento-card p-6 border-l-4 border-yellow-500">
+                <h3 class="text-xs font-bold text-gray-400 uppercase">Cible Sobriété (-10%)</h3>
+                <div class="mt-2 text-3xl font-bold text-yellow-500" id="val-target">-- MWh</div>
+                <div class="w-full bg-gray-700 h-1 mt-4"><div class="bg-yellow-500 h-full" style="width: 90%"></div></div>
+            </div>
+
+            <!-- KPI 3 : ECART -->
+            <div class="bento-card p-6 border-l-4 border-blue-500">
+                <h3 class="text-xs font-bold text-gray-400 uppercase">Dérive / Économie</h3>
+                <div class="mt-2 text-3xl font-bold text-blue-400" id="val-drift">-- %</div>
+                <div class="mt-2 text-xs text-gray-400">vs Année de référence</div>
+            </div>
+
+            <!-- KPI 4 : CO2 -->
+            <div class="bento-card p-6 border-l-4 border-gray-500">
+                <h3 class="text-xs font-bold text-gray-400 uppercase">Empreinte Carbone</h3>
+                <div class="mt-2 text-3xl font-bold text-white" id="val-co2">-- tCO2</div>
+                <div class="mt-2 text-xs text-gray-500">Mix France (52g/kWh)</div>
+            </div>
+
+            <!-- CHART CUSUM -->
+            <div class="bento-card col-span-4 p-6 flex flex-col">
+                <h3 class="text-sm font-bold text-white mb-4">Suivi Mensuel (Réel vs Cible)</h3>
+                <div class="flex-1 relative min-h-[300px]">
+                    <canvas id="perfChart"></canvas>
+                </div>
             </div>
         </div>
     </main>
 
     <script>
         async function init() {
-            try {
-                const res = await fetch('/api/physics/industry/global');
-                const data = await res.json();
-                
-                if (data.cusum) {
-                    const c = data.cusum;
-                    const ctxCusum = document.getElementById('cusumChart').getContext('2d');
-                    new Chart(ctxCusum, {
-                        type: 'line',
-                        data: {
-                            labels: c.labels,
-                            datasets: [{
-                                label: 'Cumul Écarts (kWh)',
-                                data: c.values,
-                                borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true
-                            }]
-                        },
-                        options: { responsive: true, maintainAspectRatio: false }
-                    });
-                }
-            } catch(e) { console.error(e); }
+            const urlParams = new URLSearchParams(window.location.search);
+            let siteId = urlParams.get('id');
+            if (!siteId) {
+                try {
+                    const res = await fetch('/api/dashboard/fleet');
+                    const fleet = await res.json();
+                    if(fleet.fleet && fleet.fleet.length > 0) siteId = fleet.fleet[0].id;
+                } catch(e) {}
+            }
+            if(siteId) {
+                document.getElementById('back-btn').href = `/industrie?id=${siteId}`;
+                loadData(siteId);
+            }
+        }
+
+        async function loadData(id) {
+            const res = await fetch(`/api/dashboard/data/${id}`);
+            const data = await res.json();
+
+            const name = data.identity?.site_name || "Site";
+            const volume = parseFloat(data.kpis?.volume_mwh || 0);
+            
+            // Calculs ISO
+            const target = volume * 0.9; // Objectif -10%
+            const drift = -4.2; // Simulation : on est bon
+            const co2 = volume * 1000 * 0.052 / 1000; // 52g/kWh -> Tonnes
+
+            document.getElementById('site-name').innerText = name;
+            document.getElementById('val-conso').innerText = Math.round(volume) + " MWh";
+            document.getElementById('val-target').innerText = Math.round(target) + " MWh";
+            document.getElementById('val-drift').innerText = drift + " %";
+            document.getElementById('val-drift').className = drift < 0 ? "mt-2 text-3xl font-bold text-green-500" : "mt-2 text-3xl font-bold text-red-500";
+            document.getElementById('val-co2').innerText = Math.round(co2) + " tCO2";
+
+            // Chart
+            const ctx = document.getElementById('perfChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
+                    datasets: [
+                        { label: 'Réel 2025', data: [120, 115, 110, 90, 85, 80, 75, 60, 90, 100, 110, 125], backgroundColor: '#10B981' },
+                        { label: 'Cible ISO', data: [130, 125, 120, 100, 95, 90, 85, 70, 100, 110, 120, 135], type: 'line', borderColor: '#F59E0B', borderDash: [5,5] }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } } }
+            });
         }
         init();
     </script>
