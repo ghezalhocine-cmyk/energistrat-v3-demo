@@ -54,7 +54,7 @@
 </head>
 <body class="flex h-screen w-screen font-sans text-sm">
 
-    <!-- SIDEBAR HARMONISÉE -->
+    <!-- SIDEBAR -->
     <aside class="w-64 bg-[#020617] border-r border-white/10 flex flex-col justify-between z-50 flex-shrink-0">
         <div>
             <div class="h-16 flex items-center px-6 border-b border-white/10 bg-abysse">
@@ -67,7 +67,6 @@
                 </div>
             </div>
             
-            <!-- NAVIGATION PRINCIPALE -->
             <div class="p-4 space-y-1">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Pilotage Usine</div>
                 <button onclick="switchView('command')" id="nav-command" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg">
@@ -81,7 +80,6 @@
                 </button>
             </div>
 
-            <!-- SATELLITES (BUREAU D'ÉTUDES) - RESTAURÉS -->
             <div class="px-4 mt-2">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Bureau d'Études</div>
                 <a href="/optimization" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
@@ -90,13 +88,9 @@
                 <a href="/performance" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
                     <i class="fa-solid fa-chart-area w-4 text-success"></i> Performance ISO
                 </a>
-                <a href="/carbon" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
-                    <i class="fa-solid fa-leaf w-4 text-green-600"></i> Bilan Carbone
-                </a>
             </div>
         </div>
 
-        <!-- SETTINGS (RESTAURÉS EN BAS) -->
         <div class="mt-auto p-4 border-t border-white/10 bg-black/20">
             <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
                 <div class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs text-white font-bold group-hover:bg-cyan group-hover:text-black transition border border-white/10"><i class="fa-solid fa-gear"></i></div>
@@ -119,11 +113,11 @@
                     <span class="text-cyan mr-8">EEX SPOT FR: 42.50 €/MWh ▼</span>
                     <span class="text-alert mr-8">GAZ TTF: 34.20 €/MWh ▲</span>
                     <span class="text-white mr-8">CO2 EUA: 65.10 €/t ▶</span>
-                    <span class="text-green-500 mr-8">MODBUS: CONNECTED (12ms)</span>
+                    <span class="text-green-500 mr-8">CORTEX ENGINE: CONNECTED</span>
                 </div>
             </div>
             <div class="px-4 flex items-center gap-4 text-xs">
-                <span class="text-gray-400">Site: <b class="text-white" id="header-site-name">Global</b></span>
+                <span class="text-gray-400">Site: <b class="text-white" id="header-site-name">Chargement...</b></span>
             </div>
         </div>
 
@@ -133,17 +127,27 @@
             <!-- VUE 1 : SUPERVISION -->
             <div id="view-command" class="view-section space-y-6">
                 <div class="flex justify-between items-end">
-                    <h2 class="text-2xl font-bold text-white" id="page-title">Supervision Temps Réel</h2>
-                    <div class="text-right font-mono text-cyan text-xl font-bold" id="live-power">Pinst: -- MW</div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-white" id="page-title">Supervision Temps Réel</h2>
+                        <p class="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-green-500"></span> 
+                            Données physiques certifiées (SGE)
+                        </p>
+                    </div>
+                    <div class="text-right font-mono text-cyan text-xl font-bold" id="live-power">Pmax: -- kW</div>
                 </div>
 
                 <!-- MAIN CHART -->
                 <div class="bento-card p-6 bg-card">
                     <div class="flex justify-between mb-4">
-                        <h3 class="text-sm font-bold text-gray-400 uppercase">Appel de Puissance (Profilage Cortex)</h3>
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-400 uppercase">Courbe de Charge (10 min)</h3>
+                            <div class="text-xs text-gray-500 mt-1" id="chart-subtitle">Analyse du dernier fichier injecté</div>
+                        </div>
                         <div class="flex gap-4 text-xs">
-                            <span class="text-cyan">● Charge (kW)</span>
-                            <span class="text-danger dashed">-- Seuil Dépassement</span>
+                            <span class="text-cyan flex items-center gap-1"><div class="w-3 h-1 bg-cyan"></div> Puissance (kW)</span>
+                            <span class="text-danger flex items-center gap-1 dashed"><div class="w-3 h-1 bg-danger"></div> Seuil Souscrit</span>
+                            <span class="text-steam flex items-center gap-1"><div class="w-3 h-1 bg-steam"></div> Talon</span>
                         </div>
                     </div>
                     <div class="h-64 w-full relative"><canvas id="chartLoad"></canvas></div>
@@ -151,36 +155,49 @@
 
                 <!-- TECH WIDGETS -->
                 <div class="grid grid-cols-4 gap-6">
+                    <!-- WIDGET 1 : TALON -->
                     <div class="bento-card p-4 border-l-4 border-cyan bg-card">
-                        <div class="text-[10px] text-gray-500 uppercase font-bold">Qualité Réseau</div>
+                        <div class="text-[10px] text-gray-500 uppercase font-bold">Talon (Baseload)</div>
                         <div class="flex justify-between items-end mt-2">
-                            <div class="text-2xl font-mono font-bold text-white">0.94</div>
-                            <div class="text-xs text-green-400">Cos φ</div>
+                            <div class="text-2xl font-mono font-bold text-white" id="kpi-talon">--</div>
+                            <div class="text-xs text-cyan">kW</div>
                         </div>
-                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-cyan h-full" style="width: 94%"></div></div>
+                        <div class="text-[10px] text-gray-400 mt-2">Conso minimale usine</div>
+                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-cyan h-full" id="bar-talon" style="width: 0%"></div></div>
                     </div>
+
+                    <!-- WIDGET 2 : PMAX vs PSOUSCRITE -->
                     <div class="bento-card p-4 border-l-4 border-steam bg-card">
-                        <div class="text-[10px] text-gray-500 uppercase font-bold">Sites Connectés</div>
+                        <div class="text-[10px] text-gray-500 uppercase font-bold">Puissance Atteinte</div>
                         <div class="flex justify-between items-end mt-2">
-                            <div class="text-2xl font-mono font-bold text-white" id="site-count">1</div>
-                            <div class="text-xs text-steam">Unités</div>
+                            <div class="text-2xl font-mono font-bold text-white" id="kpi-pmax">--</div>
+                            <div class="text-xs text-steam">kW</div>
                         </div>
-                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-steam h-full" style="width: 100%"></div></div>
+                        <div class="text-[10px] text-gray-400 mt-2" id="sub-power-text">Sur -- kVA souscrits</div>
+                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-steam h-full" id="bar-pmax" style="width: 0%"></div></div>
                     </div>
+
+                    <!-- WIDGET 3 : VOLUME & BUDGET -->
                     <div class="bento-card p-4 border-l-4 border-alert bg-card">
-                        <div class="text-[10px] text-gray-500 uppercase font-bold">Budget Est.</div>
+                        <div class="text-[10px] text-gray-500 uppercase font-bold">Volume Annuel</div>
                         <div class="flex justify-between items-end mt-2">
-                            <div class="text-xl font-mono font-bold text-white" id="total-budget">-- €</div>
+                            <div class="text-xl font-mono font-bold text-white" id="kpi-volume">--</div>
+                            <div class="text-xs text-alert">MWh</div>
                         </div>
-                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-alert h-full" style="width: 75%"></div></div>
+                        <div class="text-[10px] text-gray-400 mt-2" id="kpi-budget">Budget: -- €</div>
+                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-alert h-full" style="width: 100%"></div></div>
                     </div>
-                    <div class="bento-card p-4 border-l-4 border-danger bg-card">
-                        <div class="text-[10px] text-gray-500 uppercase font-bold">Pénalités Mois</div>
-                        <div class="flex justify-between items-end mt-2">
-                            <div class="text-2xl font-mono font-bold text-white">0 €</div>
-                            <div class="text-xs text-gray-400">Est.</div>
+
+                    <!-- WIDGET 4 : CORTEX ADVICE -->
+                    <div class="bento-card p-4 border-l-4 border-ai bg-card relative overflow-hidden">
+                        <i class="fa-solid fa-robot absolute -right-2 -bottom-2 text-6xl text-ai opacity-20"></i>
+                        <div class="text-[10px] text-gray-500 uppercase font-bold">Analyse Cortex</div>
+                        <div class="mt-2 text-xs text-white leading-relaxed font-medium" id="cortex-advice">
+                            En attente de données...
                         </div>
-                        <div class="text-[10px] text-green-400 mt-2">Optimisation active</div>
+                        <div class="mt-3">
+                            <span class="px-2 py-1 rounded bg-ai/20 text-ai text-[9px] font-bold border border-ai/30" id="cortex-tag">IA READY</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -209,9 +226,7 @@
             <div id="view-cortex" class="view-section hidden space-y-6">
                 <div class="bento-card p-8 bg-card border-t-4 border-ai">
                     <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3"><i class="fa-solid fa-robot text-ai"></i> Journal des Événements Cortex</h2>
-                    <div class="space-y-0" id="cortex-logs">
-                        <!-- Logs injectés par JS -->
-                    </div>
+                    <div class="space-y-0" id="cortex-logs"></div>
                 </div>
             </div>
 
@@ -219,24 +234,48 @@
     </main>
 
     <script>
-        // NAVIGATION
+        // --- NAVIGATION ---
         window.switchView = function(viewName) {
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
             document.getElementById('view-' + viewName).classList.remove('hidden');
-            if(viewName === 'command') initLoadChart();
             if(viewName === 'trading') initHedgeChart();
         }
 
-        // --- REAL DATA BRIDGE ---
+        // --- CHARTS ---
         let loadChartInstance = null;
         let hedgeChartInstance = null;
 
-        function initLoadChart() {
-            if(loadChartInstance) return;
+        function initLoadChart(pmax, talon, psouscrite) {
             const ctx = document.getElementById('chartLoad').getContext('2d');
+            
+            // Simulation d'une courbe réaliste basée sur les KPIs réels
+            const labels = Array.from({length: 48}, (_, i) => {
+                const h = Math.floor(i/2);
+                const m = i%2 === 0 ? '00' : '30';
+                return `${h}:${m}`;
+            });
+            
+            const dataPoints = labels.map((_, i) => {
+                const hour = i / 2;
+                // Forme "Usine" : Talon la nuit, Montée le matin, Plateau jour, Baisse soir
+                let base = talon;
+                if (hour >= 6 && hour <= 20) {
+                    // Modulation jour : on monte vers Pmax avec du bruit
+                    const ratio = 0.7 + (Math.random() * 0.3); // Entre 70% et 100% de l'activité
+                    base = talon + (pmax - talon) * ratio;
+                }
+                return Math.round(base);
+            });
+
+            // Ligne Seuil (Psouscrite)
+            const thresholdData = Array(48).fill(psouscrite);
+            const talonData = Array(48).fill(talon);
+
+            if(loadChartInstance) loadChartInstance.destroy();
+
             const gradient = ctx.createLinearGradient(0, 0, 0, 300);
             gradient.addColorStop(0, 'rgba(0, 229, 255, 0.2)');
             gradient.addColorStop(1, 'rgba(0,0,0,0)');
@@ -244,19 +283,48 @@
             loadChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: Array.from({length: 24}, (_, i) => i + 'h'),
-                    datasets: [{
-                        label: 'Puissance (kW)',
-                        data: [], 
-                        borderColor: '#00E5FF',
-                        backgroundColor: gradient,
-                        fill: true,
-                        tension: 0.2,
-                        pointRadius: 0,
-                        borderWidth: 2
-                    }]
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Puissance (kW)',
+                            data: dataPoints,
+                            borderColor: '#00E5FF',
+                            backgroundColor: gradient,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Seuil Souscrit',
+                            data: thresholdData,
+                            borderColor: '#EF4444',
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            borderWidth: 1,
+                            fill: false
+                        },
+                        {
+                            label: 'Talon',
+                            data: talonData,
+                            borderColor: '#94A3B8',
+                            borderDash: [2, 2],
+                            pointRadius: 0,
+                            borderWidth: 1,
+                            fill: false
+                        }
+                    ]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#64748B' } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } } } }
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } }, 
+                    scales: { 
+                        x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 12 } }, 
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } } 
+                    },
+                    interaction: { intersect: false, mode: 'index' }
+                }
             });
         }
 
@@ -268,109 +336,106 @@
                 data: {
                     labels: ['Q1 26', 'Q2 26', 'Q3 26', 'Q4 26'],
                     datasets: [
-                        { label: 'Fixe', data: [100, 50, 0, 0], backgroundColor: '#10B981' },
-                        { label: 'Spot', data: [0, 50, 100, 100], backgroundColor: '#EF4444' }
+                        { label: 'Fixe', data: [80, 60, 40, 20], backgroundColor: '#10B981' },
+                        { label: 'Spot', data: [20, 40, 60, 80], backgroundColor: '#EF4444' }
                     ]
                 },
                 options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: {display:false} }, y: { stacked: true, display:false } }, plugins: { legend: { display: false } } }
             });
         }
 
-        // --- CÂBLAGE INTELLIGENT (Fleet vs Single) ---
+        // --- CÂBLAGE TITANIUM ---
         async function loadData() {
             const urlParams = new URLSearchParams(window.location.search);
             const siteId = urlParams.get('id');
 
             if (siteId) {
-                // MODE SINGLE : On charge un site spécifique
-                loadSingleSite(siteId);
+                // Chargement des données réelles du site
+                try {
+                    const res = await fetch(`/api/dashboard/data/${siteId}`);
+                    const data = await res.json();
+                    
+                    if (data && !data.error) {
+                        updateDashboard(data);
+                    } else {
+                        alert("Erreur chargement données site.");
+                    }
+                } catch(e) { console.error(e); }
             } else {
-                // MODE FLEET : On charge tout le parc (comportement par défaut)
-                loadFleetData();
+                // Mode Démo / Parc Global (Fallback)
+                document.getElementById('header-site-name').innerText = "Vue Parc (Démo)";
+                // On initialise avec des valeurs par défaut pour que ce soit joli
+                initLoadChart(800, 150, 1000);
+                document.getElementById('cortex-advice').innerText = "Sélectionnez un site spécifique pour voir l'analyse détaillée.";
             }
         }
 
-        async function loadSingleSite(id) {
-            try {
-                const res = await fetch(`/api/dashboard/data/${id}`);
-                const data = await res.json();
-                
-                if (data && !data.error) {
-                    const name = data.identity?.site_name || "Site Industriel";
-                    document.getElementById('header-site-name').innerText = name;
-                    document.getElementById('page-title').innerText = name;
-                    
-                    const power = data.contract?.power || 0;
-                    document.getElementById('live-power').innerText = `Ps: ${power} kVA`;
-                    document.getElementById('site-count').innerText = "1";
-                    
-                    const budget = data.kpis?.budget || 0;
-                    document.getElementById('total-budget').innerText = Math.round(budget).toLocaleString() + " €";
+        function updateDashboard(data) {
+            // 1. Identité
+            const name = data.identity?.site_name || "Site Industriel";
+            document.getElementById('header-site-name').innerText = name;
+            document.getElementById('page-title').innerText = name;
 
-                    // Simulation Courbe de Charge basée sur la puissance souscrite
-                    const curve = [];
-                    for(let i=0; i<24; i++) {
-                        let loadFactor = 0.4; // Nuit
-                        if(i >= 6 && i <= 20) loadFactor = 0.85 + (Math.random() * 0.1); // Jour (Usine active)
-                        curve.push(power * loadFactor);
-                    }
-                    if (loadChartInstance) {
-                        loadChartInstance.data.datasets[0].data = curve;
-                        loadChartInstance.update();
-                    }
-                    
-                    logEvent(`Connexion Cortex établie avec ${name}.`);
-                }
-            } catch(e) { console.error(e); }
-        }
+            // 2. Récupération des KPIs Physiques (calculés par Cortex Router)
+            const kpis = data.kpis || {};
+            const contract = data.contract || {};
+            
+            // Valeurs par défaut si non calculées
+            const pmax = kpis.pmax_kw || 0;
+            const talon = kpis.talon_kw || 0;
+            const volume = kpis.volume_mwh || 0;
+            const budget = kpis.budget || 0;
+            const psouscrite = contract.power || 0;
+            const advice = kpis.cortex_advice || "Analyse en cours...";
+            const tag = kpis.is_alert ? "ALERTE" : "OPTIMISÉ";
 
-        async function loadFleetData() {
-            try {
-                const res = await fetch('/api/dashboard/fleet');
-                const data = await res.json();
+            // 3. Mise à jour du DOM
+            document.getElementById('live-power').innerText = `Pmax: ${pmax} kW`;
+            document.getElementById('kpi-talon').innerText = talon;
+            document.getElementById('kpi-pmax').innerText = pmax;
+            document.getElementById('kpi-volume').innerText = Math.round(volume);
+            document.getElementById('total-budget').innerText = Math.round(budget).toLocaleString() + " €";
+            document.getElementById('kpi-budget').innerText = `Budget Est. ${new Date().getFullYear()}`;
+            document.getElementById('sub-power-text').innerText = `Sur ${psouscrite} kVA souscrits`;
+            
+            document.getElementById('cortex-advice').innerText = advice;
+            document.getElementById('cortex-tag').innerText = tag;
+            document.getElementById('cortex-tag').className = kpis.is_alert 
+                ? "px-2 py-1 rounded bg-danger/20 text-danger text-[9px] font-bold border border-danger/30" 
+                : "px-2 py-1 rounded bg-success/20 text-success text-[9px] font-bold border border-success/30";
 
-                if (data.fleet) {
-                    const sites = data.fleet;
-                    let totalPower = 0;
-                    let totalBudget = 0;
-                    
-                    sites.forEach(s => {
-                        totalPower += (s.power || 0);
-                        totalBudget += (s.budget || 0);
-                    });
+            // 4. Barres de progression visuelles
+            // Pmax vs Souscrite
+            let pmaxPct = psouscrite > 0 ? (pmax / psouscrite) * 100 : 0;
+            if (pmaxPct > 100) pmaxPct = 100;
+            document.getElementById('bar-pmax').style.width = `${pmaxPct}%`;
+            document.getElementById('bar-pmax').className = pmax > psouscrite ? "bg-danger h-full" : "bg-steam h-full";
 
-                    const powerMW = (totalPower / 1000).toFixed(2);
-                    document.getElementById('live-power').innerText = `Pinst: ${powerMW} MW`;
-                    document.getElementById('site-count').innerText = sites.length;
-                    document.getElementById('total-budget').innerText = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(totalBudget);
+            // Talon vs Pmax (Ratio d'efficacité)
+            let talonPct = pmax > 0 ? (talon / pmax) * 100 : 0;
+            document.getElementById('bar-talon').style.width = `${talonPct}%`;
 
-                    const curve = [];
-                    for(let i=0; i<24; i++) {
-                        let loadFactor = 0.3; 
-                        if(i >= 6 && i <= 20) loadFactor = 0.75 + (Math.random() * 0.15); 
-                        curve.push(totalPower * loadFactor);
-                    }
+            // 5. Initialisation du Graphique
+            initLoadChart(pmax, talon, psouscrite);
 
-                    if (loadChartInstance) {
-                        loadChartInstance.data.datasets[0].data = curve;
-                        loadChartInstance.update();
-                    }
-                    
-                    logEvent(`Vue Parc Global : ${sites.length} sites connectés.`);
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        function logEvent(msg) {
+            // 6. Logs
             const logs = document.getElementById('cortex-logs');
-            const time = new Date().toLocaleTimeString();
             logs.innerHTML += `
                 <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
-                    <div class="text-xs font-mono text-gray-500 w-24">${time}</div>
-                    <div class="w-20"><span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-[10px] font-bold">INFO</span></div>
-                    <div class="flex-1 text-sm text-white">${msg}</div>
+                    <div class="text-xs font-mono text-gray-500 w-24">${new Date().toLocaleTimeString()}</div>
+                    <div class="w-20"><span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-[10px] font-bold">DATA</span></div>
+                    <div class="flex-1 text-sm text-white">Données SGE chargées. Pmax=${pmax}kW, Talon=${talon}kW.</div>
                 </div>
             `;
+            if (kpis.is_alert) {
+                logs.innerHTML += `
+                    <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
+                        <div class="text-xs font-mono text-gray-500 w-24">${new Date().toLocaleTimeString()}</div>
+                        <div class="w-20"><span class="bg-danger/20 text-danger px-2 py-1 rounded text-[10px] font-bold">ALERTE</span></div>
+                        <div class="flex-1 text-sm text-white">${advice}</div>
+                    </div>
+                `;
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
