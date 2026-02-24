@@ -54,7 +54,7 @@
 </head>
 <body class="flex h-screen w-screen font-sans text-sm">
 
-    <!-- SIDEBAR -->
+    <!-- SIDEBAR HARMONISÉE -->
     <aside class="w-64 bg-[#020617] border-r border-white/10 flex flex-col justify-between z-50 flex-shrink-0">
         <div>
             <div class="h-16 flex items-center px-6 border-b border-white/10 bg-abysse">
@@ -67,6 +67,7 @@
                 </div>
             </div>
             
+            <!-- NAVIGATION PRINCIPALE -->
             <div class="p-4 space-y-1">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Pilotage Usine</div>
                 <button onclick="switchView('command')" id="nav-command" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg">
@@ -80,6 +81,7 @@
                 </button>
             </div>
 
+            <!-- SATELLITES (BUREAU D'ÉTUDES) - RESTAURÉS -->
             <div class="px-4 mt-2">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Bureau d'Études</div>
                 <a href="/optimization" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
@@ -88,9 +90,13 @@
                 <a href="/performance" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
                     <i class="fa-solid fa-chart-area w-4 text-success"></i> Performance ISO
                 </a>
+                <a href="/carbon" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
+                    <i class="fa-solid fa-leaf w-4 text-green-600"></i> Bilan Carbone
+                </a>
             </div>
         </div>
 
+        <!-- SETTINGS (RESTAURÉS EN BAS) -->
         <div class="mt-auto p-4 border-t border-white/10 bg-black/20">
             <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
                 <div class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs text-white font-bold group-hover:bg-cyan group-hover:text-black transition border border-white/10"><i class="fa-solid fa-gear"></i></div>
@@ -117,7 +123,7 @@
                 </div>
             </div>
             <div class="px-4 flex items-center gap-4 text-xs">
-                <span class="text-gray-400">Site: <b class="text-white" id="header-site-name">Chargement...</b></span>
+                <span class="text-gray-400">Site: <b class="text-white" id="header-site-name">Recherche...</b></span>
             </div>
         </div>
 
@@ -193,7 +199,7 @@
                         <i class="fa-solid fa-robot absolute -right-2 -bottom-2 text-6xl text-ai opacity-20"></i>
                         <div class="text-[10px] text-gray-500 uppercase font-bold">Analyse Cortex</div>
                         <div class="mt-2 text-xs text-white leading-relaxed font-medium" id="cortex-advice">
-                            En attente de données...
+                            Chargement...
                         </div>
                         <div class="mt-3">
                             <span class="px-2 py-1 rounded bg-ai/20 text-ai text-[9px] font-bold border border-ai/30" id="cortex-tag">IA READY</span>
@@ -344,30 +350,53 @@
             });
         }
 
-        // --- CÂBLAGE TITANIUM ---
+        // --- CÂBLAGE INTELLIGENT (AUTO-DETECT) ---
         async function loadData() {
             const urlParams = new URLSearchParams(window.location.search);
             const siteId = urlParams.get('id');
 
             if (siteId) {
-                // Chargement des données réelles du site
-                try {
-                    const res = await fetch(`/api/dashboard/data/${siteId}`);
-                    const data = await res.json();
-                    
-                    if (data && !data.error) {
-                        updateDashboard(data);
-                    } else {
-                        alert("Erreur chargement données site.");
-                    }
-                } catch(e) { console.error(e); }
+                // CAS 1 : ID SPÉCIFIQUE
+                loadSingleSite(siteId);
             } else {
-                // Mode Démo / Parc Global (Fallback)
-                document.getElementById('header-site-name').innerText = "Vue Parc (Démo)";
-                // On initialise avec des valeurs par défaut pour que ce soit joli
-                initLoadChart(800, 150, 1000);
-                document.getElementById('cortex-advice').innerText = "Sélectionnez un site spécifique pour voir l'analyse détaillée.";
+                // CAS 2 : PAS D'ID -> AUTO-DÉTECTION DANS LA FLOTTE
+                try {
+                    const res = await fetch('/api/dashboard/fleet');
+                    const fleetData = await res.json();
+                    
+                    if (fleetData.fleet && fleetData.fleet.length > 0) {
+                        // On prend le premier site trouvé (ABAG dans ton cas)
+                        const firstSite = fleetData.fleet[0];
+                        console.log("Auto-connecting to:", firstSite.name);
+                        loadSingleSite(firstSite.id);
+                    } else {
+                        // Vraiment vide -> Mode Démo
+                        loadDemoMode();
+                    }
+                } catch(e) {
+                    console.error("Erreur Auto-Detect:", e);
+                    loadDemoMode();
+                }
             }
+        }
+
+        async function loadSingleSite(id) {
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                const data = await res.json();
+                
+                if (data && !data.error) {
+                    updateDashboard(data);
+                } else {
+                    alert("Erreur chargement données site.");
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function loadDemoMode() {
+            document.getElementById('header-site-name').innerText = "Vue Parc (Démo)";
+            initLoadChart(800, 150, 1000);
+            document.getElementById('cortex-advice').innerText = "Aucun site connecté. Veuillez ingérer des données via Ops Center.";
         }
 
         function updateDashboard(data) {
