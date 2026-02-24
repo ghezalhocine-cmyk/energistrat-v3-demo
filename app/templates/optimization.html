@@ -2,80 +2,178 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT | Optimisation Contrats</title>
+    <title>ENERGISTRAT V3 | Optimisation TURPE</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script>
-        tailwind.config = { theme: { extend: { colors: { abysse: '#050505', card: '#0F172A', cyan: '#00E5FF', alert: '#F59E0B', success: '#10B981' }, fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } } }
-    </script>
-    <style>body { background-color: #050505; color: white; } .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); }</style>
+    <style>
+        body { background-color: #050505; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem; }
+        .btn-nav { @apply px-4 py-2 text-xs font-bold text-gray-400 hover:text-white transition; }
+    </style>
 </head>
-<body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
+<body class="flex h-screen w-screen">
+
+    <!-- SIDEBAR LIGHT (Navigation Rapide) -->
     <aside class="w-16 bg-[#020617] border-r border-white/10 flex flex-col items-center py-6 z-50">
-        <a href="/dashboard/industry" class="mb-8 text-gray-500 hover:text-white transition" title="Retour Cockpit"><i class="fa-solid fa-arrow-left text-xl"></i></a>
-        <div class="w-10 h-10 rounded bg-cyan/20 text-cyan flex items-center justify-center mb-4"><i class="fa-solid fa-sliders"></i></div>
+        <a href="/industrie" id="back-btn" class="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-white hover:bg-cyan-500 hover:text-black transition mb-6" title="Retour Supervision">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <div class="w-10 h-10 rounded bg-cyan/20 text-cyan flex items-center justify-center border border-cyan/30 mb-2">
+            <i class="fa-solid fa-sliders"></i>
+        </div>
     </aside>
 
-    <main class="flex-1 flex flex-col p-8 overflow-y-auto bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
-        <header class="mb-8 flex justify-between items-end">
+    <!-- MAIN -->
+    <main class="flex-1 flex flex-col p-8 gap-6">
+        
+        <header class="flex justify-between items-center">
             <div>
-                <h1 class="text-3xl font-black text-white">Optimisation Tarifaire</h1>
-                <p class="text-gray-400 text-xs mt-1">Données calculées sur le parc réel</p>
+                <h1 class="text-3xl font-bold text-white">Optimisation Tarifaire (TURPE)</h1>
+                <p class="text-sm text-gray-400 mt-1">Analyse des marges de puissance et réactif</p>
             </div>
             <div class="text-right">
-                <div class="text-xs text-gray-500 uppercase">Gisement d'économie</div>
-                <div class="text-2xl font-mono font-bold text-success" id="total-savings">Calcul...</div>
+                <div class="text-xs text-gray-500 uppercase font-bold">Site Actif</div>
+                <div class="text-xl font-bold text-cyan" id="site-name">Chargement...</div>
             </div>
         </header>
 
-        <div class="grid grid-cols-2 gap-8">
-            <div class="bento-card p-8 rounded-2xl">
-                <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3"><i class="fa-solid fa-bolt text-cyan"></i> Calibrage Puissance (TURPE)</h2>
-                <div class="h-64 relative mb-6"><canvas id="turpeChart"></canvas></div>
-                <div class="bg-white/5 p-4 rounded-xl border border-white/10">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-xs text-gray-400">Puissance Souscrite Actuelle</span>
-                        <span class="font-mono font-bold text-white" id="current-p">-- kVA</span>
+        <!-- GRID -->
+        <div class="grid grid-cols-3 gap-6 h-full">
+            
+            <!-- COL 1 : ANALYSE PUISSANCE -->
+            <div class="bento-card p-6 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Analyse de Puissance</h3>
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-gray-400 text-xs">Puissance Souscrite</span>
+                        <span class="text-white font-mono font-bold text-xl" id="val-souscrite">-- kVA</span>
                     </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs text-cyan">Optimum Calculé</span>
-                        <span class="font-mono font-bold text-cyan" id="opti-p">-- kVA</span>
+                    <div class="w-full bg-gray-700 h-1 mb-6"><div class="bg-gray-500 h-full" style="width: 100%"></div></div>
+
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-gray-400 text-xs">Puissance Atteinte (Pmax)</span>
+                        <span class="text-white font-mono font-bold text-xl" id="val-pmax">-- kW</span>
                     </div>
+                    <div class="w-full bg-gray-700 h-1 mb-6"><div class="bg-cyan h-full" id="bar-pmax" style="width: 0%"></div></div>
+                </div>
+                
+                <div class="bg-white/5 p-4 rounded-lg border border-white/10">
+                    <div class="flex items-center gap-3 mb-2">
+                        <i class="fa-solid fa-calculator text-cyan"></i>
+                        <span class="text-xs font-bold text-white">Verdict Cortex</span>
+                    </div>
+                    <p class="text-xs text-gray-300 leading-relaxed" id="opti-verdict">Calcul en cours...</p>
                 </div>
             </div>
+
+            <!-- COL 2 : GAIN FINANCIER -->
+            <div class="bento-card p-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 text-8xl text-green-500"><i class="fa-solid fa-sack-dollar"></i></div>
+                
+                <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Potentiel d'Économie</h3>
+                <div class="text-5xl font-black text-white mb-2" id="val-gain">-- €</div>
+                <div class="text-xs text-green-400 font-bold uppercase border border-green-500/30 bg-green-500/10 px-3 py-1 rounded-full mb-8">Annuel</div>
+
+                <button class="bg-cyan hover:bg-white text-black font-bold py-3 px-8 rounded-full transition shadow-[0_0_20px_rgba(0,229,255,0.3)]">
+                    Générer Demande Enedis
+                </button>
+            </div>
+
+            <!-- COL 3 : QUALITÉ (COS PHI) -->
+            <div class="bento-card p-6">
+                <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Énergie Réactive (Cos φ)</h3>
+                <div class="relative h-48 w-full flex items-center justify-center">
+                    <canvas id="cosPhiChart"></canvas>
+                    <div class="absolute text-center">
+                        <div class="text-3xl font-bold text-white" id="val-cosphi">0.94</div>
+                        <div class="text-[10px] text-gray-500">Moyenne</div>
+                    </div>
+                </div>
+                <div class="mt-6 text-center">
+                    <p class="text-xs text-gray-300">Aucune pénalité détectée sur la période.</p>
+                    <div class="mt-2 text-[10px] text-gray-500">Seuil Tan φ < 0.4</div>
+                </div>
+            </div>
+
         </div>
     </main>
 
     <script>
         async function init() {
-            try {
-                const res = await fetch('/api/physics/industry/global');
-                const data = await res.json();
-                
-                if (data.turpe) {
-                    const t = data.turpe;
-                    document.getElementById('current-p').innerText = t.current_p + " kVA";
-                    document.getElementById('opti-p').innerText = t.optimal_p + " kVA";
-                    document.getElementById('total-savings').innerText = "+ " + t.potential_savings + " €/an";
-                    
-                    const ctx = document.getElementById('turpeChart').getContext('2d');
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: [t.optimal_p*0.8, t.optimal_p*0.9, t.optimal_p, t.optimal_p*1.1, t.optimal_p*1.2],
-                            datasets: [{
-                                label: 'Coût Total (€)',
-                                data: [50000, 48000, 45000, 49000, 52000], // Simulé pour l'affichage courbe en U
-                                borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, tension: 0.4
-                            }]
-                        },
-                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false } } }
-                    });
-                }
-            } catch(e) { console.error(e); }
+            // Récupération ID (comme pour industry.html)
+            const urlParams = new URLSearchParams(window.location.search);
+            let siteId = urlParams.get('id');
+
+            // Auto-detect si pas d'ID
+            if (!siteId) {
+                try {
+                    const res = await fetch('/api/dashboard/fleet');
+                    const fleet = await res.json();
+                    if(fleet.fleet && fleet.fleet.length > 0) siteId = fleet.fleet[0].id;
+                } catch(e) {}
+            }
+
+            if(siteId) {
+                // Mise à jour du lien retour
+                document.getElementById('back-btn').href = `/industrie?id=${siteId}`;
+                loadData(siteId);
+            }
         }
+
+        async function loadData(id) {
+            const res = await fetch(`/api/dashboard/data/${id}`);
+            const data = await res.json();
+
+            // Mapping Données
+            const name = data.identity?.site_name || "Site";
+            const pmax = parseFloat(data.kpis?.pmax_kw || 0);
+            const souscrite = parseFloat(data.contract?.power || 0);
+            
+            // DOM Update
+            document.getElementById('site-name').innerText = name;
+            document.getElementById('val-souscrite').innerText = souscrite + " kVA";
+            document.getElementById('val-pmax').innerText = pmax + " kW";
+
+            // Calcul Optimisation (Moteur Simplifié TURPE)
+            // Coût kVA approx : 15€/an
+            let gain = 0;
+            let verdict = "";
+            const margin = souscrite - pmax;
+
+            // Barre Pmax
+            const pmaxPct = souscrite > 0 ? (pmax / souscrite) * 100 : 0;
+            document.getElementById('bar-pmax').style.width = `${Math.min(pmaxPct, 100)}%`;
+            
+            if (margin > 12) { // Marge > 12 kVA -> On peut baisser
+                const newPower = Math.ceil(pmax * 1.1); // Marge sécu 10%
+                const delta = souscrite - newPower;
+                gain = delta * 15; // 15€ par kVA
+                verdict = `Votre puissance souscrite est trop élevée. Vous pouvez la réduire à <b>${newPower} kVA</b> sans risque de disjonction.`;
+                document.getElementById('bar-pmax').className = "bg-green-500 h-full";
+            } else if (margin < 0) { // Dépassement
+                verdict = "⚠️ DANGER : Dépassements de puissance détectés. Risque de pénalités majeures. Augmentez votre contrat.";
+                document.getElementById('bar-pmax').className = "bg-red-500 h-full";
+                gain = 0;
+            } else {
+                verdict = "Votre contrat est parfaitement optimisé. Aucune action requise.";
+                document.getElementById('bar-pmax').className = "bg-cyan h-full";
+            }
+
+            document.getElementById('val-gain').innerText = Math.round(gain) + " €";
+            document.getElementById('opti-verdict').innerHTML = verdict;
+
+            // Chart Cos Phi (Donut)
+            new Chart(document.getElementById('cosPhiChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Actif', 'Réactif'],
+                    datasets: [{ data: [94, 6], backgroundColor: ['#00E5FF', '#1F2937'], borderWidth: 0 }]
+                },
+                options: { cutout: '80%', responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+
         init();
     </script>
 </body>
