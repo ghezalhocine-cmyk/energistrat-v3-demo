@@ -48,8 +48,15 @@
         .ticker-wrap { width: 100%; overflow: hidden; background: rgba(0,0,0,0.3); }
         .ticker { display: inline-block; white-space: nowrap; animation: ticker 20s linear infinite; }
         @keyframes ticker { 0% { transform: translate3d(100%, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
-        .live-dot { width: 8px; height: 8px; background: #EF4444; border-radius: 50%; box-shadow: 0 0 10px #EF4444; animation: blink-live 1s infinite; }
-        @keyframes blink-live { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        
+        select.cyber-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2300E5FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.7rem top 50%;
+            background-size: 0.65rem auto;
+            padding-right: 2.5rem;
+        }
     </style>
 </head>
 <body class="flex h-screen w-screen font-sans text-sm">
@@ -67,7 +74,6 @@
                 </div>
             </div>
             
-            <!-- NAVIGATION PRINCIPALE -->
             <div class="p-4 space-y-1">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Pilotage Usine</div>
                 <button onclick="switchView('command')" id="nav-command" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg">
@@ -81,7 +87,7 @@
                 </button>
             </div>
 
-            <!-- SATELLITES (BUREAU D'ÉTUDES) - NAVIGATION INTELLIGENTE -->
+            <!-- NAVIGATION SATELLITE -->
             <div class="px-4 mt-2">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Bureau d'Études</div>
                 <div onclick="navigateToSatellite('optimization')" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5 cursor-pointer">
@@ -96,7 +102,6 @@
             </div>
         </div>
 
-        <!-- SETTINGS -->
         <div class="mt-auto p-4 border-t border-white/10 bg-black/20">
             <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
                 <div class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs text-white font-bold group-hover:bg-cyan group-hover:text-black transition border border-white/10"><i class="fa-solid fa-gear"></i></div>
@@ -112,18 +117,23 @@
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         
         <!-- TOP BAR -->
-        <div class="h-10 bg-black border-b border-white/10 flex items-center z-40">
-            <div class="bg-cyan text-black font-bold px-3 h-full flex items-center text-xs">LIVE</div>
-            <div class="ticker-wrap flex-1">
-                <div class="ticker text-xs font-mono py-2">
-                    <span class="text-cyan mr-8">EEX SPOT FR: 42.50 €/MWh ▼</span>
-                    <span class="text-alert mr-8">GAZ TTF: 34.20 €/MWh ▲</span>
-                    <span class="text-white mr-8">CO2 EUA: 65.10 €/t ▶</span>
-                    <span class="text-green-500 mr-8">CORTEX ENGINE: CONNECTED</span>
+        <div class="h-10 bg-black border-b border-white/10 flex items-center z-40 justify-between pr-4">
+            <div class="flex items-center h-full">
+                <div class="bg-cyan text-black font-bold px-3 h-full flex items-center text-xs">LIVE</div>
+                <div class="ticker-wrap w-96 border-r border-white/10">
+                    <div class="ticker text-xs font-mono py-2">
+                        <span class="text-cyan mr-8">EEX SPOT FR: 42.50 €/MWh ▼</span>
+                        <span class="text-alert mr-8">GAZ TTF: 34.20 €/MWh ▲</span>
+                        <span class="text-green-500 mr-8">CORTEX ENGINE: CONNECTED</span>
+                    </div>
                 </div>
             </div>
-            <div class="px-4 flex items-center gap-4 text-xs">
-                <span class="text-gray-400">Site: <b class="text-white" id="header-site-name">Recherche...</b></span>
+            
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-500 uppercase font-bold">Site Actif :</span>
+                <select id="site-selector" onchange="switchSite(this.value)" class="cyber-select bg-white/5 border border-white/20 text-white text-xs font-bold rounded px-3 py-1.5 focus:outline-none focus:border-cyan hover:bg-white/10 transition cursor-pointer min-w-[200px]">
+                    <option value="">Chargement des sites...</option>
+                </select>
             </div>
         </div>
 
@@ -172,7 +182,7 @@
                         <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-cyan h-full" id="bar-talon" style="width: 0%"></div></div>
                     </div>
 
-                    <!-- WIDGET 2 : PMAX vs PSOUSCRITE -->
+                    <!-- WIDGET 2 : PMAX -->
                     <div class="bento-card p-4 border-l-4 border-steam bg-card">
                         <div class="text-[10px] text-gray-500 uppercase font-bold">Puissance Atteinte</div>
                         <div class="flex justify-between items-end mt-2">
@@ -250,24 +260,12 @@
             if(viewName === 'trading') initHedgeChart();
         }
 
-        // --- NAVIGATION SATELLITE (NOUVEAU) ---
+        // --- NAVIGATION SATELLITE ---
         function navigateToSatellite(page) {
-            const urlParams = new URLSearchParams(window.location.search);
-            const siteId = urlParams.get('id');
-            if(siteId) {
-                window.location.href = `/${page}?id=${siteId}`;
+            if(window.CURRENT_SITE_ID) {
+                window.location.href = `/${page}?id=${window.CURRENT_SITE_ID}`;
             } else {
-                // Tentative de récupération depuis l'état chargé
-                const headerName = document.getElementById('header-site-name').innerText;
-                if(headerName !== "Recherche..." && headerName !== "Vue Parc (Démo)") {
-                    // On est chargé mais sans ID dans l'URL (Auto-detect)
-                    // On ne peut pas facilement deviner l'ID ici sans variable globale
-                    // Amélioration : stocker l'ID globalement
-                    if(window.CURRENT_SITE_ID) window.location.href = `/${page}?id=${window.CURRENT_SITE_ID}`;
-                    else alert("Veuillez attendre le chargement complet du site.");
-                } else {
-                    alert("Aucun site sélectionné.");
-                }
+                alert("Veuillez sélectionner un site dans le menu en haut à droite.");
             }
         }
 
@@ -277,13 +275,11 @@
 
         function initLoadChart(pmax, talon, psouscrite) {
             const ctx = document.getElementById('chartLoad').getContext('2d');
-            
             const labels = Array.from({length: 48}, (_, i) => {
                 const h = Math.floor(i/2);
                 const m = i%2 === 0 ? '00' : '30';
                 return `${h}:${m}`;
             });
-            
             const dataPoints = labels.map((_, i) => {
                 const hour = i / 2;
                 let base = talon;
@@ -309,47 +305,12 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        {
-                            label: 'Puissance (kW)',
-                            data: dataPoints,
-                            borderColor: '#00E5FF',
-                            backgroundColor: gradient,
-                            fill: true,
-                            tension: 0.3,
-                            pointRadius: 0,
-                            borderWidth: 2
-                        },
-                        {
-                            label: 'Seuil Souscrit',
-                            data: thresholdData,
-                            borderColor: '#EF4444',
-                            borderDash: [5, 5],
-                            pointRadius: 0,
-                            borderWidth: 1,
-                            fill: false,
-                            spanGaps: false
-                        },
-                        {
-                            label: 'Talon',
-                            data: talonData,
-                            borderColor: '#94A3B8',
-                            borderDash: [2, 2],
-                            pointRadius: 0,
-                            borderWidth: 1,
-                            fill: false
-                        }
+                        { label: 'Puissance (kW)', data: dataPoints, borderColor: '#00E5FF', backgroundColor: gradient, fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                        { label: 'Seuil Souscrit', data: thresholdData, borderColor: '#EF4444', borderDash: [5, 5], pointRadius: 0, borderWidth: 1, fill: false, spanGaps: false },
+                        { label: 'Talon', data: talonData, borderColor: '#94A3B8', borderDash: [2, 2], pointRadius: 0, borderWidth: 1, fill: false }
                     ]
                 },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } }, 
-                    scales: { 
-                        x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 12 } }, 
-                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } } 
-                    },
-                    interaction: { intersect: false, mode: 'index' }
-                }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } } }, interaction: { intersect: false, mode: 'index' } }
             });
         }
 
@@ -369,30 +330,50 @@
             });
         }
 
-        // --- CÂBLAGE INTELLIGENT ---
-        async function loadData() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const siteId = urlParams.get('id');
+        // --- GESTION MULTI-SITES ---
+        async function initSiteSelector() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                const selector = document.getElementById('site-selector');
+                selector.innerHTML = ''; 
 
-            if (siteId) {
-                loadSingleSite(siteId);
-            } else {
-                try {
-                    const res = await fetch('/api/dashboard/fleet');
-                    const fleetData = await res.json();
+                if (data.fleet && data.fleet.length > 0) {
+                    data.fleet.forEach(site => {
+                        const opt = document.createElement('option');
+                        opt.value = site.id;
+                        opt.innerText = site.name;
+                        selector.appendChild(opt);
+                    });
+
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const urlId = urlParams.get('id');
                     
-                    if (fleetData.fleet && fleetData.fleet.length > 0) {
-                        const firstSite = fleetData.fleet[0];
-                        console.log("Auto-connecting to:", firstSite.name);
-                        loadSingleSite(firstSite.id);
+                    if (urlId) {
+                        selector.value = urlId;
+                        loadSingleSite(urlId);
                     } else {
-                        loadDemoMode();
+                        selector.selectedIndex = 0;
+                        loadSingleSite(selector.value);
                     }
-                } catch(e) {
-                    console.error("Erreur Auto-Detect:", e);
+                } else {
+                    const opt = document.createElement('option');
+                    opt.innerText = "Aucun site disponible";
+                    selector.appendChild(opt);
                     loadDemoMode();
                 }
+            } catch(e) {
+                console.error("Erreur Init Selecteur:", e);
+                loadDemoMode();
             }
+        }
+
+        function switchSite(siteId) {
+            if(!siteId) return;
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('id', siteId);
+            window.history.pushState({}, '', newUrl);
+            loadSingleSite(siteId);
         }
 
         async function loadSingleSite(id) {
@@ -401,7 +382,7 @@
                 const data = await res.json();
                 
                 if (data && !data.error) {
-                    window.CURRENT_SITE_ID = id; // Stockage global pour la navigation
+                    window.CURRENT_SITE_ID = id; 
                     updateDashboard(data);
                 } else {
                     alert("Erreur chargement données site.");
@@ -410,20 +391,17 @@
         }
 
         function loadDemoMode() {
-            document.getElementById('header-site-name').innerText = "Vue Parc (Démo)";
+            document.getElementById('site-selector').innerHTML = '<option>Mode Démo</option>';
             initLoadChart(800, 150, 1000);
-            document.getElementById('cortex-advice').innerText = "Aucun site connecté. Veuillez ingérer des données via Ops Center.";
+            document.getElementById('cortex-advice').innerText = "Veuillez ingérer des données via Ops Center pour activer le pilotage.";
         }
 
         function updateDashboard(data) {
-            const name = data.identity?.site_name || "Site Industriel";
-            document.getElementById('header-site-name').innerText = name;
-            document.getElementById('page-title').innerText = name;
+            document.getElementById('page-title').innerText = "Supervision Temps Réel";
 
             const kpis = data.kpis || {};
             const contract = data.contract || {};
             
-            // CONVERSION NUMÉRIQUE (Fix Graphique)
             const pmax = parseFloat(kpis.pmax_kw) || 0;
             const talon = parseFloat(kpis.talon_kw) || 0;
             const volume = parseFloat(kpis.volume_mwh) || 0;
@@ -437,8 +415,6 @@
             document.getElementById('kpi-talon').innerText = talon;
             document.getElementById('kpi-pmax').innerText = pmax;
             document.getElementById('kpi-volume').innerText = Math.round(volume);
-            
-            // FIX BUDGET DISPLAY
             document.getElementById('kpi-budget').innerText = `Budget: ${Math.round(budget).toLocaleString()} €`;
             
             if (psouscrite > 0) {
@@ -461,36 +437,21 @@
             let talonPct = pmax > 0 ? (talon / pmax) * 100 : 0;
             document.getElementById('bar-talon').style.width = `${talonPct}%`;
 
-            // INITIALISATION GRAPHIQUE SÉCURISÉE
-            try {
-                initLoadChart(pmax, talon, psouscrite);
-            } catch(err) {
-                console.error("Erreur Graphique:", err);
-            }
+            try { initLoadChart(pmax, talon, psouscrite); } catch(err) { console.error(err); }
 
-            // Logs
             const logs = document.getElementById('cortex-logs');
-            logs.innerHTML += `
+            logs.innerHTML = `
                 <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
                     <div class="text-xs font-mono text-gray-500 w-24">${new Date().toLocaleTimeString()}</div>
-                    <div class="w-20"><span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-[10px] font-bold">DATA</span></div>
-                    <div class="flex-1 text-sm text-white">Données SGE chargées. Pmax=${pmax}kW, Talon=${talon}kW.</div>
+                    <div class="w-20"><span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-[10px] font-bold">SYNC</span></div>
+                    <div class="flex-1 text-sm text-white">Site chargé : ${data.identity?.site_name}</div>
                 </div>
             `;
-            if (kpis.is_alert) {
-                logs.innerHTML += `
-                    <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
-                        <div class="text-xs font-mono text-gray-500 w-24">${new Date().toLocaleTimeString()}</div>
-                        <div class="w-20"><span class="bg-danger/20 text-danger px-2 py-1 rounded text-[10px] font-bold">ALERTE</span></div>
-                        <div class="flex-1 text-sm text-white">${advice}</div>
-                    </div>
-                `;
-            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             switchView('command');
-            setTimeout(loadData, 500); 
+            initSiteSelector(); 
         });
     </script>
 </body>
