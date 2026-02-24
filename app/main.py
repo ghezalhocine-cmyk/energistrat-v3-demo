@@ -21,7 +21,7 @@ try:
 except ImportError:
     PANDAS_READY = False
 
-# --- BLOC IMPORT CORTEX (CORRIGÉ & ROBUSTE) ---
+# --- BLOC IMPORT CORTEX (ROBUSTE) ---
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
@@ -44,7 +44,7 @@ except ImportError:
             def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router module missing"}
         router = MockRouter()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1240-ULTIMATE")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1250-GOLD")
 
 app.add_middleware(
     CORSMiddleware,
@@ -320,16 +320,34 @@ async def get_dashboard_data(client_id: str, response: Response):
     }
     return JSONResponse(json_compliant(response_data))
 
-# --- ROUTE FORECAST ---
+# --- ROUTE FORECAST CORRIGÉE (FIX VOLUME) ---
 @app.get("/api/forecast/simulate/{client_id}")
 async def api_forecast_simulate(client_id: str):
     file_path = find_site_file(client_id)
     if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
+    
     with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
     
-    fin = cortex.enrich_site_financials(data)
+    # 1. RÉCUPÉRATION ROBUSTE DU VOLUME (PRIORITÉ AU ROUTEUR)
+    vol = 0
+    # A. On regarde si le routeur a écrit un KPI direct
+    if 'kpis' in data and 'volume_mwh' in data['kpis']:
+        vol = float(data['kpis']['volume_mwh'])
     
-    vol = fin['volume_mwh']
+    # B. Sinon, on regarde dans les détails du contrat
+    elif 'contract' in data and 'consumption_details' in data['contract']:
+        vol_annuel = data['contract']['consumption_details'].get('volume_annuel', 0)
+        vol = vol_annuel / 1000 # Conversion kWh -> MWh
+    
+    # C. Fallback sur le moteur financier classique
+    if vol == 0:
+        fin = cortex.enrich_site_financials(data)
+        vol = fin['volume_mwh']
+
+    # Sécurité anti-crash
+    if vol == 0: vol = 100 
+
+    # 2. DÉTECTION TYPOLOGIE
     typology = data.get('location', {}).get('typologie', '')
     if not typology:
         name = data.get('identity', {}).get('site_name', '').upper()
@@ -337,9 +355,15 @@ async def api_forecast_simulate(client_id: str):
         elif "ECLAIRAGE" in name: typology = "ECLAIRAGE"
         elif "MAIRIE" in name: typology = "ADMIN"
     
-    energy = "gaz" if fin['meta']['is_gas'] else "elec"
+    energy = "gaz" if data.get('contract', {}).get('pce') else "elec"
     
+    # 3. GÉNÉRATION
     res = forecast.generate_3_year_projection(vol, typology, energy)
+    
+    # 4. INJECTION EXPLICITE DU VOLUME POUR LE FRONTEND
+    res['volume_mwh'] = vol
+    res['volume_actuel'] = vol 
+    
     return JSONResponse(json_compliant(res))
 
 @app.post("/api/ops/market/update")
