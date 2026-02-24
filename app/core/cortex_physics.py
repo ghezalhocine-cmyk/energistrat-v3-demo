@@ -16,11 +16,11 @@ except ImportError:
 
 # CONFIGURATION DU LOGGING
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_PHYSICS_V57_DIAMOND")
+logger = logging.getLogger("CORTEX_PHYSICS_V60_TITANIUM")
 
 class CortexPhysics:
     def __init__(self):
-        self.version = "57.0 (Diamond: Integrated Physics Core + Benchmark)"
+        self.version = "60.0 (Titanium: Ingestion & Profiling added)"
         
         # RÉFÉRENTIEL NAF - MOYENNES DE CONSOMMATION (kWh/m²/an)
         self.NAF_BENCHMARK = {
@@ -187,7 +187,7 @@ class CortexPhysics:
         }
 
     # =========================================================
-    # MODULE 3 : BENCHMARK AUDIT (LA FONCTION MANQUANTE)
+    # MODULE 3 : BENCHMARK AUDIT
     # =========================================================
     def calculate_benchmark(self, naf_code, surface_m2, annual_volume_mwh):
         """ Compare la conso réelle vs théorique (NAF) """
@@ -286,5 +286,94 @@ class CortexPhysics:
                 "message": "Talon week-end élevé détecté" if is_waste else "Régulation week-end correcte"
             }
         except: return {}
+
+    # =========================================================
+    # MODULE 5 : CLIMAT (DJU) - ADDITION TITANIUM
+    # =========================================================
+    def calculate_dju_correction(self, dju_reel, dju_ref):
+        """Calcule le coefficient de rigueur climatique."""
+        if not dju_ref or dju_ref == 0: return 1.0
+        return round(dju_reel / dju_ref, 2)
+
+    # =========================================================
+    # MODULE 6 : INGESTION SGE (TITANIUM CORE)
+    # =========================================================
+    def analyze_load_curve(self, df: pd.DataFrame, val_col: str):
+        """
+        Analyse une série temporelle brute (SGE) pour extraire le Talon et la Pointe.
+        Input: DataFrame Pandas brut + Nom de la colonne valeur
+        Output: Dictionnaire de KPIs physiques
+        """
+        if not MATH_ENGINE_READY:
+            return {"error": "Moteur mathématique non disponible"}
+
+        # 1. Nettoyage des données
+        try:
+            if df[val_col].dtype == object:
+                df[val_col] = df[val_col].astype(str).str.replace(',', '.').str.replace(r'\s+', '', regex=True)
+            
+            # Conversion en série numérique (Watts ou kW)
+            series = pd.to_numeric(df[val_col], errors='coerce').fillna(0)
+            
+            if series.empty:
+                return {"error": "Série vide ou illisible"}
+
+            # 2. Calcul du Volume (Intégrale)
+            # SGE fournit une Puissance Moyenne 10 min (en Watts souvent)
+            # Énergie (Wh) = Puissance (W) * (10/60)h
+            avg_power_watts = series.mean()
+            total_points = len(series)
+            
+            # Hypothèse standard SGE : Pas de 10 minutes
+            # Si moins de 5000 points sur un an, c'est peut-être du pas horaire
+            time_step_hours = 10 / 60
+            if total_points < 10000: time_step_hours = 1.0 # Pas horaire probable
+            
+            total_energy_wh = series.sum() * time_step_hours
+            volume_mwh = round(total_energy_wh / 1_000_000, 2)
+            volume_annuel_kwh = int(total_energy_wh / 1000)
+
+            # 3. Calcul du Talon (Baseload)
+            # On utilise le quantile 5% pour ignorer les coupures de courant (0)
+            talon_raw = series.quantile(0.05)
+            
+            # 4. Calcul de la Pointe (Peak Load)
+            pmax_raw = series.max()
+
+            # Conversion en kW (si les données sont en W, ce qui est fréquent chez SGE)
+            # Détection heuristique : Si Pmax > 10 000, c'est probablement des Watts
+            unit_div = 1
+            if pmax_raw > 5000: unit_div = 1000
+            
+            talon_kw = round(talon_raw / unit_div, 1)
+            pmax_kw = round(pmax_raw / unit_div, 1)
+
+            # 5. Le Diagnostic Intelligent (Le "Coach")
+            ratio = talon_kw / pmax_kw if pmax_kw > 0 else 0
+            
+            advice = "Profil de consommation standard."
+            tag = "Tertiaire"
+            alert = False
+            
+            if ratio > 0.4:
+                tag = "Industrie / Froid"
+                advice = f"⚠️ Talon critique détecté ({int(ratio*100)}% de Pmax). Vérifier régulation froid ou compresseurs."
+                alert = True
+            elif ratio < 0.15:
+                tag = "Bureaux / École"
+                advice = "✅ Excellent effacement nocturne. Bâtiment performant."
+            
+            return {
+                "volume_mwh": volume_mwh,
+                "volume_annuel_kwh": volume_annuel_kwh,
+                "talon_kw": talon_kw,
+                "pmax_kw": pmax_kw,
+                "ratio_talon": round(ratio * 100, 1),
+                "tag": tag,
+                "advice": advice,
+                "is_alert": alert
+            }
+        except Exception as e:
+            return {"error": f"Erreur calcul: {str(e)}"}
 
 physics = CortexPhysics()
