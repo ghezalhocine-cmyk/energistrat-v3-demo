@@ -15,35 +15,40 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+# --- BLOC IMPORT CORTEX (CORRECTIF TITANIUM V2) ---
+# Ce bloc pointe maintenant vers le dossier app/core/ où se trouve ton router
 try:
     import pandas as pd
     PANDAS_READY = True
 except ImportError:
     PANDAS_READY = False
 
-# --- BLOC IMPORT CORTEX (MIS À JOUR TITANIUM) ---
 try:
+    # Import principal (Structure Cloud Run / Docker)
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
     from app.core.cortex_forecast import forecast
-    from cortex_router import router  # NOUVEAU MODULE TITANIUM
-except ImportError:
+    from app.core.cortex_router import router  # <--- CHEMIN CORRIGÉ ICI
+except ImportError as e:
+    print(f"⚠️ Erreur Import Principal: {e}")
     try:
+        # Fallback (Structure Locale / Dev)
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
         import cortex_forecast as forecast
-        import cortex_router as router_module # Fallback
-        router = router_module.router # Instance
-    except: 
-        # Fallback critique si le routeur n'est pas encore créé
+        # On essaie d'importer depuis core si on est à la racine
+        from core.cortex_router import router
+    except ImportError as e2:
+        print(f"⚠️ Erreur Import Secondaire: {e2}")
+        # Mock de secours pour éviter le crash 500
         class MockRouter:
-            def get_api_status(self): return {"sge_enedis": {"status": "OFFLINE"}}
-            def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router missing"}
+            def get_api_status(self): return {"sge_enedis": {"status": "OFFLINE (Mock)"}, "adam_grdf": {"status": "OFFLINE (Mock)"}}
+            def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router module missing"}
         router = MockRouter()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1200")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1205")
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,9 +61,12 @@ app.add_middleware(
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
+
+# Configuration des Templates (Compatible app/templates et root/templates)
 TEMPLATE_DIR = os.path.join(BASE_DIR, "app/templates")
 if not os.path.exists(TEMPLATE_DIR): TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
+
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -493,9 +501,17 @@ async def generate_tender(request: Request):
 
 @app.get("/ops/ingest", response_class=HTMLResponse)
 async def ops_ingest_page(request: Request):
-    """Page d'Ingestion Massive (Data Center)."""
-    api_status = router.get_api_status()
-    return templates.TemplateResponse("ops_ingest.html", {"request": request, "api_status": api_status})
+    """Page d'Ingestion Massive avec Sécurité Import."""
+    try:
+        # On vérifie que le module est bien chargé
+        if 'router' not in globals() and 'router' not in locals():
+            raise Exception("Le module Router n'est pas chargé.")
+        
+        api_status = router.get_api_status()
+        return templates.TemplateResponse("ops_ingest.html", {"request": request, "api_status": api_status})
+    except Exception as e:
+        # En cas d'erreur critique, on affiche une page d'erreur propre
+        return HTMLResponse(content=f"<h1>Erreur Système (Titanium Node)</h1><p>{str(e)}</p>", status_code=500)
 
 @app.post("/api/ingest/upload")
 async def ingest_files_mass(files: List[UploadFile] = File(...)):
