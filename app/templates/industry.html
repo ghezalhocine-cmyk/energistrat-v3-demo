@@ -277,7 +277,9 @@
             });
 
             // Ligne Seuil (Psouscrite)
-            const thresholdData = Array(48).fill(psouscrite);
+            // SÉCURITÉ : Si psouscrite est 0, on met null pour ne pas afficher la ligne rouge à 0
+            const thresholdValue = psouscrite > 0 ? psouscrite : null;
+            const thresholdData = Array(48).fill(thresholdValue);
             const talonData = Array(48).fill(talon);
 
             if(loadChartInstance) loadChartInstance.destroy();
@@ -308,7 +310,8 @@
                             borderDash: [5, 5],
                             pointRadius: 0,
                             borderWidth: 1,
-                            fill: false
+                            fill: false,
+                            spanGaps: false // Ne trace pas si null
                         },
                         {
                             label: 'Talon',
@@ -365,12 +368,11 @@
                     const fleetData = await res.json();
                     
                     if (fleetData.fleet && fleetData.fleet.length > 0) {
-                        // On prend le premier site trouvé (ABAG dans ton cas)
+                        // On prend le premier site trouvé
                         const firstSite = fleetData.fleet[0];
                         console.log("Auto-connecting to:", firstSite.name);
                         loadSingleSite(firstSite.id);
                     } else {
-                        // Vraiment vide -> Mode Démo
                         loadDemoMode();
                     }
                 } catch(e) {
@@ -405,16 +407,17 @@
             document.getElementById('header-site-name').innerText = name;
             document.getElementById('page-title').innerText = name;
 
-            // 2. Récupération des KPIs Physiques (calculés par Cortex Router)
+            // 2. Récupération des KPIs (AVEC CONVERSION NUMÉRIQUE FORCÉE)
             const kpis = data.kpis || {};
             const contract = data.contract || {};
             
-            // Valeurs par défaut si non calculées
-            const pmax = kpis.pmax_kw || 0;
-            const talon = kpis.talon_kw || 0;
-            const volume = kpis.volume_mwh || 0;
-            const budget = kpis.budget || 0;
-            const psouscrite = contract.power || 0;
+            // IMPORTANT : parseFloat pour éviter le bug du graphique vide
+            const pmax = parseFloat(kpis.pmax_kw) || 0;
+            const talon = parseFloat(kpis.talon_kw) || 0;
+            const volume = parseFloat(kpis.volume_mwh) || 0;
+            const budget = parseFloat(kpis.budget) || 0;
+            const psouscrite = parseFloat(contract.power) || 0;
+            
             const advice = kpis.cortex_advice || "Analyse en cours...";
             const tag = kpis.is_alert ? "ALERTE" : "OPTIMISÉ";
 
@@ -425,7 +428,12 @@
             document.getElementById('kpi-volume').innerText = Math.round(volume);
             document.getElementById('total-budget').innerText = Math.round(budget).toLocaleString() + " €";
             document.getElementById('kpi-budget').innerText = `Budget Est. ${new Date().getFullYear()}`;
-            document.getElementById('sub-power-text').innerText = `Sur ${psouscrite} kVA souscrits`;
+            
+            if (psouscrite > 0) {
+                document.getElementById('sub-power-text').innerText = `Sur ${psouscrite} kVA souscrits`;
+            } else {
+                document.getElementById('sub-power-text').innerText = `Puissance souscrite non renseignée`;
+            }
             
             document.getElementById('cortex-advice').innerText = advice;
             document.getElementById('cortex-tag').innerText = tag;
@@ -434,13 +442,11 @@
                 : "px-2 py-1 rounded bg-success/20 text-success text-[9px] font-bold border border-success/30";
 
             // 4. Barres de progression visuelles
-            // Pmax vs Souscrite
             let pmaxPct = psouscrite > 0 ? (pmax / psouscrite) * 100 : 0;
             if (pmaxPct > 100) pmaxPct = 100;
             document.getElementById('bar-pmax').style.width = `${pmaxPct}%`;
             document.getElementById('bar-pmax').className = pmax > psouscrite ? "bg-danger h-full" : "bg-steam h-full";
 
-            // Talon vs Pmax (Ratio d'efficacité)
             let talonPct = pmax > 0 ? (talon / pmax) * 100 : 0;
             document.getElementById('bar-talon').style.width = `${talonPct}%`;
 
