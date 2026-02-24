@@ -9,14 +9,12 @@
     <style>
         body { background-color: #050505; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
         .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem; }
-        .btn-nav { @apply px-4 py-2 text-xs font-bold text-gray-400 hover:text-white transition; }
     </style>
 </head>
 <body class="flex h-screen w-screen">
 
-    <!-- SIDEBAR LIGHT (Navigation Rapide) -->
     <aside class="w-16 bg-[#020617] border-r border-white/10 flex flex-col items-center py-6 z-50">
-        <a href="/industrie" id="back-btn" class="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-white hover:bg-cyan-500 hover:text-black transition mb-6" title="Retour Supervision">
+        <a href="/industrie" id="back-btn" class="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-white hover:bg-cyan-500 hover:text-black transition mb-6">
             <i class="fa-solid fa-arrow-left"></i>
         </a>
         <div class="w-10 h-10 rounded bg-cyan/20 text-cyan flex items-center justify-center border border-cyan/30 mb-2">
@@ -24,9 +22,7 @@
         </div>
     </aside>
 
-    <!-- MAIN -->
     <main class="flex-1 flex flex-col p-8 gap-6">
-        
         <header class="flex justify-between items-center">
             <div>
                 <h1 class="text-3xl font-bold text-white">Optimisation Tarifaire (TURPE)</h1>
@@ -38,10 +34,8 @@
             </div>
         </header>
 
-        <!-- GRID -->
         <div class="grid grid-cols-3 gap-6 h-full">
-            
-            <!-- COL 1 : ANALYSE PUISSANCE -->
+            <!-- COL 1 -->
             <div class="bento-card p-6 flex flex-col justify-between">
                 <div>
                     <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Analyse de Puissance</h3>
@@ -67,45 +61,31 @@
                 </div>
             </div>
 
-            <!-- COL 2 : GAIN FINANCIER -->
+            <!-- COL 2 -->
             <div class="bento-card p-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
                 <div class="absolute top-0 right-0 p-4 opacity-10 text-8xl text-green-500"><i class="fa-solid fa-sack-dollar"></i></div>
-                
                 <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Potentiel d'Économie</h3>
                 <div class="text-5xl font-black text-white mb-2" id="val-gain">-- €</div>
                 <div class="text-xs text-green-400 font-bold uppercase border border-green-500/30 bg-green-500/10 px-3 py-1 rounded-full mb-8">Annuel</div>
-
-                <button class="bg-cyan hover:bg-white text-black font-bold py-3 px-8 rounded-full transition shadow-[0_0_20px_rgba(0,229,255,0.3)]">
-                    Générer Demande Enedis
-                </button>
+                <button class="bg-cyan hover:bg-white text-black font-bold py-3 px-8 rounded-full transition shadow-[0_0_20px_rgba(0,229,255,0.3)]">Générer Demande Enedis</button>
             </div>
 
-            <!-- COL 3 : QUALITÉ (COS PHI) -->
+            <!-- COL 3 -->
             <div class="bento-card p-6">
                 <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Énergie Réactive (Cos φ)</h3>
                 <div class="relative h-48 w-full flex items-center justify-center">
                     <canvas id="cosPhiChart"></canvas>
-                    <div class="absolute text-center">
-                        <div class="text-3xl font-bold text-white" id="val-cosphi">0.94</div>
-                        <div class="text-[10px] text-gray-500">Moyenne</div>
-                    </div>
+                    <div class="absolute text-center"><div class="text-3xl font-bold text-white" id="val-cosphi">0.94</div><div class="text-[10px] text-gray-500">Moyenne</div></div>
                 </div>
-                <div class="mt-6 text-center">
-                    <p class="text-xs text-gray-300">Aucune pénalité détectée sur la période.</p>
-                    <div class="mt-2 text-[10px] text-gray-500">Seuil Tan φ < 0.4</div>
-                </div>
+                <div class="mt-6 text-center"><p class="text-xs text-gray-300">Aucune pénalité détectée sur la période.</p></div>
             </div>
-
         </div>
     </main>
 
     <script>
         async function init() {
-            // Récupération ID (comme pour industry.html)
             const urlParams = new URLSearchParams(window.location.search);
             let siteId = urlParams.get('id');
-
-            // Auto-detect si pas d'ID
             if (!siteId) {
                 try {
                     const res = await fetch('/api/dashboard/fleet');
@@ -113,9 +93,7 @@
                     if(fleet.fleet && fleet.fleet.length > 0) siteId = fleet.fleet[0].id;
                 } catch(e) {}
             }
-
             if(siteId) {
-                // Mise à jour du lien retour
                 document.getElementById('back-btn').href = `/industrie?id=${siteId}`;
                 loadData(siteId);
             }
@@ -125,55 +103,43 @@
             const res = await fetch(`/api/dashboard/data/${id}`);
             const data = await res.json();
 
-            // Mapping Données
             const name = data.identity?.site_name || "Site";
             const pmax = parseFloat(data.kpis?.pmax_kw || 0);
             const souscrite = parseFloat(data.contract?.power || 0);
             
-            // DOM Update
             document.getElementById('site-name').innerText = name;
             document.getElementById('val-souscrite').innerText = souscrite + " kVA";
             document.getElementById('val-pmax').innerText = pmax + " kW";
 
-            // Calcul Optimisation (Moteur Simplifié TURPE)
-            // Coût kVA approx : 15€/an
             let gain = 0;
             let verdict = "";
             const margin = souscrite - pmax;
-
-            // Barre Pmax
             const pmaxPct = souscrite > 0 ? (pmax / souscrite) * 100 : 0;
             document.getElementById('bar-pmax').style.width = `${Math.min(pmaxPct, 100)}%`;
             
-            if (margin > 12) { // Marge > 12 kVA -> On peut baisser
-                const newPower = Math.ceil(pmax * 1.1); // Marge sécu 10%
+            if (margin > 12) { 
+                const newPower = Math.ceil(pmax * 1.1);
                 const delta = souscrite - newPower;
-                gain = delta * 15; // 15€ par kVA
-                verdict = `Votre puissance souscrite est trop élevée. Vous pouvez la réduire à <b>${newPower} kVA</b> sans risque de disjonction.`;
+                gain = delta * 15; 
+                verdict = `Votre puissance souscrite est trop élevée. Vous pouvez la réduire à <b>${newPower} kVA</b> sans risque.`;
                 document.getElementById('bar-pmax').className = "bg-green-500 h-full";
-            } else if (margin < 0) { // Dépassement
-                verdict = "⚠️ DANGER : Dépassements de puissance détectés. Risque de pénalités majeures. Augmentez votre contrat.";
+            } else if (margin < 0) {
+                verdict = "⚠️ DANGER : Dépassements de puissance détectés. Risque de pénalités.";
                 document.getElementById('bar-pmax').className = "bg-red-500 h-full";
-                gain = 0;
             } else {
-                verdict = "Votre contrat est parfaitement optimisé. Aucune action requise.";
+                verdict = "Votre contrat est optimisé.";
                 document.getElementById('bar-pmax').className = "bg-cyan h-full";
             }
 
             document.getElementById('val-gain').innerText = Math.round(gain) + " €";
             document.getElementById('opti-verdict').innerHTML = verdict;
 
-            // Chart Cos Phi (Donut)
             new Chart(document.getElementById('cosPhiChart'), {
                 type: 'doughnut',
-                data: {
-                    labels: ['Actif', 'Réactif'],
-                    datasets: [{ data: [94, 6], backgroundColor: ['#00E5FF', '#1F2937'], borderWidth: 0 }]
-                },
+                data: { labels: ['Actif', 'Réactif'], datasets: [{ data: [94, 6], backgroundColor: ['#00E5FF', '#1F2937'], borderWidth: 0 }] },
                 options: { cutout: '80%', responsive: true, plugins: { legend: { display: false } } }
             });
         }
-
         init();
     </script>
 </body>
