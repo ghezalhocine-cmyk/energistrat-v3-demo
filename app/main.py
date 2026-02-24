@@ -15,37 +15,33 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# --- GESTION DES DEPENDANCES ---
 try:
     import pandas as pd
     PANDAS_READY = True
 except ImportError:
     PANDAS_READY = False
 
-# --- BLOC IMPORT CORTEX (ROBUSTE) ---
+# --- BLOC IMPORT CORTEX ---
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
     from app.core.cortex_forecast import forecast
-    # AJOUT TITANIUM : Import du routeur d'ingestion
     from app.core.cortex_router import router
 except ImportError:
     try:
-        # Fallback pour environnement local
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
         import cortex_forecast as forecast
         from core.cortex_router import router
     except ImportError:
-        # Mock de secours critique pour éviter le crash au démarrage
         class MockRouter:
             def get_api_status(self): return {"sge_enedis": {"status": "OFFLINE"}, "adam_grdf": {"status": "OFFLINE"}}
             def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router module missing"}
         router = MockRouter()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1350-MASTER")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1310-FIX-NAV")
 
 app.add_middleware(
     CORSMiddleware,
@@ -110,7 +106,7 @@ def get_market_ref():
         "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 }
     }
 
-# --- API PRINCIPALES ---
+# --- API ---
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
@@ -227,12 +223,10 @@ async def get_fleet_data(response: Response):
         raw_id = s.get('identity',{}).get('id')
         safe_id = get_safe_id(raw_id)
         
-        # FIX TITANIUM : Affichage PDL
         pdl_display = contract.get('pdl')
         if not pdl_display or len(str(pdl_display)) < 5:
             pdl_display = contract.get('pce', '-')
         
-        # LOGIQUE DE RECALCUL BUDGET TITANIUM
         vol_engine = fin['volume_mwh']
         vol_router = 0
         if 'kpis' in s and 'volume_mwh' in s['kpis']:
@@ -243,10 +237,9 @@ async def get_fleet_data(response: Response):
             final_vol = vol_router
 
         final_budget = fin['budget_annual']
-        # Si volume Titanium détecté, on force le recalcul du budget
         if vol_engine == 0 and vol_router > 0:
             pricing = s.get('pricing', {})
-            avg_price = 0.20 # Prix par défaut
+            avg_price = 0.20
             for k in ['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
                 if k in pricing and pricing[k]:
                     try: avg_price = float(pricing[k]); break
@@ -297,13 +290,11 @@ async def get_dashboard_data(client_id: str, response: Response):
     pricing = financials['pricing_details']
     display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
 
-    # FIX TITANIUM : Injection Volume
     vol_display = financials['volume_mwh']
     kpis_raw = data.get('kpis', {})
     if vol_display == 0 and 'volume_mwh' in kpis_raw:
         vol_display = float(kpis_raw['volume_mwh'])
 
-    # FIX TITANIUM : Injection Budget
     budget_display = financials['budget_annual']
     if financials['volume_mwh'] == 0 and vol_display > 0:
         p_data = data.get('pricing', {})
@@ -355,7 +346,6 @@ async def get_dashboard_data(client_id: str, response: Response):
     }
     return JSONResponse(json_compliant(response_data))
 
-# --- ROUTE FORECAST CORRIGÉE (FIX VOLUME) ---
 @app.get("/api/forecast/simulate/{client_id}")
 async def api_forecast_simulate(client_id: str):
     file_path = find_site_file(client_id)
@@ -405,8 +395,6 @@ async def api_solar_sim(request: Request):
         lat, lon = physics.get_coordinates_from_address(address)
         return JSONResponse(physics.simulate_solar_roi(lat, lon, surface, price))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
-
-# --- OUTILS & TEMPLATES ---
 
 @app.get("/api/tools/template/{template_type}")
 async def download_template(template_type: str):
@@ -561,6 +549,7 @@ async def ingest_files_mass(files: List[UploadFile] = File(...)):
     return JSONResponse(content={"report": report})
 
 @app.get("/industrie", response_class=HTMLResponse)
+@app.get("/industry", response_class=HTMLResponse)
 async def view_industrie(request: Request, id: Optional[str] = None):
     """Profil Industrie (Usine 4.0) - Câblé sur les vraies données."""
     if id:
@@ -579,11 +568,12 @@ async def view_industrie(request: Request, id: Optional[str] = None):
                     "depassements": 0,
                     "kpis": fin.get('kpis', {})
                 }
-                return templates.TemplateResponse("industrie.html", {"request": request, "data": context_data})
+                # FIX: Charge bien le fichier template "industry.html" (anglais)
+                return templates.TemplateResponse("industry.html", {"request": request, "data": context_data})
     
     # Mock Demo
     data = {"client_name": "USINE SGE TEST (DEMO)", "site_type": "ISO 50001 - HTA", "puissance_souscrite": 3200, "talon_moyen": 450, "cos_phi": 0.94, "depassements": 1}
-    return templates.TemplateResponse("industrie.html", {"request": request, "data": data})
+    return templates.TemplateResponse("industry.html", {"request": request, "data": data})
 
 @app.get("/syndic", response_class=HTMLResponse)
 async def view_syndic(request: Request, id: Optional[str] = None):
@@ -610,7 +600,7 @@ async def view_syndic(request: Request, id: Optional[str] = None):
     data = {"client_name": "RÉSIDENCE DÉMO", "dju_n": 2100, "dju_n_1": 2400, "conso_n": 450000}
     return templates.TemplateResponse("syndic.html", {"request": request, "data": data})
 
-# --- ROUTES SATELLITES (NOUVEAU) ---
+# --- ROUTES SATELLITES ---
 @app.get("/optimization", response_class=HTMLResponse)
 async def view_optimization(request: Request):
     return templates.TemplateResponse("optimization.html", {"request": request})
