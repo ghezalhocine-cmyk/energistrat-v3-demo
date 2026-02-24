@@ -35,43 +35,29 @@
         </header>
 
         <div class="grid grid-cols-4 gap-6 h-full pb-10">
-            
-            <!-- KPI 1 : CONSO -->
             <div class="bento-card p-6 border-l-4 border-green-500">
                 <h3 class="text-xs font-bold text-gray-400 uppercase">Conso Réelle (N)</h3>
                 <div class="mt-2 text-3xl font-bold text-white" id="val-conso">-- MWh</div>
-                <div class="mt-2 text-xs text-green-400 flex items-center gap-1">
-                    <i class="fa-solid fa-certificate"></i> Données SGE
-                </div>
+                <div class="mt-2 text-xs text-green-400 flex items-center gap-1"><i class="fa-solid fa-certificate"></i> Données SGE</div>
             </div>
-
-            <!-- KPI 2 : OBJECTIF -->
             <div class="bento-card p-6 border-l-4 border-yellow-500">
                 <h3 class="text-xs font-bold text-gray-400 uppercase">Cible Sobriété (-10%)</h3>
                 <div class="mt-2 text-3xl font-bold text-yellow-500" id="val-target">-- MWh</div>
                 <div class="w-full bg-gray-700 h-1 mt-4"><div class="bg-yellow-500 h-full" style="width: 90%"></div></div>
             </div>
-
-            <!-- KPI 3 : ECART -->
             <div class="bento-card p-6 border-l-4 border-blue-500">
                 <h3 class="text-xs font-bold text-gray-400 uppercase">Dérive / Économie</h3>
                 <div class="mt-2 text-3xl font-bold text-blue-400" id="val-drift">-- %</div>
                 <div class="mt-2 text-xs text-gray-400">vs Année de référence</div>
             </div>
-
-            <!-- KPI 4 : CO2 -->
             <div class="bento-card p-6 border-l-4 border-gray-500">
                 <h3 class="text-xs font-bold text-gray-400 uppercase">Empreinte Carbone</h3>
                 <div class="mt-2 text-3xl font-bold text-white" id="val-co2">-- tCO2</div>
                 <div class="mt-2 text-xs text-gray-500">Mix France (52g/kWh)</div>
             </div>
-
-            <!-- CHART CUSUM -->
             <div class="bento-card col-span-4 p-6 flex flex-col">
                 <h3 class="text-sm font-bold text-white mb-4">Suivi Mensuel (Réel vs Cible)</h3>
-                <div class="flex-1 relative min-h-[300px]">
-                    <canvas id="perfChart"></canvas>
-                </div>
+                <div class="flex-1 relative min-h-[300px]"><canvas id="perfChart"></canvas></div>
             </div>
         </div>
     </main>
@@ -88,6 +74,7 @@
                 } catch(e) {}
             }
             if(siteId) {
+                // FIX REDIRECTION
                 document.getElementById('back-btn').href = `/industrie?id=${siteId}`;
                 loadData(siteId);
             }
@@ -100,10 +87,9 @@
             const name = data.identity?.site_name || "Site";
             const volume = parseFloat(data.kpis?.volume_mwh || 0);
             
-            // Calculs ISO
-            const target = volume * 0.9; // Objectif -10%
-            const drift = -4.2; // Simulation : on est bon
-            const co2 = volume * 1000 * 0.052 / 1000; // 52g/kWh -> Tonnes
+            const target = volume * 0.9;
+            const drift = -4.2;
+            const co2 = volume * 1000 * 0.052 / 1000;
 
             document.getElementById('site-name').innerText = name;
             document.getElementById('val-conso').innerText = Math.round(volume) + " MWh";
@@ -112,7 +98,6 @@
             document.getElementById('val-drift').className = drift < 0 ? "mt-2 text-3xl font-bold text-green-500" : "mt-2 text-3xl font-bold text-red-500";
             document.getElementById('val-co2').innerText = Math.round(co2) + " tCO2";
 
-            // Chart
             const ctx = document.getElementById('perfChart').getContext('2d');
             new Chart(ctx, {
                 type: 'bar',
