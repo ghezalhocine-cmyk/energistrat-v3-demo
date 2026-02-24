@@ -48,6 +48,8 @@
         .ticker-wrap { width: 100%; overflow: hidden; background: rgba(0,0,0,0.3); }
         .ticker { display: inline-block; white-space: nowrap; animation: ticker 20s linear infinite; }
         @keyframes ticker { 0% { transform: translate3d(100%, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
+        .live-dot { width: 8px; height: 8px; background: #EF4444; border-radius: 50%; box-shadow: 0 0 10px #EF4444; animation: blink-live 1s infinite; }
+        @keyframes blink-live { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
     </style>
 </head>
 <body class="flex h-screen w-screen font-sans text-sm">
@@ -65,6 +67,7 @@
                 </div>
             </div>
             
+            <!-- NAVIGATION PRINCIPALE -->
             <div class="p-4 space-y-1">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Pilotage Usine</div>
                 <button onclick="switchView('command')" id="nav-command" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg">
@@ -78,17 +81,22 @@
                 </button>
             </div>
 
+            <!-- SATELLITES (BUREAU D'ÉTUDES) - NAVIGATION INTELLIGENTE -->
             <div class="px-4 mt-2">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Bureau d'Études</div>
-                <a href="/optimization" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
+                <div onclick="navigateToSatellite('optimization')" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5 cursor-pointer">
                     <i class="fa-solid fa-sliders w-4 text-cyan"></i> Optimisation
-                </a>
-                <a href="/performance" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
+                </div>
+                <div onclick="navigateToSatellite('performance')" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5 cursor-pointer">
                     <i class="fa-solid fa-chart-area w-4 text-success"></i> Performance ISO
-                </a>
+                </div>
+                <div onclick="navigateToSatellite('carbon')" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5 cursor-pointer">
+                    <i class="fa-solid fa-leaf w-4 text-green-600"></i> Bilan Carbone
+                </div>
             </div>
         </div>
 
+        <!-- SETTINGS -->
         <div class="mt-auto p-4 border-t border-white/10 bg-black/20">
             <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
                 <div class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs text-white font-bold group-hover:bg-cyan group-hover:text-black transition border border-white/10"><i class="fa-solid fa-gear"></i></div>
@@ -115,7 +123,7 @@
                 </div>
             </div>
             <div class="px-4 flex items-center gap-4 text-xs">
-                <span class="text-gray-400">Site: <b class="text-white" id="header-site-name">Chargement...</b></span>
+                <span class="text-gray-400">Site: <b class="text-white" id="header-site-name">Recherche...</b></span>
             </div>
         </div>
 
@@ -242,6 +250,27 @@
             if(viewName === 'trading') initHedgeChart();
         }
 
+        // --- NAVIGATION SATELLITE (NOUVEAU) ---
+        function navigateToSatellite(page) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const siteId = urlParams.get('id');
+            if(siteId) {
+                window.location.href = `/${page}?id=${siteId}`;
+            } else {
+                // Tentative de récupération depuis l'état chargé
+                const headerName = document.getElementById('header-site-name').innerText;
+                if(headerName !== "Recherche..." && headerName !== "Vue Parc (Démo)") {
+                    // On est chargé mais sans ID dans l'URL (Auto-detect)
+                    // On ne peut pas facilement deviner l'ID ici sans variable globale
+                    // Amélioration : stocker l'ID globalement
+                    if(window.CURRENT_SITE_ID) window.location.href = `/${page}?id=${window.CURRENT_SITE_ID}`;
+                    else alert("Veuillez attendre le chargement complet du site.");
+                } else {
+                    alert("Aucun site sélectionné.");
+                }
+            }
+        }
+
         // --- CHARTS ---
         let loadChartInstance = null;
         let hedgeChartInstance = null;
@@ -265,7 +294,6 @@
                 return Math.round(base);
             });
 
-            // GESTION NULL POUR LA LIGNE ROUGE
             const thresholdValue = psouscrite > 0 ? psouscrite : null;
             const thresholdData = Array(48).fill(thresholdValue);
             const talonData = Array(48).fill(talon);
@@ -341,7 +369,7 @@
             });
         }
 
-        // --- CÂBLAGE INTELLIGENT (AUTO-DETECT) ---
+        // --- CÂBLAGE INTELLIGENT ---
         async function loadData() {
             const urlParams = new URLSearchParams(window.location.search);
             const siteId = urlParams.get('id');
@@ -355,6 +383,7 @@
                     
                     if (fleetData.fleet && fleetData.fleet.length > 0) {
                         const firstSite = fleetData.fleet[0];
+                        console.log("Auto-connecting to:", firstSite.name);
                         loadSingleSite(firstSite.id);
                     } else {
                         loadDemoMode();
@@ -372,6 +401,7 @@
                 const data = await res.json();
                 
                 if (data && !data.error) {
+                    window.CURRENT_SITE_ID = id; // Stockage global pour la navigation
                     updateDashboard(data);
                 } else {
                     alert("Erreur chargement données site.");
@@ -386,16 +416,14 @@
         }
 
         function updateDashboard(data) {
-            // 1. Identité
             const name = data.identity?.site_name || "Site Industriel";
             document.getElementById('header-site-name').innerText = name;
             document.getElementById('page-title').innerText = name;
 
-            // 2. Récupération des KPIs (AVEC CONVERSION NUMÉRIQUE FORCÉE)
             const kpis = data.kpis || {};
             const contract = data.contract || {};
             
-            // IMPORTANT : parseFloat pour éviter le bug du graphique vide
+            // CONVERSION NUMÉRIQUE (Fix Graphique)
             const pmax = parseFloat(kpis.pmax_kw) || 0;
             const talon = parseFloat(kpis.talon_kw) || 0;
             const volume = parseFloat(kpis.volume_mwh) || 0;
@@ -405,13 +433,12 @@
             const advice = kpis.cortex_advice || "Analyse en cours...";
             const tag = kpis.is_alert ? "ALERTE" : "OPTIMISÉ";
 
-            // 3. Mise à jour du DOM
             document.getElementById('live-power').innerText = `Pmax: ${pmax} kW`;
             document.getElementById('kpi-talon').innerText = talon;
             document.getElementById('kpi-pmax').innerText = pmax;
             document.getElementById('kpi-volume').innerText = Math.round(volume);
             
-            // CORRECTION BUG BUDGET (Affichage)
+            // FIX BUDGET DISPLAY
             document.getElementById('kpi-budget').innerText = `Budget: ${Math.round(budget).toLocaleString()} €`;
             
             if (psouscrite > 0) {
@@ -426,7 +453,6 @@
                 ? "px-2 py-1 rounded bg-danger/20 text-danger text-[9px] font-bold border border-danger/30" 
                 : "px-2 py-1 rounded bg-success/20 text-success text-[9px] font-bold border border-success/30";
 
-            // 4. Barres de progression visuelles
             let pmaxPct = psouscrite > 0 ? (pmax / psouscrite) * 100 : 0;
             if (pmaxPct > 100) pmaxPct = 100;
             document.getElementById('bar-pmax').style.width = `${pmaxPct}%`;
@@ -435,14 +461,14 @@
             let talonPct = pmax > 0 ? (talon / pmax) * 100 : 0;
             document.getElementById('bar-talon').style.width = `${talonPct}%`;
 
-            // 5. Initialisation du Graphique (SÉCURISÉ)
+            // INITIALISATION GRAPHIQUE SÉCURISÉE
             try {
                 initLoadChart(pmax, talon, psouscrite);
             } catch(err) {
                 console.error("Erreur Graphique:", err);
             }
 
-            // 6. Logs
+            // Logs
             const logs = document.getElementById('cortex-logs');
             logs.innerHTML += `
                 <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
