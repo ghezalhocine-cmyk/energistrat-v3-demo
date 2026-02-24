@@ -123,7 +123,7 @@
                 </div>
             </div>
             <div class="px-4 flex items-center gap-4 text-xs">
-                <span class="text-gray-400">Site: <b class="text-white" id="site-name">Global</b></span>
+                <span class="text-gray-400">Site: <b class="text-white" id="header-site-name">Global</b></span>
             </div>
         </div>
 
@@ -133,7 +133,7 @@
             <!-- VUE 1 : SUPERVISION -->
             <div id="view-command" class="view-section space-y-6">
                 <div class="flex justify-between items-end">
-                    <h2 class="text-2xl font-bold text-white">Supervision Temps Réel</h2>
+                    <h2 class="text-2xl font-bold text-white" id="page-title">Supervision Temps Réel</h2>
                     <div class="text-right font-mono text-cyan text-xl font-bold" id="live-power">Pinst: -- MW</div>
                 </div>
 
@@ -162,7 +162,7 @@
                     <div class="bento-card p-4 border-l-4 border-steam bg-card">
                         <div class="text-[10px] text-gray-500 uppercase font-bold">Sites Connectés</div>
                         <div class="flex justify-between items-end mt-2">
-                            <div class="text-2xl font-mono font-bold text-white" id="site-count">0</div>
+                            <div class="text-2xl font-mono font-bold text-white" id="site-count">1</div>
                             <div class="text-xs text-steam">Unités</div>
                         </div>
                         <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-steam h-full" style="width: 100%"></div></div>
@@ -276,7 +276,55 @@
             });
         }
 
-        async function loadRealData() {
+        // --- CÂBLAGE INTELLIGENT (Fleet vs Single) ---
+        async function loadData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const siteId = urlParams.get('id');
+
+            if (siteId) {
+                // MODE SINGLE : On charge un site spécifique
+                loadSingleSite(siteId);
+            } else {
+                // MODE FLEET : On charge tout le parc (comportement par défaut)
+                loadFleetData();
+            }
+        }
+
+        async function loadSingleSite(id) {
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                const data = await res.json();
+                
+                if (data && !data.error) {
+                    const name = data.identity?.site_name || "Site Industriel";
+                    document.getElementById('header-site-name').innerText = name;
+                    document.getElementById('page-title').innerText = name;
+                    
+                    const power = data.contract?.power || 0;
+                    document.getElementById('live-power').innerText = `Ps: ${power} kVA`;
+                    document.getElementById('site-count').innerText = "1";
+                    
+                    const budget = data.kpis?.budget || 0;
+                    document.getElementById('total-budget').innerText = Math.round(budget).toLocaleString() + " €";
+
+                    // Simulation Courbe de Charge basée sur la puissance souscrite
+                    const curve = [];
+                    for(let i=0; i<24; i++) {
+                        let loadFactor = 0.4; // Nuit
+                        if(i >= 6 && i <= 20) loadFactor = 0.85 + (Math.random() * 0.1); // Jour (Usine active)
+                        curve.push(power * loadFactor);
+                    }
+                    if (loadChartInstance) {
+                        loadChartInstance.data.datasets[0].data = curve;
+                        loadChartInstance.update();
+                    }
+                    
+                    logEvent(`Connexion Cortex établie avec ${name}.`);
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadFleetData() {
             try {
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
@@ -308,24 +356,26 @@
                         loadChartInstance.update();
                     }
                     
-                    // Inject Logs
-                    const logs = document.getElementById('cortex-logs');
-                    logs.innerHTML = `
-                        <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
-                            <div class="text-xs font-mono text-gray-500 w-24">14:02:55</div>
-                            <div class="w-20"><span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-[10px] font-bold">INFO</span></div>
-                            <div class="flex-1 text-sm text-white">Connexion API Fleet établie. ${sites.length} sites synchronisés.</div>
-                        </div>
-                    `;
+                    logEvent(`Vue Parc Global : ${sites.length} sites connectés.`);
                 }
-            } catch (e) {
-                console.error("Erreur Bridge:", e);
-            }
+            } catch (e) { console.error(e); }
+        }
+
+        function logEvent(msg) {
+            const logs = document.getElementById('cortex-logs');
+            const time = new Date().toLocaleTimeString();
+            logs.innerHTML += `
+                <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
+                    <div class="text-xs font-mono text-gray-500 w-24">${time}</div>
+                    <div class="w-20"><span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-[10px] font-bold">INFO</span></div>
+                    <div class="flex-1 text-sm text-white">${msg}</div>
+                </div>
+            `;
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             switchView('command');
-            setTimeout(loadRealData, 500); 
+            setTimeout(loadData, 500); 
         });
     </script>
 </body>
