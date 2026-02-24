@@ -44,7 +44,7 @@ except ImportError:
             def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router module missing"}
         router = MockRouter()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1285-FULL-SECURE")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1290-FULL-SECURE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -608,6 +608,15 @@ async def view_syndic(request: Request, id: Optional[str] = None):
     # Mock Demo
     data = {"client_name": "RÉSIDENCE DÉMO", "dju_n": 2100, "dju_n_1": 2400, "conso_n": 450000}
     return templates.TemplateResponse("syndic.html", {"request": request, "data": data})
+
+# --- ROUTES SATELLITES (NOUVEAU) ---
+@app.get("/optimization", response_class=HTMLResponse)
+async def view_optimization(request: Request):
+    return templates.TemplateResponse("optimization.html", {"request": request})
+
+@app.get("/performance", response_class=HTMLResponse)
+async def view_performance(request: Request):
+    return templates.TemplateResponse("performance.html", {"request": request})
 
 # --- ROUTES DE BASE (INCHANGÉES) ---
 
