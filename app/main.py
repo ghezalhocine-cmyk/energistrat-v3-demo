@@ -21,30 +21,27 @@ try:
 except ImportError:
     PANDAS_READY = False
 
-# --- BLOC IMPORT CORTEX (ROBUSTE) ---
+# --- BLOC IMPORT CORTEX ---
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
     from app.core.cortex_forecast import forecast
-    # AJOUT TITANIUM : Import du routeur d'ingestion
     from app.core.cortex_router import router
 except ImportError:
     try:
-        # Fallback pour environnement local
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
         import cortex_forecast as forecast
         from core.cortex_router import router
     except ImportError:
-        # Mock de secours critique
         class MockRouter:
             def get_api_status(self): return {"sge_enedis": {"status": "OFFLINE"}, "adam_grdf": {"status": "OFFLINE"}}
             def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router module missing"}
         router = MockRouter()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1250-GOLD")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1260-FINAL")
 
 app.add_middleware(
     CORSMiddleware,
@@ -130,7 +127,7 @@ async def api_save_client(request: Request):
                 existing_data['location'].update(data['location'])
             if 'identity' in data: existing_data['identity'].update(data['identity'])
             if 'contract' in data: existing_data['contract'].update(data['contract'])
-            # AJOUT TITANIUM : Sauvegarde des KPIs (Volume calculé par le routeur)
+            if 'pricing' in data: existing_data['pricing'] = data['pricing'] # Sauvegarde Tarif
             if 'kpis' in data:
                 if 'kpis' not in existing_data: existing_data['kpis'] = {}
                 existing_data['kpis'].update(data['kpis'])
@@ -175,28 +172,22 @@ async def api_import_csv(file: UploadFile = File(...)):
                 
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f: existing = json.load(f)
-                    
-                    # FORCE OVERWRITE CONTRACT & IDENTITY FROM EXCEL
                     if 'contract' in s: existing['contract'].update(s['contract'])
                     if 'pricing' in s: existing['pricing'] = s['pricing']
                     if 'identity' in s: existing['identity'].update(s['identity'])
-                    
                     new_tech = s.get('technical', {})
                     old_tech = existing.get('technical', {})
                     for k, v in new_tech.items():
                         if v: old_tech[k] = v
                     existing['technical'] = old_tech
-                    
                     new_loc = s.get('location', {})
                     old_loc = existing.get('location', {})
                     for k, v in new_loc.items():
                         if v: old_loc[k] = v
                     existing['location'] = old_loc
-                    
                     final_s = existing
                 else:
                     final_s = s
-
                 with open(file_path, 'w', encoding='utf-8') as f: json.dump(final_s, f, indent=4, ensure_ascii=False)
                 saved += 1
             except Exception as e: pass
@@ -232,27 +223,50 @@ async def get_fleet_data(response: Response):
         raw_id = s.get('identity',{}).get('id')
         safe_id = get_safe_id(raw_id)
         
-        # --- FIX TITANIUM : AFFICHAGE PDL/PCE POUR MAIRIE ---
         pdl_display = contract.get('pdl')
         if not pdl_display or len(str(pdl_display)) < 5:
             pdl_display = contract.get('pce', '-')
-        # ----------------------------------------------------
         
+        # --- LOGIQUE DE CALCUL DU BUDGET TITANIUM ---
+        display_vol = fin['volume_mwh']
+        display_budget = fin['budget_annual']
+        
+        # 1. Si le moteur financier n'a rien vu, on regarde le routeur
+        if display_vol == 0 and 'kpis' in s and 'volume_mwh' in s['kpis']:
+            display_vol = float(s['kpis']['volume_mwh'])
+        
+        # 2. Si on a un volume mais pas de budget, on recalcule à la volée
+        if display_budget == 0 and display_vol > 0:
+            # Recherche du prix unitaire (Pricing ou Fallback)
+            unit_price = 0.25 # Prix par défaut (250€/MWh)
+            
+            pricing = s.get('pricing', {})
+            # On cherche un prix dans les clés connues
+            for k in ['price_hph', 'price_kwh', 'prix_hph', 'prix_kwh']:
+                if k in pricing and pricing[k]:
+                    try: 
+                        unit_price = float(pricing[k])
+                        break
+                    except: pass
+            
+            # Calcul : MWh * 1000 * Prix_kWh
+            display_budget = (display_vol * 1000) * unit_price
+
         fleet_list.append({
             "id": safe_id,
             "name": fin['meta']['site_label'],
             "city": city,
             "zip": s.get('location', {}).get('zip_code', ''),
-            "volume": fin['volume_mwh'],
+            "volume": display_vol, # Volume consolidé
             "energy": "gaz" if fin['meta']['is_gas'] else "elec",
             "segment": contract.get('segment', '-'),
             "provider": prov,
-            "budget": fin['budget_annual'],
+            "budget": display_budget, # Budget consolidé
             "landing": fin['landing_forecast'],
             "alert": fin['kpis']['pmc_eur_mwh'] > 300,
             "ghost_savings": fin['kpis']['ghost_savings'],
             "power": contract.get('power', 0),
-            "pdl": pdl_display # Champ critique ajouté
+            "pdl": pdl_display
         })
     response_data = {
         "fleet": fleet_list, "count": len(fleet_list),
@@ -280,8 +294,12 @@ async def get_dashboard_data(client_id: str, response: Response):
     )
     contract = data.get('contract', {})
     pricing = financials['pricing_details']
-    
     display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
+
+    # FIX TITANIUM : Injection du volume routeur dans les KPIs si manquant
+    vol_display = financials['volume_mwh']
+    if vol_display == 0 and 'kpis' in data and 'volume_mwh' in data['kpis']:
+        vol_display = float(data['kpis']['volume_mwh'])
 
     response_data = {
         "energy_type": "gaz" if is_gas else "elec",
@@ -306,7 +324,7 @@ async def get_dashboard_data(client_id: str, response: Response):
         },
         "pricing": pricing,
         "kpis": {
-            "volume_mwh": financials['volume_mwh'],
+            "volume_mwh": vol_display, # Volume corrigé
             "budget": financials['budget_annual'],
             "pmc": financials['kpis']['pmc_eur_mwh'],
             "ghost_savings": financials['kpis']['ghost_savings']
@@ -320,34 +338,22 @@ async def get_dashboard_data(client_id: str, response: Response):
     }
     return JSONResponse(json_compliant(response_data))
 
-# --- ROUTE FORECAST CORRIGÉE (FIX VOLUME) ---
 @app.get("/api/forecast/simulate/{client_id}")
 async def api_forecast_simulate(client_id: str):
     file_path = find_site_file(client_id)
     if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
-    
     with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
     
-    # 1. RÉCUPÉRATION ROBUSTE DU VOLUME (PRIORITÉ AU ROUTEUR)
     vol = 0
-    # A. On regarde si le routeur a écrit un KPI direct
-    if 'kpis' in data and 'volume_mwh' in data['kpis']:
-        vol = float(data['kpis']['volume_mwh'])
-    
-    # B. Sinon, on regarde dans les détails du contrat
+    if 'kpis' in data and 'volume_mwh' in data['kpis']: vol = float(data['kpis']['volume_mwh'])
     elif 'contract' in data and 'consumption_details' in data['contract']:
-        vol_annuel = data['contract']['consumption_details'].get('volume_annuel', 0)
-        vol = vol_annuel / 1000 # Conversion kWh -> MWh
+        vol = data['contract']['consumption_details'].get('volume_annuel', 0) / 1000
     
-    # C. Fallback sur le moteur financier classique
     if vol == 0:
         fin = cortex.enrich_site_financials(data)
         vol = fin['volume_mwh']
-
-    # Sécurité anti-crash
     if vol == 0: vol = 100 
 
-    # 2. DÉTECTION TYPOLOGIE
     typology = data.get('location', {}).get('typologie', '')
     if not typology:
         name = data.get('identity', {}).get('site_name', '').upper()
@@ -356,14 +362,9 @@ async def api_forecast_simulate(client_id: str):
         elif "MAIRIE" in name: typology = "ADMIN"
     
     energy = "gaz" if data.get('contract', {}).get('pce') else "elec"
-    
-    # 3. GÉNÉRATION
     res = forecast.generate_3_year_projection(vol, typology, energy)
-    
-    # 4. INJECTION EXPLICITE DU VOLUME POUR LE FRONTEND
     res['volume_mwh'] = vol
     res['volume_actuel'] = vol 
-    
     return JSONResponse(json_compliant(res))
 
 @app.post("/api/ops/market/update")
@@ -394,37 +395,15 @@ async def download_template(template_type: str):
     try:
         with pd.ExcelWriter(stream, engine='openpyxl') as writer:
             if "import_elec" in template_type or "template_csv" == template_type:
-                df = pd.DataFrame(columns=[
-                    "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "REF_COPRO", 
-                    "NAF", "CEE_ELIGIBLE", "GO_PERCENT", "COMPTEUR_PRODUCTION", "PDL", "SEGMENT", "FTA", "GRD", 
-                    "TYPOLOGIE", "PUISSANCE_SOUSCRITE", "POINTE_MAX", 
-                    "PS_HPH", "PS_HCH", "PS_HPE", "PS_HCE", 
-                    "CONSO_HPH", "CONSO_HCH", "CONSO_HPE", "CONSO_HCE", 
-                    "VOLUME_ANNUEL", "COMMENTAIRE", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", 
-                    "ABONNEMENT", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES", 
-                    "SURFACE_M2", "CODE_INSEE", "CHAUFFAGE", "ISOLATION", "REGULATION"
-                ])
+                df = pd.DataFrame(columns=["ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "REF_COPRO", "NAF", "CEE_ELIGIBLE", "GO_PERCENT", "COMPTEUR_PRODUCTION", "PDL", "SEGMENT", "FTA", "GRD", "TYPOLOGIE", "PUISSANCE_SOUSCRITE", "POINTE_MAX", "PS_HPH", "PS_HCH", "PS_HPE", "PS_HCE", "CONSO_HPH", "CONSO_HCH", "CONSO_HPE", "CONSO_HCE", "VOLUME_ANNUEL", "COMMENTAIRE", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", "ABONNEMENT", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES", "SURFACE_M2", "CODE_INSEE", "CHAUFFAGE", "ISOLATION", "REGULATION"])
                 df.to_excel(writer, index=False)
             elif "import_gaz" in template_type or "template_csv_gaz" == template_type:
-                df = pd.DataFrame(columns=[
-                    "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "NAF", 
-                    "CEE_ELIGIBLE", "PCE", "CAR_MWH", "CJA_MWH_J", "SEGMENT_GAZ", "PROFIL", 
-                    "TARIF_ACHEM", "GRD", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", 
-                    "ABONNEMENT", "PRIX_MOLECULE", "TERME_STOCK", "TAXES", "INSEE", "SURFACE_M2",
-                    "CHAUFFAGE", "ISOLATION", "REGULATION"
-                ])
+                df = pd.DataFrame(columns=["ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "NAF", "CEE_ELIGIBLE", "PCE", "CAR_MWH", "CJA_MWH_J", "SEGMENT_GAZ", "PROFIL", "TARIF_ACHEM", "GRD", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", "ABONNEMENT", "PRIX_MOLECULE", "TERME_STOCK", "TAXES", "INSEE", "SURFACE_M2", "CHAUFFAGE", "ISOLATION", "REGULATION"])
                 df.to_excel(writer, index=False)
             elif "import_patrimoine" in template_type:
                 df = pd.DataFrame(columns=["PDL", "NOM_SITE", "SURFACE_M2", "CHAUFFAGE", "ISOLATION", "REGULATION"])
                 df.to_excel(writer, index=False, sheet_name="DATA")
-                df_notice = pd.DataFrame({
-                    "CHAMP": ["CHAUFFAGE", "ISOLATION", "REGULATION"],
-                    "VALEURS_AUTORISEES": [
-                        "Gaz Condensation, Fioul, Élec Direct, PAC, Réseau Chaleur",
-                        "Non Isolé, Double Vitrage, ITE Complète",
-                        "Aucune, Thermostat Simple, GTB/GTC, Horloge"
-                    ]
-                })
+                df_notice = pd.DataFrame({"CHAMP": ["CHAUFFAGE", "ISOLATION", "REGULATION"], "VALEURS_AUTORISEES": ["Gaz Condensation, Fioul, Élec Direct, PAC, Réseau Chaleur", "Non Isolé, Double Vitrage, ITE Complète", "Aucune, Thermostat Simple, GTB/GTC, Horloge"]})
                 df_notice.to_excel(writer, index=False, sheet_name="MODE_EMPLOI")
             elif "bpu" in template_type:
                 df = pd.DataFrame(columns=["PRIX_HPH", "ABONNEMENT"])
@@ -527,16 +506,10 @@ async def generate_tender(request: Request):
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_Energistrat_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-# ==========================================
-# ROUTES TITANIUM (INGESTION & PROFILS CÂBLÉS)
-# ==========================================
-
 @app.get("/ops/ingest", response_class=HTMLResponse)
 async def ops_ingest_page(request: Request):
-    """Page d'Ingestion Massive avec Sécurité Import."""
     try:
-        if 'router' not in globals() and 'router' not in locals():
-            raise Exception("Le module Router n'est pas chargé.")
+        if 'router' not in globals() and 'router' not in locals(): raise Exception("Le module Router n'est pas chargé.")
         api_status = router.get_api_status()
         return templates.TemplateResponse("ops_ingest.html", {"request": request, "api_status": api_status})
     except Exception as e:
@@ -544,36 +517,24 @@ async def ops_ingest_page(request: Request):
 
 @app.post("/api/ingest/upload")
 async def ingest_files_mass(files: List[UploadFile] = File(...)):
-    """
-    Ingestion Massive SGE/GRDF.
-    Lit le flux binaire, détecte le PDL (via Deep Scan), et prépare l'injection.
-    """
     report = []
     for file in files:
         try:
             content = await file.read()
-            # Analyse profonde via le Cortex Router V5 (Content First + Calcul Volume)
             analysis = router.analyze_file_stream(content, file.filename)
             report.append(analysis)
         except Exception as e:
-            report.append({
-                "filename": file.filename,
-                "status": "ERROR",
-                "message": str(e),
-                "pdl": "ERR"
-            })
+            report.append({"filename": file.filename, "status": "ERROR", "message": str(e), "pdl": "ERR"})
     return JSONResponse(content={"report": report})
 
 @app.get("/industrie", response_class=HTMLResponse)
 async def view_industrie(request: Request, id: Optional[str] = None):
-    """Profil Industrie (Usine 4.0) - Câblé sur les vraies données."""
     if id:
         file_path = find_site_file(id)
         if file_path:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 fin = cortex.enrich_site_financials(data)
-                
                 context_data = {
                     "client_name": data.get('identity', {}).get('site_name', 'Client'),
                     "site_type": "Industrie - Réel",
@@ -584,21 +545,17 @@ async def view_industrie(request: Request, id: Optional[str] = None):
                     "kpis": fin.get('kpis', {})
                 }
                 return templates.TemplateResponse("industrie.html", {"request": request, "data": context_data})
-    
-    # Mock Demo
     data = {"client_name": "USINE SGE TEST (DEMO)", "site_type": "ISO 50001 - HTA", "puissance_souscrite": 3200, "talon_moyen": 450, "cos_phi": 0.94, "depassements": 1}
     return templates.TemplateResponse("industrie.html", {"request": request, "data": data})
 
 @app.get("/syndic", response_class=HTMLResponse)
 async def view_syndic(request: Request, id: Optional[str] = None):
-    """Profil Syndic (Habitat) - Câblé sur les vraies données."""
     if id:
         file_path = find_site_file(id)
         if file_path:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 fin = cortex.enrich_site_financials(data)
-                
                 context_data = {
                     "client_name": data.get('identity', {}).get('site_name', 'Résidence'),
                     "lots": 0,
@@ -609,12 +566,8 @@ async def view_syndic(request: Request, id: Optional[str] = None):
                     "conso_n_1": (fin.get('volume_mwh', 0) * 1000) * 1.1
                 }
                 return templates.TemplateResponse("syndic.html", {"request": request, "data": context_data})
-
-    # Mock Demo
     data = {"client_name": "RÉSIDENCE DÉMO", "dju_n": 2100, "dju_n_1": 2400, "conso_n": 450000}
     return templates.TemplateResponse("syndic.html", {"request": request, "data": data})
-
-# --- ROUTES DE BASE (INCHANGÉES) ---
 
 @app.get("/")
 async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
