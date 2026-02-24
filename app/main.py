@@ -15,40 +15,35 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# --- BLOC IMPORT CORTEX (CORRECTIF TITANIUM V2) ---
-# Ce bloc pointe maintenant vers le dossier app/core/ où se trouve ton router
 try:
     import pandas as pd
     PANDAS_READY = True
 except ImportError:
     PANDAS_READY = False
 
+# --- BLOC IMPORT CORTEX (CORRIGÉ POUR APP/CORE) ---
 try:
-    # Import principal (Structure Cloud Run / Docker)
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
     from app.core.cortex_forecast import forecast
-    from app.core.cortex_router import router  # <--- CHEMIN CORRIGÉ ICI
-except ImportError as e:
-    print(f"⚠️ Erreur Import Principal: {e}")
+    # AJOUT TITANIUM : Import correct du routeur
+    from app.core.cortex_router import router
+except ImportError:
     try:
-        # Fallback (Structure Locale / Dev)
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
         import cortex_forecast as forecast
-        # On essaie d'importer depuis core si on est à la racine
         from core.cortex_router import router
-    except ImportError as e2:
-        print(f"⚠️ Erreur Import Secondaire: {e2}")
-        # Mock de secours pour éviter le crash 500
+    except ImportError:
+        # Mock de secours pour éviter le crash 500 si le fichier manque
         class MockRouter:
-            def get_api_status(self): return {"sge_enedis": {"status": "OFFLINE (Mock)"}, "adam_grdf": {"status": "OFFLINE (Mock)"}}
+            def get_api_status(self): return {"sge_enedis": {"status": "OFFLINE"}, "adam_grdf": {"status": "OFFLINE"}}
             def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router module missing"}
         router = MockRouter()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1205")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1220-FULL")
 
 app.add_middleware(
     CORSMiddleware,
@@ -62,7 +57,6 @@ BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
 
-# Configuration des Templates (Compatible app/templates et root/templates)
 TEMPLATE_DIR = os.path.join(BASE_DIR, "app/templates")
 if not os.path.exists(TEMPLATE_DIR): TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
@@ -233,6 +227,12 @@ async def get_fleet_data(response: Response):
         raw_id = s.get('identity',{}).get('id')
         safe_id = get_safe_id(raw_id)
         
+        # --- FIX TITANIUM : AFFICHAGE PDL/PCE ---
+        pdl_display = contract.get('pdl')
+        if not pdl_display or len(str(pdl_display)) < 5:
+            pdl_display = contract.get('pce', '-')
+        # ----------------------------------------
+        
         fleet_list.append({
             "id": safe_id,
             "name": fin['meta']['site_label'],
@@ -246,7 +246,8 @@ async def get_fleet_data(response: Response):
             "landing": fin['landing_forecast'],
             "alert": fin['kpis']['pmc_eur_mwh'] > 300,
             "ghost_savings": fin['kpis']['ghost_savings'],
-            "power": contract.get('power', 0)
+            "power": contract.get('power', 0),
+            "pdl": pdl_display # Ajouté pour le tableau Mairie
         })
     response_data = {
         "fleet": fleet_list, "count": len(fleet_list),
@@ -497,7 +498,9 @@ async def generate_tender(request: Request):
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_Energistrat_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-# --- ROUTES TITANIUM (NOUVELLES) ---
+# ==========================================
+# EXTENSIONS PHASE TITANIUM (INGEST & PROFILS)
+# ==========================================
 
 @app.get("/ops/ingest", response_class=HTMLResponse)
 async def ops_ingest_page(request: Request):
@@ -517,13 +520,13 @@ async def ops_ingest_page(request: Request):
 async def ingest_files_mass(files: List[UploadFile] = File(...)):
     """
     Ingestion Massive SGE/GRDF.
-    Lit le flux binaire, détecte le PDL (via Regex ou Deep Scan), et prépare l'injection.
+    Lit le flux binaire, détecte le PDL (via Deep Scan), et prépare l'injection.
     """
     report = []
     for file in files:
         try:
             content = await file.read()
-            # Analyse profonde via le Cortex Router V2
+            # Analyse profonde via le Cortex Router V4 (Content First)
             analysis = router.analyze_file_stream(content, file.filename)
             report.append(analysis)
         except Exception as e:
@@ -561,7 +564,7 @@ async def view_syndic(request: Request):
     }
     return templates.TemplateResponse("syndic.html", {"request": request, "data": data})
 
-# --- FIN ROUTES TITANIUM ---
+# --- FIN EXTENSIONS TITANIUM ---
 
 @app.get("/")
 async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
