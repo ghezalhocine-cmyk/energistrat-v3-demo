@@ -41,7 +41,7 @@ except ImportError:
             def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router module missing"}
         router = MockRouter()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1260-FINAL")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1270-BUDGET-FIX")
 
 app.add_middleware(
     CORSMiddleware,
@@ -127,7 +127,7 @@ async def api_save_client(request: Request):
                 existing_data['location'].update(data['location'])
             if 'identity' in data: existing_data['identity'].update(data['identity'])
             if 'contract' in data: existing_data['contract'].update(data['contract'])
-            if 'pricing' in data: existing_data['pricing'] = data['pricing'] # Sauvegarde Tarif
+            if 'pricing' in data: existing_data['pricing'] = data['pricing']
             if 'kpis' in data:
                 if 'kpis' not in existing_data: existing_data['kpis'] = {}
                 existing_data['kpis'].update(data['kpis'])
@@ -227,41 +227,51 @@ async def get_fleet_data(response: Response):
         if not pdl_display or len(str(pdl_display)) < 5:
             pdl_display = contract.get('pce', '-')
         
-        # --- LOGIQUE DE CALCUL DU BUDGET TITANIUM ---
-        display_vol = fin['volume_mwh']
-        display_budget = fin['budget_annual']
+        # --- LOGIQUE DE RECALCUL BUDGET TITANIUM ---
+        vol_engine = fin['volume_mwh']
+        vol_router = 0
+        if 'kpis' in s and 'volume_mwh' in s['kpis']:
+            vol_router = float(s['kpis']['volume_mwh'])
         
-        # 1. Si le moteur financier n'a rien vu, on regarde le routeur
-        if display_vol == 0 and 'kpis' in s and 'volume_mwh' in s['kpis']:
-            display_vol = float(s['kpis']['volume_mwh'])
+        # Décision Volume : On prend le routeur si le moteur est à 0
+        final_vol = vol_engine
+        if vol_engine == 0 and vol_router > 0:
+            final_vol = vol_router
+
+        # Décision Budget
+        final_budget = fin['budget_annual']
         
-        # 2. Si on a un volume mais pas de budget, on recalcule à la volée
-        if display_budget == 0 and display_vol > 0:
-            # Recherche du prix unitaire (Pricing ou Fallback)
-            unit_price = 0.25 # Prix par défaut (250€/MWh)
-            
+        # SI on a changé le volume (via Titanium), le budget actuel est faux (c'est juste l'abo).
+        # On doit le recalculer : (Volume * Prix Moyen) + Abonnement
+        if vol_engine == 0 and vol_router > 0:
             pricing = s.get('pricing', {})
-            # On cherche un prix dans les clés connues
-            for k in ['price_hph', 'price_kwh', 'prix_hph', 'prix_kwh']:
+            avg_price = 0.20 # Fallback 200€/MWh
+            
+            # Recherche d'un prix saisi (HPH, Unique, etc.)
+            found_price = False
+            for k in ['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
                 if k in pricing and pricing[k]:
-                    try: 
-                        unit_price = float(pricing[k])
+                    try:
+                        avg_price = float(pricing[k])
+                        found_price = True
                         break
                     except: pass
             
-            # Calcul : MWh * 1000 * Prix_kWh
-            display_budget = (display_vol * 1000) * unit_price
+            # Recalcul : (MWh * 1000) * Prix_kWh + Abonnement
+            sub_cost = fin.get('budget_subscription', 0)
+            energy_cost = (final_vol * 1000) * avg_price
+            final_budget = sub_cost + energy_cost
 
         fleet_list.append({
             "id": safe_id,
             "name": fin['meta']['site_label'],
             "city": city,
             "zip": s.get('location', {}).get('zip_code', ''),
-            "volume": display_vol, # Volume consolidé
+            "volume": final_vol,
             "energy": "gaz" if fin['meta']['is_gas'] else "elec",
             "segment": contract.get('segment', '-'),
             "provider": prov,
-            "budget": display_budget, # Budget consolidé
+            "budget": final_budget, # Budget Corrigé
             "landing": fin['landing_forecast'],
             "alert": fin['kpis']['pmc_eur_mwh'] > 300,
             "ghost_savings": fin['kpis']['ghost_savings'],
@@ -296,10 +306,21 @@ async def get_dashboard_data(client_id: str, response: Response):
     pricing = financials['pricing_details']
     display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
 
-    # FIX TITANIUM : Injection du volume routeur dans les KPIs si manquant
+    # FIX TITANIUM : Injection Volume
     vol_display = financials['volume_mwh']
     if vol_display == 0 and 'kpis' in data and 'volume_mwh' in data['kpis']:
         vol_display = float(data['kpis']['volume_mwh'])
+
+    # FIX TITANIUM : Injection Budget (Même logique que Fleet)
+    budget_display = financials['budget_annual']
+    if financials['volume_mwh'] == 0 and vol_display > 0:
+        p_data = data.get('pricing', {})
+        u_price = 0.20
+        for k in ['price_kwh', 'prix_kwh', 'price_hph']:
+            if k in p_data and p_data[k]: 
+                try: u_price = float(p_data[k]); break
+                except: pass
+        budget_display = financials.get('budget_subscription', 0) + (vol_display * 1000 * u_price)
 
     response_data = {
         "energy_type": "gaz" if is_gas else "elec",
@@ -324,8 +345,8 @@ async def get_dashboard_data(client_id: str, response: Response):
         },
         "pricing": pricing,
         "kpis": {
-            "volume_mwh": vol_display, # Volume corrigé
-            "budget": financials['budget_annual'],
+            "volume_mwh": vol_display,
+            "budget": budget_display, # Budget Corrigé
             "pmc": financials['kpis']['pmc_eur_mwh'],
             "ghost_savings": financials['kpis']['ghost_savings']
         },
