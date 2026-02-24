@@ -6,10 +6,22 @@ import glob
 import pandas as pd
 from datetime import datetime
 
+# --- IMPORT DU MOTEUR PHYSIQUE (NOUVEAUTÉ) ---
+# Le routeur délègue désormais les calculs mathématiques au physicien
+try:
+    from app.core.cortex_physics import physics
+except ImportError:
+    try:
+        from core.cortex_physics import physics
+    except ImportError:
+        physics = None
+        print("⚠️ ALERTE : Cortex Physics introuvable. Le calcul intelligent sera désactivé.")
+
 class CortexRouter:
     """
-    CORTEX ROUTER V5 - CALCULATION ENGINE
-    Reconnait le client ET calcule/sauvegarde le volume réel pour le Forecast.
+    CORTEX ROUTER V6 - PHYSICS INTEGRATION
+    Responsabilités : I/O Fichiers, Identification Client, Orchestration.
+    Délègue l'analyse de la courbe à CortexPhysics.
     """
 
     def __init__(self):
@@ -45,7 +57,7 @@ class CortexRouter:
                     if "usine" in typologie or "indus" in typologie: profile = "industrie"
                     if "residence" in typologie or "syndic" in typologie: profile = "syndic"
 
-                    # Mapping : On stocke aussi le chemin du fichier pour pouvoir écrire dedans
+                    # Mapping
                     info = {"client": client_name, "type": "ELEC", "profile": profile, "path": file_path}
                     
                     if pdl and len(pdl) > 5:
@@ -68,14 +80,13 @@ class CortexRouter:
             # CAS 1 : EXCEL
             if filename.endswith('.xlsx'):
                 df = pd.read_excel(io.BytesIO(file_content), dtype=str)
-                # Recherche Header & PDL
                 for idx, row in df.head(20).iterrows():
                     row_str = " ".join([str(x) for x in row.values])
                     match = re.search(r'\d{14}', row_str)
                     if match and not match.group(0).startswith('202'):
                         pdl = match.group(0)
                         break
-                return pdl, df, 0 # Excel gère ses headers différemment
+                return pdl, df, 0
 
             # CAS 2 : CSV (SGE)
             else:
@@ -84,20 +95,15 @@ class CortexRouter:
 
                 lines = text.splitlines()
                 
-                # 1. Trouver le PDL et la ligne d'en-tête
                 for i, line in enumerate(lines[:30]):
-                    # Recherche PDL brut
                     match = re.search(r'\d{14}', line)
                     if match and not match.group(0).startswith('202'):
                         pdl = match.group(0)
                     
-                    # Recherche ligne d'en-tête (colonnes)
                     if "Valeur" in line or "Consommation" in line or "Nature" in line:
                         header_row = i
-                        # Si on a le PDL et le header, on arrête
                         if pdl: break
                 
-                # Si pas de PDL trouvé dans les premières lignes, on cherche dans tout le début
                 if not pdl:
                     match = re.search(r'\d{14}', text[:5000])
                     if match and not match.group(0).startswith('202'):
@@ -110,85 +116,80 @@ class CortexRouter:
             return None, None, 0
 
     def _process_and_save_volume(self, pdl, file_stream, header_row, filename):
-        """Calcule le volume et met à jour le JSON client."""
+        """Orchestre le calcul physique et la sauvegarde."""
         try:
             client_info = self.pdl_mapping.get(pdl)
             if not client_info: return "Client inconnu"
 
-            # Lecture intelligente avec Pandas
-            # On saute les lignes avant le header
+            # 1. Lecture du Fichier (I/O)
             try:
                 if filename.endswith('.xlsx'):
-                    df = file_stream # Déjà chargé
+                    df = file_stream 
                 else:
                     df = pd.read_csv(file_stream, sep=';', skiprows=header_row, encoding='latin-1', on_bad_lines='skip')
             except:
-                # Tentative avec séparateur virgule
                 file_stream.seek(0)
                 df = pd.read_csv(file_stream, sep=',', skiprows=header_row, encoding='utf-8', on_bad_lines='skip')
 
-            # Recherche de la colonne Valeur
+            # 2. Identification Colonne Valeur
             val_col = None
             for col in df.columns:
                 if "Valeur" in str(col) or "Conso" in str(col) or "P (W)" in str(col):
                     val_col = col
                     break
             
-            if not val_col:
-                return "Colonne 'Valeur' introuvable"
+            if not val_col: return "Colonne 'Valeur' introuvable"
 
-            # Nettoyage et Somme
-            # SGE donne des Watts (puissance moyenne 10min). 
-            # Volume (Wh) = Somme(W) * (10min / 60min)
-            # Volume (kWh) = Volume (Wh) / 1000
+            # 3. APPEL AU PHYSICIEN (Calculs Mathématiques)
+            if not physics: return "Erreur: Moteur physique non chargé"
             
-            # Conversion numérique (gestion des virgules)
-            if df[val_col].dtype == object:
-                df[val_col] = df[val_col].astype(str).str.replace(',', '.').str.replace(r'\s+', '', regex=True)
+            # C'est ici que la magie opère : on envoie les données brutes, on reçoit l'intelligence
+            results = physics.analyze_load_curve(df, val_col)
             
-            total_watts = pd.to_numeric(df[val_col], errors='coerce').sum()
-            
-            # Estimation Pas de temps (si > 4000 points par mois, c'est du 10min)
-            # Hypothèse SGE standard : Pas 10 min
-            volume_kwh = (total_watts * 10 / 60) / 1000
-            volume_mwh = round(volume_kwh / 1000, 2)
+            if "error" in results:
+                return f"Erreur Analyse: {results['error']}"
 
-            # Mise à jour du JSON Client
+            # 4. Sauvegarde des résultats (Persistance)
             json_path = client_info['path']
             with open(json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # Injection des données
             if 'kpis' not in data: data['kpis'] = {}
-            data['kpis']['volume_mwh'] = volume_mwh
+            
+            # Injection des nouvelles métriques
+            data['kpis']['volume_mwh'] = results['volume_mwh']
+            data['kpis']['talon_kw'] = results['talon_kw']       # Nouveau
+            data['kpis']['pmax_kw'] = results['pmax_kw']         # Nouveau
+            data['kpis']['cortex_advice'] = results['advice']    # Nouveau
+            data['kpis']['is_alert'] = results['is_alert']       # Nouveau
             
             if 'contract' not in data: data['contract'] = {}
             if 'consumption_details' not in data['contract']: data['contract']['consumption_details'] = {}
-            data['contract']['consumption_details']['volume_annuel'] = int(volume_kwh)
+            data['contract']['consumption_details']['volume_annuel'] = results['volume_annuel_kwh']
             data['contract']['consumption_details']['last_upload'] = datetime.now().strftime("%d/%m/%Y")
 
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
 
-            return f"Volume calculé : {volume_mwh} MWh (Sauvegardé)"
+            return f"Vol: {results['volume_mwh']} MWh | Talon: {results['talon_kw']} kW | {results['advice']}"
 
         except Exception as e:
-            print(f"Erreur Calcul Volume: {e}")
-            return "Erreur calcul volume"
+            print(f"Erreur Process Router: {e}")
+            return "Erreur traitement fichier"
 
     def analyze_file_stream(self, file_content: bytes, filename: str):
-        """Orchestration Complète."""
+        """Point d'entrée de l'API."""
         self.refresh_database()
 
-        # 1. Deep Scan pour trouver le PDL et préparer la lecture
+        # 1. Deep Scan
         pdl, stream, header_row = self._extract_pdl_from_content(file_content, filename)
 
-        # 2. Fallback Nom Fichier
+        # 2. Fallback Nom
         if not pdl:
             match_filename = re.search(r'\d{14}', filename)
             if match_filename and not match_filename.group(0).startswith('202'):
                 pdl = match_filename.group(0)
-                stream = io.BytesIO(file_content) # Reset stream
+                stream = io.BytesIO(file_content)
 
         status = "REJECTED"
         message = "PDL introuvable."
@@ -198,11 +199,11 @@ class CortexRouter:
             if pdl in self.pdl_mapping:
                 client_info = self.pdl_mapping[pdl]
                 
-                # 3. CALCUL DU VOLUME ET SAUVEGARDE
+                # Lancement du traitement complet
                 vol_msg = self._process_and_save_volume(pdl, stream, header_row, filename)
                 
                 status = "INGESTED"
-                message = f"Client: {client_info['client']} | {vol_msg}"
+                message = f"{client_info['client']} -> {vol_msg}"
             else:
                 status = "UNKNOWN_PDL"
                 message = f"PDL {pdl} détecté mais absent de la base."
