@@ -15,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+# --- GESTION DES DEPENDANCES ---
 try:
     import pandas as pd
     PANDAS_READY = True
@@ -38,13 +39,13 @@ except ImportError:
         import cortex_forecast as forecast
         from core.cortex_router import router
     except ImportError:
-        # Mock de secours critique
+        # Mock de secours critique pour éviter le crash au démarrage
         class MockRouter:
             def get_api_status(self): return {"sge_enedis": {"status": "OFFLINE"}, "adam_grdf": {"status": "OFFLINE"}}
             def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router module missing"}
         router = MockRouter()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1290-FULL-SECURE")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1350-MASTER")
 
 app.add_middleware(
     CORSMiddleware,
@@ -109,7 +110,7 @@ def get_market_ref():
         "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 }
     }
 
-# --- API ---
+# --- API PRINCIPALES ---
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
@@ -226,11 +227,12 @@ async def get_fleet_data(response: Response):
         raw_id = s.get('identity',{}).get('id')
         safe_id = get_safe_id(raw_id)
         
+        # FIX TITANIUM : Affichage PDL
         pdl_display = contract.get('pdl')
         if not pdl_display or len(str(pdl_display)) < 5:
             pdl_display = contract.get('pce', '-')
         
-        # --- LOGIQUE DE RECALCUL BUDGET TITANIUM (V1270) ---
+        # LOGIQUE DE RECALCUL BUDGET TITANIUM
         vol_engine = fin['volume_mwh']
         vol_router = 0
         if 'kpis' in s and 'volume_mwh' in s['kpis']:
@@ -260,7 +262,7 @@ async def get_fleet_data(response: Response):
             "energy": "gaz" if fin['meta']['is_gas'] else "elec",
             "segment": contract.get('segment', '-'),
             "provider": prov,
-            "budget": final_budget, # Budget Corrigé
+            "budget": final_budget,
             "landing": fin['landing_forecast'],
             "alert": fin['kpis']['pmc_eur_mwh'] > 300,
             "ghost_savings": fin['kpis']['ghost_savings'],
@@ -295,13 +297,13 @@ async def get_dashboard_data(client_id: str, response: Response):
     pricing = financials['pricing_details']
     display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
 
-    # --- FIX TITANIUM : Injection Volume (V1270) ---
+    # FIX TITANIUM : Injection Volume
     vol_display = financials['volume_mwh']
     kpis_raw = data.get('kpis', {})
     if vol_display == 0 and 'volume_mwh' in kpis_raw:
         vol_display = float(kpis_raw['volume_mwh'])
 
-    # --- FIX TITANIUM : Injection Budget (V1270) ---
+    # FIX TITANIUM : Injection Budget
     budget_display = financials['budget_annual']
     if financials['volume_mwh'] == 0 and vol_display > 0:
         p_data = data.get('pricing', {})
@@ -339,12 +341,10 @@ async def get_dashboard_data(client_id: str, response: Response):
             "budget": budget_display,
             "pmc": financials['kpis']['pmc_eur_mwh'],
             "ghost_savings": financials['kpis']['ghost_savings'],
-            # --- AJOUT CRITIQUE V1280 (AFFICHAGE INDUSTRIE) ---
             "talon_kw": kpis_raw.get('talon_kw', 0),
             "pmax_kw": kpis_raw.get('pmax_kw', 0),
             "cortex_advice": kpis_raw.get('cortex_advice', "Pas d'analyse disponible."),
             "is_alert": kpis_raw.get('is_alert', False)
-            # --------------------------------------------------
         },
         "cortex_insight": {
             "message": "Analyse CORTEX terminée.",
@@ -355,6 +355,7 @@ async def get_dashboard_data(client_id: str, response: Response):
     }
     return JSONResponse(json_compliant(response_data))
 
+# --- ROUTE FORECAST CORRIGÉE (FIX VOLUME) ---
 @app.get("/api/forecast/simulate/{client_id}")
 async def api_forecast_simulate(client_id: str):
     file_path = find_site_file(client_id)
@@ -404,6 +405,8 @@ async def api_solar_sim(request: Request):
         lat, lon = physics.get_coordinates_from_address(address)
         return JSONResponse(physics.simulate_solar_roi(lat, lon, surface, price))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
+
+# --- OUTILS & TEMPLATES ---
 
 @app.get("/api/tools/template/{template_type}")
 async def download_template(template_type: str):
@@ -524,7 +527,7 @@ async def generate_tender(request: Request):
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 # ==========================================
-# ROUTES TITANIUM (INGESTION & PROFILS CÂBLÉS)
+# ROUTES TITANIUM (INGESTION & PROFILS)
 # ==========================================
 
 @app.get("/ops/ingest", response_class=HTMLResponse)
@@ -541,13 +544,11 @@ async def ops_ingest_page(request: Request):
 async def ingest_files_mass(files: List[UploadFile] = File(...)):
     """
     Ingestion Massive SGE/GRDF.
-    Lit le flux binaire, détecte le PDL (via Deep Scan), et prépare l'injection.
     """
     report = []
     for file in files:
         try:
             content = await file.read()
-            # Analyse profonde via le Cortex Router V5 (Content First + Calcul Volume)
             analysis = router.analyze_file_stream(content, file.filename)
             report.append(analysis)
         except Exception as e:
@@ -618,7 +619,11 @@ async def view_optimization(request: Request):
 async def view_performance(request: Request):
     return templates.TemplateResponse("performance.html", {"request": request})
 
-# --- ROUTES DE BASE (INCHANGÉES) ---
+@app.get("/carbon", response_class=HTMLResponse)
+async def view_carbon(request: Request):
+    return templates.TemplateResponse("carbon.html", {"request": request})
+
+# --- ROUTES DE BASE ---
 
 @app.get("/")
 async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
