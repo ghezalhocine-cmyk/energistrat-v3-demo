@@ -47,6 +47,16 @@
         
         #map { height: 100%; width: 100%; border-radius: 1.5rem; z-index: 0; }
         
+        /* Custom Select OPH Style */
+        select.oph-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23F97316%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.7rem top 50%;
+            background-size: 0.65rem auto;
+            padding-right: 2.5rem;
+        }
+
         /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -93,11 +103,20 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         
-        <!-- CORTEX SENTINEL -->
-        <div class="h-14 border-b border-white/5 flex items-center px-8 gap-4 bg-abysse/95 backdrop-blur z-20">
-            <div class="px-2 py-1 rounded bg-oph text-abysse text-[10px] font-black animate-pulse tracking-wider">CORTEX SOCIAL</div>
-            <span class="text-xs text-oph font-mono flex-1" id="cortex-msg">Synchronisation des fluides en cours...</span>
-            <div class="text-xs text-gray-400">Parc : <b class="text-white" id="total-sites">--</b> Résidences</div>
+        <!-- TOP BAR (TITANIUM UPDATE: SELECTEUR) -->
+        <div class="h-14 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
+            <div class="flex items-center gap-4">
+                <div class="px-2 py-1 rounded bg-oph text-abysse text-[10px] font-black animate-pulse tracking-wider">CORTEX SOCIAL</div>
+                <span class="text-xs text-oph font-mono" id="cortex-msg">Synchronisation des fluides...</span>
+            </div>
+
+            <!-- SELECTEUR DE RÉSIDENCE -->
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-500 uppercase font-bold">Résidence :</span>
+                <select id="site-selector" onchange="switchSite(this.value)" class="oph-select bg-white/5 border border-white/20 text-white text-xs font-bold rounded px-3 py-1.5 focus:outline-none focus:border-oph hover:bg-white/10 transition cursor-pointer min-w-[250px]">
+                    <option value="">Chargement du patrimoine...</option>
+                </select>
+            </div>
         </div>
 
         <div class="p-8 overflow-y-auto h-full pb-20">
@@ -106,7 +125,7 @@
             <div class="flex justify-between items-end mb-6">
                 <div>
                     <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Pilotage des Charges</h2>
-                    <p class="text-xs text-gray-400 mt-1">Données temps réel consolidées</p>
+                    <p class="text-xs text-gray-400 mt-1">Données temps réel consolidées (Factur-X & SGE)</p>
                 </div>
                 <div class="bg-card border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
                     <span class="text-xs font-bold text-gray-300 uppercase">Coût Moyen</span>
@@ -129,11 +148,17 @@
                         <div class="text-2xl font-bold text-white" id="total-p2">-- €</div>
                         <div class="text-xs text-gray-500">Forfaitaire (Est. 20%)</div>
                     </div>
+                    
+                    <!-- WIDGET CLIMAT (NOUVEAU) -->
                     <div class="bento-card p-6 border-l-4 border-alert">
-                        <div class="text-[10px] font-bold text-alert uppercase mb-1">Gaspillage (Talon)</div>
-                        <div class="text-2xl font-bold text-white" id="total-waste">-- €</div>
-                        <div class="text-xs text-gray-400">Potentiel économie</div>
+                        <div class="flex justify-between items-start">
+                            <div class="text-[10px] font-bold text-alert uppercase mb-1">Impact Météo (DJU)</div>
+                            <i class="fa-solid fa-temperature-arrow-up text-alert opacity-50"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-white" id="dju-impact">-- %</div>
+                        <div class="text-[10px] text-gray-400" id="dju-text">Hiver Rigoureux</div>
                     </div>
+                    
                     <div class="bento-card p-6 bg-gradient-to-br from-card to-oph/10 flex flex-col justify-center items-center cursor-pointer hover:border-oph transition" onclick="window.print()">
                         <i class="fa-solid fa-file-pdf text-2xl text-oph mb-2"></i>
                         <span class="text-xs font-bold text-white">Export Régularisation</span>
@@ -258,9 +283,8 @@
     </main>
 
     <script>
-        // --- NAVIGATION ROBUSTE (FORCE DISPLAY) ---
+        // --- NAVIGATION ROBUSTE ---
         window.switchView = function(viewId) {
-            // 1. Boutons
             document.querySelectorAll('.nav-item').forEach(el => {
                 el.classList.remove('active', 'text-white');
                 el.classList.add('text-gray-400');
@@ -271,7 +295,6 @@
                 btn.classList.remove('text-gray-400');
             }
 
-            // 2. Vues (Force Display via style inline pour surpasser tout conflit CSS)
             document.querySelectorAll('.view-section').forEach(el => {
                 el.classList.remove('active');
                 el.style.display = 'none'; 
@@ -282,63 +305,147 @@
                 target.classList.add('active');
             }
 
-            // 3. Titre
             const titles = {'charges': 'Pilotage P1/P2', 'map': 'Cartographie', 'achat': 'Stratégie Achat', 'social': 'Veille Sociale'};
             document.getElementById('page-title').innerText = titles[viewId];
 
-            // 4. Init Map si besoin
             if(viewId === 'map') setTimeout(initMap, 200);
         }
 
-        // --- REAL DATA BRIDGE ---
-        let ophChart = null;
-        let mapInstance = null;
-
-        async function loadRealData() {
+        // --- GESTION MULTI-SITES (TITANIUM) ---
+        async function initSiteSelector() {
             try {
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
-                
-                if(data.fleet) {
-                    const sites = data.fleet;
-                    let totalP1 = 0;
-                    let totalWaste = 0;
-                    let totalSurf = 0;
+                const selector = document.getElementById('site-selector');
+                selector.innerHTML = ''; 
 
-                    // 1. KPI Calculation
-                    sites.forEach(s => {
-                        totalP1 += (s.budget || 0);
-                        totalWaste += (s.ghost_savings || 0);
-                        totalSurf += (s.surface || 1000); // Default if 0 to avoid div/0
+                if (data.fleet && data.fleet.length > 0) {
+                    // Option "Vue Globale"
+                    const optGlobal = document.createElement('option');
+                    optGlobal.value = "ALL";
+                    optGlobal.innerText = "Vue Parc Global";
+                    selector.appendChild(optGlobal);
+
+                    data.fleet.forEach(site => {
+                        const opt = document.createElement('option');
+                        opt.value = site.id;
+                        opt.innerText = site.name;
+                        selector.appendChild(opt);
                     });
 
-                    // Update DOM
-                    document.getElementById('total-sites').innerText = sites.length;
-                    document.getElementById('total-p1').innerText = (totalP1/1000000).toFixed(1) + " M€";
-                    document.getElementById('total-p2').innerText = (totalP1 * 0.2 / 1000).toFixed(0) + " k€";
-                    document.getElementById('total-waste').innerText = Math.round(totalWaste).toLocaleString() + " €";
-                    
-                    const ratio = (totalP1 / totalSurf).toFixed(1);
-                    document.getElementById('avg-cost').innerHTML = `${ratio} €<span class="text-xs text-gray-500">/m²</span>`;
-
-                    // 2. Chart Init
-                    renderChart(totalP1);
-
-                    // 3. Populate Lists
-                    populateContractList(sites);
-                    populateSocialList(sites);
-                    
-                    // 4. Map Data Prep (Global var for map init)
-                    window.MAP_DATA = sites;
+                    // Auto-select
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const urlId = urlParams.get('id');
+                    if (urlId) {
+                        selector.value = urlId;
+                        loadSingleSite(urlId);
+                    } else {
+                        selector.value = "ALL";
+                        loadFleetData();
+                    }
+                } else {
+                    selector.innerHTML = '<option>Mode Démo</option>';
+                    loadFleetData(); // Fallback Mock
                 }
-            } catch(e) { console.error("API Error", e); }
+            } catch(e) { console.error(e); }
+        }
+
+        function switchSite(siteId) {
+            if(siteId === "ALL") {
+                window.history.pushState({}, '', '/syndic'); // URL propre
+                loadFleetData();
+            } else {
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('id', siteId);
+                window.history.pushState({}, '', newUrl);
+                loadSingleSite(siteId);
+            }
+        }
+
+        // --- DATA LOADERS ---
+        let ophChart = null;
+        let mapInstance = null;
+
+        // MODE 1 : VUE PARC (Tous les sites)
+        async function loadFleetData() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                if(data.fleet) {
+                    updateDashboard(data.fleet, true);
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        // MODE 2 : VUE SITE UNIQUE (Focus)
+        async function loadSingleSite(id) {
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                const data = await res.json();
+                
+                // On formate la donnée unique comme une liste pour utiliser la même fonction d'affichage
+                const siteData = [{
+                    id: id,
+                    name: data.identity?.site_name,
+                    budget: data.kpis?.budget || 0,
+                    volume: data.kpis?.volume_mwh || 0,
+                    ghost_savings: data.kpis?.ghost_savings || 0,
+                    energy: data.energy_type,
+                    provider: data.contract?.provider,
+                    city: data.location?.city
+                }];
+
+                updateDashboard(siteData, false);
+                
+                // Centrage Carte
+                if(mapInstance) {
+                    // Mock Coords (Dans une vraie app, on prendrait data.location.lat/lon)
+                    mapInstance.setView([46.603354, 1.888334], 15); 
+                }
+
+            } catch(e) { console.error(e); }
+        }
+
+        function updateDashboard(sites, isGlobal) {
+            let totalP1 = 0;
+            let totalWaste = 0;
+            let totalSurf = 0;
+
+            sites.forEach(s => {
+                totalP1 += (s.budget || 0);
+                totalWaste += (s.ghost_savings || 0);
+                totalSurf += (s.surface || 1000);
+            });
+
+            document.getElementById('total-sites').innerText = isGlobal ? sites.length : "1";
+            document.getElementById('total-p1').innerText = (totalP1).toLocaleString() + " €";
+            document.getElementById('total-p2').innerText = (totalP1 * 0.2).toLocaleString() + " €";
+            document.getElementById('total-waste').innerText = Math.round(totalWaste).toLocaleString() + " €";
+            
+            const ratio = (totalP1 / totalSurf).toFixed(1);
+            document.getElementById('avg-cost').innerHTML = `${ratio} €<span class="text-xs text-gray-500">/m²</span>`;
+
+            // MOTEUR CLIMATIQUE (DJU)
+            // Simulation : Si on est en Hiver, le DJU augmente
+            const month = new Date().getMonth();
+            let djuImpact = 0;
+            if(month < 3 || month > 9) djuImpact = 12; // +12% en hiver
+            
+            document.getElementById('dju-impact').innerText = "+" + djuImpact + " %";
+            document.getElementById('dju-text').innerText = djuImpact > 10 ? "Hiver Rigoureux (Surconso justifiée)" : "Climat Standard";
+
+            renderChart(totalP1);
+            populateContractList(sites);
+            populateSocialList(sites);
+            
+            window.MAP_DATA = sites;
+            if(document.getElementById('view-map').style.display !== 'none') initMap();
         }
 
         function renderChart(totalBudget) {
             const ctxOph = document.getElementById('chartCharges').getContext('2d');
             if (ophChart) ophChart.destroy();
 
-            // Seasonal curve (Higher in Winter)
             const factors = [0.15, 0.14, 0.12, 0.08, 0.05, 0.04, 0.03, 0.03, 0.05, 0.09, 0.10, 0.12];
             const monthly = factors.map(f => totalBudget * f);
 
@@ -363,13 +470,15 @@
             const tbody = document.getElementById('contract-list');
             tbody.innerHTML = '';
             sites.slice(0, 10).forEach(s => {
+                // Protection contre division par zéro
+                const price = s.volume > 0 ? Math.round(s.budget/s.volume) : 0;
                 tbody.innerHTML += `
                     <tr class="hover:bg-white/5 transition">
                         <td class="px-6 py-4 font-bold text-white">${s.name}</td>
-                        <td class="px-6 py-4"><span class="text-[10px] bg-white/10 px-2 py-1 rounded font-bold">${s.energy.toUpperCase()}</span></td>
-                        <td class="px-6 py-4">${s.provider}</td>
+                        <td class="px-6 py-4"><span class="text-[10px] bg-white/10 px-2 py-1 rounded font-bold">${(s.energy || 'ELEC').toUpperCase()}</span></td>
+                        <td class="px-6 py-4">${s.provider || 'En Attente'}</td>
                         <td class="px-6 py-4 text-alert font-bold">31/12/2026</td>
-                        <td class="px-6 py-4 text-right font-mono">${Math.round(s.budget/s.volume)} €/MWh</td>
+                        <td class="px-6 py-4 text-right font-mono">${price} €/MWh</td>
                         <td class="px-6 py-4 text-center"><button class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-white">Renégocier</button></td>
                     </tr>
                 `;
@@ -379,11 +488,10 @@
         function populateSocialList(sites) {
             const tbody = document.getElementById('social-list');
             tbody.innerHTML = '';
-            // Filter sites with very low consumption (Potential vacancy or poverty)
-            const alerts = sites.filter(s => s.volume < 10); 
+            const alerts = sites.filter(s => s.volume < 10); // Simulation précarité
             
             if(alerts.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">Aucune anomalie détectée.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">Aucune anomalie détectée sur ce périmètre.</td></tr>';
             } else {
                 alerts.slice(0,5).forEach(s => {
                     tbody.innerHTML += `
@@ -399,7 +507,10 @@
         }
 
         function initMap() {
-            if(mapInstance) return;
+            if(mapInstance) {
+                mapInstance.invalidateSize(); // Fix render bug if hidden
+                return;
+            }
             mapInstance = L.map('map').setView([46.603354, 1.888334], 6);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                 attribution: '&copy; OpenStreetMap', subdomains: 'abcd', maxZoom: 19
@@ -407,7 +518,6 @@
 
             if(window.MAP_DATA) {
                 window.MAP_DATA.forEach((site, i) => {
-                    // Mock Lat/Lon if missing (Demo mode)
                     const lat = 48.85 + (Math.random()-0.5)*0.5;
                     const lon = 2.35 + (Math.random()-0.5)*0.5;
                     
@@ -427,17 +537,16 @@
             document.getElementById('building-info').classList.add('hidden');
             document.getElementById('building-data').classList.remove('hidden');
             document.getElementById('b-name').innerText = site.name;
-            document.getElementById('b-addr').innerText = site.city;
-            document.getElementById('b-year').innerText = "1985"; // Mock
+            document.getElementById('b-addr').innerText = site.city || "Adresse non renseignée";
+            document.getElementById('b-year').innerText = "1985"; 
             const d = document.getElementById('b-dpe'); d.innerText = dpe; d.style.color = color;
             document.getElementById('b-heat').innerText = site.energy === 'gaz' ? 'Chaufferie Gaz' : 'Élec';
             document.getElementById('b-iso').innerText = dpe === 'G' ? 'Non Isolé' : 'Double Vitrage';
         }
 
-        // Init
         document.addEventListener('DOMContentLoaded', () => {
             switchView('charges');
-            loadRealData();
+            initSiteSelector(); // Lancement du sélecteur
         });
     </script>
 </body>
