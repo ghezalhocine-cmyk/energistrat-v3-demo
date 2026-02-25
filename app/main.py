@@ -15,33 +15,43 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+# --- GESTION DES DEPENDANCES ---
 try:
     import pandas as pd
     PANDAS_READY = True
 except ImportError:
     PANDAS_READY = False
 
-# --- BLOC IMPORT CORTEX ---
+# --- BLOC IMPORT CORTEX (ROBUSTE) ---
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
     from app.core.cortex_forecast import forecast
     from app.core.cortex_router import router
+    # AJOUT TITANIUM V2 : Moteur de Marché
+    from app.core.cortex_market import market
 except ImportError:
     try:
+        # Fallback pour environnement local
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
         import cortex_forecast as forecast
         from core.cortex_router import router
+        from core.cortex_market import market
     except ImportError:
+        # Mock de secours critique
         class MockRouter:
             def get_api_status(self): return {"sge_enedis": {"status": "OFFLINE"}, "adam_grdf": {"status": "OFFLINE"}}
             def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router module missing"}
         router = MockRouter()
+        
+        class MockMarket:
+            def valoriser_strategie(self, l, b): return {"error": "Market module missing"}
+        market = MockMarket()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1310-FIX-NAV")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1400-MARKET")
 
 app.add_middleware(
     CORSMiddleware,
@@ -68,6 +78,11 @@ class MarketUpdateModel(BaseModel):
     gaz: Dict[str, Any]
     trve: Optional[Dict[str, Any]] = None
     targets: Optional[Dict[str, Any]] = None
+
+# NOUVEAU MODÈLE POUR LA STRATÉGIE BLOC
+class StrategyRequest(BaseModel):
+    site_id: str
+    bloc_kw: float
 
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
@@ -106,7 +121,7 @@ def get_market_ref():
         "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 }
     }
 
-# --- API ---
+# --- API PRINCIPALES ---
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
@@ -227,6 +242,7 @@ async def get_fleet_data(response: Response):
         if not pdl_display or len(str(pdl_display)) < 5:
             pdl_display = contract.get('pce', '-')
         
+        # LOGIQUE DE RECALCUL BUDGET TITANIUM
         vol_engine = fin['volume_mwh']
         vol_router = 0
         if 'kpis' in s and 'volume_mwh' in s['kpis']:
@@ -396,6 +412,33 @@ async def api_solar_sim(request: Request):
         return JSONResponse(physics.simulate_solar_roi(lat, lon, surface, price))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
+# --- NOUVELLE ROUTE : SIMULATION STRATÉGIE BLOC + SPOT ---
+@app.post("/api/ops/market/simulate_strategy")
+async def api_simulate_strategy(payload: StrategyRequest):
+    """Simule une stratégie d'achat (Bloc + Spot) sur la courbe réelle du client."""
+    file_path = find_site_file(payload.site_id)
+    if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
+    
+    with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
+    
+    # 1. Récupération des paramètres physiques (Talon/Pmax)
+    kpis = data.get('kpis', {})
+    pmax = float(kpis.get('pmax_kw', 100))
+    talon = float(kpis.get('talon_kw', 20))
+    
+    # 2. Génération d'une courbe type 24h basée sur ces paramètres
+    load_curve = []
+    for h in range(24):
+        val = talon
+        if 6 <= h <= 20: 
+            val = talon + (pmax - talon) * 0.8 
+        load_curve.append(val)
+        
+    # 3. Calcul Financier via le Cortex Market
+    result = market.valoriser_strategie(load_curve, payload.bloc_kw)
+    
+    return JSONResponse(json_compliant(result))
+
 @app.get("/api/tools/template/{template_type}")
 async def download_template(template_type: str):
     if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
@@ -530,9 +573,6 @@ async def ops_ingest_page(request: Request):
 
 @app.post("/api/ingest/upload")
 async def ingest_files_mass(files: List[UploadFile] = File(...)):
-    """
-    Ingestion Massive SGE/GRDF.
-    """
     report = []
     for file in files:
         try:
@@ -540,12 +580,7 @@ async def ingest_files_mass(files: List[UploadFile] = File(...)):
             analysis = router.analyze_file_stream(content, file.filename)
             report.append(analysis)
         except Exception as e:
-            report.append({
-                "filename": file.filename,
-                "status": "ERROR",
-                "message": str(e),
-                "pdl": "ERR"
-            })
+            report.append({"filename": file.filename, "status": "ERROR", "message": str(e), "pdl": "ERR"})
     return JSONResponse(content={"report": report})
 
 @app.get("/industrie", response_class=HTMLResponse)
@@ -568,10 +603,7 @@ async def view_industrie(request: Request, id: Optional[str] = None):
                     "depassements": 0,
                     "kpis": fin.get('kpis', {})
                 }
-                # FIX: Charge bien le fichier template "industry.html" (anglais)
                 return templates.TemplateResponse("industry.html", {"request": request, "data": context_data})
-    
-    # Mock Demo
     data = {"client_name": "USINE SGE TEST (DEMO)", "site_type": "ISO 50001 - HTA", "puissance_souscrite": 3200, "talon_moyen": 450, "cos_phi": 0.94, "depassements": 1}
     return templates.TemplateResponse("industry.html", {"request": request, "data": data})
 
@@ -584,7 +616,6 @@ async def view_syndic(request: Request, id: Optional[str] = None):
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 fin = cortex.enrich_site_financials(data)
-                
                 context_data = {
                     "client_name": data.get('identity', {}).get('site_name', 'Résidence'),
                     "lots": 0,
@@ -595,8 +626,6 @@ async def view_syndic(request: Request, id: Optional[str] = None):
                     "conso_n_1": (fin.get('volume_mwh', 0) * 1000) * 1.1
                 }
                 return templates.TemplateResponse("syndic.html", {"request": request, "data": context_data})
-
-    # Mock Demo
     data = {"client_name": "RÉSIDENCE DÉMO", "dju_n": 2100, "dju_n_1": 2400, "conso_n": 450000}
     return templates.TemplateResponse("syndic.html", {"request": request, "data": data})
 
