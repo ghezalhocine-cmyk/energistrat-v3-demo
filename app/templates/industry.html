@@ -22,7 +22,8 @@
                         danger: '#EF4444', 
                         success: '#10B981',
                         steam: '#94A3B8',  
-                        ai: '#A855F7'      
+                        ai: '#A855F7',
+                        gold: '#F59E0B'
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
@@ -48,7 +49,10 @@
         .ticker-wrap { width: 100%; overflow: hidden; background: rgba(0,0,0,0.3); }
         .ticker { display: inline-block; white-space: nowrap; animation: ticker 20s linear infinite; }
         @keyframes ticker { 0% { transform: translate3d(100%, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
-        
+        .live-dot { width: 8px; height: 8px; background: #EF4444; border-radius: 50%; box-shadow: 0 0 10px #EF4444; animation: blink-live 1s infinite; }
+        @keyframes blink-live { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+        /* Styles pour le Selecteur et le Slider */
         select.cyber-select {
             appearance: none;
             background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2300E5FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
@@ -57,11 +61,14 @@
             background-size: 0.65rem auto;
             padding-right: 2.5rem;
         }
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #00E5FF; cursor: pointer; margin-top: -6px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #334155; border-radius: 2px; }
     </style>
 </head>
 <body class="flex h-screen w-screen font-sans text-sm">
 
-    <!-- SIDEBAR -->
+    <!-- SIDEBAR HARMONISÉE -->
     <aside class="w-64 bg-[#020617] border-r border-white/10 flex flex-col justify-between z-50 flex-shrink-0">
         <div>
             <div class="h-16 flex items-center px-6 border-b border-white/10 bg-abysse">
@@ -74,6 +81,7 @@
                 </div>
             </div>
             
+            <!-- NAVIGATION PRINCIPALE -->
             <div class="p-4 space-y-1">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Pilotage Usine</div>
                 <button onclick="switchView('command')" id="nav-command" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg">
@@ -87,7 +95,7 @@
                 </button>
             </div>
 
-            <!-- NAVIGATION SATELLITE -->
+            <!-- SATELLITES (BUREAU D'ÉTUDES) -->
             <div class="px-4 mt-2">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Bureau d'Études</div>
                 <div onclick="navigateToSatellite('optimization')" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5 cursor-pointer">
@@ -99,9 +107,14 @@
                 <div onclick="navigateToSatellite('carbon')" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5 cursor-pointer">
                     <i class="fa-solid fa-leaf w-4 text-green-600"></i> Bilan Carbone
                 </div>
+                <!-- BOUTON EBITDA -->
+                <div onclick="openEbitdaModal()" class="flex items-center gap-3 px-4 py-2 text-xs text-gold hover:text-white transition rounded-lg hover:bg-white/5 cursor-pointer mt-2 border border-gold/20">
+                    <i class="fa-solid fa-scale-unbalanced w-4"></i> Simulateur EBITDA
+                </div>
             </div>
         </div>
 
+        <!-- SETTINGS -->
         <div class="mt-auto p-4 border-t border-white/10 bg-black/20">
             <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
                 <div class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs text-white font-bold group-hover:bg-cyan group-hover:text-black transition border border-white/10"><i class="fa-solid fa-gear"></i></div>
@@ -116,7 +129,7 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         
-        <!-- TOP BAR -->
+        <!-- TOP BAR (MULTI-SITE SELECTOR) -->
         <div class="h-10 bg-black border-b border-white/10 flex items-center z-40 justify-between pr-4">
             <div class="flex items-center h-full">
                 <div class="bg-cyan text-black font-bold px-3 h-full flex items-center text-xs">LIVE</div>
@@ -182,15 +195,15 @@
                         <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-cyan h-full" id="bar-talon" style="width: 0%"></div></div>
                     </div>
 
-                    <!-- WIDGET 2 : PMAX -->
+                    <!-- WIDGET 2 : COS PHI (OPTIMISÉ) -->
                     <div class="bento-card p-4 border-l-4 border-steam bg-card">
-                        <div class="text-[10px] text-gray-500 uppercase font-bold">Puissance Atteinte</div>
+                        <div class="text-[10px] text-gray-500 uppercase font-bold">Qualité Réseau</div>
                         <div class="flex justify-between items-end mt-2">
-                            <div class="text-2xl font-mono font-bold text-white" id="kpi-pmax">--</div>
-                            <div class="text-xs text-steam">kW</div>
+                            <div class="text-2xl font-mono font-bold text-white" id="kpi-cosphi">0.94</div>
+                            <div class="text-xs text-steam">Cos φ</div>
                         </div>
-                        <div class="text-[10px] text-gray-400 mt-2" id="sub-power-text">Sur -- kVA souscrits</div>
-                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-steam h-full" id="bar-pmax" style="width: 0%"></div></div>
+                        <div class="text-[10px] mt-2 font-bold" id="cosphi-status">Analyse...</div>
+                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-steam h-full" id="bar-cosphi" style="width: 94%"></div></div>
                     </div>
 
                     <!-- WIDGET 3 : VOLUME & BUDGET -->
@@ -247,9 +260,28 @@
             </div>
 
         </div>
+
+        <!-- MODAL EBITDA -->
+        <div id="ebitda-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center p-8 backdrop-blur-sm">
+            <div class="bento-card w-[600px] p-8 relative border border-gold/30 shadow-[0_0_50px_rgba(245,158,11,0.15)]">
+                <button onclick="document.getElementById('ebitda-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+                <h3 class="text-2xl font-bold text-white mb-2 flex items-center gap-3"><i class="fa-solid fa-scale-unbalanced text-gold"></i> Simulateur Impact EBITDA</h3>
+                <p class="text-xs text-gray-400 mb-8">Traduisez vos économies d'énergie en performance financière.</p>
+                <div class="grid grid-cols-2 gap-6 mb-8">
+                    <div><label class="text-[10px] text-gray-500 uppercase font-bold">Chiffre d'Affaires (k€)</label><input type="number" id="input-ca" value="5000" class="w-full bg-abysse border border-white/10 rounded p-2 text-white text-sm mt-1 focus:border-gold outline-none" oninput="updateEbitda()"></div>
+                    <div><label class="text-[10px] text-gray-500 uppercase font-bold">Marge EBITDA Actuelle (%)</label><input type="number" id="input-margin" value="8" class="w-full bg-abysse border border-white/10 rounded p-2 text-white text-sm mt-1 focus:border-gold outline-none" oninput="updateEbitda()"></div>
+                </div>
+                <div class="mb-8"><div class="flex justify-between mb-2"><span class="text-xs font-bold text-white">Hypothèse d'Économie Énergie</span><span class="text-xs font-bold text-cyan" id="disp-saving-pct">10%</span></div><input type="range" id="input-saving" min="0" max="50" value="10" step="1" oninput="updateEbitda()"></div>
+                <div class="bg-white/5 p-6 rounded-xl border border-white/10"><div class="flex justify-between items-center mb-4"><span class="text-sm text-gray-300">Gain direct sur Marge</span><span class="text-xl font-bold text-green-500" id="res-gain">-- €</span></div><div class="h-px bg-white/10 mb-4"></div><div class="text-center"><p class="text-xs text-gray-400 mb-1 uppercase">Équivalent Chiffre d'Affaires à générer</p><p class="text-2xl font-black text-gold" id="res-equivalent">-- €</p><p class="text-[10px] text-gray-500 mt-1">Pour obtenir le même résultat net</p></div></div>
+            </div>
+        </div>
+
     </main>
 
     <script>
+        // GLOBALS
+        let GLOBAL_BUDGET = 0;
+
         // --- NAVIGATION ---
         window.switchView = function(viewName) {
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
@@ -267,6 +299,26 @@
             } else {
                 alert("Veuillez sélectionner un site dans le menu en haut à droite.");
             }
+        }
+
+        // --- EBITDA SIMULATOR ---
+        window.openEbitdaModal = function() {
+            if(GLOBAL_BUDGET === 0) alert("Budget énergie non disponible pour ce site.");
+            else {
+                document.getElementById('ebitda-modal').classList.remove('hidden');
+                updateEbitda();
+            }
+        }
+
+        window.updateEbitda = function() {
+            const ca = parseFloat(document.getElementById('input-ca').value) * 1000;
+            const margin = parseFloat(document.getElementById('input-margin').value) / 100;
+            const savingPct = parseFloat(document.getElementById('input-saving').value) / 100;
+            document.getElementById('disp-saving-pct').innerText = (savingPct * 100).toFixed(0) + "%";
+            const gain = GLOBAL_BUDGET * savingPct;
+            const equivalentCA = margin > 0 ? gain / margin : 0;
+            document.getElementById('res-gain').innerText = "+" + Math.round(gain).toLocaleString() + " €";
+            document.getElementById('res-equivalent').innerText = Math.round(equivalentCA).toLocaleString() + " €";
         }
 
         // --- CHARTS ---
@@ -408,8 +460,25 @@
             const budget = parseFloat(kpis.budget) || 0;
             const psouscrite = parseFloat(contract.power) || 0;
             
-            const advice = kpis.cortex_advice || "Analyse en cours...";
-            const tag = kpis.is_alert ? "ALERTE" : "OPTIMISÉ";
+            GLOBAL_BUDGET = budget;
+
+            // Cos Phi Logic
+            const cosPhi = data.technical?.cos_phi || 0.94;
+            document.getElementById('kpi-cosphi').innerText = cosPhi;
+            
+            const cosStatus = document.getElementById('cosphi-status');
+            const cosBar = document.getElementById('bar-cosphi');
+            
+            if (cosPhi < 0.93) {
+                const penalty = Math.round(volume * 1000 * 0.015);
+                cosStatus.innerText = `⚠️ Pénalité Est.: ${penalty} €`;
+                cosStatus.className = "text-[10px] mt-2 font-bold text-danger animate-pulse";
+                cosBar.className = "bg-danger h-full";
+            } else {
+                cosStatus.innerText = "Optimisé (Pas de pénalité)";
+                cosStatus.className = "text-[10px] mt-2 font-bold text-success";
+                cosBar.className = "bg-success h-full";
+            }
 
             document.getElementById('live-power').innerText = `Pmax: ${pmax} kW`;
             document.getElementById('kpi-talon').innerText = talon;
@@ -423,7 +492,10 @@
                 document.getElementById('sub-power-text').innerText = `Puissance souscrite non renseignée`;
             }
             
+            const advice = kpis.cortex_advice || "Analyse en cours...";
             document.getElementById('cortex-advice').innerText = advice;
+            
+            const tag = kpis.is_alert ? "ALERTE" : "OPTIMISÉ";
             document.getElementById('cortex-tag').innerText = tag;
             document.getElementById('cortex-tag').className = kpis.is_alert 
                 ? "px-2 py-1 rounded bg-danger/20 text-danger text-[9px] font-bold border border-danger/30" 
@@ -447,6 +519,15 @@
                     <div class="flex-1 text-sm text-white">Site chargé : ${data.identity?.site_name}</div>
                 </div>
             `;
+            if (kpis.is_alert) {
+                logs.innerHTML += `
+                    <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
+                        <div class="text-xs font-mono text-gray-500 w-24">${new Date().toLocaleTimeString()}</div>
+                        <div class="w-20"><span class="bg-danger/20 text-danger px-2 py-1 rounded text-[10px] font-bold">ALERTE</span></div>
+                        <div class="flex-1 text-sm text-white">${advice}</div>
+                    </div>
+                `;
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
