@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>ENERGISTRAT OPS | AGGREGATOR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>body { background-color: #050505; color: #e5e5e5; font-family: sans-serif; }</style>
+</head>
+<body class="p-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="flex items-center gap-4 mb-8">
+            <div class="w-12 h-12 bg-purple-600 rounded flex items-center justify-center text-white text-xl font-bold"><i class="fa-solid fa-layer-group"></i></div>
+            <div>
+                <h1 class="text-2xl font-bold text-white">Cortex Aggregator</h1>
+                <p class="text-gray-400">Création de PDL Virtuels & Projection N+3</p>
+            </div>
+        </header>
+
+        <div class="bg-[#0a0a0a] border border-gray-800 rounded-xl p-6">
+            <h3 class="text-white font-bold mb-4">Sélectionnez les sites à agréger</h3>
+            <div id="site-list" class="grid grid-cols-2 gap-4 mb-8 max-h-96 overflow-y-auto">
+                <!-- JS injectera les sites ici -->
+                <div class="text-gray-500 italic">Chargement de la flotte...</div>
+            </div>
+
+            <div class="flex items-center justify-between border-t border-gray-800 pt-6">
+                <div class="flex items-center gap-4">
+                    <label class="text-sm text-gray-400">Horizon de projection :</label>
+                    <select id="years-select" class="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-white">
+                        <option value="1">1 An (N+1)</option>
+                        <option value="2">2 Ans (N+2)</option>
+                        <option value="3" selected>3 Ans (N+3)</option>
+                    </select>
+                </div>
+                <button onclick="generateAggregate()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-6 rounded transition flex items-center gap-2">
+                    <i class="fa-solid fa-file-csv"></i> Générer CSV SGE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let FLEET = [];
+
+        async function init() {
+            const res = await fetch('/api/dashboard/fleet');
+            const data = await res.json();
+            FLEET = data.fleet || [];
+            renderList();
+        }
+
+        function renderList() {
+            const container = document.getElementById('site-list');
+            container.innerHTML = '';
+            
+            if(FLEET.length === 0) {
+                container.innerHTML = '<div class="text-red-500">Aucun site disponible.</div>';
+                return;
+            }
+
+            FLEET.forEach(site => {
+                const div = document.createElement('div');
+                div.className = "flex items-center gap-3 p-3 bg-gray-900/50 rounded border border-gray-800 hover:border-purple-500/50 cursor-pointer";
+                div.onclick = () => {
+                    const cb = div.querySelector('input');
+                    cb.checked = !cb.checked;
+                };
+                div.innerHTML = `
+                    <input type="checkbox" value="${site.id}" class="w-4 h-4 accent-purple-500">
+                    <div>
+                        <div class="font-bold text-sm text-white">${site.name}</div>
+                        <div class="text-xs text-gray-500">${site.city} | ${Math.round(site.volume)} MWh</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        async function generateAggregate() {
+            const checked = Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+            
+            if(checked.length === 0) return alert("Sélectionnez au moins un site.");
+            
+            const btn = document.querySelector('button');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Calcul en cours...';
+            
+            try {
+                const res = await fetch('/api/ops/aggregate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        site_ids: checked,
+                        years: parseInt(document.getElementById('years-select').value)
+                    })
+                });
+
+                if(res.ok) {
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `SGE_VIRTUAL_${checked.length}_SITES.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } else {
+                    alert("Erreur serveur");
+                }
+            } catch(e) {
+                console.error(e);
+                alert("Erreur réseau");
+            }
+            btn.innerHTML = originalText;
+        }
+
+        init();
+    </script>
+</body>
+</html>
