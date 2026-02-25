@@ -26,6 +26,10 @@
         /* TITANIUM LINK STYLE */
         .nav-icon.titanium { color: #00E5FF; border: 1px solid rgba(0, 229, 255, 0.3); }
         .nav-icon.titanium:hover { background: #00E5FF; color: #000; box-shadow: 0 0 20px rgba(0, 229, 255, 0.4); }
+        
+        /* AGGREGATOR LINK STYLE */
+        .nav-icon.aggregator { color: #A855F7; border: 1px solid rgba(168, 85, 247, 0.3); }
+        .nav-icon.aggregator:hover { background: #A855F7; color: #fff; box-shadow: 0 0 20px rgba(168, 85, 247, 0.4); }
 
         .input-dark { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 8px; font-size: 0.75rem; }
         .chart-btn { padding: 4px 12px; font-size: 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; background: transparent; color: #94a3b8; }
@@ -53,9 +57,14 @@
         
         <div onclick="navTo('datalab')" id="nav-datalab" class="nav-icon active" title="Data Lab (Single Analysis)"><i class="fa-solid fa-chart-line text-lg"></i></div>
         
-        <!-- NEW: TITANIUM INGEST NODE LINK -->
-        <a href="/ops/ingest" target="_blank" class="nav-icon titanium" title="TITANIUM INGEST NODE (Mass Upload)">
+        <!-- TITANIUM INGEST NODE LINK -->
+        <a href="/ops/ingest" target="_blank" class="nav-icon titanium" title="INGEST NODE (Mass Upload)">
             <i class="fa-solid fa-server text-lg"></i>
+        </a>
+        
+        <!-- TITANIUM AGGREGATOR LINK (NOUVEAU) -->
+        <a href="/ops/aggregator" target="_blank" class="nav-icon aggregator" title="CORTEX AGGREGATOR (PDL Virtuel)">
+            <i class="fa-solid fa-layer-group text-lg"></i>
         </a>
 
         <div onclick="navTo('finlab')" id="nav-finlab" class="nav-icon" title="Finance Lab"><i class="fa-solid fa-coins text-lg"></i></div>
@@ -100,10 +109,15 @@
                 <input type="file" id="real-upload" class="hidden" onchange="handleFileSelect(this.files[0])">
                 
                 <div class="mt-4 pt-4 border-t border-white/10 text-center">
-                    <p class="text-[10px] text-gray-500 mb-2">Besoin d'ingérer 500+ fichiers ?</p>
-                    <a href="/ops/ingest" target="_blank" class="block w-full py-2 bg-cyan-900/30 text-cyan-400 border border-cyan-500/30 rounded text-xs font-bold hover:bg-cyan-500 hover:text-black transition">
-                        OUVRIR OPS INGEST NODE
-                    </a>
+                    <p class="text-[10px] text-gray-500 mb-2">Outils Big Data :</p>
+                    <div class="flex gap-2">
+                        <a href="/ops/ingest" target="_blank" class="flex-1 py-2 bg-cyan-900/30 text-cyan-400 border border-cyan-500/30 rounded text-[10px] font-bold hover:bg-cyan-500 hover:text-black transition">
+                            INGESTION
+                        </a>
+                        <a href="/ops/aggregator" target="_blank" class="flex-1 py-2 bg-purple-900/30 text-purple-400 border border-purple-500/30 rounded text-[10px] font-bold hover:bg-purple-500 hover:text-white transition">
+                            AGRÉGATION
+                        </a>
+                    </div>
                 </div>
                 
                 <a id="view-client-btn" href="#" target="_blank" class="hidden w-full py-2 bg-white/10 text-white text-center rounded text-xs font-bold hover:bg-white/20 border border-white/20 mt-2">
@@ -226,7 +240,8 @@
             document.querySelectorAll('.page-content').forEach(e => e.classList.remove('active'));
             document.getElementById('view-' + pageId).classList.add('active');
             document.querySelectorAll('.nav-icon').forEach(e => {
-                if(!e.classList.contains('titanium')) e.classList.remove('active'); // Ne pas toucher au bouton Titanium
+                // Ne pas toucher aux boutons spéciaux
+                if(!e.classList.contains('titanium') && !e.classList.contains('aggregator')) e.classList.remove('active');
             });
             const navBtn = document.getElementById('nav-' + pageId);
             if(navBtn) navBtn.classList.add('active');
@@ -260,18 +275,16 @@
             
             const fd = new FormData(); 
             fd.append('file', file); 
-            fd.append('target', target); // Utilisé par api_analyze si implémenté
+            fd.append('target', target); 
             
             try {
-                // APPEL A API_ANALYZE (Single File)
                 const res = await fetch('/api/ops/analyze', { method: 'POST', body: fd });
                 const data = await res.json();
                 
-                if(data.chart) { // Vérification de succès
+                if(data.chart) { 
                     localStorage.setItem('last_cortex_result', JSON.stringify(data));
                     
                     const btn = document.getElementById('view-client-btn');
-                    // Redirection vers les nouveaux profils si sélectionnés
                     if (target === 'industry') btn.href = '/industrie';
                     else if (target === 'syndic') btn.href = '/syndic';
                     else btn.href = `/dashboard/${target}`;
