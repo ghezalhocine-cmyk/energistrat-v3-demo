@@ -22,20 +22,21 @@ try:
 except ImportError:
     PANDAS_READY = False
 
-# --- BLOC IMPORT CORTEX (ROBUSTE) ---
+# --- BLOC IMPORT CORTEX (INTEGRATION TITANIUM) ---
 try:
+    # On tente d'importer depuis le package app.core (Structure Prod)
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
     from app.core.cortex_forecast import forecast
-    # AJOUT TITANIUM : Import du routeur d'ingestion
+    # NOUVEAUX MODULES TITANIUM
     from app.core.cortex_router import router
     from app.core.cortex_market import market
     # AJOUT AGGREGATOR
     from app.core.cortex_aggregator import aggregator
 except ImportError:
     try:
-        # Fallback pour environnement local
+        # Fallback pour environnement local (Dev)
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
@@ -44,7 +45,8 @@ except ImportError:
         from core.cortex_market import market
         from core.cortex_aggregator import aggregator
     except ImportError:
-        # Mock de secours critique
+        # Mock de secours critique pour éviter le crash au démarrage si un fichier manque
+        print("CRITICAL WARNING: Cortex Modules missing. Running in degraded mode.")
         class MockRouter:
             def get_api_status(self): return {"sge_enedis": {"status": "OFFLINE"}, "adam_grdf": {"status": "OFFLINE"}}
             def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router module missing"}
@@ -80,12 +82,15 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+# --- MODELES DE DONNEES ---
+
 class MarketUpdateModel(BaseModel):
     elec: Dict[str, Any]
     gaz: Dict[str, Any]
     trve: Optional[Dict[str, Any]] = None
     targets: Optional[Dict[str, Any]] = None
 
+# Modèle pour la stratégie de trading
 class StrategyRequest(BaseModel):
     site_id: str
     bloc_kw: float
@@ -94,6 +99,8 @@ class StrategyRequest(BaseModel):
 class AggregationRequest(BaseModel):
     site_ids: List[str]
     years: int = 3
+
+# --- FONCTIONS UTILITAIRES ---
 
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
@@ -132,7 +139,7 @@ def get_market_ref():
         "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 }
     }
 
-# --- API PRINCIPALES ---
+# --- API PRINCIPALES (SETTINGS & DATA) ---
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
@@ -145,10 +152,23 @@ async def api_save_client(request: Request):
         
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
-            for section in ['technical', 'location', 'identity', 'contract', 'pricing', 'kpis', 'financials']:
-                if section in data:
-                    if section not in existing_data: existing_data[section] = {}
-                    existing_data[section].update(data[section])
+            # Mise à jour intelligente section par section
+            if 'technical' in data:
+                if 'technical' not in existing_data: existing_data['technical'] = {}
+                existing_data['technical'].update(data['technical'])
+            if 'location' in data:
+                if 'location' not in existing_data: existing_data['location'] = {}
+                existing_data['location'].update(data['location'])
+            if 'identity' in data: existing_data['identity'].update(data['identity'])
+            if 'contract' in data: existing_data['contract'].update(data['contract'])
+            if 'pricing' in data: existing_data['pricing'] = data['pricing']
+            if 'kpis' in data:
+                if 'kpis' not in existing_data: existing_data['kpis'] = {}
+                existing_data['kpis'].update(data['kpis'])
+            # Sauvegarde des données financières (EBITDA)
+            if 'financials' in data:
+                existing_data['financials'] = data['financials']
+                
             final_data = existing_data
         else:
             final_data = data
@@ -190,22 +210,27 @@ async def api_import_csv(file: UploadFile = File(...)):
                 
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f: existing = json.load(f)
+                    
                     if 'contract' in s: existing['contract'].update(s['contract'])
                     if 'pricing' in s: existing['pricing'] = s['pricing']
                     if 'identity' in s: existing['identity'].update(s['identity'])
+                    
                     new_tech = s.get('technical', {})
                     old_tech = existing.get('technical', {})
                     for k, v in new_tech.items():
                         if v: old_tech[k] = v
                     existing['technical'] = old_tech
+                    
                     new_loc = s.get('location', {})
                     old_loc = existing.get('location', {})
                     for k, v in new_loc.items():
                         if v: old_loc[k] = v
                     existing['location'] = old_loc
+                    
                     final_s = existing
                 else:
                     final_s = s
+
                 with open(file_path, 'w', encoding='utf-8') as f: json.dump(final_s, f, indent=4, ensure_ascii=False)
                 saved += 1
             except Exception as e: pass
@@ -241,6 +266,7 @@ async def get_fleet_data(response: Response):
         raw_id = s.get('identity',{}).get('id')
         safe_id = get_safe_id(raw_id)
         
+        # FIX TITANIUM : AFFICHAGE PDL/PCE (MAIRIE)
         pdl_display = contract.get('pdl')
         if not pdl_display or len(str(pdl_display)) < 5:
             pdl_display = contract.get('pce', '-')
@@ -251,19 +277,26 @@ async def get_fleet_data(response: Response):
         if 'kpis' in s and 'volume_mwh' in s['kpis']:
             vol_router = float(s['kpis']['volume_mwh'])
         
+        # Priorité au volume réel du routeur
         final_vol = vol_engine
         if vol_engine == 0 and vol_router > 0:
             final_vol = vol_router
 
+        # Si volume Titanium détecté mais budget à 0 (ou juste abo), on recalcule
         final_budget = fin['budget_annual']
         if vol_engine == 0 and vol_router > 0:
             pricing = s.get('pricing', {})
-            avg_price = 0.20
+            avg_price = 0.20 # Fallback prudent
+            # Recherche d'un prix unitaire renseigné
             for k in ['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
                 if k in pricing and pricing[k]:
                     try: avg_price = float(pricing[k]); break
                     except: pass
-            final_budget = fin.get('budget_subscription', 0) + (final_vol * 1000 * avg_price)
+            
+            # Formule : (Vol MWh * 1000 * Prix) + Abo
+            sub_cost = fin.get('budget_subscription', 0)
+            energy_cost = (final_vol * 1000) * avg_price
+            final_budget = sub_cost + energy_cost
 
         fleet_list.append({
             "id": safe_id,
@@ -279,7 +312,7 @@ async def get_fleet_data(response: Response):
             "alert": fin['kpis']['pmc_eur_mwh'] > 300,
             "ghost_savings": fin['kpis']['ghost_savings'],
             "power": contract.get('power', 0),
-            "pdl": pdl_display
+            "pdl": pdl_display # Ajouté pour le tableau
         })
     response_data = {
         "fleet": fleet_list, "count": len(fleet_list),
@@ -309,11 +342,13 @@ async def get_dashboard_data(client_id: str, response: Response):
     pricing = financials['pricing_details']
     display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
 
+    # FIX TITANIUM : Injection Volume
     vol_display = financials['volume_mwh']
     kpis_raw = data.get('kpis', {})
     if vol_display == 0 and 'volume_mwh' in kpis_raw:
         vol_display = float(kpis_raw['volume_mwh'])
 
+    # FIX TITANIUM : Injection Budget
     budget_display = financials['budget_annual']
     if financials['volume_mwh'] == 0 and vol_display > 0:
         p_data = data.get('pricing', {})
@@ -366,6 +401,7 @@ async def get_dashboard_data(client_id: str, response: Response):
     }
     return JSONResponse(json_compliant(response_data))
 
+# --- ROUTE FORECAST ---
 @app.get("/api/forecast/simulate/{client_id}")
 async def api_forecast_simulate(client_id: str):
     file_path = find_site_file(client_id)
