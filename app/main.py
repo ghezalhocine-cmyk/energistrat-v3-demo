@@ -22,16 +22,17 @@ try:
 except ImportError:
     PANDAS_READY = False
 
-# --- BLOC IMPORT CORTEX (ROBUSTE) ---
+# --- BLOC IMPORT CORTEX (INTEGRATION TITANIUM) ---
 try:
     # On tente d'importer depuis le package app.core (Structure Prod)
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
     from app.core.cortex_forecast import forecast
-    # AJOUT TITANIUM : Import du routeur d'ingestion et modules avancés
+    # NOUVEAUX MODULES TITANIUM
     from app.core.cortex_router import router
     from app.core.cortex_market import market
+    # AJOUT AGGREGATOR
     from app.core.cortex_aggregator import aggregator
 except ImportError:
     try:
@@ -59,7 +60,7 @@ except ImportError:
             def aggregate_sites(self, s, y): return None
         aggregator = MockAggregator()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1805-SAFE")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1820-ROUTING-FIX")
 
 app.add_middleware(
     CORSMiddleware,
@@ -89,10 +90,12 @@ class MarketUpdateModel(BaseModel):
     trve: Optional[Dict[str, Any]] = None
     targets: Optional[Dict[str, Any]] = None
 
+# Modèle pour la stratégie de trading
 class StrategyRequest(BaseModel):
     site_id: str
     bloc_kw: float
 
+# Modèle pour l'agrégation
 class AggregationRequest(BaseModel):
     site_ids: List[str]
     years: int = 3
@@ -150,10 +153,22 @@ async def api_save_client(request: Request):
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
             # Mise à jour intelligente section par section
-            for section in ['technical', 'location', 'identity', 'contract', 'pricing', 'kpis', 'financials']:
-                if section in data:
-                    if section not in existing_data: existing_data[section] = {}
-                    existing_data[section].update(data[section])
+            if 'technical' in data:
+                if 'technical' not in existing_data: existing_data['technical'] = {}
+                existing_data['technical'].update(data['technical'])
+            if 'location' in data:
+                if 'location' not in existing_data: existing_data['location'] = {}
+                existing_data['location'].update(data['location'])
+            if 'identity' in data: existing_data['identity'].update(data['identity'])
+            if 'contract' in data: existing_data['contract'].update(data['contract'])
+            if 'pricing' in data: existing_data['pricing'] = data['pricing']
+            if 'kpis' in data:
+                if 'kpis' not in existing_data: existing_data['kpis'] = {}
+                existing_data['kpis'].update(data['kpis'])
+            # Sauvegarde des données financières (EBITDA)
+            if 'financials' in data:
+                existing_data['financials'] = data['financials']
+                
             final_data = existing_data
         else:
             final_data = data
@@ -262,20 +277,23 @@ async def get_fleet_data(response: Response):
         if 'kpis' in s and 'volume_mwh' in s['kpis']:
             vol_router = float(s['kpis']['volume_mwh'])
         
+        # Priorité au volume réel du routeur
         final_vol = vol_engine
         if vol_engine == 0 and vol_router > 0:
             final_vol = vol_router
 
-        final_budget = fin['budget_annual']
         # Si volume Titanium détecté mais budget à 0 (ou juste abo), on recalcule
+        final_budget = fin['budget_annual']
         if vol_engine == 0 and vol_router > 0:
             pricing = s.get('pricing', {})
             avg_price = 0.20 # Fallback prudent
+            # Recherche d'un prix unitaire renseigné
             for k in ['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
                 if k in pricing and pricing[k]:
                     try: avg_price = float(pricing[k]); break
                     except: pass
             
+            # Formule : (Vol MWh * 1000 * Prix) + Abo
             sub_cost = fin.get('budget_subscription', 0)
             energy_cost = (final_vol * 1000) * avg_price
             final_budget = sub_cost + energy_cost
@@ -295,7 +313,7 @@ async def get_fleet_data(response: Response):
             "ghost_savings": fin['kpis']['ghost_savings'],
             "power": contract.get('power', 0),
             "pdl": pdl_display,
-            "surface": s.get('location', {}).get('surface', 0) # Ajout pour OPH
+            "surface": s.get('location', {}).get('surface', 0)
         })
     response_data = {
         "fleet": fleet_list, "count": len(fleet_list),
@@ -384,7 +402,7 @@ async def get_dashboard_data(client_id: str, response: Response):
     }
     return JSONResponse(json_compliant(response_data))
 
-# --- ROUTE FORECAST ---
+# --- ROUTE FORECAST CORRIGÉE (FIX VOLUME) ---
 @app.get("/api/forecast/simulate/{client_id}")
 async def api_forecast_simulate(client_id: str):
     file_path = find_site_file(client_id)
@@ -435,6 +453,50 @@ async def api_solar_sim(request: Request):
         return JSONResponse(physics.simulate_solar_roi(lat, lon, surface, price))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
+# NOUVEAU : Simulation Stratégie
+@app.post("/api/ops/market/simulate_strategy")
+async def api_simulate_strategy(payload: StrategyRequest):
+    """Simule une stratégie d'achat (Bloc + Spot) sur la courbe réelle du client."""
+    file_path = find_site_file(payload.site_id)
+    if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
+    
+    with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
+    
+    kpis = data.get('kpis', {})
+    pmax = float(kpis.get('pmax_kw', 100))
+    talon = float(kpis.get('talon_kw', 20))
+    
+    load_curve = []
+    for h in range(24):
+        val = talon
+        if 6 <= h <= 20: 
+            val = talon + (pmax - talon) * 0.8 
+        load_curve.append(val)
+        
+    result = market.valoriser_strategie(load_curve, payload.bloc_kw)
+    return JSONResponse(json_compliant(result))
+
+# NOUVEAU : Route pour l'agrégateur SGE
+@app.post("/api/ops/aggregate")
+async def api_aggregate_sites(payload: AggregationRequest):
+    """
+    Génère un fichier SGE virtuel agglomérant plusieurs sites.
+    """
+    try:
+        csv_content = aggregator.aggregate_sites(payload.site_ids, payload.years)
+        
+        if not csv_content:
+            return JSONResponse({"error": "Aucune donnée générée (sites introuvables ?)"}, 400)
+            
+        # Création de la réponse fichier
+        response = Response(content=csv_content, media_type="text/csv")
+        filename = f"SGE_AGGREGAT_{len(payload.site_ids)}SITES_{payload.years}ANS.csv"
+        response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+        return response
+        
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, 500)
+
 @app.get("/api/tools/template/{template_type}")
 async def download_template(template_type: str):
     if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
@@ -442,15 +504,37 @@ async def download_template(template_type: str):
     try:
         with pd.ExcelWriter(stream, engine='openpyxl') as writer:
             if "import_elec" in template_type or "template_csv" == template_type:
-                df = pd.DataFrame(columns=["ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "REF_COPRO", "NAF", "CEE_ELIGIBLE", "GO_PERCENT", "COMPTEUR_PRODUCTION", "PDL", "SEGMENT", "FTA", "GRD", "TYPOLOGIE", "PUISSANCE_SOUSCRITE", "POINTE_MAX", "PS_HPH", "PS_HCH", "PS_HPE", "PS_HCE", "CONSO_HPH", "CONSO_HCH", "CONSO_HPE", "CONSO_HCE", "VOLUME_ANNUEL", "COMMENTAIRE", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", "ABONNEMENT", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES", "SURFACE_M2", "CODE_INSEE", "CHAUFFAGE", "ISOLATION", "REGULATION"])
+                df = pd.DataFrame(columns=[
+                    "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "REF_COPRO", 
+                    "NAF", "CEE_ELIGIBLE", "GO_PERCENT", "COMPTEUR_PRODUCTION", "PDL", "SEGMENT", "FTA", "GRD", 
+                    "TYPOLOGIE", "PUISSANCE_SOUSCRITE", "POINTE_MAX", 
+                    "PS_HPH", "PS_HCH", "PS_HPE", "PS_HCE", 
+                    "CONSO_HPH", "CONSO_HCH", "CONSO_HPE", "CONSO_HCE", 
+                    "VOLUME_ANNUEL", "COMMENTAIRE", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", 
+                    "ABONNEMENT", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES", 
+                    "SURFACE_M2", "CODE_INSEE", "CHAUFFAGE", "ISOLATION", "REGULATION"
+                ])
                 df.to_excel(writer, index=False)
             elif "import_gaz" in template_type or "template_csv_gaz" == template_type:
-                df = pd.DataFrame(columns=["ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "NAF", "CEE_ELIGIBLE", "PCE", "CAR_MWH", "CJA_MWH_J", "SEGMENT_GAZ", "PROFIL", "TARIF_ACHEM", "GRD", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", "ABONNEMENT", "PRIX_MOLECULE", "TERME_STOCK", "TAXES", "INSEE", "SURFACE_M2", "CHAUFFAGE", "ISOLATION", "REGULATION"])
+                df = pd.DataFrame(columns=[
+                    "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "NAF", 
+                    "CEE_ELIGIBLE", "PCE", "CAR_MWH", "CJA_MWH_J", "SEGMENT_GAZ", "PROFIL", 
+                    "TARIF_ACHEM", "GRD", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", 
+                    "ABONNEMENT", "PRIX_MOLECULE", "TERME_STOCK", "TAXES", "INSEE", "SURFACE_M2",
+                    "CHAUFFAGE", "ISOLATION", "REGULATION"
+                ])
                 df.to_excel(writer, index=False)
             elif "import_patrimoine" in template_type:
                 df = pd.DataFrame(columns=["PDL", "NOM_SITE", "SURFACE_M2", "CHAUFFAGE", "ISOLATION", "REGULATION"])
                 df.to_excel(writer, index=False, sheet_name="DATA")
-                df_notice = pd.DataFrame({"CHAMP": ["CHAUFFAGE", "ISOLATION", "REGULATION"], "VALEURS_AUTORISEES": ["Gaz Condensation, Fioul, Élec Direct, PAC, Réseau Chaleur", "Non Isolé, Double Vitrage, ITE Complète", "Aucune, Thermostat Simple, GTB/GTC, Horloge"]})
+                df_notice = pd.DataFrame({
+                    "CHAMP": ["CHAUFFAGE", "ISOLATION", "REGULATION"],
+                    "VALEURS_AUTORISEES": [
+                        "Gaz Condensation, Fioul, Élec Direct, PAC, Réseau Chaleur",
+                        "Non Isolé, Double Vitrage, ITE Complète",
+                        "Aucune, Thermostat Simple, GTB/GTC, Horloge"
+                    ]
+                })
                 df_notice.to_excel(writer, index=False, sheet_name="MODE_EMPLOI")
             elif "bpu" in template_type:
                 df = pd.DataFrame(columns=["PRIX_HPH", "ABONNEMENT"])
@@ -631,78 +715,79 @@ async def api_aggregate_sites(payload: AggregationRequest):
     except Exception as e:
         return JSONResponse({"error": str(e)}, 500)
 
-# ==========================================
-# ROUTES PROFILS (VUES MÉTIER)
-# ==========================================
-
-# 1. INDUSTRIE (Factory.OS)
 @app.get("/industrie", response_class=HTMLResponse)
 @app.get("/industry", response_class=HTMLResponse)
 async def view_industrie(request: Request, id: Optional[str] = None):
+    """Profil Industrie (Usine 4.0) - Câblé sur les vraies données."""
     if id:
         file_path = find_site_file(id)
         if file_path:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 fin = cortex.enrich_site_financials(data)
+                
                 context_data = {
                     "client_name": data.get('identity', {}).get('site_name', 'Client'),
                     "site_type": "Industrie - Réel",
                     "puissance_souscrite": data.get('contract', {}).get('power', 0),
-                    "talon_moyen": 0, "cos_phi": 0.95, "depassements": 0,
+                    "talon_moyen": 0,
+                    "cos_phi": 0.95,
+                    "depassements": 0,
                     "kpis": fin.get('kpis', {})
                 }
-                # Charge le template "industry.html" (version anglaise standardisée)
+                # FIX TITANIUM : Charge le template "industry.html" (version anglaise standardisée)
                 return templates.TemplateResponse("industry.html", {"request": request, "data": context_data})
     
     # Mock Demo
     data = {"client_name": "USINE DÉMO", "site_type": "DÉMO", "puissance_souscrite": 0, "kpis": {}}
     return templates.TemplateResponse("industry.html", {"request": request, "data": data})
 
-# 2. SYNDIC (Habitat.OS)
 @app.get("/syndic", response_class=HTMLResponse)
 async def view_syndic(request: Request, id: Optional[str] = None):
+    """Profil Syndic (Habitat) - Câblé sur les vraies données."""
     if id:
         file_path = find_site_file(id)
         if file_path:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 fin = cortex.enrich_site_financials(data)
+                
                 context_data = {
                     "client_name": data.get('identity', {}).get('site_name', 'Résidence'),
-                    "lots": 0, "chaufferie": "Collectif", "dju_n": 2100, "dju_n_1": 2400,
+                    "lots": 0,
+                    "chaufferie": "Chauffage Collectif",
+                    "dju_n": 2100,
+                    "dju_n_1": 2400,
                     "conso_n": fin.get('volume_mwh', 0) * 1000,
                     "conso_n_1": (fin.get('volume_mwh', 0) * 1000) * 1.1
                 }
                 return templates.TemplateResponse("syndic.html", {"request": request, "data": context_data})
-    return templates.TemplateResponse("syndic.html", {"request": request, "data": {}})
 
-# 3. MAIRIE / COLLECTIVITÉ
+    # Mock Demo
+    data = {"client_name": "RÉSIDENCE DÉMO", "dju_n": 2100, "dju_n_1": 2400, "conso_n": 450000}
+    return templates.TemplateResponse("syndic.html", {"request": request, "data": data})
+
+# --- ROUTES NOUVEAUX PROFILS (CORRIGÉES) ---
 @app.get("/mairie", response_class=HTMLResponse)
 async def view_mairie(request: Request, id: Optional[str] = None):
     return templates.TemplateResponse("mairie.html", {"request": request})
 
-# 4. RETAIL / FRANCHISE
 @app.get("/retail", response_class=HTMLResponse)
 async def view_retail(request: Request, id: Optional[str] = None):
     return templates.TemplateResponse("retail.html", {"request": request})
 
-# 5. PME / ARTISAN (Nouveau)
 @app.get("/pme", response_class=HTMLResponse)
 async def view_pme(request: Request, id: Optional[str] = None):
     return templates.TemplateResponse("pme.html", {"request": request})
 
-# 6. SDE / SYNDICAT (Nouveau)
 @app.get("/sde", response_class=HTMLResponse)
 async def view_sde(request: Request, id: Optional[str] = None):
     return templates.TemplateResponse("sde.html", {"request": request})
 
-# 7. OPH / BAILLEUR SOCIAL (Nouveau)
 @app.get("/oph", response_class=HTMLResponse)
 async def view_oph(request: Request, id: Optional[str] = None):
     return templates.TemplateResponse("oph.html", {"request": request})
 
-# 8. CITOYEN / PARTICULIER (Nouveau)
 @app.get("/citoyen", response_class=HTMLResponse)
 async def view_citoyen(request: Request, id: Optional[str] = None):
     return templates.TemplateResponse("citoyen.html", {"request": request})
@@ -734,6 +819,7 @@ async def view_onboarding(request: Request): return templates.TemplateResponse("
 async def view_processing(request: Request): return templates.TemplateResponse("processing.html", {"request": request})
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str):
+    # ROUTAGE EXPLICITE CORRIGÉ
     if profile == "retail": return templates.TemplateResponse("retail.html", {"request": request})
     if profile == "mairie": return templates.TemplateResponse("mairie.html", {"request": request})
     if profile == "sde": return templates.TemplateResponse("sde.html", {"request": request})
