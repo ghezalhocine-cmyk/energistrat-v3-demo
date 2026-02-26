@@ -4,133 +4,143 @@ import holidays
 import io
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 class CortexAggregator:
     """
-    CORTEX AGGREGATOR V2 - LONG TERM PROJECTION
-    Génère des courbes de charge prévisionnelles multi-sites (N+1, N+2, N+3)
-    PAS DE TEMPS : 60 Minutes (Optimisé pour projection financière).
+    CORTEX AGGREGATOR V3 - PRODUCTION READY
+    Génération courbe SGE 3 Ans / Pas 60 min (Standard Marché).
+    Architecture : "Skeleton First" pour éviter les erreurs d'alignement temporel.
     """
 
     def __init__(self):
-        # Initialisation des jours fériés France
-        self.fr_holidays = holidays.France()
+        # On pré-charge les jours fériés sur une large plage pour couvrir N+3
+        # Cela évite les erreurs si on dépasse l'année en cours
+        self.fr_holidays = holidays.France(years=range(2024, 2030))
         self.base_dir = os.getcwd()
         self.data_dir = os.path.join(self.base_dir, "data")
 
     def get_site_dna(self, site_id):
-        """Récupère l'ADN énergétique du site (Talon, Pmax, Profil)."""
-        clean_id = site_id.replace('/', '_').replace(' ', '_').strip()
+        """Récupère les paramètres physiques du site (ADN)."""
+        if not site_id: return None
+        
+        clean_id = str(site_id).replace('/', '_').replace(' ', '_').strip()
         path = os.path.join(self.data_dir, f"{clean_id}.json")
         
-        if not os.path.exists(path):
-            return None
+        if not os.path.exists(path): return None
 
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            
             kpis = data.get('kpis', {})
-            return {
-                "name": data.get('identity', {}).get('site_name', 'Site Inconnu'),
-                "pdl": data.get('contract', {}).get('pdl', '000000'),
-                "pmax": float(kpis.get('pmax_kw', 100)),
-                "talon": float(kpis.get('talon_kw', 20)),
-                "typologie": data.get('location', {}).get('typologie', 'Indus')
-            }
-        except Exception:
-            return None
-
-    def generate_curve_for_site(self, dna, start_date, end_date):
-        """
-        Génère une courbe 60min (1H) réaliste sur 3 ans.
-        """
-        # --- CHANGEMENT MAJEUR : FREQ='1H' ---
-        dates = pd.date_range(start=start_date, end=end_date, freq='1H')
-        df = pd.DataFrame(index=dates)
-        
-        # Détection du type de jour
-        df['weekday'] = df.index.weekday
-        df['hour'] = df.index.hour
-        
-        # Mapping des jours fériés (Optimisé)
-        years = range(start_date.year, end_date.year + 1)
-        holiday_dates = set()
-        for y in years:
-            holiday_dates.update(self.fr_holidays.get(y).keys())
             
-        # Logique vectorielle
-        # 1. Base = Talon
-        df['power'] = dna['talon']
-
-        # 2. Identification Jours Ouvrés (Lundi-Vendredi et Pas Férié)
-        # On crée un masque booléen
-        is_weekend = df.index.weekday >= 5
-        is_holiday = df.index.normalize().isin(holiday_dates)
-        is_working_day = ~(is_weekend | is_holiday)
-
-        # 3. Profil Heures Ouvrées (7h-19h)
-        is_working_hour = (df['hour'] >= 7) & (df['hour'] <= 19)
-        
-        # Application de la charge
-        mask_active = is_working_day & is_working_hour
-        
-        # Ajout de variabilité (Bruit)
-        noise = np.random.normal(1.0, 0.05, size=len(df))
-        
-        # Formule : Talon + (Delta * 0.85)
-        # On ne monte pas à 100% de Pmax tout le temps (moyenne foisonnée)
-        load_add = (dna['pmax'] - dna['talon']) * 0.85
-        
-        df.loc[mask_active, 'power'] = (dna['talon'] + load_add) * noise[mask_active]
-
-        return df['power']
+            # On sécurise les valeurs pour éviter les calculs sur None
+            pmax = float(kpis.get('pmax_kw', 0))
+            talon = float(kpis.get('talon_kw', 0))
+            
+            # Si pas de données physiques, on met des valeurs par défaut minimales
+            if pmax == 0: pmax = 100.0
+            if talon == 0: talon = 20.0
+            
+            return {
+                "pmax": pmax,
+                "talon": talon
+            }
+        except: return None
 
     def aggregate_sites(self, site_ids, years=3):
         """
-        Point d'entrée principal.
+        Point d'entrée : Génère l'agrégat des courbes.
         """
-        # Calcul de la plage de dates (3 ans complets à partir du prochain 1er Janvier)
+        # 1. Définition du Calendrier Maître (Le Squelette)
+        # Du 1er Janvier N+1 au 31 Décembre N+Years
         next_year = datetime.now().year + 1
-        start_date = datetime(next_year, 1, 1, 0, 0) 
+        start_date = datetime(next_year, 1, 1, 0, 0)
         end_date = datetime(next_year + years - 1, 12, 31, 23, 0)
         
-        global_curve = None
+        # On crée une Série vide alignée sur le calendrier final (Pas 60 min)
+        # C'est la clé pour éviter les bugs de concaténation et les trous
+        master_index = pd.date_range(start=start_date, end=end_date, freq='1H')
+        global_load = pd.Series(0.0, index=master_index)
         
+        sites_processed = 0
+
+        # 2. Boucle d'addition
         for site_id in site_ids:
             dna = self.get_site_dna(site_id)
             if not dna: continue
             
-            site_curve = self.generate_curve_for_site(dna, start_date, end_date)
+            # Génération de la courbe du site
+            site_curve = self._generate_curve(master_index, dna)
             
-            if global_curve is None:
-                global_curve = site_curve
-            else:
-                global_curve = global_curve.add(site_curve, fill_value=0)
-                
-        if global_curve is None: return None
+            # Addition vectorielle (rapide et sûre)
+            global_load = global_load.add(site_curve, fill_value=0)
+            sites_processed += 1
 
-        return self.format_to_sge_csv(global_curve)
+        if sites_processed == 0: return None
 
-    def format_to_sge_csv(self, series):
-        """
-        Formate en CSV SGE (Pas Horaire PT60M).
-        """
+        # 3. Export au format SGE
+        return self._format_sge(global_load)
+
+    def _generate_curve(self, index, dna):
+        """Calcule la puissance pour un site donné sur l'index fourni."""
+        df = pd.DataFrame(index=index)
+        df['weekday'] = df.index.weekday
+        df['hour'] = df.index.hour
+        
+        # Détection Fériés (Vectorisée via map pour rapidité)
+        # On convertit l'index en date simple pour comparer avec holidays
+        # C'est ici que la librairie holidays est critique
+        is_holiday = df.index.normalize().map(lambda x: x in self.fr_holidays)
+        is_weekend = df['weekday'] >= 5
+        
+        # Jours Ouvrés = Ni Weekend, Ni Férié
+        is_working_day = ~(is_weekend | is_holiday)
+        
+        # Heures Ouvrées (7h-19h)
+        is_active_hour = (df['hour'] >= 7) & (df['hour'] <= 19)
+        
+        # Masque d'activité (Quand l'usine tourne)
+        mask_active = is_working_day & is_active_hour
+        
+        # Initialisation au Talon (Nuit/WE)
+        df['power'] = dna['talon']
+        
+        # Ajout de la charge sur les heures actives
+        # Formule : Talon + 85% du delta Pmax (Foisonnement)
+        delta_load = (dna['pmax'] - dna['talon']) * 0.85
+        
+        # Bruit aléatoire (5%) pour simuler la vie réelle
+        noise = np.random.normal(1.0, 0.05, size=len(df))
+        
+        # Application de la charge
+        df.loc[mask_active, 'power'] = (dna['talon'] + delta_load)
+        
+        # Application du bruit partout
+        df['power'] = df['power'] * noise
+        
+        # Sécurité : Pas de puissance négative
+        df['power'] = df['power'].clip(lower=0)
+        
+        return df['power']
+
+    def _format_sge(self, series):
+        """Formatage strict SGE pour ré-import."""
         output = io.StringIO()
         
-        # Header SGE Standard
+        # Header Enedis Standard
         output.write("Identifiant PRM;Date de debut;Date de fin;Grandeur physique;Grandeur metier;Etape metier;Unite;Horodate;Valeur;Nature;Pas;Indice de qualite;Etat compl.\n")
         
-        # Conversion en Watts (Standard SGE)
-        df = series.to_frame(name='val')
-        df['val_w'] = (df['val'] * 1000).astype(int)
+        # Nettoyage des NaNs (CRITIQUE pour éviter le crash .astype(int))
+        series = series.fillna(0)
         
-        # Écriture optimisée
-        # On utilise PT60M pour le pas horaire
-        for ts, row in df.iterrows():
+        # Conversion kW -> Watts (Standard SGE)
+        vals_w = (series * 1000).astype(int)
+        
+        # Écriture ligne à ligne
+        for ts, val in vals_w.items():
             ts_str = ts.isoformat()
-            val = row['val_w']
+            # PT60M = Pas Horaire
             line = f"AGGREGAT_VIRTUEL;;;PA;CONS;BEST;W;{ts_str};{val};R;PT60M;;\n"
             output.write(line)
             
