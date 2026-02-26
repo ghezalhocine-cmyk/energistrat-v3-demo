@@ -5,8 +5,6 @@
     <title>ENERGISTRAT V3 | SDE Territoire</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- CORE ENGINE UX -->
-    <script src="/static/js/main.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <script>
@@ -171,8 +169,42 @@
         </div>
     </main>
 
+    <!-- SYSTÈME DE NOTIFICATION (TOAST) AUTONOME -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
     <script>
-        // NAVIGATION
+        // --- UTILITAIRE APP (PATCH) ---
+        const App = {
+            toast: function(msg, type='info') {
+                const container = document.getElementById('toast-container');
+                if(!container) return;
+                
+                const colors = { 
+                    success: 'bg-green-600 border-green-500', 
+                    error: 'bg-red-600 border-red-500', 
+                    info: 'bg-blue-600 border-blue-500' 
+                };
+                
+                const el = document.createElement('div');
+                el.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-2xl text-xs font-bold border border-white/10 flex items-center gap-2 transform transition-all duration-300 translate-y-10 opacity-0 pointer-events-auto`;
+                el.innerHTML = `<span>${type === 'success' ? '✅' : (type === 'error' ? '⚠️' : 'ℹ️')}</span> ${msg}`;
+                
+                container.appendChild(el);
+                
+                // Animation d'entrée
+                requestAnimationFrame(() => {
+                    el.classList.remove('translate-y-10', 'opacity-0');
+                });
+
+                // Suppression auto
+                setTimeout(() => {
+                    el.classList.add('opacity-0', 'translate-x-full');
+                    setTimeout(() => el.remove(), 300);
+                }, 3000);
+            }
+        };
+
+        // --- NAVIGATION ---
         function navTo(pageId) {
             // UI Update
             document.querySelectorAll('.nav-item').forEach(el => {
@@ -198,7 +230,7 @@
             if (pageId === 'supervision') setTimeout(renderChart, 100);
         }
 
-        // CHART
+        // --- CHART ---
         let sdeChart = null;
 
         function renderChart() {
