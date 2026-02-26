@@ -22,17 +22,16 @@ try:
 except ImportError:
     PANDAS_READY = False
 
-# --- BLOC IMPORT CORTEX (INTEGRATION TITANIUM) ---
+# --- BLOC IMPORT CORTEX (ROBUSTE) ---
 try:
     # On tente d'importer depuis le package app.core (Structure Prod)
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
     from app.core.cortex_forecast import forecast
-    # NOUVEAUX MODULES TITANIUM
+    # AJOUT TITANIUM : Import du routeur d'ingestion et modules avancés
     from app.core.cortex_router import router
     from app.core.cortex_market import market
-    # AJOUT AGGREGATOR
     from app.core.cortex_aggregator import aggregator
 except ImportError:
     try:
@@ -60,7 +59,7 @@ except ImportError:
             def aggregate_sites(self, s, y): return None
         aggregator = MockAggregator()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1700-AGGREGATOR")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1805-SAFE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -90,12 +89,10 @@ class MarketUpdateModel(BaseModel):
     trve: Optional[Dict[str, Any]] = None
     targets: Optional[Dict[str, Any]] = None
 
-# Modèle pour la stratégie de trading
 class StrategyRequest(BaseModel):
     site_id: str
     bloc_kw: float
 
-# NOUVEAU : Modèle pour l'agrégation
 class AggregationRequest(BaseModel):
     site_ids: List[str]
     years: int = 3
@@ -153,22 +150,10 @@ async def api_save_client(request: Request):
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
             # Mise à jour intelligente section par section
-            if 'technical' in data:
-                if 'technical' not in existing_data: existing_data['technical'] = {}
-                existing_data['technical'].update(data['technical'])
-            if 'location' in data:
-                if 'location' not in existing_data: existing_data['location'] = {}
-                existing_data['location'].update(data['location'])
-            if 'identity' in data: existing_data['identity'].update(data['identity'])
-            if 'contract' in data: existing_data['contract'].update(data['contract'])
-            if 'pricing' in data: existing_data['pricing'] = data['pricing']
-            if 'kpis' in data:
-                if 'kpis' not in existing_data: existing_data['kpis'] = {}
-                existing_data['kpis'].update(data['kpis'])
-            # Sauvegarde des données financières (EBITDA)
-            if 'financials' in data:
-                existing_data['financials'] = data['financials']
-                
+            for section in ['technical', 'location', 'identity', 'contract', 'pricing', 'kpis', 'financials']:
+                if section in data:
+                    if section not in existing_data: existing_data[section] = {}
+                    existing_data[section].update(data[section])
             final_data = existing_data
         else:
             final_data = data
@@ -271,29 +256,26 @@ async def get_fleet_data(response: Response):
         if not pdl_display or len(str(pdl_display)) < 5:
             pdl_display = contract.get('pce', '-')
         
-        # LOGIQUE DE RECALCUL BUDGET TITANIUM
+        # LOGIQUE DE RECALCUL BUDGET TITANIUM (V1270)
         vol_engine = fin['volume_mwh']
         vol_router = 0
         if 'kpis' in s and 'volume_mwh' in s['kpis']:
             vol_router = float(s['kpis']['volume_mwh'])
         
-        # Priorité au volume réel du routeur
         final_vol = vol_engine
         if vol_engine == 0 and vol_router > 0:
             final_vol = vol_router
 
-        # Si volume Titanium détecté mais budget à 0 (ou juste abo), on recalcule
         final_budget = fin['budget_annual']
+        # Si volume Titanium détecté mais budget à 0 (ou juste abo), on recalcule
         if vol_engine == 0 and vol_router > 0:
             pricing = s.get('pricing', {})
             avg_price = 0.20 # Fallback prudent
-            # Recherche d'un prix unitaire renseigné
             for k in ['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
                 if k in pricing and pricing[k]:
                     try: avg_price = float(pricing[k]); break
                     except: pass
             
-            # Formule : (Vol MWh * 1000 * Prix) + Abo
             sub_cost = fin.get('budget_subscription', 0)
             energy_cost = (final_vol * 1000) * avg_price
             final_budget = sub_cost + energy_cost
@@ -312,7 +294,8 @@ async def get_fleet_data(response: Response):
             "alert": fin['kpis']['pmc_eur_mwh'] > 300,
             "ghost_savings": fin['kpis']['ghost_savings'],
             "power": contract.get('power', 0),
-            "pdl": pdl_display # Ajouté pour le tableau
+            "pdl": pdl_display,
+            "surface": s.get('location', {}).get('surface', 0) # Ajout pour OPH
         })
     response_data = {
         "fleet": fleet_list, "count": len(fleet_list),
@@ -648,59 +631,83 @@ async def api_aggregate_sites(payload: AggregationRequest):
     except Exception as e:
         return JSONResponse({"error": str(e)}, 500)
 
+# ==========================================
+# ROUTES PROFILS (VUES MÉTIER)
+# ==========================================
+
+# 1. INDUSTRIE (Factory.OS)
 @app.get("/industrie", response_class=HTMLResponse)
 @app.get("/industry", response_class=HTMLResponse)
 async def view_industrie(request: Request, id: Optional[str] = None):
-    """Profil Industrie (Usine 4.0) - Câblé sur les vraies données."""
     if id:
         file_path = find_site_file(id)
         if file_path:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 fin = cortex.enrich_site_financials(data)
-                
                 context_data = {
                     "client_name": data.get('identity', {}).get('site_name', 'Client'),
                     "site_type": "Industrie - Réel",
                     "puissance_souscrite": data.get('contract', {}).get('power', 0),
-                    "talon_moyen": 0,
-                    "cos_phi": 0.95,
-                    "depassements": 0,
+                    "talon_moyen": 0, "cos_phi": 0.95, "depassements": 0,
                     "kpis": fin.get('kpis', {})
                 }
-                # FIX TITANIUM : Charge le template "industry.html" (version anglaise standardisée)
+                # Charge le template "industry.html" (version anglaise standardisée)
                 return templates.TemplateResponse("industry.html", {"request": request, "data": context_data})
     
     # Mock Demo
-    data = {"client_name": "USINE SGE TEST (DEMO)", "site_type": "ISO 50001 - HTA", "puissance_souscrite": 3200, "talon_moyen": 450, "cos_phi": 0.94, "depassements": 1}
+    data = {"client_name": "USINE DÉMO", "site_type": "DÉMO", "puissance_souscrite": 0, "kpis": {}}
     return templates.TemplateResponse("industry.html", {"request": request, "data": data})
 
+# 2. SYNDIC (Habitat.OS)
 @app.get("/syndic", response_class=HTMLResponse)
 async def view_syndic(request: Request, id: Optional[str] = None):
-    """Profil Syndic (Habitat) - Câblé sur les vraies données."""
     if id:
         file_path = find_site_file(id)
         if file_path:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 fin = cortex.enrich_site_financials(data)
-                
                 context_data = {
                     "client_name": data.get('identity', {}).get('site_name', 'Résidence'),
-                    "lots": 0,
-                    "chaufferie": "Chauffage Collectif",
-                    "dju_n": 2100,
-                    "dju_n_1": 2400,
+                    "lots": 0, "chaufferie": "Collectif", "dju_n": 2100, "dju_n_1": 2400,
                     "conso_n": fin.get('volume_mwh', 0) * 1000,
                     "conso_n_1": (fin.get('volume_mwh', 0) * 1000) * 1.1
                 }
                 return templates.TemplateResponse("syndic.html", {"request": request, "data": context_data})
+    return templates.TemplateResponse("syndic.html", {"request": request, "data": {}})
 
-    # Mock Demo
-    data = {"client_name": "RÉSIDENCE DÉMO", "dju_n": 2100, "dju_n_1": 2400, "conso_n": 450000}
-    return templates.TemplateResponse("syndic.html", {"request": request, "data": data})
+# 3. MAIRIE / COLLECTIVITÉ
+@app.get("/mairie", response_class=HTMLResponse)
+async def view_mairie(request: Request, id: Optional[str] = None):
+    return templates.TemplateResponse("mairie.html", {"request": request})
 
-# --- ROUTES SATELLITES (NOUVEAU) ---
+# 4. RETAIL / FRANCHISE
+@app.get("/retail", response_class=HTMLResponse)
+async def view_retail(request: Request, id: Optional[str] = None):
+    return templates.TemplateResponse("retail.html", {"request": request})
+
+# 5. PME / ARTISAN (Nouveau)
+@app.get("/pme", response_class=HTMLResponse)
+async def view_pme(request: Request, id: Optional[str] = None):
+    return templates.TemplateResponse("pme.html", {"request": request})
+
+# 6. SDE / SYNDICAT (Nouveau)
+@app.get("/sde", response_class=HTMLResponse)
+async def view_sde(request: Request, id: Optional[str] = None):
+    return templates.TemplateResponse("sde.html", {"request": request})
+
+# 7. OPH / BAILLEUR SOCIAL (Nouveau)
+@app.get("/oph", response_class=HTMLResponse)
+async def view_oph(request: Request, id: Optional[str] = None):
+    return templates.TemplateResponse("oph.html", {"request": request})
+
+# 8. CITOYEN / PARTICULIER (Nouveau)
+@app.get("/citoyen", response_class=HTMLResponse)
+async def view_citoyen(request: Request, id: Optional[str] = None):
+    return templates.TemplateResponse("citoyen.html", {"request": request})
+
+# --- SATELLITES (NOUVEAU) ---
 @app.get("/optimization", response_class=HTMLResponse)
 async def view_optimization(request: Request):
     return templates.TemplateResponse("optimization.html", {"request": request})
@@ -729,10 +736,16 @@ async def view_processing(request: Request): return templates.TemplateResponse("
 async def view_dashboard(request: Request, profile: str):
     if profile == "retail": return templates.TemplateResponse("retail.html", {"request": request})
     if profile == "mairie": return templates.TemplateResponse("mairie.html", {"request": request})
+    if profile == "sde": return templates.TemplateResponse("sde.html", {"request": request})
+    if profile == "oph": return templates.TemplateResponse("oph.html", {"request": request})
+    if profile == "pme": return templates.TemplateResponse("pme.html", {"request": request})
+    if profile == "citoyen": return templates.TemplateResponse("citoyen.html", {"request": request})
     if profile == "forecast": return templates.TemplateResponse("forecast.html", {"request": request}) 
+    
     t = f"{profile}.html"
     if os.path.exists(os.path.join(TEMPLATE_DIR, t)): return templates.TemplateResponse(t, {"request": request, "profile": profile})
     return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
+
 @app.get("/settings")
 async def view_settings(request: Request): return templates.TemplateResponse("settings.html", {"request": request})
 @app.get("/partner/settings")
