@@ -8,78 +8,82 @@ from datetime import datetime, timedelta
 
 class CortexAggregator:
     """
-    CORTEX AGGREGATOR
+    CORTEX AGGREGATOR V2 - LONG TERM PROJECTION
     Génère des courbes de charge prévisionnelles multi-sites (N+1, N+2, N+3)
-    en respectant le calendrier français (Fériés, Week-ends).
-    Agrège le tout en un "PDL Virtuel" au format SGE.
+    PAS DE TEMPS : 60 Minutes (Optimisé pour projection financière).
     """
 
     def __init__(self):
+        # Initialisation des jours fériés France
         self.fr_holidays = holidays.France()
         self.base_dir = os.getcwd()
         self.data_dir = os.path.join(self.base_dir, "data")
 
     def get_site_dna(self, site_id):
         """Récupère l'ADN énergétique du site (Talon, Pmax, Profil)."""
-        # Nettoyage ID
         clean_id = site_id.replace('/', '_').replace(' ', '_').strip()
         path = os.path.join(self.data_dir, f"{clean_id}.json")
         
         if not os.path.exists(path):
             return None
 
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        kpis = data.get('kpis', {})
-        return {
-            "name": data.get('identity', {}).get('site_name', 'Site Inconnu'),
-            "pdl": data.get('contract', {}).get('pdl', '000000'),
-            "pmax": float(kpis.get('pmax_kw', 100)),
-            "talon": float(kpis.get('talon_kw', 20)),
-            "typologie": data.get('location', {}).get('typologie', 'Indus')
-        }
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            kpis = data.get('kpis', {})
+            return {
+                "name": data.get('identity', {}).get('site_name', 'Site Inconnu'),
+                "pdl": data.get('contract', {}).get('pdl', '000000'),
+                "pmax": float(kpis.get('pmax_kw', 100)),
+                "talon": float(kpis.get('talon_kw', 20)),
+                "typologie": data.get('location', {}).get('typologie', 'Indus')
+            }
+        except Exception:
+            return None
 
     def generate_curve_for_site(self, dna, start_date, end_date):
         """
-        Génère une courbe 10min réaliste sur la période donnée
-        en fonction du calendrier (Ouvré vs Férié/WE).
+        Génère une courbe 60min (1H) réaliste sur 3 ans.
         """
-        # Création de l'index temporel (10 min)
-        dates = pd.date_range(start=start_date, end=end_date, freq='10T')
+        # --- CHANGEMENT MAJEUR : FREQ='1H' ---
+        dates = pd.date_range(start=start_date, end=end_date, freq='1H')
         df = pd.DataFrame(index=dates)
         
         # Détection du type de jour
-        # 0=Lundi ... 6=Dimanche
         df['weekday'] = df.index.weekday
         df['hour'] = df.index.hour
         
-        # Fonction rapide pour détecter les fériés
-        def is_off_day(ts):
-            if ts.weekday() >= 5: return True # Samedi Dimanche
-            if ts.date() in self.fr_holidays: return True # Férié
-            return False
-
-        # On applique la logique vectorielle (plus rapide)
-        # 1. Par défaut : Tout est au Talon
+        # Mapping des jours fériés (Optimisé)
+        years = range(start_date.year, end_date.year + 1)
+        holiday_dates = set()
+        for y in years:
+            holiday_dates.update(self.fr_holidays.get(y).keys())
+            
+        # Logique vectorielle
+        # 1. Base = Talon
         df['power'] = dna['talon']
 
-        # 2. Jours Ouvrés (Lundi-Vendredi, hors fériés)
-        # On ne peut pas vectoriser facilement holidays(), on fait une map
-        date_series = df.index.normalize() # Juste la date
-        unique_dates = date_series.unique()
-        off_days = {d: (d in self.fr_holidays or d.weekday() >= 5) for d in unique_dates}
-        
-        df['is_off'] = df.index.normalize().map(off_days)
+        # 2. Identification Jours Ouvrés (Lundi-Vendredi et Pas Férié)
+        # On crée un masque booléen
+        is_weekend = df.index.weekday >= 5
+        is_holiday = df.index.normalize().isin(holiday_dates)
+        is_working_day = ~(is_weekend | is_holiday)
 
-        # 3. Application du Profil d'Activité (Heures ouvrées 7h-19h)
-        # Si Jour Ouvré ET Heure entre 7h et 19h -> On monte vers Pmax
-        mask_active = (~df['is_off']) & (df['hour'] >= 7) & (df['hour'] <= 19)
+        # 3. Profil Heures Ouvrées (7h-19h)
+        is_working_hour = (df['hour'] >= 7) & (df['hour'] <= 19)
         
-        # On ajoute un peu de "bruit" aléatoire pour faire réaliste
-        noise = np.random.normal(1.0, 0.05, size=len(df)) # +/- 5%
+        # Application de la charge
+        mask_active = is_working_day & is_working_hour
         
-        df.loc[mask_active, 'power'] = (dna['talon'] + (dna['pmax'] - dna['talon']) * 0.85) * noise[mask_active]
+        # Ajout de variabilité (Bruit)
+        noise = np.random.normal(1.0, 0.05, size=len(df))
+        
+        # Formule : Talon + (Delta * 0.85)
+        # On ne monte pas à 100% de Pmax tout le temps (moyenne foisonnée)
+        load_add = (dna['pmax'] - dna['talon']) * 0.85
+        
+        df.loc[mask_active, 'power'] = (dna['talon'] + load_add) * noise[mask_active]
 
         return df['power']
 
@@ -87,8 +91,10 @@ class CortexAggregator:
         """
         Point d'entrée principal.
         """
-        start_date = datetime(datetime.now().year + 1, 1, 1) # 1er Janv N+1
-        end_date = datetime(datetime.now().year + years, 12, 31, 23, 50)
+        # Calcul de la plage de dates (3 ans complets à partir du prochain 1er Janvier)
+        next_year = datetime.now().year + 1
+        start_date = datetime(next_year, 1, 1, 0, 0) 
+        end_date = datetime(next_year + years - 1, 12, 31, 23, 0)
         
         global_curve = None
         
@@ -109,29 +115,23 @@ class CortexAggregator:
 
     def format_to_sge_csv(self, series):
         """
-        Formate la série Pandas en fichier CSV strictement identique à Enedis.
+        Formate en CSV SGE (Pas Horaire PT60M).
         """
         output = io.StringIO()
         
         # Header SGE Standard
         output.write("Identifiant PRM;Date de debut;Date de fin;Grandeur physique;Grandeur metier;Etape metier;Unite;Horodate;Valeur;Nature;Pas;Indice de qualite;Etat compl.\n")
         
-        # Préparation des données
-        # Format SGE : 2026-01-01T00:10:00+01:00
-        # Valeur en Watts (donc kW * 1000)
-        
+        # Conversion en Watts (Standard SGE)
         df = series.to_frame(name='val')
         df['val_w'] = (df['val'] * 1000).astype(int)
         
-        # Pour aller vite, on écrit ligne à ligne ou on utilise to_csv avec un formatteur
-        # SGE est un peu pénible avec les dates, on fait simple pour l'instant
-        
+        # Écriture optimisée
+        # On utilise PT60M pour le pas horaire
         for ts, row in df.iterrows():
-            # Format ISO 8601 strict pour SGE
             ts_str = ts.isoformat()
             val = row['val_w']
-            # Ligne SGE fictive (PDL Virtuel Aggregé)
-            line = f"AGGREGAT_VIRTUEL;;;PA;CONS;BEST;W;{ts_str};{val};R;PT10M;;\n"
+            line = f"AGGREGAT_VIRTUEL;;;PA;CONS;BEST;W;{ts_str};{val};R;PT60M;;\n"
             output.write(line)
             
         return output.getvalue()
