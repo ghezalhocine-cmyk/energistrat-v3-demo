@@ -5,8 +5,6 @@
     <title>ENERGISTRAT V3 | Espace Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- CORE ENGINE UX -->
-    <script src="/static/js/main.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -34,6 +32,11 @@
         .bento-card:hover { border-color: rgba(234, 179, 8, 0.5); transform: translateY(-2px); }
         .nav-item.active { background: rgba(234, 179, 8, 0.1); border-left: 3px solid #EAB308; color: white; }
         .page-content { display: none; } .page-content.active { display: grid; }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
@@ -72,7 +75,7 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         
-        <!-- CORTEX SENTINEL (HEADER CORRIGÉ) -->
+        <!-- CORTEX SENTINEL -->
         <div class="h-14 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
             
             <!-- LEFT: CONSEIL IA -->
@@ -89,7 +92,7 @@
                     <span class="text-[10px] text-gray-400 font-mono">LINKY ACTIF</span>
                 </div>
 
-                <!-- Settings Button (NOUVEAU) -->
+                <!-- Settings Button -->
                 <a href="/settings" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 flex items-center justify-center text-gray-400 hover:text-white transition group" title="Paramètres">
                     <i class="fa-solid fa-gear group-hover:rotate-90 transition duration-500"></i>
                 </a>
@@ -219,8 +222,42 @@
 
     </main>
 
+    <!-- SYSTÈME DE NOTIFICATION (TOAST) AUTONOME -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
     <!-- LOGIC -->
     <script>
+        // --- UTILITAIRE APP (PATCH) ---
+        const App = {
+            toast: function(msg, type='info') {
+                const container = document.getElementById('toast-container');
+                if(!container) return;
+                
+                const colors = { 
+                    success: 'bg-green-600 border-green-500', 
+                    error: 'bg-red-600 border-red-500', 
+                    info: 'bg-blue-600 border-blue-500' 
+                };
+                
+                const el = document.createElement('div');
+                el.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-2xl text-xs font-bold border border-white/10 flex items-center gap-2 transform transition-all duration-300 translate-y-10 opacity-0 pointer-events-auto`;
+                el.innerHTML = `<span>${type === 'success' ? '✅' : (type === 'error' ? '⚠️' : 'ℹ️')}</span> ${msg}`;
+                
+                container.appendChild(el);
+                
+                // Animation d'entrée
+                requestAnimationFrame(() => {
+                    el.classList.remove('translate-y-10', 'opacity-0');
+                });
+
+                // Suppression auto
+                setTimeout(() => {
+                    el.classList.add('opacity-0', 'translate-x-full');
+                    setTimeout(() => el.remove(), 300);
+                }, 3000);
+            }
+        };
+
         // NAVIGATION
         function navTo(pageId) {
             document.querySelectorAll('.nav-item').forEach(el => {
