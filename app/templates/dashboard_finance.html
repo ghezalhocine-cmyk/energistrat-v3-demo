@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>FINANCIAL TWIN | ENERGISTRAT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        abysse: '#050505',
+                        card: '#0F172A',
+                        cyan: '#00E5FF',
+                        gold: '#F59E0B',
+                        danger: '#EF4444',
+                        success: '#10B981'
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #050505; color: white; }
+        .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1.5rem; }
+        .tab-active { border-bottom: 2px solid #F59E0B; color: #F59E0B; }
+        .tab-inactive { color: #64748B; }
+    </style>
+</head>
+<body class="flex h-screen w-screen overflow-hidden">
+
+    <!-- SIDEBAR (Simplifiée pour l'exemple) -->
+    <aside class="w-16 bg-abysse border-r border-white/10 flex flex-col items-center py-6 gap-6 z-50">
+        <div class="text-cyan text-xl"><i class="fa-solid fa-bolt"></i></div>
+        <a href="/" class="text-gray-500 hover:text-white"><i class="fa-solid fa-house"></i></a>
+        <a href="/industry" class="text-gray-500 hover:text-white"><i class="fa-solid fa-industry"></i></a>
+        <a href="#" class="text-gold bg-gold/10 p-2 rounded-lg"><i class="fa-solid fa-scale-unbalanced"></i></a>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col relative bg-abysse">
+        
+        <!-- HEADER -->
+        <div class="h-16 border-b border-white/10 flex items-center justify-between px-8 bg-abysse/50 backdrop-blur">
+            <div>
+                <h1 class="text-xl font-bold text-white tracking-wide">FINANCIAL <span class="text-gold">TWIN</span></h1>
+                <div class="text-[10px] text-gray-500 font-mono">MODULE DE RAPPROCHEMENT & PROJECTION</div>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="switchTab('twin')" id="btn-twin" class="px-4 py-2 text-sm font-bold tab-active transition">PROJECTION (TWIN)</button>
+                <button onclick="switchTab('audit')" id="btn-audit" class="px-4 py-2 text-sm font-bold tab-inactive transition">AUDIT (TRIANGULATION)</button>
+            </div>
+        </div>
+
+        <!-- CONTENT AREA -->
+        <div class="flex-1 overflow-y-auto p-8 relative">
+            
+            <!-- ONGLET 1 : FINANCIAL TWIN (FUTUR) -->
+            <div id="tab-twin" class="space-y-6">
+                <!-- TOP KPI -->
+                <div class="grid grid-cols-3 gap-6">
+                    <div class="bento-card p-6 border-l-4 border-gold">
+                        <div class="text-xs text-gray-500 uppercase font-bold">Atterrissage Budget (Y-E)</div>
+                        <div class="text-3xl font-mono font-bold text-white mt-2" id="landing-euro">-- €</div>
+                        <div class="text-xs text-gold mt-1 flex items-center gap-2"><i class="fa-solid fa-arrow-trend-up"></i> Projection IA</div>
+                    </div>
+                    <div class="bento-card p-6 border-l-4 border-cyan">
+                        <div class="text-xs text-gray-500 uppercase font-bold">Volume Annuel Estimé</div>
+                        <div class="text-3xl font-mono font-bold text-white mt-2" id="landing-vol">-- MWh</div>
+                        <div class="text-xs text-cyan mt-1">Basé sur historique SGE</div>
+                    </div>
+                    <div class="bento-card p-6 border-l-4 border-success">
+                        <div class="text-xs text-gray-500 uppercase font-bold">Gisement d'Économies (TURPE)</div>
+                        <div class="text-3xl font-mono font-bold text-white mt-2" id="opti-euro">-- €</div>
+                        <div class="text-xs text-success mt-1" id="opti-msg">Analyse en cours...</div>
+                    </div>
+                </div>
+
+                <!-- CHART PROJECTION -->
+                <div class="bento-card p-6 h-96">
+                    <h3 class="text-sm font-bold text-gray-400 mb-4">Trajectoire Budgétaire (Réel vs Budget)</h3>
+                    <canvas id="chartProjection"></canvas>
+                </div>
+            </div>
+
+            <!-- ONGLET 2 : AUDIT (PASSÉ) -->
+            <div id="tab-audit" class="hidden space-y-6">
+                
+                <!-- UPLOAD ZONE -->
+                <div class="bento-card p-8 border-2 border-dashed border-white/10 flex flex-col items-center justify-center hover:bg-white/5 transition cursor-pointer" onclick="document.getElementById('file-input').click()">
+                    <i class="fa-solid fa-cloud-arrow-up text-4xl text-gray-600 mb-4"></i>
+                    <h3 class="text-lg font-bold text-white">Déposer Facture (PDF/XML/Excel)</h3>
+                    <p class="text-sm text-gray-500 mt-2">Supporte Factur-X, Chorus Pro, Excel Enedis</p>
+                    <input type="file" id="file-input" class="hidden" onchange="handleUpload(this.files)">
+                </div>
+
+                <!-- LISTE AUDITS -->
+                <div class="bento-card p-6">
+                    <h3 class="text-sm font-bold text-gray-400 mb-4">Derniers Audits Réalisés</h3>
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-xs text-gray-500 border-b border-white/10">
+                                <th class="p-3">Date</th>
+                                <th class="p-3">Fichier</th>
+                                <th class="p-3">Période</th>
+                                <th class="p-3">Montant Facturé</th>
+                                <th class="p-3">Montant Recalculé (SGE)</th>
+                                <th class="p-3">Écart</th>
+                                <th class="p-3">Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-list" class="text-sm text-gray-300">
+                            <!-- JS Injection -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- LOGIQUE TABS ---
+        function switchTab(tab) {
+            document.getElementById('tab-twin').classList.add('hidden');
+            document.getElementById('tab-audit').classList.add('hidden');
+            document.getElementById('btn-twin').classList.remove('tab-active', 'text-gold');
+            document.getElementById('btn-audit').classList.remove('tab-active', 'text-gold');
+            document.getElementById('btn-twin').classList.add('tab-inactive', 'text-gray-500');
+            document.getElementById('btn-audit').classList.add('tab-inactive', 'text-gray-500');
+
+            document.getElementById('tab-' + tab).classList.remove('hidden');
+            document.getElementById('btn-' + tab).classList.add('tab-active', 'text-gold');
+            document.getElementById('btn-' + tab).classList.remove('tab-inactive', 'text-gray-500');
+        }
+
+        // --- CHART JS ---
+        const ctx = document.getElementById('chartProjection').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
+                datasets: [
+                    { label: 'Budget Initial', data: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120], borderColor: '#64748B', borderDash: [5,5], fill: false },
+                    { label: 'Réalisé + Landing', data: [12, 22, 31, 42, 53, 65, 78, 88, 95, 105, 118, 130], borderColor: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } } }
+        });
+
+        // --- UPLOAD SIMULATION ---
+        function handleUpload(files) {
+            if(files.length === 0) return;
+            const file = files[0];
+            
+            // Simulation d'appel API
+            setTimeout(() => {
+                const mockRow = `
+                    <tr class="border-b border-white/5 hover:bg-white/5 transition">
+                        <td class="p-3 font-mono text-xs">${new Date().toLocaleDateString()}</td>
+                        <td class="p-3 font-bold text-white">${file.name}</td>
+                        <td class="p-3">Jan 2026</td>
+                        <td class="p-3">12 500.00 €</td>
+                        <td class="p-3 text-cyan">12 150.00 €</td>
+                        <td class="p-3 text-danger font-bold">+ 350.00 € (2.8%)</td>
+                        <td class="p-3"><span class="px-2 py-1 rounded bg-danger/20 text-danger text-[10px] font-bold border border-danger/30">ANOMALIE</span></td>
+                    </tr>
+                `;
+                document.getElementById('audit-list').innerHTML += mockRow;
+                alert("Analyse Terminée : Écart détecté !");
+            }, 1500);
+        }
+
+        // --- INIT DATA ---
+        async function loadData() {
+            // Ici on appellerait /api/finance/landing/{id}
+            document.getElementById('landing-euro').innerText = "145 200 €";
+            document.getElementById('landing-vol').innerText = "850 MWh";
+            document.getElementById('opti-euro').innerText = "1 250 €";
+            document.getElementById('opti-msg').innerText = "Baisser PS à 210 kVA";
+        }
+        loadData();
+
+    </script>
+</body>
+</html>
