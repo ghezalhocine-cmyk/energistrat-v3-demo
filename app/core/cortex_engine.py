@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
+import json
 import logging
 
-# Imports robustes pour éviter les crashs si un module manque
+# Imports robustes
 try:
     from app.core.cortex_ingest import ingest
     from app.core.cortex_physics import physics
@@ -17,12 +18,11 @@ class CortexEngine:
     def __init__(self):
         self.version = "1120.0 (Master Gold: Retail + Mairie + Forecast)"
         
-        # RÉFÉRENCES MARCHÉ (TRVE = Elec, PEG = Gaz)
+        # RÉFÉRENCES MARCHÉ
         self.MARKET_DEFAULTS = {
             "elec": {"price": 0.18, "tax": 0.025, "trve_ref": 0.225}, 
             "gas": {"price": 0.045, "tax": 0.00844, "peg_ref": 0.065}
         }
-        # PRIX CIBLES POUR CALCUL GASPILLAGE (GHOST SAVINGS)
         self.OPTIMAL_PRICE = {"elec": 0.12, "gas": 0.045} 
 
     def _safe_float(self, value, default=0.0):
@@ -41,7 +41,7 @@ class CortexEngine:
 
     def enrich_site_financials(self, site_data):
         """
-        Cœur du calcul financier. Appelé pour chaque site (Retail ou Mairie).
+        Cœur du calcul financier. Appelé pour chaque site.
         """
         ident = site_data.get('identity', {})
         contract = site_data.get('contract', {})
@@ -53,7 +53,7 @@ class CortexEngine:
         if not site_label or site_label == "Site Inconnu":
             site_label = f"{loc.get('city', 'Site')} ({str(contract.get('pdl', ''))[-4:]})"
         
-        # 2. NETTOYAGE SEGMENT (Pour éviter la duplication des tags NAF/INSEE)
+        # 2. NETTOYAGE SEGMENT
         raw_segment = str(contract.get('segment', '')).upper()
         if " | " in raw_segment:
             segment = raw_segment.split(" | ")[0].strip()
@@ -62,21 +62,25 @@ class CortexEngine:
 
         grd = str(contract.get('grd', '')).upper()
         
-        # 3. DÉTECTION ÉNERGIE (ROBUSTE)
+        # 3. DÉTECTION ÉNERGIE
         energy_type_str = contract.get('energy_type', 'elec').lower()
         is_gas = False
         if 'gaz' in energy_type_str or 'gas' in energy_type_str: is_gas = True
         elif segment in ['T1', 'T2', 'T3', 'T4', 'TP']: is_gas = True
         elif 'GRDF' in grd: is_gas = True
         
-        # 4. VOLUMÉTRIE
+        # 4. VOLUMÉTRIE (PRIORITÉ AU ROUTEUR TITANIUM SI DISPO)
         vol_kwh = self._safe_float(contract.get('annual_volume_estimated'))
         
+        # FIX TITANIUM : Si KPI Routeur existe, on l'utilise
+        if 'kpis' in site_data and 'volume_mwh' in site_data['kpis']:
+            vol_router = float(site_data['kpis']['volume_mwh'])
+            if vol_router > 0: vol_kwh = vol_router * 1000
+
         # 5. PRIX UNITAIRE & CONVERSIONS
         raw_price = self._safe_float(pricing.get('hph'))
         unit_price = raw_price
         
-        # Règle de Fer : Si prix > 2.0 (Gaz) ou > 5.0 (Elec), c'est du MWh -> on divise
         if is_gas and raw_price > 2.0: unit_price = raw_price / 1000.0
         elif not is_gas and raw_price > 5.0: unit_price = raw_price / 1000.0
             
@@ -89,29 +93,24 @@ class CortexEngine:
         fixe = self._safe_float(pricing.get('fix'))
         commodity = vol_kwh * unit_price
         
-        # 7. LOGIQUE DE SANCTUARISATION (FIX MAIRIE GAZ)
-        # Si les taxes sont à 0 ou incohérentes, on force les standards légaux
+        # 7. LOGIQUE DE SANCTUARISATION (TAXES)
         if is_gas:
             stored_tax = self._safe_float(pricing.get('tax'))
             stored_stock = self._safe_float(pricing.get('storage'))
+            STD_TAX_KWH = 0.00844 
+            STD_STOCK_KWH = 0.0007 
             
-            STD_TAX_KWH = 0.00844 # TICGN + CTA approx
-            STD_STOCK_KWH = 0.0007 # Stockage moyen
-            
-            # Si taxe stockée < 1€ total alors qu'il y a du volume, on force le standard
             if vol_kwh > 0 and stored_tax < 1.0: taxes_total = vol_kwh * STD_TAX_KWH
-            elif stored_tax > 1.0: taxes_total = stored_tax # On garde la valeur si elle semble être un montant
+            elif stored_tax > 1.0: taxes_total = stored_tax 
             else: taxes_total = vol_kwh * STD_TAX_KWH
 
             if vol_kwh > 0 and stored_stock < 0.1: storage_total = vol_kwh * STD_STOCK_KWH
             elif stored_stock > 0.1: storage_total = stored_stock
             else: storage_total = vol_kwh * STD_STOCK_KWH
         else:
-            # ELEC : Calcul classique
             raw_tax = self._safe_float(pricing.get('tax'))
             if raw_tax > 0.5: raw_tax_kwh = raw_tax / 1000.0
             else: raw_tax_kwh = raw_tax
-            
             if raw_tax_kwh < 0.001: raw_tax_kwh = self.MARKET_DEFAULTS['elec']['tax']
             taxes_total = vol_kwh * raw_tax_kwh
             
@@ -119,14 +118,13 @@ class CortexEngine:
             storage_total = vol_kwh * (raw_stock / 1000.0 if raw_stock > 0.5 else raw_stock)
         
         budget_ttc = commodity + fixe + taxes_total + storage_total
-        landing = budget_ttc * 1.02 # Marge de sécurité 2%
+        landing = budget_ttc * 1.02 
         pmc_mwh = self._safe_div(budget_ttc, (vol_kwh / 1000))
         
-        # Calcul du "Gaspillage" (Écart vs Prix Optimal)
         optimal = self.OPTIMAL_PRICE['gas'] if is_gas else self.OPTIMAL_PRICE['elec']
         ghost = max(0, (unit_price - optimal) * vol_kwh)
 
-        # 8. PRIX SECONDAIRES (Elec)
+        # 8. PRIX SECONDAIRES
         p_hch = self._safe_float(pricing.get('hch'))
         p_hpe = self._safe_float(pricing.get('hpe'))
         p_hce = self._safe_float(pricing.get('hce'))
@@ -135,8 +133,7 @@ class CortexEngine:
             if p_hpe > 5.0: p_hpe /= 1000.0
             if p_hce > 5.0: p_hce /= 1000.0
 
-        # 9. UX HACK : RECONSTRUCTION DU SEGMENT POUR AFFICHAGE
-        # On injecte NAF, INSEE, COPRO dans le segment pour l'affichage tableau
+        # 9. UX HACK : SEGMENT
         naf_code = ident.get('naf', '')
         insee_code = ident.get('insee', '')
         ref_copro = ident.get('ref_copro', '')
@@ -149,7 +146,6 @@ class CortexEngine:
         
         if extras: display_segment = f"{segment} | {' '.join(extras)}"
 
-        # Référence Marché pour Jauge
         ref_market_price = self.MARKET_DEFAULTS['gas']['peg_ref'] if is_gas else self.MARKET_DEFAULTS['elec']['trve_ref']
 
         return {
@@ -197,7 +193,10 @@ class CortexEngine:
         }
 
     def generate_dqe_structure(self, sites_data):
-        """ Génère les données pour l'export Excel DQE (Tender) """
+        """ 
+        Génère les données pour l'export Excel DQE (Tender).
+        CORRECTIF TITANIUM : Récupération des champs manuels (Ville, CP, Conso détaillée)
+        """
         rows = []
         for s in sites_data:
             if s.get('identity',{}).get('id') == "new_client": continue
@@ -208,34 +207,48 @@ class CortexEngine:
             con_det = con.get('consumption_details', {})
             energy = con.get('energy_type', 'elec')
             
+            # --- FIX TITANIUM : Récupération intelligente des volumes ---
             sum_conso = (
                 self._safe_float(con_det.get('hph')) + 
                 self._safe_float(con_det.get('hch')) + 
                 self._safe_float(con_det.get('hpe')) + 
                 self._safe_float(con_det.get('hce'))
             )
-            vol_annuel = sum_conso if sum_conso > 0 else self._safe_float(con.get('annual_volume_estimated'))
+            # Si pas de détail, on prend le volume annuel estimé
+            if sum_conso > 0:
+                vol_annuel = sum_conso
+            else:
+                vol_annuel = self._safe_float(con.get('annual_volume_estimated'))
+                
+            # Si toujours 0, on regarde si le Routeur a calculé un KPI
+            if vol_annuel == 0 and 'kpis' in s and 'volume_mwh' in s['kpis']:
+                vol_annuel = float(s['kpis']['volume_mwh']) * 1000
+
+            # --- FIX TITANIUM : Récupération intelligente du PDL ---
+            pdl = ident.get('id', '') # Par défaut l'ID
+            if con.get('pdl') and len(str(con.get('pdl'))) > 5: pdl = con.get('pdl')
+            if con.get('pce') and len(str(con.get('pce'))) > 5: pdl = con.get('pce')
 
             row = {
                 "Type": "GAZ" if "gaz" in energy else "ELEC",
-                "Entité": ident.get('entity_name', ''),
+                "Entité": ident.get('name', ''), # Raison Sociale
                 "Nom du site": ident.get('site_name', ''),
                 "Adresse": loc.get('address', ''),
-                "CP": loc.get('zip_code', ''),
-                "Ville": loc.get('city', ''),
-                "PDL": ident.get('id', ''),
+                "CP": loc.get('zip_code', ''), # FIX: Récupère bien le CP
+                "Ville": loc.get('city', ''),  # FIX: Récupère bien la Ville
+                "PDL": pdl,                    # FIX: Le bon PDL
                 "Segment": con.get('segment', ''),
                 "FTA": con.get('fta', ''),
                 "S Max (kVA)": con.get('power', 0),
-                "PS HPH": pow_det.get('hph', 0), "PS HCH": pow_det.get('hch', 0), 
-                "PS HPE": pow_det.get('hpe', 0), "PS HCE": pow_det.get('hce', 0),
+                "PS HPH": pow_det.get('ps_hph', 0), "PS HCH": pow_det.get('ps_hch', 0), 
+                "PS HPE": pow_det.get('ps_hpe', 0), "PS HCE": pow_det.get('ps_hce', 0),
                 "Conso HPH": con_det.get('hph', 0), "Conso HCH": con_det.get('hch', 0), 
                 "Conso HPE": con_det.get('hpe', 0), "Conso HCE": con_det.get('hce', 0),
                 "Vol. Annuel": vol_annuel,
                 "SIRET": ident.get('siret', ''),
                 "NAF": ident.get('naf', ''),
                 "INSEE": ident.get('insee', ''),
-                "REF_COPRO": ident.get('ref_copro', '')
+                "REF_COPRO": ident.get('lot_name', '') # Mappe Lot vers Ref Copro
             }
             rows.append(row)
         return pd.DataFrame(rows)
