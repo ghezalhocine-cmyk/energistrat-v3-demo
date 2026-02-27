@@ -60,7 +60,7 @@ except ImportError:
             def aggregate_sites(self, s, y): return None
         aggregator = MockAggregator()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1820-ROUTING-FIX")
+app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1950-GOLD-MASTER")
 
 app.add_middleware(
     CORSMiddleware,
@@ -453,50 +453,6 @@ async def api_solar_sim(request: Request):
         return JSONResponse(physics.simulate_solar_roi(lat, lon, surface, price))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-# NOUVEAU : Simulation Stratégie
-@app.post("/api/ops/market/simulate_strategy")
-async def api_simulate_strategy(payload: StrategyRequest):
-    """Simule une stratégie d'achat (Bloc + Spot) sur la courbe réelle du client."""
-    file_path = find_site_file(payload.site_id)
-    if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
-    
-    with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
-    
-    kpis = data.get('kpis', {})
-    pmax = float(kpis.get('pmax_kw', 100))
-    talon = float(kpis.get('talon_kw', 20))
-    
-    load_curve = []
-    for h in range(24):
-        val = talon
-        if 6 <= h <= 20: 
-            val = talon + (pmax - talon) * 0.8 
-        load_curve.append(val)
-        
-    result = market.valoriser_strategie(load_curve, payload.bloc_kw)
-    return JSONResponse(json_compliant(result))
-
-# NOUVEAU : Route pour l'agrégateur SGE
-@app.post("/api/ops/aggregate")
-async def api_aggregate_sites(payload: AggregationRequest):
-    """
-    Génère un fichier SGE virtuel agglomérant plusieurs sites.
-    """
-    try:
-        csv_content = aggregator.aggregate_sites(payload.site_ids, payload.years)
-        
-        if not csv_content:
-            return JSONResponse({"error": "Aucune donnée générée (sites introuvables ?)"}, 400)
-            
-        # Création de la réponse fichier
-        response = Response(content=csv_content, media_type="text/csv")
-        filename = f"SGE_AGGREGAT_{len(payload.site_ids)}SITES_{payload.years}ANS.csv"
-        response.headers["Content-Disposition"] = f"attachment; filename={filename}"
-        return response
-        
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, 500)
-
 @app.get("/api/tools/template/{template_type}")
 async def download_template(template_type: str):
     if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
@@ -504,37 +460,15 @@ async def download_template(template_type: str):
     try:
         with pd.ExcelWriter(stream, engine='openpyxl') as writer:
             if "import_elec" in template_type or "template_csv" == template_type:
-                df = pd.DataFrame(columns=[
-                    "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "REF_COPRO", 
-                    "NAF", "CEE_ELIGIBLE", "GO_PERCENT", "COMPTEUR_PRODUCTION", "PDL", "SEGMENT", "FTA", "GRD", 
-                    "TYPOLOGIE", "PUISSANCE_SOUSCRITE", "POINTE_MAX", 
-                    "PS_HPH", "PS_HCH", "PS_HPE", "PS_HCE", 
-                    "CONSO_HPH", "CONSO_HCH", "CONSO_HPE", "CONSO_HCE", 
-                    "VOLUME_ANNUEL", "COMMENTAIRE", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", 
-                    "ABONNEMENT", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES", 
-                    "SURFACE_M2", "CODE_INSEE", "CHAUFFAGE", "ISOLATION", "REGULATION"
-                ])
+                df = pd.DataFrame(columns=["ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "REF_COPRO", "NAF", "CEE_ELIGIBLE", "GO_PERCENT", "COMPTEUR_PRODUCTION", "PDL", "SEGMENT", "FTA", "GRD", "TYPOLOGIE", "PUISSANCE_SOUSCRITE", "POINTE_MAX", "PS_HPH", "PS_HCH", "PS_HPE", "PS_HCE", "CONSO_HPH", "CONSO_HCH", "CONSO_HPE", "CONSO_HCE", "VOLUME_ANNUEL", "COMMENTAIRE", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", "ABONNEMENT", "PRIX_HPH", "PRIX_HCH", "PRIX_HPE", "PRIX_HCE", "TAXES", "SURFACE_M2", "CODE_INSEE", "CHAUFFAGE", "ISOLATION", "REGULATION"])
                 df.to_excel(writer, index=False)
             elif "import_gaz" in template_type or "template_csv_gaz" == template_type:
-                df = pd.DataFrame(columns=[
-                    "ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "NAF", 
-                    "CEE_ELIGIBLE", "PCE", "CAR_MWH", "CJA_MWH_J", "SEGMENT_GAZ", "PROFIL", 
-                    "TARIF_ACHEM", "GRD", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", 
-                    "ABONNEMENT", "PRIX_MOLECULE", "TERME_STOCK", "TAXES", "INSEE", "SURFACE_M2",
-                    "CHAUFFAGE", "ISOLATION", "REGULATION"
-                ])
+                df = pd.DataFrame(columns=["ENTITE", "NOM_SITE", "ADRESSE_SITE", "CP", "VILLE", "SIRET_SITE", "NAF", "CEE_ELIGIBLE", "PCE", "CAR_MWH", "CJA_MWH_J", "SEGMENT_GAZ", "PROFIL", "TARIF_ACHEM", "GRD", "DATE_DEBUT", "DATE_FIN", "FOURNISSEUR", "ABONNEMENT", "PRIX_MOLECULE", "TERME_STOCK", "TAXES", "INSEE", "SURFACE_M2", "CHAUFFAGE", "ISOLATION", "REGULATION"])
                 df.to_excel(writer, index=False)
             elif "import_patrimoine" in template_type:
                 df = pd.DataFrame(columns=["PDL", "NOM_SITE", "SURFACE_M2", "CHAUFFAGE", "ISOLATION", "REGULATION"])
                 df.to_excel(writer, index=False, sheet_name="DATA")
-                df_notice = pd.DataFrame({
-                    "CHAMP": ["CHAUFFAGE", "ISOLATION", "REGULATION"],
-                    "VALEURS_AUTORISEES": [
-                        "Gaz Condensation, Fioul, Élec Direct, PAC, Réseau Chaleur",
-                        "Non Isolé, Double Vitrage, ITE Complète",
-                        "Aucune, Thermostat Simple, GTB/GTC, Horloge"
-                    ]
-                })
+                df_notice = pd.DataFrame({"CHAMP": ["CHAUFFAGE", "ISOLATION", "REGULATION"], "VALEURS_AUTORISEES": ["Gaz Condensation, Fioul, Élec Direct, PAC, Réseau Chaleur", "Non Isolé, Double Vitrage, ITE Complète", "Aucune, Thermostat Simple, GTB/GTC, Horloge"]})
                 df_notice.to_excel(writer, index=False, sheet_name="MODE_EMPLOI")
             elif "bpu" in template_type:
                 df = pd.DataFrame(columns=["PRIX_HPH", "ABONNEMENT"])
@@ -730,9 +664,7 @@ async def view_industrie(request: Request, id: Optional[str] = None):
                     "client_name": data.get('identity', {}).get('site_name', 'Client'),
                     "site_type": "Industrie - Réel",
                     "puissance_souscrite": data.get('contract', {}).get('power', 0),
-                    "talon_moyen": 0,
-                    "cos_phi": 0.95,
-                    "depassements": 0,
+                    "talon_moyen": 0, "cos_phi": 0.95, "depassements": 0,
                     "kpis": fin.get('kpis', {})
                 }
                 # FIX TITANIUM : Charge le template "industry.html" (version anglaise standardisée)
@@ -804,6 +736,10 @@ async def view_performance(request: Request):
 @app.get("/carbon", response_class=HTMLResponse)
 async def view_carbon(request: Request):
     return templates.TemplateResponse("carbon.html", {"request": request})
+
+@app.get("/trading", response_class=HTMLResponse)
+async def view_trading(request: Request):
+    return templates.TemplateResponse("trading.html", {"request": request})
 
 @app.get("/ops/aggregator", response_class=HTMLResponse)
 async def view_aggregator(request: Request):
