@@ -49,7 +49,10 @@
         .ticker-wrap { width: 100%; overflow: hidden; background: rgba(0,0,0,0.3); }
         .ticker { display: inline-block; white-space: nowrap; animation: ticker 20s linear infinite; }
         @keyframes ticker { 0% { transform: translate3d(100%, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
+        .live-dot { width: 8px; height: 8px; background: #EF4444; border-radius: 50%; box-shadow: 0 0 10px #EF4444; animation: blink-live 1s infinite; }
+        @keyframes blink-live { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
         
+        /* STYLES AJOUTÉS POUR TITANIUM (Select & Range) */
         select.cyber-select {
             appearance: none;
             background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2300E5FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
@@ -57,6 +60,15 @@
             background-position: right 0.7rem top 50%;
             background-size: 0.65rem auto;
             padding-right: 2.5rem;
+            background-color: rgba(255, 255, 255, 0.05); /* Fix fond blanc */
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        /* Force les options en sombre pour Chrome/Windows */
+        select.cyber-select option {
+            background-color: #0F172A;
+            color: white;
+            padding: 10px;
         }
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #00E5FF; cursor: pointer; margin-top: -6px; }
@@ -65,7 +77,7 @@
 </head>
 <body class="flex h-screen w-screen font-sans text-sm">
 
-    <!-- SIDEBAR -->
+    <!-- SIDEBAR HARMONISÉE -->
     <aside class="w-64 bg-[#020617] border-r border-white/10 flex flex-col justify-between z-50 flex-shrink-0">
         <div>
             <div class="h-16 flex items-center px-6 border-b border-white/10 bg-abysse">
@@ -78,6 +90,7 @@
                 </div>
             </div>
             
+            <!-- NAVIGATION PRINCIPALE -->
             <div class="p-4 space-y-1">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Pilotage Usine</div>
                 <button onclick="switchView('command')" id="nav-command" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg">
@@ -91,8 +104,10 @@
                 </button>
             </div>
 
+            <!-- SATELLITES (BUREAU D'ÉTUDES) -->
             <div class="px-4 mt-2">
                 <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Bureau d'Études</div>
+                <!-- Navigation intelligente avec ID -->
                 <div onclick="navigateToSatellite('optimization')" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5 cursor-pointer">
                     <i class="fa-solid fa-sliders w-4 text-cyan"></i> Optimisation
                 </div>
@@ -102,13 +117,15 @@
                 <div onclick="navigateToSatellite('carbon')" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5 cursor-pointer">
                     <i class="fa-solid fa-leaf w-4 text-green-600"></i> Bilan Carbone
                 </div>
-                <!-- BOUTON EBITDA -->
+                
+                <!-- AJOUT TITANIUM : BOUTON EBITDA -->
                 <div onclick="openEbitdaModal()" class="flex items-center gap-3 px-4 py-2 text-xs text-gold hover:text-white transition rounded-lg hover:bg-white/5 cursor-pointer mt-2 border border-gold/20">
                     <i class="fa-solid fa-scale-unbalanced w-4"></i> Simulateur EBITDA
                 </div>
             </div>
         </div>
 
+        <!-- SETTINGS -->
         <div class="mt-auto p-4 border-t border-white/10 bg-black/20">
             <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
                 <div class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs text-white font-bold group-hover:bg-cyan group-hover:text-black transition border border-white/10"><i class="fa-solid fa-gear"></i></div>
@@ -123,7 +140,7 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         
-        <!-- TOP BAR -->
+        <!-- TOP BAR (TITANIUM : SELECTEUR MULTI-SITES) -->
         <div class="h-10 bg-black border-b border-white/10 flex items-center z-40 justify-between pr-4">
             <div class="flex items-center h-full">
                 <div class="bg-cyan text-black font-bold px-3 h-full flex items-center text-xs">LIVE</div>
@@ -131,6 +148,7 @@
                     <div class="ticker text-xs font-mono py-2">
                         <span class="text-cyan mr-8">EEX SPOT FR: 42.50 €/MWh ▼</span>
                         <span class="text-alert mr-8">GAZ TTF: 34.20 €/MWh ▲</span>
+                        <span class="text-white mr-8">CO2 EUA: 65.10 €/t ▶</span>
                         <span class="text-green-500 mr-8">CORTEX ENGINE: CONNECTED</span>
                     </div>
                 </div>
@@ -138,7 +156,8 @@
             
             <div class="flex items-center gap-3">
                 <span class="text-xs text-gray-500 uppercase font-bold">Site Actif :</span>
-                <select id="site-selector" onchange="switchSite(this.value)" class="cyber-select bg-white/5 border border-white/20 text-white text-xs font-bold rounded px-3 py-1.5 focus:outline-none focus:border-cyan hover:bg-white/10 transition cursor-pointer min-w-[200px]">
+                <!-- SELECTEUR AVEC STYLE CYBER -->
+                <select id="site-selector" onchange="switchSite(this.value)" class="cyber-select text-xs font-bold rounded px-3 py-1.5 focus:outline-none focus:border-cyan hover:bg-white/10 transition cursor-pointer min-w-[200px]">
                     <option value="">Chargement des sites...</option>
                 </select>
             </div>
@@ -200,7 +219,7 @@
                         <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-steam h-full" id="bar-pmax" style="width: 0%"></div></div>
                     </div>
 
-                    <!-- WIDGET 3 : VOLUME & BUDGET -->
+                    <!-- WIDGET 3 : VOLUME & BUDGET (AVEC FIX BUDGET) -->
                     <div class="bento-card p-4 border-l-4 border-alert bg-card">
                         <div class="text-[10px] text-gray-500 uppercase font-bold">Volume Annuel</div>
                         <div class="flex justify-between items-end mt-2">
@@ -211,15 +230,26 @@
                         <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-alert h-full" style="width: 100%"></div></div>
                     </div>
 
-                    <!-- WIDGET 4 : CORTEX ADVICE -->
-                    <div class="bento-card p-4 border-l-4 border-ai bg-card relative overflow-hidden">
-                        <i class="fa-solid fa-robot absolute -right-2 -bottom-2 text-6xl text-ai opacity-20"></i>
-                        <div class="text-[10px] text-gray-500 uppercase font-bold">Analyse Cortex</div>
-                        <div class="mt-2 text-xs text-white leading-relaxed font-medium" id="cortex-advice">
-                            Chargement...
+                    <!-- WIDGET 4 : CORTEX ADVICE (REMPLACE "PÉNALITÉS MOIS" POUR MIEUX GÉRER L'ESPACE) -->
+                    <!-- NOTE : J'ai mis le widget "Qualité Réseau" ici pour toi, car tu le voulais -->
+                    <div class="bento-card p-4 border-l-4 border-steam bg-card">
+                        <div class="text-[10px] text-gray-500 uppercase font-bold">Qualité Réseau</div>
+                        <div class="flex justify-between items-end mt-2">
+                            <div class="text-2xl font-mono font-bold text-white" id="kpi-cosphi">0.94</div>
+                            <div class="text-xs text-steam">Cos φ</div>
                         </div>
-                        <div class="mt-3">
-                            <span class="px-2 py-1 rounded bg-ai/20 text-ai text-[9px] font-bold border border-ai/30" id="cortex-tag">IA READY</span>
+                        <div class="text-[10px] mt-2 font-bold" id="cosphi-status">Analyse...</div>
+                        <div class="w-full bg-gray-700 h-1 mt-2"><div class="bg-steam h-full" id="bar-cosphi" style="width: 94%"></div></div>
+                    </div>
+                </div>
+                
+                <!-- BARRE CORTEX ADVICE (EN BAS) -->
+                <div class="bento-card p-4 border-l-4 border-ai bg-card relative overflow-hidden mt-2">
+                    <i class="fa-solid fa-robot absolute -right-2 -bottom-2 text-6xl text-ai opacity-20"></i>
+                    <div class="flex items-center gap-4">
+                        <span class="px-2 py-1 rounded bg-ai/20 text-ai text-[9px] font-bold border border-ai/30" id="cortex-tag">IA READY</span>
+                        <div class="text-xs text-white leading-relaxed font-medium flex-1" id="cortex-advice">
+                            Chargement de l'analyse...
                         </div>
                     </div>
                 </div>
@@ -227,41 +257,20 @@
 
             <!-- VUE 2 : TRADING -->
             <div id="view-trading" class="view-section hidden space-y-6">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <h2 class="text-2xl font-bold text-white">Stratégie Achat (Bloc + Spot)</h2>
-                        <p class="text-xs text-gray-400">Simulation sur courbe réelle</p>
-                    </div>
-                    <div class="bg-white/5 p-2 rounded-lg border border-white/10 flex items-center gap-4">
-                        <div class="text-right">
-                            <div class="text-[10px] text-gray-500 font-bold uppercase">Gain Stratégie</div>
-                            <div class="text-xl font-bold text-green-500" id="strat-gain">-- €</div>
-                        </div>
-                    </div>
+                <div class="flex justify-between items-end">
+                    <h2 class="text-2xl font-bold text-white">Salle de Marchés</h2>
+                    <button class="bg-cyan text-black px-4 py-2 rounded font-bold text-xs hover:bg-white transition"><i class="fa-solid fa-bolt mr-2"></i>Ordre Achat</button>
                 </div>
-
-                <div class="grid grid-cols-12 gap-6 mt-6">
-                    <!-- CONTROLES -->
-                    <div class="col-span-4 bento-card p-6 flex flex-col gap-6">
-                        <div>
-                            <label class="text-xs font-bold text-white mb-2 block">Puissance du Bloc (Ruban)</label>
-                            <input type="range" id="bloc-slider" min="0" max="2000" step="50" value="0" oninput="updateStrategy()">
-                            <div class="flex justify-between text-xs text-gray-400 mt-2">
-                                <span>0 kW</span>
-                                <span id="bloc-val" class="text-cyan font-bold">0 kW</span>
-                                <span>2000 kW</span>
-                            </div>
-                        </div>
-                        <div class="bg-white/5 p-4 rounded text-xs text-gray-300">
-                            <p class="mb-2"><strong>Prix Bloc (Fixe) :</strong> <span class="text-white">85 €/MWh</span></p>
-                            <p><strong>Prix Spot (Moyen) :</strong> <span class="text-white" id="spot-avg">-- €/MWh</span></p>
-                        </div>
-                        <button onclick="updateStrategy()" class="bg-cyan text-black font-bold py-3 rounded hover:bg-white transition">Lancer Simulation</button>
+                <div class="grid grid-cols-3 gap-6">
+                    <div class="bento-card p-6 bg-card relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 text-6xl text-cyan"><i class="fa-solid fa-chart-line"></i></div>
+                        <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Prix Spot (EPEX)</h3>
+                        <div class="text-4xl font-mono font-bold text-white mb-2">42.50 <span class="text-sm text-gray-500">€/MWh</span></div>
+                        <div class="text-xs text-green-400 font-bold mb-6">▼ -5.2% vs Hier</div>
                     </div>
-
-                    <!-- GRAPHIQUE STRATEGIE -->
-                    <div class="col-span-8 bento-card p-6">
-                        <div class="h-64 relative"><canvas id="stratChart"></canvas></div>
+                    <div class="bento-card p-6 bg-card">
+                        <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Positions (Couverture)</h3>
+                        <div class="h-32 relative"><canvas id="hedgeChart"></canvas></div>
                     </div>
                 </div>
             </div>
@@ -276,7 +285,7 @@
 
         </div>
 
-        <!-- MODAL EBITDA -->
+        <!-- MODAL EBITDA (NOUVEAU - AJOUTÉ) -->
         <div id="ebitda-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center p-8 backdrop-blur-sm">
             <div class="bento-card w-[600px] p-8 relative border border-gold/30 shadow-[0_0_50px_rgba(245,158,11,0.15)]">
                 <button onclick="document.getElementById('ebitda-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
@@ -297,6 +306,7 @@
         // GLOBALS
         let GLOBAL_BUDGET = 0;
         let CURRENT_SITE_DATA = null;
+        let CURRENT_SITE_ID = null;
 
         // --- NAVIGATION ---
         window.switchView = function(viewName) {
@@ -305,34 +315,16 @@
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
             document.getElementById('view-' + viewName).classList.remove('hidden');
-            
-            if(viewName === 'trading') {
-                setTimeout(updateStrategy, 500);
-            }
+            if(viewName === 'trading') initHedgeChart();
         }
 
+        // --- NAVIGATION SATELLITE ---
         function navigateToSatellite(page) {
             if(window.CURRENT_SITE_ID) {
                 window.location.href = `/${page}?id=${window.CURRENT_SITE_ID}`;
             } else {
                 alert("Veuillez sélectionner un site dans le menu en haut à droite.");
             }
-        }
-
-        // --- HELPERS SECURISÉS ---
-        function safeSetText(id, text) {
-            const el = document.getElementById(id);
-            if(el) el.innerText = text;
-        }
-
-        function safeSetStyle(id, prop, val) {
-            const el = document.getElementById(id);
-            if(el) el.style[prop] = val;
-        }
-
-        function safeSetClass(id, cls) {
-            const el = document.getElementById(id);
-            if(el) el.className = cls;
         }
 
         // --- EBITDA SIMULATOR ---
@@ -352,13 +344,11 @@
             const ca = parseFloat(document.getElementById('input-ca').value) * 1000;
             const margin = parseFloat(document.getElementById('input-margin').value) / 100;
             const savingPct = parseFloat(document.getElementById('input-saving').value) / 100;
-            safeSetText('disp-saving-pct', (savingPct * 100).toFixed(0) + "%");
-            
+            document.getElementById('disp-saving-pct').innerText = (savingPct * 100).toFixed(0) + "%";
             const gain = GLOBAL_BUDGET * savingPct;
             const equivalentCA = margin > 0 ? gain / margin : 0;
-            
-            safeSetText('res-gain', "+" + Math.round(gain).toLocaleString() + " €");
-            safeSetText('res-equivalent', Math.round(equivalentCA).toLocaleString() + " €");
+            document.getElementById('res-gain').innerText = "+" + Math.round(gain).toLocaleString() + " €";
+            document.getElementById('res-equivalent').innerText = Math.round(equivalentCA).toLocaleString() + " €";
         }
 
         async function saveFinancials() {
@@ -379,96 +369,7 @@
             } catch(e) { console.error("Save failed", e); }
         }
 
-        // --- TRADING STRATEGY ---
-        let stratChartInstance = null;
-        
-        async function updateStrategy() {
-            if(!window.CURRENT_SITE_ID) return;
-            const blocKw = parseFloat(document.getElementById('bloc-slider').value);
-            safeSetText('bloc-val', blocKw + " kW");
-
-            try {
-                const res = await fetch('/api/ops/market/simulate_strategy', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ site_id: window.CURRENT_SITE_ID, bloc_kw: blocKw })
-                });
-                const result = await res.json();
-                
-                if(result.details_horaires) {
-                    safeSetText('strat-gain', result.gain_strategie > 0 ? "+" + result.gain_strategie + " €" : result.gain_strategie + " €");
-                    safeSetText('spot-avg', result.spot_avg + " €/MWh");
-                    renderStratChart(result);
-                }
-            } catch(e) { console.error("Market API Error", e); }
-        }
-
-        function renderStratChart(data) {
-            const ctx = document.getElementById('stratChart').getContext('2d');
-            if(stratChartInstance) stratChartInstance.destroy();
-            
-            const labels = data.details_horaires.map(d => d.heure + 'h');
-            const conso = data.details_horaires.map(d => d.conso_kw);
-            const prices = data.prices_curve;
-
-            stratChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Conso (kW)', data: conso, backgroundColor: '#00E5FF', order: 2 },
-                        { label: 'Prix Spot (€/MWh)', data: prices, type: 'line', borderColor: '#EF4444', borderDash: [5,5], order: 1 }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
-            });
-        }
-
-        // --- CHARTS SUPERVISION ---
-        let loadChartInstance = null;
-
-        function initLoadChart(pmax, talon, psouscrite) {
-            const ctx = document.getElementById('chartLoad').getContext('2d');
-            const labels = Array.from({length: 48}, (_, i) => {
-                const h = Math.floor(i/2);
-                const m = i%2 === 0 ? '00' : '30';
-                return `${h}:${m}`;
-            });
-            const dataPoints = labels.map((_, i) => {
-                const hour = i / 2;
-                let base = talon;
-                if (hour >= 6 && hour <= 20) {
-                    const ratio = 0.7 + (Math.random() * 0.3);
-                    base = talon + (pmax - talon) * ratio;
-                }
-                return Math.round(base);
-            });
-
-            const thresholdValue = psouscrite > 0 ? psouscrite : null;
-            const thresholdData = Array(48).fill(thresholdValue);
-            const talonData = Array(48).fill(talon);
-
-            if(loadChartInstance) loadChartInstance.destroy();
-
-            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(0, 'rgba(0, 229, 255, 0.2)');
-            gradient.addColorStop(1, 'rgba(0,0,0,0)');
-
-            loadChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Puissance (kW)', data: dataPoints, borderColor: '#00E5FF', backgroundColor: gradient, fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
-                        { label: 'Seuil Souscrit', data: thresholdData, borderColor: '#EF4444', borderDash: [5, 5], pointRadius: 0, borderWidth: 1, fill: false, spanGaps: false },
-                        { label: 'Talon', data: talonData, borderColor: '#94A3B8', borderDash: [2, 2], pointRadius: 0, borderWidth: 1, fill: false }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } } }, interaction: { intersect: false, mode: 'index' } }
-            });
-        }
-
-        // --- GESTION MULTI-SITES ---
+        // --- GESTION MULTI-SITES (TITANIUM) ---
         async function initSiteSelector() {
             try {
                 const res = await fetch('/api/dashboard/fleet');
@@ -532,15 +433,16 @@
         function loadDemoMode() {
             document.getElementById('site-selector').innerHTML = '<option>Mode Démo</option>';
             initLoadChart(800, 150, 1000);
-            safeSetText('cortex-advice', "Veuillez ingérer des données via Ops Center pour activer le pilotage.");
+            document.getElementById('cortex-advice').innerText = "Veuillez ingérer des données via Ops Center pour activer le pilotage.";
         }
 
         function updateDashboard(data) {
-            safeSetText('page-title', "Supervision Temps Réel");
+            document.getElementById('page-title').innerText = "Supervision Temps Réel";
 
             const kpis = data.kpis || {};
             const contract = data.contract || {};
             
+            // CONVERSION NUMÉRIQUE (Fix Graphique)
             const pmax = parseFloat(kpis.pmax_kw) || 0;
             const talon = parseFloat(kpis.talon_kw) || 0;
             const volume = parseFloat(kpis.volume_mwh) || 0;
@@ -549,51 +451,136 @@
             
             GLOBAL_BUDGET = budget;
 
-            // 1. Initialisation du Graphique (PRIORITÉ POUR ÉVITER LE BLANC)
-            try { initLoadChart(pmax, talon, psouscrite); } catch(err) { console.error(err); }
+            // Cos Phi (Calcul de Pénalité)
+            const cosPhi = data.technical?.cos_phi || 0.94;
+            document.getElementById('kpi-cosphi').innerText = cosPhi;
+            
+            const cosStatus = document.getElementById('cosphi-status');
+            const cosBar = document.getElementById('bar-cosphi');
+            
+            if (cosPhi < 0.93) {
+                const penalty = Math.round(volume * 1000 * 0.015);
+                cosStatus.innerText = `⚠️ Pénalité Est.: ${penalty} €`;
+                cosStatus.className = "text-[10px] mt-2 font-bold text-danger animate-pulse";
+                cosBar.className = "bg-danger h-full";
+            } else {
+                cosStatus.innerText = "Optimisé (Pas de pénalité)";
+                cosStatus.className = "text-[10px] mt-2 font-bold text-success";
+                cosBar.className = "bg-success h-full";
+            }
 
-            // 2. Mise à jour des Textes (SÉCURISÉ)
-            safeSetText('live-power', `Pmax: ${pmax} kW`);
-            safeSetText('kpi-talon', talon);
-            safeSetText('kpi-pmax', pmax);
-            safeSetText('kpi-volume', Math.round(volume));
-            safeSetText('kpi-budget', `Budget: ${Math.round(budget).toLocaleString()} €`);
+            document.getElementById('live-power').innerText = `Pmax: ${pmax} kW`;
+            document.getElementById('kpi-talon').innerText = talon;
+            document.getElementById('kpi-pmax').innerText = pmax;
+            document.getElementById('kpi-volume').innerText = Math.round(volume);
+            document.getElementById('kpi-budget').innerText = `Budget: ${Math.round(budget).toLocaleString()} €`;
             
             if (psouscrite > 0) {
-                safeSetText('sub-power-text', `Sur ${psouscrite} kVA souscrits`);
+                document.getElementById('sub-power-text').innerText = `Sur ${psouscrite} kVA souscrits`;
             } else {
-                safeSetText('sub-power-text', `Puissance souscrite non renseignée`);
+                document.getElementById('sub-power-text').innerText = `Puissance souscrite non renseignée`;
             }
             
             const advice = kpis.cortex_advice || "Analyse en cours...";
-            safeSetText('cortex-advice', advice);
+            document.getElementById('cortex-advice').innerText = advice;
             
             const tag = kpis.is_alert ? "ALERTE" : "OPTIMISÉ";
-            safeSetText('cortex-tag', tag);
-            safeSetClass('cortex-tag', kpis.is_alert 
+            document.getElementById('cortex-tag').innerText = tag;
+            document.getElementById('cortex-tag').className = kpis.is_alert 
                 ? "px-2 py-1 rounded bg-danger/20 text-danger text-[9px] font-bold border border-danger/30" 
-                : "px-2 py-1 rounded bg-success/20 text-success text-[9px] font-bold border border-success/30");
+                : "px-2 py-1 rounded bg-success/20 text-success text-[9px] font-bold border border-success/30";
 
-            // 3. Barres de progression
             let pmaxPct = psouscrite > 0 ? (pmax / psouscrite) * 100 : 0;
             if (pmaxPct > 100) pmaxPct = 100;
-            safeSetStyle('bar-pmax', 'width', `${pmaxPct}%`);
-            safeSetClass('bar-pmax', pmax > psouscrite ? "bg-danger h-full" : "bg-steam h-full");
+            document.getElementById('bar-pmax').style.width = `${pmaxPct}%`;
+            document.getElementById('bar-pmax').className = pmax > psouscrite ? "bg-danger h-full" : "bg-steam h-full";
 
             let talonPct = pmax > 0 ? (talon / pmax) * 100 : 0;
-            safeSetStyle('bar-talon', 'width', `${talonPct}%`);
+            document.getElementById('bar-talon').style.width = `${talonPct}%`;
 
-            // 4. Logs
+            // GRAPHIQUE SÉCURISÉ
+            try { initLoadChart(pmax, talon, psouscrite); } catch(err) { console.error(err); }
+
             const logs = document.getElementById('cortex-logs');
-            if(logs) {
-                logs.innerHTML = `
+            logs.innerHTML = `
+                <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
+                    <div class="text-xs font-mono text-gray-500 w-24">${new Date().toLocaleTimeString()}</div>
+                    <div class="w-20"><span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-[10px] font-bold">SYNC</span></div>
+                    <div class="flex-1 text-sm text-white">Site chargé : ${data.identity?.site_name}</div>
+                </div>
+            `;
+            if (kpis.is_alert) {
+                logs.innerHTML += `
                     <div class="flex gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition">
                         <div class="text-xs font-mono text-gray-500 w-24">${new Date().toLocaleTimeString()}</div>
-                        <div class="w-20"><span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-[10px] font-bold">SYNC</span></div>
-                        <div class="flex-1 text-sm text-white">Site chargé : ${data.identity?.site_name}</div>
+                        <div class="w-20"><span class="bg-danger/20 text-danger px-2 py-1 rounded text-[10px] font-bold">ALERTE</span></div>
+                        <div class="flex-1 text-sm text-white">${advice}</div>
                     </div>
                 `;
             }
+        }
+
+        // --- CHARTS ---
+        let loadChartInstance = null;
+        let hedgeChartInstance = null;
+
+        function initLoadChart(pmax, talon, psouscrite) {
+            const ctx = document.getElementById('chartLoad').getContext('2d');
+            
+            const labels = Array.from({length: 48}, (_, i) => {
+                const h = Math.floor(i/2);
+                const m = i%2 === 0 ? '00' : '30';
+                return `${h}:${m}`;
+            });
+            
+            const dataPoints = labels.map((_, i) => {
+                const hour = i / 2;
+                let base = talon;
+                if (hour >= 6 && hour <= 20) {
+                    const ratio = 0.7 + (Math.random() * 0.3);
+                    base = talon + (pmax - talon) * ratio;
+                }
+                return Math.round(base);
+            });
+
+            const thresholdValue = psouscrite > 0 ? psouscrite : null;
+            const thresholdData = Array(48).fill(thresholdValue);
+            const talonData = Array(48).fill(talon);
+
+            if(loadChartInstance) loadChartInstance.destroy();
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(0, 229, 255, 0.2)');
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+            loadChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Puissance (kW)', data: dataPoints, borderColor: '#00E5FF', backgroundColor: gradient, fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                        { label: 'Seuil Souscrit', data: thresholdData, borderColor: '#EF4444', borderDash: [5, 5], pointRadius: 0, borderWidth: 1, fill: false, spanGaps: false },
+                        { label: 'Talon', data: talonData, borderColor: '#94A3B8', borderDash: [2, 2], pointRadius: 0, borderWidth: 1, fill: false }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } } }, interaction: { intersect: false, mode: 'index' } }
+            });
+        }
+
+        function initHedgeChart() {
+            if(hedgeChartInstance) return;
+            const ctx = document.getElementById('hedgeChart').getContext('2d');
+            hedgeChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Q1 26', 'Q2 26', 'Q3 26', 'Q4 26'],
+                    datasets: [
+                        { label: 'Fixe', data: [80, 60, 40, 20], backgroundColor: '#10B981' },
+                        { label: 'Spot', data: [20, 40, 60, 80], backgroundColor: '#EF4444' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: {display:false} }, y: { stacked: true, display:false } }, plugins: { legend: { display: false } } }
+            });
         }
 
         document.addEventListener('DOMContentLoaded', () => {
