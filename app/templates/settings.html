@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V22.27 | Settings Enterprise (Full Master)</title>
+    <title>ENERGISTRAT V22.30 | Settings Enterprise (Full Master)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -161,120 +161,148 @@
             </div>
         </div>
 
-        <!-- TAB 1: CLIENTS & PARC (TITANIUM UPDATED) -->
+        <!-- TAB 1: CLIENTS & PARC -->
         <div id="tab-clients" class="tab-content hidden max-w-6xl mx-auto space-y-6">
             <header class="flex justify-between items-end">
                 <div><h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2><p class="text-gray-400 text-xs">Gestion Multi-Sites, Gaz/Élec et Lots.</p></div>
                 <div class="flex gap-2">
+                    <!-- BOUTON AUTO-DISCOVERY (NOUVEAU) -->
+                    <button onclick="toggleDiscoveryModal()" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow-lg shadow-purple-500/20"><i class="fa-solid fa-magic mr-2"></i>Auto-Découverte</button>
+                    
                     <button onclick="toggleImportModal()" class="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg text-xs font-bold border border-white/10 transition"><i class="fa-solid fa-file-csv mr-2"></i>Import Masse</button>
                     <button onclick="saveSite()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20"><i class="fa-solid fa-save mr-2"></i>Enregistrer le Site</button>
                 </div>
             </header>
-
-            <!-- 1. IDENTITÉ -->
-            <div class="bento-card rounded-bento p-6 border-l-4 border-cyan">
-                <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span class="w-6 h-6 rounded bg-cyan/20 text-cyan flex items-center justify-center text-[10px]">1</span> IDENTITÉ</h3>
-                <div class="flex gap-4 mb-4">
-                    <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="entity_type" value="company" checked class="accent-cyan" onchange="updateFormType()"><span class="text-xs text-white">Entreprise / Public</span></label>
-                    <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="entity_type" value="copro" class="accent-orange" onchange="updateFormType()"><span class="text-xs text-white">Copropriété (RNC)</span></label>
-                </div>
-                <div class="grid grid-cols-12 gap-4">
-                    <div class="col-span-2">
-                        <label id="lbl-id" class="text-[10px] text-gray-500 font-bold uppercase">SIRET *</label>
-                        <div class="relative"><input type="text" id="id-input" placeholder="123..." class="w-full input-dark p-2 rounded text-xs font-mono" onblur="checkIdentity()"><div id="id-status" class="absolute right-2 top-2 text-[10px]"></div></div>
+            
+            <div class="grid grid-cols-12 gap-6 h-[calc(100vh-200px)]">
+                <!-- LISTE -->
+                <div class="col-span-3 bento-card p-4 overflow-y-auto">
+                    <div class="flex justify-between items-center mb-4 px-2">
+                        <h3 class="font-bold text-white">Sites Existants</h3>
+                        <button onclick="resetForm()" class="text-xs bg-cyan-900/30 text-cyan-400 px-3 py-1 rounded border border-cyan-500/30 hover:bg-cyan-500 hover:text-black transition">
+                            <i class="fa-solid fa-plus mr-1"></i> Nouveau
+                        </button>
                     </div>
-                    <!-- AJOUT CHAMP NAF -->
-                    <div class="col-span-2">
-                        <label class="text-[10px] text-gray-500 font-bold uppercase">Code NAF</label>
-                        <input type="text" id="naf-input" class="w-full input-dark p-2 rounded text-xs font-mono text-gray-400">
+                    <input type="text" id="search-site" placeholder="Filtrer..." class="input-dark mb-4" oninput="loadSites()">
+                    <div id="site-list" class="flex-1 overflow-y-auto space-y-2 pr-2">
+                        <!-- JS Injection -->
+                        <div class="text-center text-gray-500 text-xs mt-10">Chargement...</div>
                     </div>
-                    <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Raison Sociale</label><input type="text" id="company-name" placeholder="Juridique..." class="w-full input-dark p-2 rounded text-xs bg-white/5"></div>
-                    <div class="col-span-4"><label class="text-[10px] text-cyan font-bold uppercase">NOM DU SITE (Dashboard)</label><input type="text" id="site-name-input" placeholder="Ex: École Jules Ferry..." class="w-full input-dark p-2 rounded text-xs border border-cyan/30 text-white font-bold"></div>
-                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Groupe / Réseau</label><select class="w-full input-dark p-2 rounded text-xs"><option value="none">Aucun</option><option value="sde">Syndicat Énergie</option><option value="retail">Réseau Retail</option></select></div>
-                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Nom du Lot / Grappe</label><input type="text" id="lot-input" placeholder="Ex: Lot 1..." class="w-full input-dark p-2 rounded text-xs text-cyan border-cyan/20"></div>
-                </div>
-            </div>
-
-            <!-- 2. TECHNIQUE (CORRECTIF ICI : AJOUT VILLE/CP) -->
-            <div class="bento-card rounded-bento p-6 border-l-4 border-purple-500">
-                <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span class="w-6 h-6 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px]">2</span> LOCALISATION & DONNÉES PHYSIQUES</h3>
-                <div class="grid grid-cols-12 gap-4">
-                    <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Usage</label><select id="inp-type" class="w-full input-dark p-2 rounded text-xs"><option value="batiment">Bâtiment</option><option value="ep">Éclairage Public</option><option value="process">Industrie</option></select></div>
-                    
-                    <div class="col-span-3 relative"><label class="text-[10px] text-gray-500 font-bold uppercase">Adresse (Voie)</label><input type="text" id="address-input" class="w-full input-dark p-2 rounded text-xs" oninput="searchAddress()"><div id="address-suggestions" class="suggestions-list hidden"></div></div>
-                    
-                    <!-- AJOUT CP / VILLE -->
-                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Code Postal</label><input type="text" id="zip-input" class="w-full input-dark p-2 rounded text-xs"></div>
-                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase text-cyan">Ville</label><input type="text" id="city-input" class="w-full input-dark p-2 rounded text-xs"></div>
-                    
-                    <div class="col-span-2">
-                        <label class="text-[10px] text-gray-500 font-bold uppercase">Surface (m²)</label>
-                        <input type="number" id="surface-input" placeholder="0" class="w-full input-dark p-2 rounded text-xs font-mono text-cyan" title="Nécessaire pour le calcul Green League">
-                    </div>
-
-                    <div class="col-span-12"><div class="flex items-center justify-between bg-white/5 p-2 rounded-lg mt-1 border border-white/10"><span class="text-[9px] text-gray-400 uppercase font-bold">Siège / Principal</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" class="sr-only peer"><div class="w-8 h-4 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-cyan"></div></label></div></div>
-                </div>
-            </div>
-
-            <!-- 3. ÉNERGIE & PRIX -->
-            <div class="bento-card rounded-bento p-6 border-l-4 border-yellow-500 transition-colors" id="card-energy">
-                <h3 class="text-sm font-bold text-white mb-4 flex items-center justify-between">
-                    <div class="flex items-center gap-2"><span class="w-6 h-6 rounded bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-[10px]">3</span> CONTRAT & PRIX</div>
-                    <div class="flex bg-black/40 rounded-lg p-1">
-                        <button onclick="setEnergy('elec')" id="btn-elec" class="px-3 py-1 text-[10px] font-bold rounded bg-cyan text-black transition">ÉLEC</button>
-                        <button onclick="setEnergy('gaz')" id="btn-gaz" class="px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition">GAZ</button>
-                    </div>
-                </h3>
-                
-                <!-- AJOUT FTA & DATES -->
-                <div class="grid grid-cols-12 gap-4 mb-4">
-                    <div class="col-span-3"><label id="lbl-ref" class="text-[10px] text-gray-500 font-bold uppercase">PDL / PRM (14)</label><input type="text" id="ref-input" placeholder="000..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
-                    <div class="col-span-2"><label id="lbl-puiss" class="text-[10px] text-gray-500 font-bold uppercase">Puissance (kVA)</label><input type="number" id="val-input" class="w-full input-dark p-2 rounded text-xs font-mono text-yellow-500 font-bold" oninput="inferContract()"></div>
-                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">FTA (Achem.)</label><select id="fta-input" class="w-full input-dark p-2 rounded text-xs"><option value="-">-</option><option value="MTA4">MTA4</option><option value="MTA5">MTA5</option><option value="BT > 36">BT > 36</option><option value="BT < 36">BT < 36</option></select></div>
-                    <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Fournisseur</label><select id="provider-input" class="w-full input-dark p-2 rounded text-xs"><option>EDF</option><option>Engie</option><option>TotalEnergies</option><option>Eni</option><option>Vattenfall</option></select></div>
-                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Segment</label><input type="text" id="segment-display" readonly class="w-full input-dark p-2 rounded text-xs font-bold text-gray-400 bg-white/5" value="--"></div>
                 </div>
 
-                <div class="grid grid-cols-12 gap-4 mb-4">
-                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Date Début</label><input type="date" id="date-start" class="w-full input-dark p-2 rounded text-xs text-gray-400"></div>
-                    <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Date Fin</label><input type="date" id="date-end" class="w-full input-dark p-2 rounded text-xs text-gray-400"></div>
-                    <div class="col-span-8"></div>
-                </div>
-
-                <div class="bg-white/5 p-4 rounded-xl border border-white/5">
-                    <div class="text-[10px] font-bold text-gray-400 uppercase mb-3 flex justify-between">
-                        <span id="price-title">Structure Tarifaire (€ HT)</span>
-                        <span class="text-cyan cursor-pointer hover:underline" onclick="openPropagationModal()"><i class="fa-solid fa-copy mr-1"></i>Dupliquer</span>
-                    </div>
-                    
-                    <div id="grid-elec" class="grid grid-cols-6 gap-2">
-                        <div><label class="text-[9px] text-gray-500 uppercase">Abonnement /an</label><input type="number" id="price-fix" placeholder="0.00" class="w-full input-dark p-2 rounded text-xs text-right text-yellow-500"></div>
-                        <div><label class="text-[9px] text-gray-500 uppercase font-bold text-white">HPH (Hiver P)</label><input type="number" id="price-hph" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right"></div>
-                        <div><label class="text-[9px] text-gray-500 uppercase font-bold text-white">HCH (Hiver C)</label><input type="number" id="price-hch" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right"></div>
-                        <div><label class="text-[9px] text-gray-500 uppercase font-bold text-cyan">HPE (Été P)</label><input type="number" id="price-hpe" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right border border-cyan/20"></div>
-                        <div><label class="text-[9px] text-gray-500 uppercase font-bold text-cyan">HCE (Été C)</label><input type="number" id="price-hce" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right"></div>
-                        <div><label id="lbl-tax" class="text-[9px] text-gray-500 uppercase">CSPE / TICGN</label><input type="number" id="price-tax" placeholder="22.5" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
+                <!-- FORMULAIRE COMPLET -->
+                <div class="col-span-9 bento-card p-6 overflow-y-auto">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="font-bold text-white flex items-center gap-3">
+                            <i class="fa-solid fa-building-user text-gray-500"></i>
+                            <span id="form-title">Nouveau Site</span>
+                        </h3>
+                        <div class="text-xs text-gray-500 font-mono" id="form-id">ID: NEW</div>
                     </div>
 
-                    <!-- AJOUT PUISSANCES DETAILLEES -->
-                    <div id="grid-ps" class="grid grid-cols-6 gap-2 mt-4 border-t border-white/5 pt-4">
-                         <div class="col-span-6 mb-2"><span class="text-[9px] font-bold text-gray-500 uppercase">Puissances Souscrites (kW)</span></div>
-                         <div class="col-start-2"><input type="number" id="ps-hph" placeholder="P1" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
-                         <div><input type="number" id="ps-hch" placeholder="P2" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
-                         <div><input type="number" id="ps-hpe" placeholder="P3" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
-                         <div><input type="number" id="ps-hce" placeholder="P4" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
+                    <!-- 1. IDENTITÉ (TITANIUM : NAF AJOUTÉ) -->
+                    <div class="bento-card rounded-bento p-6 border-l-4 border-cyan mb-6">
+                        <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span class="w-6 h-6 rounded bg-cyan/20 text-cyan flex items-center justify-center text-[10px]">1</span> IDENTITÉ</h3>
+                        <div class="grid grid-cols-12 gap-4">
+                            <div class="col-span-2">
+                                <label id="lbl-id" class="text-[10px] text-gray-500 font-bold uppercase">SIRET *</label>
+                                <div class="relative"><input type="text" id="id-input" placeholder="123..." class="w-full input-dark p-2 rounded text-xs font-mono" onblur="checkIdentity()"><div id="id-status" class="absolute right-2 top-2 text-[10px]"></div></div>
+                            </div>
+                            <!-- AJOUT CHAMP NAF -->
+                            <div class="col-span-2">
+                                <label class="text-[10px] text-gray-500 font-bold uppercase">Code NAF</label>
+                                <input type="text" id="naf-input" class="w-full input-dark p-2 rounded text-xs font-mono text-gray-400">
+                            </div>
+                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Raison Sociale</label><input type="text" id="company-name" placeholder="Juridique..." class="w-full input-dark p-2 rounded text-xs bg-white/5"></div>
+                            <div class="col-span-4"><label class="text-[10px] text-cyan font-bold uppercase">NOM DU SITE (Dashboard)</label><input type="text" id="site-name-input" placeholder="Ex: École Jules Ferry..." class="w-full input-dark p-2 rounded text-xs border border-cyan/30 text-white font-bold"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Groupe / Réseau</label><select class="w-full input-dark p-2 rounded text-xs"><option value="none">Aucun</option><option value="sde">Syndicat Énergie</option><option value="retail">Réseau Retail</option></select></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Nom du Lot / Grappe</label><input type="text" id="lot-input" placeholder="Ex: Lot 1..." class="w-full input-dark p-2 rounded text-xs text-cyan border-cyan/20"></div>
+                        </div>
                     </div>
 
-                    <div id="grid-gaz" class="grid grid-cols-3 gap-4 hidden">
-                        <div><label class="text-[9px] text-gray-500 uppercase">Abonnement /an</label><input type="number" id="price-gaz-fix" placeholder="0.00" class="w-full input-dark p-2 rounded text-xs text-right text-yellow-500"></div>
-                        <div><label class="text-[9px] text-gray-500 uppercase font-bold text-red-500">Prix Molécule (€/MWh)</label><input type="number" id="price-gaz-mol" placeholder="45.00" class="w-full input-dark p-2 rounded text-xs text-right border border-red-500/30 text-white"></div>
-                        <div><label class="text-[9px] text-gray-500 uppercase">TICGN / Taxes</label><input type="number" id="price-gaz-tax" placeholder="8.44" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
+                    <!-- 2. TECHNIQUE (TITANIUM : VILLE/CP AJOUTÉS) -->
+                    <div class="bento-card rounded-bento p-6 border-l-4 border-purple-500 mb-6">
+                        <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span class="w-6 h-6 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px]">2</span> LOCALISATION & DONNÉES PHYSIQUES</h3>
+                        <div class="grid grid-cols-12 gap-4">
+                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Usage</label><select id="inp-type" class="w-full input-dark p-2 rounded text-xs"><option value="Admin">Administratif / Mairie</option><option value="Ecole">École</option><option value="Sport">Sport</option><option value="Industrie">Industrie</option><option value="Habitat">Habitat</option></select></div>
+                            
+                            <div class="col-span-3 relative"><label class="text-[10px] text-gray-500 font-bold uppercase">Adresse (Voie)</label><input type="text" id="address-input" class="w-full input-dark p-2 rounded text-xs" oninput="searchAddress()"><div id="address-suggestions" class="suggestions-list hidden"></div></div>
+                            
+                            <!-- AJOUT CP / VILLE -->
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Code Postal</label><input type="text" id="zip-input" class="w-full input-dark p-2 rounded text-xs"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase text-cyan">Ville</label><input type="text" id="city-input" class="w-full input-dark p-2 rounded text-xs"></div>
+                            
+                            <div class="col-span-2">
+                                <label class="text-[10px] text-gray-500 font-bold uppercase">Surface (m²)</label>
+                                <input type="number" id="surface-input" placeholder="0" class="w-full input-dark p-2 rounded text-xs font-mono text-cyan" title="Nécessaire pour le calcul Green League">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. ÉNERGIE & PRIX (TITANIUM : FTA, DATES, PUISSANCES) -->
+                    <div class="bento-card rounded-bento p-6 border-l-4 border-yellow-500 transition-colors" id="card-energy">
+                        <h3 class="text-sm font-bold text-white mb-4 flex items-center justify-between">
+                            <div class="flex items-center gap-2"><span class="w-6 h-6 rounded bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-[10px]">3</span> CONTRAT & PRIX</div>
+                            <div class="flex bg-black/40 rounded-lg p-1">
+                                <button onclick="setEnergy('elec')" id="btn-elec" class="px-3 py-1 text-[10px] font-bold rounded bg-cyan text-black transition">ÉLEC</button>
+                                <button onclick="setEnergy('gaz')" id="btn-gaz" class="px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition">GAZ</button>
+                            </div>
+                        </h3>
+                        
+                        <div class="grid grid-cols-12 gap-4 mb-4">
+                            <div class="col-span-3"><label id="lbl-ref" class="text-[10px] text-gray-500 font-bold uppercase">PDL / PRM (14)</label><input type="text" id="ref-input" placeholder="000..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
+                            <div class="col-span-2"><label id="lbl-puiss" class="text-[10px] text-gray-500 font-bold uppercase">P. Souscrite</label><input type="number" id="val-input" class="w-full input-dark p-2 rounded text-xs font-mono text-yellow-500 font-bold" oninput="inferContract()"></div>
+                            
+                            <!-- AJOUT FTA -->
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">FTA (Achem.)</label><select id="fta-input" class="w-full input-dark p-2 rounded text-xs"><option value="-">-</option><option value="MTA4">MTA4</option><option value="MTA5">MTA5</option><option value="BT > 36">BT > 36</option></select></div>
+                            
+                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Fournisseur</label><select id="provider-input" class="w-full input-dark p-2 rounded text-xs"><option>EDF</option><option>Engie</option><option>TotalEnergies</option><option>Eni</option><option>Vattenfall</option></select></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Segment</label><input type="text" id="segment-display" readonly class="w-full input-dark p-2 rounded text-xs font-bold text-gray-400 bg-white/5" value="--"></div>
+                        </div>
+
+                        <!-- AJOUT DATES -->
+                        <div class="grid grid-cols-12 gap-4 mb-4">
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Date Début</label><input type="date" id="date-start" class="w-full input-dark p-2 rounded text-xs text-gray-400"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Date Fin</label><input type="date" id="date-end" class="w-full input-dark p-2 rounded text-xs text-gray-400"></div>
+                            <div class="col-span-8"></div>
+                        </div>
+
+                        <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                            <div class="text-[10px] font-bold text-gray-400 uppercase mb-3 flex justify-between">
+                                <span id="price-title">Structure Tarifaire (€ HT)</span>
+                                <span class="text-cyan cursor-pointer hover:underline" onclick="openPropagationModal()"><i class="fa-solid fa-copy mr-1"></i>Dupliquer</span>
+                            </div>
+                            
+                            <div id="grid-elec" class="grid grid-cols-6 gap-2">
+                                <div><label class="text-[9px] text-gray-500 uppercase">Abonnement /an</label><input type="number" id="price-fix" placeholder="0.00" class="w-full input-dark p-2 rounded text-xs text-right text-yellow-500"></div>
+                                <div><label class="text-[9px] text-gray-500 uppercase font-bold text-white">HPH (Hiver P)</label><input type="number" id="price-hph" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right"></div>
+                                <div><label class="text-[9px] text-gray-500 uppercase font-bold text-white">HCH (Hiver C)</label><input type="number" id="price-hch" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right"></div>
+                                <div><label class="text-[9px] text-gray-500 uppercase font-bold text-cyan">HPE (Été P)</label><input type="number" id="price-hpe" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right border border-cyan/20"></div>
+                                <div><label class="text-[9px] text-gray-500 uppercase font-bold text-cyan">HCE (Été C)</label><input type="number" id="price-hce" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right"></div>
+                                <div><label id="lbl-tax" class="text-[9px] text-gray-500 uppercase">CSPE / TICGN</label><input type="number" id="price-tax" placeholder="22.5" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
+                            </div>
+
+                            <!-- AJOUT PUISSANCES DETAILLEES (PS) -->
+                            <div id="grid-ps" class="grid grid-cols-6 gap-2 mt-4 border-t border-white/5 pt-4">
+                                 <div class="col-span-6 mb-2"><span class="text-[9px] font-bold text-gray-500 uppercase">Puissances Souscrites Détaillées (kW)</span></div>
+                                 <div class="col-start-2"><input type="number" id="ps-hph" placeholder="P1 (HPH)" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
+                                 <div><input type="number" id="ps-hch" placeholder="P2 (HCH)" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
+                                 <div><input type="number" id="ps-hpe" placeholder="P3 (HPE)" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
+                                 <div><input type="number" id="ps-hce" placeholder="P4 (HCE)" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
+                            </div>
+
+                            <div id="grid-gaz" class="grid grid-cols-3 gap-4 hidden">
+                                <div><label class="text-[9px] text-gray-500 uppercase">Abonnement /an</label><input type="number" id="price-gaz-fix" placeholder="0.00" class="w-full input-dark p-2 rounded text-xs text-right text-yellow-500"></div>
+                                <div><label class="text-[9px] text-gray-500 uppercase font-bold text-red-500">Prix Molécule (€/MWh)</label><input type="number" id="price-gaz-mol" placeholder="45.00" class="w-full input-dark p-2 rounded text-xs text-right border border-red-500/30 text-white"></div>
+                                <div><label class="text-[9px] text-gray-500 uppercase">TICGN / Taxes</label><input type="number" id="price-gaz-tax" placeholder="8.44" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- AUTRES ONGLETS (SUPPORT, LEGAL, SECURITY, BILLING, API) - MAINTENUS -->
+        <!-- TAB SUPPORT (INCHANGÉ - RÉINTÉGRÉ) -->
         <div id="tab-support" class="tab-content hidden max-w-6xl mx-auto space-y-6">
             <header class="flex justify-between items-end">
                 <div><h2 class="text-2xl font-bold text-white mb-1">Support & Tickets</h2><p class="text-gray-400 text-xs">Historique des demandes.</p></div>
@@ -289,6 +317,7 @@
             </div>
         </div>
 
+        <!-- TAB LEGAL (INCHANGÉ - RÉINTÉGRÉ) -->
         <div id="tab-legal" class="tab-content hidden max-w-6xl mx-auto space-y-6">
             <header class="flex justify-between items-end">
                 <div>
@@ -328,6 +357,7 @@
             </div>
         </div>
 
+        <!-- TAB SECURITY (INCHANGÉ - RÉINTÉGRÉ) -->
         <div id="tab-security" class="tab-content hidden max-w-6xl mx-auto space-y-6">
             <div class="bento-card rounded-bento p-8 border-l-4 border-green-500 flex justify-between items-center mb-6">
                 <div><h3 class="font-bold text-white text-lg">Authentification 2FA</h3><p class="text-xs text-gray-400">Actif via Google Authenticator.</p></div>
@@ -341,6 +371,7 @@
             </div>
         </div>
 
+        <!-- TAB BILLING (INCHANGÉ - RÉINTÉGRÉ) -->
         <div id="tab-billing" class="tab-content hidden max-w-6xl mx-auto space-y-6">
             <div class="bento-card rounded-bento p-8 flex justify-between items-center bg-gradient-to-r from-card to-purple-900/20 mb-6">
                 <div><h3 class="font-bold text-white mb-1">Plan Entreprise (Annuel)</h3><p class="text-xs text-gray-400">Renouvellement le 01/01/2027</p></div>
@@ -356,6 +387,7 @@
             </div>
         </div>
 
+        <!-- TAB API (INCHANGÉ - RÉINTÉGRÉ) -->
         <div id="tab-api" class="tab-content hidden max-w-6xl mx-auto space-y-6">
             <div class="bento-card rounded-bento p-8 bg-gradient-to-br from-card to-purple-900/20 border-purple-500/30">
                 <div class="flex justify-between items-center mb-6">
@@ -372,7 +404,7 @@
 
     </main>
 
-    <!-- MODAL TICKET & IMPORT & PROPAGATION (INCHANGÉS) -->
+    <!-- MODAL TICKET & IMPORT & PROPAGATION & DISCOVERY -->
     <div id="ticket-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
         <div class="bento-card p-6 w-96 rounded-xl border border-white/10">
             <h3 class="font-bold text-lg mb-4">Nouveau Ticket</h3>
@@ -433,18 +465,252 @@
         </div>
     </div>
 
+    <!-- MODAL AUTO-DISCOVERY (TITANIUM) -->
+    <div id="discovery-modal" class="fixed inset-0 bg-black/95 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bento-card p-8 rounded-bento w-[800px] h-[600px] flex flex-col relative border border-purple-500/30 shadow-2xl shadow-purple-500/10">
+            <button onclick="toggleDiscoveryModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-2xl font-bold text-white mb-2 flex items-center gap-3"><i class="fa-solid fa-magic text-purple-500"></i> Auto-Découverte de Parc</h3>
+            <p class="text-xs text-gray-400 mb-6">Saisissez un SIREN pour détecter automatiquement tous les établissements liés.</p>
+            <div class="flex gap-4 mb-6">
+                <input type="text" id="disco-siren" placeholder="SIREN (9 chiffres)" class="flex-1 input-dark p-3 rounded-xl text-lg font-mono tracking-widest text-center border-purple-500/50 focus:border-purple-500">
+                <button onclick="runDiscovery()" class="bg-purple-600 hover:bg-purple-500 text-white px-8 rounded-xl font-bold transition flex items-center gap-2"><i class="fa-solid fa-search"></i> SCANNER</button>
+            </div>
+            <div class="flex-1 overflow-y-auto bg-black/20 rounded-xl border border-white/5 p-4" id="disco-results">
+                <div class="text-center text-gray-500 mt-20 italic">En attente de recherche...</div>
+            </div>
+            <div class="mt-6 pt-4 border-t border-white/10 flex justify-between items-center">
+                <div class="text-xs text-gray-400"><span id="disco-count" class="text-white font-bold">0</span> sites trouvés</div>
+                <button onclick="importDiscovery()" id="btn-import-disco" class="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg text-xs font-bold transition opacity-50 cursor-not-allowed" disabled>IMPORTER LA SÉLECTION</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         function switchTab(id) {
             document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
             document.getElementById('tab-' + id).classList.remove('hidden');
             document.querySelectorAll('.nav-item').forEach(e => { e.classList.remove('active', 'text-white'); e.classList.add('text-gray-400'); });
             document.getElementById('nav-' + id).classList.add('active', 'text-white');
+            if(id === 'clients') loadSites();
             if(id === 'support') loadTickets();
         }
         function toggleImportModal() { document.getElementById('import-modal').classList.toggle('hidden'); }
+        function toggleDiscoveryModal() { document.getElementById('discovery-modal').classList.toggle('hidden'); }
         function openTicketModal() { document.getElementById('ticket-modal').classList.remove('hidden'); }
+        function showToast(msg) { const t = document.getElementById('toast'); t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`; t.className = "show"; setTimeout(() => t.className = "", 3000); }
 
-        // --- FONCTIONS LÉGALES (MANDAT) ---
+        // --- CORE SAVE LOGIC (CORRIGÉ AVEC VILLE/CP/NAF/FTA/DATES/PUISSANCES) ---
+        async function saveSite() {
+            const btn = document.activeElement;
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>...';
+            const rawId = document.getElementById('id-input').value;
+            const cleanId = rawId ? rawId.replace(/\s/g, '') : "draft";
+            
+            const data = {
+                client_name: document.getElementById('site-name-input').value,
+                identity: {
+                    id: cleanId, 
+                    siret: cleanId, 
+                    name: document.getElementById('company-name').value, 
+                    site_name: document.getElementById('site-name-input').value,
+                    naf: document.getElementById('naf-input').value,
+                    lot_name: document.getElementById('lot-input').value
+                },
+                location: { 
+                    address: document.getElementById('address-input').value,
+                    zip_code: document.getElementById('zip-input').value,
+                    city: document.getElementById('city-input').value,
+                    surface: parseFloat(document.getElementById('surface-input').value) || 0,
+                    typologie: document.getElementById('inp-type').value
+                },
+                contract: {
+                    pdl: document.getElementById('ref-input').value,
+                    power: parseFloat(document.getElementById('val-input').value) || 0,
+                    segment: document.getElementById('segment-display').value,
+                    provider: document.getElementById('provider-input').value,
+                    fta: document.getElementById('fta-input').value,
+                    start_date: document.getElementById('date-start').value,
+                    end_date: document.getElementById('date-end').value,
+                    power_details: {
+                        ps_hph: parseFloat(document.getElementById('ps-hph').value) || 0,
+                        ps_hch: parseFloat(document.getElementById('ps-hch').value) || 0,
+                        ps_hpe: parseFloat(document.getElementById('ps-hpe').value) || 0,
+                        ps_hce: parseFloat(document.getElementById('ps-hce').value) || 0
+                    }
+                },
+                pricing: {
+                    price_hph: parseFloat(document.getElementById('price-hph').value) || 0,
+                    price_hch: parseFloat(document.getElementById('price-hch').value) || 0,
+                    price_hpe: parseFloat(document.getElementById('price-hpe').value) || 0,
+                    price_hce: parseFloat(document.getElementById('price-hce').value) || 0,
+                    price_fix: parseFloat(document.getElementById('price-fix').value) || 0,
+                    price_tax: parseFloat(document.getElementById('price-tax').value) || 0
+                }
+            };
+            try {
+                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+                if((await res.json()).success) { showToast("Sauvegardé !"); loadSites(); }
+            } catch(e) { alert("Erreur réseau"); }
+            btn.innerHTML = original;
+        }
+
+        // --- AUTO-DISCOVERY (TITANIUM) ---
+        let DISCO_RESULTS = [];
+        async function runDiscovery() {
+            const siren = document.getElementById('disco-siren').value.replace(/\s/g, '');
+            const container = document.getElementById('disco-results');
+            container.innerHTML = '<div class="text-center mt-10"><i class="fa-solid fa-spinner fa-spin text-purple-500"></i></div>';
+            
+            try {
+                const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${siren}&etat_administratif=A&limite_resultats=100`);
+                const data = await res.json();
+                DISCO_RESULTS = [];
+                container.innerHTML = '';
+                
+                if(data.results) {
+                    data.results.forEach(r => {
+                        if(r.matching_etablissements) {
+                            r.matching_etablissements.forEach(e => processEtab(e, r.nom_complet));
+                        } else processEtab(r, r.nom_complet);
+                    });
+                }
+                
+                function processEtab(e, name) {
+                    if(e.etat_administratif !== 'A') return;
+                    DISCO_RESULTS.push({ siret: e.siret, name: name + ' - ' + (e.libelle_commune || ''), address: e.adresse, zip: e.code_postal, city: e.libelle_commune });
+                }
+
+                document.getElementById('disco-count').innerText = DISCO_RESULTS.length;
+                
+                if(DISCO_RESULTS.length > 0) {
+                    const table = document.createElement('table');
+                    table.className = "w-full text-left text-xs";
+                    table.innerHTML = `<thead><tr><th class="p-2"><input type="checkbox" onclick="toggleAllDisco(this)"></th><th class="p-2">Nom</th><th class="p-2">Ville</th></tr></thead><tbody class="divide-y divide-white/5"></tbody>`;
+                    DISCO_RESULTS.forEach((s, i) => {
+                        table.querySelector('tbody').innerHTML += `<tr><td class="p-2"><input type="checkbox" class="disco-cb accent-purple-500" value="${i}" onchange="updateImportBtn()"></td><td class="p-2 font-bold">${s.name}</td><td class="p-2 text-cyan-400">${s.city}</td></tr>`;
+                    });
+                    container.appendChild(table);
+                } else container.innerHTML = '<div class="text-center mt-10 text-gray-500">Aucun résultat.</div>';
+
+            } catch(e) { container.innerHTML = 'Erreur API.'; }
+        }
+
+        function toggleAllDisco(src) { document.querySelectorAll('.disco-cb').forEach(cb => cb.checked = src.checked); updateImportBtn(); }
+        function updateImportBtn() { 
+            const n = document.querySelectorAll('.disco-cb:checked').length;
+            const btn = document.getElementById('btn-import-disco');
+            btn.disabled = n === 0;
+            btn.classList.toggle('opacity-50', n === 0);
+            btn.classList.toggle('cursor-not-allowed', n === 0);
+            btn.innerText = n > 0 ? `IMPORTER (${n})` : "IMPORTER";
+        }
+
+        async function importDiscovery() {
+            const idxs = Array.from(document.querySelectorAll('.disco-cb:checked')).map(cb => cb.value);
+            const btn = document.getElementById('btn-import-disco');
+            btn.innerText = "CRÉATION...";
+            
+            for(const i of idxs) {
+                const s = DISCO_RESULTS[i];
+                const payload = {
+                    client_name: s.name,
+                    identity: { id: s.siret, siret: s.siret, name: s.name, site_name: s.name },
+                    location: { address: s.address, zip_code: s.zip, city: s.city, typologie: "Admin" },
+                    contract: { pdl: s.siret }
+                };
+                await fetch('/api/settings/save_client', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+            }
+            toggleDiscoveryModal();
+            showToast(`${idxs.length} sites créés !`);
+            loadSites();
+        }
+
+        // --- LOAD SITES ---
+        let SITES = [];
+        let CURRENT_ID = null;
+
+        async function loadSites() {
+            const term = document.getElementById('search-site') ? document.getElementById('search-site').value.toLowerCase() : "";
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                if(data.fleet) {
+                    SITES = data.fleet;
+                    const container = document.getElementById('site-list');
+                    if(container) {
+                        container.innerHTML = '';
+                        SITES.filter(s => s.name.toLowerCase().includes(term)).forEach(s => {
+                            const div = document.createElement('div');
+                            div.className = "p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer mb-2 transition";
+                            div.onclick = () => loadForm(s.id);
+                            div.innerHTML = `<div class="font-bold text-xs text-white truncate">${s.name}</div><div class="flex justify-between mt-1"><span class="text-[10px] text-gray-500 font-mono">${s.pdl || 'No PDL'}</span><span class="text-[10px] text-cyan-400">${s.city || ''}</span></div>`;
+                            container.appendChild(div);
+                        });
+                    }
+                }
+            } catch(e) {}
+        }
+        
+        // --- LOAD FORM (Pour édition) ---
+        async function loadForm(id) {
+            CURRENT_ID = id;
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                const data = await res.json();
+                
+                document.getElementById('form-title').innerText = "Modifier Site";
+                document.getElementById('form-id').innerText = id;
+                
+                // MAPPING COMPLET
+                document.getElementById('id-input').value = data.identity?.id || "";
+                document.getElementById('company-name').value = data.identity?.name || "";
+                document.getElementById('site-name-input').value = data.identity?.site_name || "";
+                document.getElementById('naf-input').value = data.identity?.naf || "";
+                document.getElementById('lot-input').value = data.identity?.lot_name || "";
+                
+                document.getElementById('address-input').value = data.location?.address || "";
+                document.getElementById('zip-input').value = data.location?.zip_code || "";
+                document.getElementById('city-input').value = data.location?.city || "";
+                document.getElementById('surface-input').value = data.location?.surface || "";
+                document.getElementById('inp-type').value = data.location?.typologie || "Admin";
+
+                document.getElementById('ref-input').value = data.contract?.pdl || "";
+                document.getElementById('val-input').value = data.contract?.power || "";
+                document.getElementById('segment-display').value = data.contract?.segment || "";
+                document.getElementById('provider-input').value = data.contract?.provider || "EDF";
+                
+                // NOUVEAUX CHAMPS CONTRAT
+                document.getElementById('fta-input').value = data.contract?.fta || "-";
+                document.getElementById('date-start').value = data.contract?.start_date || "";
+                document.getElementById('date-end').value = data.contract?.end_date || "";
+                
+                // PUISSANCES
+                const pd = data.contract?.power_details || {};
+                document.getElementById('ps-hph').value = pd.ps_hph || "";
+                document.getElementById('ps-hch').value = pd.ps_hch || "";
+                document.getElementById('ps-hpe').value = pd.ps_hpe || "";
+                document.getElementById('ps-hce').value = pd.ps_hce || "";
+
+                // PRIX
+                const p = data.pricing || {};
+                document.getElementById('price-hph').value = p.price_hph || "";
+                document.getElementById('price-hch').value = p.price_hch || "";
+                document.getElementById('price-hpe').value = p.price_hpe || "";
+                document.getElementById('price-hce').value = p.price_hce || "";
+                document.getElementById('price-fix').value = p.price_fix || "";
+                document.getElementById('price-tax').value = p.price_tax || "";
+                
+            } catch(e) { console.error(e); }
+        }
+
+        function resetForm() {
+            CURRENT_ID = null;
+            document.getElementById('form-title').innerText = "Nouveau Site";
+            document.querySelectorAll('input').forEach(i => i.value = '');
+        }
+
+        // --- FONCTIONS EXISTANTES ---
         function generateMandatePDF() {
             const company = document.getElementById('partner-name').value || "Société";
             const siret = document.getElementById('partner-siret').value || "00000000000000";
@@ -475,7 +741,6 @@
             }
         }
 
-        // --- IDENTITÉ PARTENAIRE (API GOUV) ---
         async function checkPartnerIdentity() {
             const val = document.getElementById('partner-siret').value.replace(/\s/g, '');
             const status = document.getElementById('partner-status');
@@ -523,7 +788,6 @@
             btn.innerHTML = original;
         }
 
-        // --- FONCTIONS EXISTANTES ---
         async function processImport() {
             const input = document.getElementById('csv-upload');
             if (!input.files || input.files.length === 0) return alert("Veuillez sélectionner un fichier CSV.");
@@ -606,7 +870,6 @@
                         if(!document.getElementById('site-name-input').value) document.getElementById('site-name-input').value = etab.nom_complet;
                         if(etab.siege && etab.siege.adresse) {
                             document.getElementById('address-input').value = etab.siege.adresse;
-                            // AUTO-FILL ZIP & CITY (NEW)
                             document.getElementById('zip-input').value = etab.siege.code_postal;
                             document.getElementById('city-input').value = etab.siege.libelle_commune;
                         } else if (etab.adresse) {
@@ -676,63 +939,6 @@
             } catch(e) {}
         }
 
-        // --- SAVE CLIENT (CORRIGÉ AVEC VILLE/CP/NAF/FTA/DATES/PUISSANCES) ---
-        async function saveSite() {
-            const btn = document.activeElement;
-            const original = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>...';
-            const rawId = document.getElementById('id-input').value;
-            const cleanId = rawId ? rawId.replace(/\s/g, '') : "draft";
-            
-            const data = {
-                client_name: document.getElementById('site-name-input').value,
-                identity: {
-                    id: cleanId, 
-                    siret: cleanId, 
-                    name: document.getElementById('company-name').value, 
-                    site_name: document.getElementById('site-name-input').value,
-                    naf: document.getElementById('naf-input').value,
-                    lot_name: document.getElementById('lot-input').value
-                },
-                location: { 
-                    address: document.getElementById('address-input').value,
-                    zip_code: document.getElementById('zip-input').value,
-                    city: document.getElementById('city-input').value,
-                    surface: parseFloat(document.getElementById('surface-input').value) || 0,
-                    typologie: document.getElementById('inp-type').value
-                },
-                contract: {
-                    pdl: document.getElementById('ref-input').value,
-                    power: parseFloat(document.getElementById('val-input').value) || 0,
-                    segment: document.getElementById('segment-display').value,
-                    provider: document.getElementById('provider-input').value,
-                    fta: document.getElementById('fta-input').value,
-                    start_date: document.getElementById('date-start').value,
-                    end_date: document.getElementById('date-end').value,
-                    power_details: {
-                        ps_hph: parseFloat(document.getElementById('ps-hph').value) || 0,
-                        ps_hch: parseFloat(document.getElementById('ps-hch').value) || 0,
-                        ps_hpe: parseFloat(document.getElementById('ps-hpe').value) || 0,
-                        ps_hce: parseFloat(document.getElementById('ps-hce').value) || 0
-                    }
-                },
-                pricing: {
-                    price_hph: parseFloat(document.getElementById('price-hph').value) || 0,
-                    price_hch: parseFloat(document.getElementById('price-hch').value) || 0,
-                    price_hpe: parseFloat(document.getElementById('price-hpe').value) || 0,
-                    price_hce: parseFloat(document.getElementById('price-hce').value) || 0,
-                    price_fix: parseFloat(document.getElementById('price-fix').value) || 0,
-                    price_tax: parseFloat(document.getElementById('price-tax').value) || 0
-                }
-            };
-            try {
-                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-                if((await res.json()).success) { showToast("Sauvegardé !"); loadSites(); }
-            } catch(e) { alert("Erreur réseau"); }
-            btn.innerHTML = original;
-        }
-
-        function showToast(msg) { const t = document.getElementById('toast'); t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`; t.className = "show"; setTimeout(() => t.className = "", 3000); }
         function updateFormType() { /* ... */ }
         
         let currentEnergy = 'elec';
@@ -773,58 +979,6 @@
             } else {
                 if (val < 6) disp.value = "T1 (Base/B0)"; else if (val < 300) disp.value = "T2 (B1)"; else if (val < 5000) disp.value = "T3 (B2i)"; else disp.value = "T4 (GT)";
             }
-        }
-        
-        // --- LOAD SITE FOR EDITING ---
-        async function loadForm(id) {
-            CURRENT_ID = id;
-            try {
-                const res = await fetch(`/api/dashboard/data/${id}`);
-                const data = await res.json();
-                
-                document.getElementById('form-title').innerText = "Modifier Site";
-                document.getElementById('form-id').innerText = id;
-                
-                // MAPPING
-                document.getElementById('id-input').value = data.identity?.id || "";
-                document.getElementById('company-name').value = data.identity?.name || "";
-                document.getElementById('site-name-input').value = data.identity?.site_name || "";
-                document.getElementById('naf-input').value = data.identity?.naf || "";
-                document.getElementById('lot-input').value = data.identity?.lot_name || "";
-                
-                document.getElementById('address-input').value = data.location?.address || "";
-                document.getElementById('zip-input').value = data.location?.zip_code || "";
-                document.getElementById('city-input').value = data.location?.city || "";
-                document.getElementById('surface-input').value = data.location?.surface || "";
-                document.getElementById('inp-type').value = data.location?.typologie || "Admin";
-
-                document.getElementById('ref-input').value = data.contract?.pdl || "";
-                document.getElementById('val-input').value = data.contract?.power || "";
-                document.getElementById('segment-display').value = data.contract?.segment || "";
-                document.getElementById('provider-input').value = data.contract?.provider || "EDF";
-                
-                // NOUVEAUX CHAMPS CONTRAT
-                document.getElementById('fta-input').value = data.contract?.fta || "-";
-                document.getElementById('date-start').value = data.contract?.start_date || "";
-                document.getElementById('date-end').value = data.contract?.end_date || "";
-                
-                // PUISSANCES
-                const pd = data.contract?.power_details || {};
-                document.getElementById('ps-hph').value = pd.ps_hph || "";
-                document.getElementById('ps-hch').value = pd.ps_hch || "";
-                document.getElementById('ps-hpe').value = pd.ps_hpe || "";
-                document.getElementById('ps-hce').value = pd.ps_hce || "";
-
-                // PRIX
-                const p = data.pricing || {};
-                document.getElementById('price-hph').value = p.price_hph || "";
-                document.getElementById('price-hch').value = p.price_hch || "";
-                document.getElementById('price-hpe').value = p.price_hpe || "";
-                document.getElementById('price-hce').value = p.price_hce || "";
-                document.getElementById('price-fix').value = p.price_fix || "";
-                document.getElementById('price-tax').value = p.price_tax || "";
-                
-            } catch(e) { console.error(e); }
         }
 
         // INITIALISATION : Onglet par défaut = 'general' (Mon Entreprise)
