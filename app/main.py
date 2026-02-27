@@ -34,6 +34,8 @@ try:
     from app.core.cortex_market import market
     # AJOUT AGGREGATOR
     from app.core.cortex_aggregator import aggregator
+    # AJOUT FINANCE (PHASE PLATINUM)
+    from app.core.cortex_finance import finance
 except ImportError:
     try:
         # Fallback pour environnement local (Dev)
@@ -44,7 +46,19 @@ except ImportError:
         from core.cortex_router import router
         from core.cortex_market import market
         from core.cortex_aggregator import aggregator
+        # AJOUT FINANCE LOCAL
+        from core.cortex_finance import finance
     except ImportError:
+        try:
+             import cortex_finance as finance
+        except:
+             # Mock Finance si manquant pour éviter crash
+            class MockFinance:
+                def parse_invoice(self, c, f): return {"status": "ERROR", "message": "Finance module missing"}
+                def audit_invoice(self, i, s): return {}
+                def simulate_landing(self, s): return {}
+            finance = MockFinance()
+
         # Mock de secours critique pour éviter le crash au démarrage si un fichier manque
         print("CRITICAL WARNING: Cortex Modules missing. Running in degraded mode.")
         class MockRouter:
@@ -744,6 +758,49 @@ async def view_trading(request: Request):
 @app.get("/ops/aggregator", response_class=HTMLResponse)
 async def view_aggregator(request: Request):
     return templates.TemplateResponse("ops_aggregator.html", {"request": request})
+
+# --- MODULE FINANCE (NOUVEAU) ---
+@app.get("/finance", response_class=HTMLResponse)
+async def view_finance(request: Request):
+    """Vue Principale Finance (Twin + Audit)"""
+    return templates.TemplateResponse("dashboard_finance.html", {"request": request})
+
+@app.post("/api/finance/upload")
+async def api_finance_upload(file: UploadFile = File(...), site_id: str = Form(...)):
+    """Upload et Audit immédiat (Factur-X/Excel)"""
+    try:
+        content = await file.read()
+        
+        # 1. Parse
+        parsed = finance.parse_invoice(content, file.filename)
+        if parsed.get("status") == "ERROR":
+            return JSONResponse(parsed, status_code=400)
+        
+        # 2. Récup Site Data (Pour le contrat)
+        file_path = find_site_file(site_id)
+        site_data = {}
+        if file_path:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                site_data = json.load(f)
+        
+        # 3. Audit
+        audit_report = finance.audit_invoice(parsed, site_data)
+        return JSONResponse(json_compliant(audit_report))
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, 500)
+
+@app.get("/api/finance/landing/{site_id}")
+async def api_finance_landing(site_id: str):
+    """Récupère les données du Twin Financier"""
+    file_path = find_site_file(site_id)
+    if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            site_data = json.load(f)
+        landing_data = finance.simulate_landing(site_data)
+        return JSONResponse(json_compliant(landing_data))
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, 500)
 
 # --- ROUTES DE BASE ---
 
