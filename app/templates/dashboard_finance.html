@@ -122,7 +122,7 @@
                         <div class="mt-4 text-xs font-medium text-gray-400" id="res-message">En attente d'analyse...</div>
                     </div>
 
-                    <!-- GHOST SAVINGS (Le Gaspillage) -->
+                    <!-- GHOST SAVINGS -->
                     <div class="bento-card p-6 bg-danger/5 border border-danger/20 relative overflow-hidden hidden" id="card-ghost">
                         <div class="absolute -right-4 -top-4 text-danger/10 text-9xl"><i class="fa-solid fa-ghost"></i></div>
                         <div class="relative z-10">
@@ -155,16 +155,17 @@
                 </div>
             </div>
 
-            <!-- COLONNE DROITE (8/12) : VISUALISATION & LOGS -->
+            <!-- DROITE : GRAPH & LOGS -->
             <div class="col-span-8 space-y-6">
                 
                 <!-- GRAPHIQUE AVEC ONGLETS -->
                 <div class="bento-card p-6 h-80 relative flex flex-col">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xs font-bold text-gray-400 uppercase">Analyse & Audit</h3>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase">Analyse & Projection</h3>
                         <div class="flex gap-2 bg-black/20 p-1 rounded-full">
-                            <button onclick="updateChart('financial')" id="btn-financial" class="tab-btn tab-active">Vue Facture (€)</button>
-                            <button onclick="updateChart('audit')" id="btn-audit" class="tab-btn tab-inactive">Vue Audit (kWh)</button>
+                            <button onclick="updateChart('financial')" id="btn-financial" class="tab-btn tab-active">Facture (€)</button>
+                            <button onclick="updateChart('audit')" id="btn-audit" class="tab-btn tab-inactive">Audit (kWh)</button>
+                            <button onclick="updateChart('trajectory')" id="btn-traj" class="tab-btn tab-inactive text-gold border-gold/20">Trajectoire</button>
                         </div>
                     </div>
                     
@@ -203,7 +204,8 @@
 
     <script>
         let invoiceChartInstance = null;
-        let GLOBAL_DATA = null; // Stockage temporaire pour switch de vue
+        let GLOBAL_DATA = null;
+        let TRAJECTORY_DATA = null;
 
         // --- GESTION DRAG & DROP ---
         const dropZone = document.getElementById('drop-zone');
@@ -220,7 +222,7 @@
             if (files.length > 0) uploadInvoice(files[0]);
         }
 
-        // --- LOGIQUE UPLOAD ---
+        // --- LOGIQUE UPLOAD & FETCH PROJECTION ---
         async function uploadInvoice(file) {
             document.getElementById('loading-spinner').classList.remove('hidden');
             document.getElementById('chart-placeholder').classList.add('hidden');
@@ -238,7 +240,19 @@
                     return;
                 }
 
-                GLOBAL_DATA = response; // Sauvegarde
+                GLOBAL_DATA = response;
+                
+                // --- FETCH PROJECTION (NOUVEAU) ---
+                if (response.technical && response.technical.pdl_detected) {
+                    try {
+                        const resTraj = await fetch(`/api/finance/landing/${response.technical.pdl_detected}`);
+                        TRAJECTORY_DATA = await resTraj.json();
+                        console.log("Trajectory loaded:", TRAJECTORY_DATA);
+                    } catch(e) {
+                        console.error("Forecast error", e);
+                    }
+                }
+
                 renderDashboard(response);
 
             } catch(e) { console.error(e); alert("Erreur système."); } 
@@ -314,69 +328,102 @@
             updateChart('financial');
         }
 
-        // --- GESTION DES DEUX VUES GRAPHIQUES ---
+        // --- GESTION DES VUES (FINANCE / AUDIT / TRAJECTOIRE) ---
         function updateChart(type) {
             if(!GLOBAL_DATA) return;
 
-            // Gestion Boutons UI
+            // UI Tabs
             const btnFin = document.getElementById('btn-financial');
             const btnAud = document.getElementById('btn-audit');
+            const btnTraj = document.getElementById('btn-traj');
+            
+            [btnFin, btnAud, btnTraj].forEach(b => { 
+                b.classList.remove('tab-active'); 
+                b.classList.add('tab-inactive'); 
+            });
             
             if(type === 'financial') {
                 btnFin.classList.add('tab-active'); btnFin.classList.remove('tab-inactive');
-                btnAud.classList.add('tab-inactive'); btnAud.classList.remove('tab-active');
-            } else {
+            } else if(type === 'audit') {
                 btnAud.classList.add('tab-active'); btnAud.classList.remove('tab-inactive');
-                btnFin.classList.add('tab-inactive'); btnFin.classList.remove('tab-active');
+            } else {
+                btnTraj.classList.add('tab-active'); btnTraj.classList.remove('tab-inactive');
             }
 
             const ctx = document.getElementById('invoiceChart').getContext('2d');
             if(invoiceChartInstance) invoiceChartInstance.destroy();
 
-            let labels, datasets;
+            let config = {};
 
             if (type === 'financial') {
-                // VUE 1 : DÉCOMPOSITION FINANCIÈRE
+                // VUE 1 : DÉCOMPOSITION
                 const amountEnergy = (GLOBAL_DATA.technical.volume_factured * GLOBAL_DATA.financials.unit_price_computed) || 0;
                 const amountGhost = GLOBAL_DATA.financials.ghost_savings;
                 let amountTaxes = GLOBAL_DATA.financials.amount_ttc - amountEnergy - amountGhost;
                 if(amountTaxes < 0) amountTaxes = 0;
 
-                labels = ['Énergie', 'Taxes & Abo', 'Pénalités'];
-                datasets = [{
-                    label: 'Montant (€)',
-                    data: [amountEnergy, amountTaxes, amountGhost],
-                    backgroundColor: ['#00E5FF', '#94A3B8', '#EF4444'],
-                    borderRadius: 4, barThickness: 40
-                }];
-            } else {
-                // VUE 2 : AUDIT PHYSIQUE (COMPARATIF SGE)
-                // Simulation SGE : Puisqu'on n'a pas encore connecté l'API, on simule un écart pour la démo
-                const volFacture = GLOBAL_DATA.technical.volume_factured;
-                // On simule que le compteur a vu un peu moins (ex: 98%) -> Écart positif pour le fournisseur
-                const volSGE = Math.round(volFacture * 0.98); 
+                config = {
+                    type: 'bar',
+                    data: {
+                        labels: ['Énergie', 'Taxes & Abo', 'Pénalités'],
+                        datasets: [{
+                            label: 'Montant (€)',
+                            data: [amountEnergy, amountTaxes, amountGhost],
+                            backgroundColor: ['#00E5FF', '#94A3B8', '#EF4444'],
+                            borderRadius: 4, barThickness: 40
+                        }]
+                    }
+                };
+            } else if (type === 'audit') {
+                // VUE 2 : KWH
+                const volSGE = GLOBAL_DATA.technical.volume_sge;
+                config = {
+                    type: 'bar',
+                    data: {
+                        labels: ['Facturé', 'Mesuré (SGE)'],
+                        datasets: [{
+                            label: 'Volume (kWh)',
+                            data: [GLOBAL_DATA.technical.volume_factured, volSGE],
+                            backgroundColor: ['#00E5FF', '#10B981'],
+                            borderRadius: 4, barThickness: 40
+                        }]
+                    }
+                };
+            } else if (type === 'trajectory' && TRAJECTORY_DATA && TRAJECTORY_DATA.trajectory) {
+                // VUE 3 : TRAJECTOIRE (LIGNE)
+                const labels = TRAJECTORY_DATA.trajectory.map(t => t.month);
+                const data = TRAJECTORY_DATA.trajectory.map(t => t.cost_cumulative);
                 
-                labels = ['Volume Facturé (Fournisseur)', 'Volume Mesuré (SGE Enedis)'];
-                datasets = [{
-                    label: 'Volume (kWh)',
-                    data: [volFacture, volSGE],
-                    backgroundColor: ['#00E5FF', '#10B981'], // Bleu vs Vert
-                    borderRadius: 4, barThickness: 40
-                }];
+                config = {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Budget Cumulé (€)',
+                            data: data,
+                            borderColor: '#F59E0B', // Gold
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }]
+                    }
+                };
             }
 
-            invoiceChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: { labels: labels, datasets: datasets },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
+            if (config.type) {
+                config.options = {
+                    responsive: true,
+                    maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
                         y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } },
                         x: { grid: { display: false }, ticks: { color: '#94A3B8' } }
                     }
-                }
-            });
+                };
+                invoiceChartInstance = new Chart(ctx, config);
+            }
         }
     </script>
 </body>
