@@ -17,17 +17,25 @@ except ImportError:
     PDF_READY = False
     print("WARNING: pdfplumber manquant. Le parsing PDF sera désactivé.")
 
+# --- DEPENDANCE CALENDRIER FRANCE (NOUVEAU POUR LA PROJECTION) ---
+try:
+    from workalendar.europe import France
+    cal_france = France()
+    CALENDAR_READY = True
+except ImportError:
+    CALENDAR_READY = False
+    # On ne bloque pas le système, on passera en mode dégradé (jours simples)
+
 class CortexFinance:
     """
-    CORTEX FINANCE ENGINE V2.7 (PERSISTENCE & PROJECTION)
+    CORTEX FINANCE ENGINE V3.0 (PLATINUM FINAL)
     Module dédié à l'Audit Financier et à la Triangulation.
     
     CAPACITÉS :
-    1. Parsing PDF Natif (EDF Particulier & Pro) avec extraction HT/TTC précise.
-    2. Gestion des Pénalités (Ghost Savings).
-    3. Audit Financier (Comparaison Facture vs SGE Réel).
-    4. Persistance du Prix Calculé (Mise à jour du profil site).
-    5. Projection Financière (Smart Twin) basée sur le prix réel.
+    1. Parsing PDF Natif (EDF Particulier & Pro).
+    2. Audit Financier (Facture vs SGE Réel).
+    3. Persistance du Prix Calculé.
+    4. Projection Financière "Smart Twin" (N-1 Mirroring + Effet Calendrier France).
     """
 
     def __init__(self):
@@ -45,9 +53,6 @@ class CortexFinance:
     # 1. ROUTEUR D'INGESTION (DISPATCHER)
     # =========================================================
     def parse_invoice(self, file_content: bytes, filename: str) -> Dict[str, Any]:
-        """
-        Point d'entrée unique. Détecte le format et lance le bon parser.
-        """
         extracted_data = {
             "source": "UNKNOWN", 
             "provider": "INCONNU", 
@@ -63,47 +68,39 @@ class CortexFinance:
         
         filename = filename.lower()
 
-        # CAS A : PDF NATIF (EDF, ENGIE...)
         if filename.endswith(".pdf"):
             if not PDF_READY:
                 return {"status": "ERROR", "message": "Module PDF (pdfplumber) non installé sur le serveur."}
             return self._parse_pdf_native(file_content, extracted_data)
 
-        # CAS B : XML (FACTUR-X / CHORUS)
         elif filename.endswith(".xml"):
             return self._parse_facturx_xml(file_content, extracted_data)
             
-        # CAS C : NON SUPPORTÉ
         return {"status": "ERROR", "message": "Format de fichier non supporté (PDF ou XML requis)."}
 
     # =========================================================
     # 2. MOTEUR D'EXTRACTION PDF (CHIRURGICAL)
     # =========================================================
     def _parse_pdf_native(self, content: bytes, data: Dict) -> Dict[str, Any]:
-        """
-        Extraction spécifique pour les PDF générés par les fournisseurs (Non scannés).
-        """
         try:
             with pdfplumber.open(io.BytesIO(content)) as pdf:
                 full_text = ""
                 p2_text = ""
                 
-                # Lecture optimisée des pages
                 for i, page in enumerate(pdf.pages):
                     text = page.extract_text()
                     if text:
                         full_text += text + "\n"
-                        # La page 2 contient souvent le détail HT chez EDF
                         if i == 1: p2_text = text 
 
                 data["source"] = "PDF_NATIVE"
 
-                # A. Extraction PDL (Regex robuste)
+                # A. Extraction PDL
                 pdl_match = re.search(r"(?:PDL|Point de livraison)\s*[:.]?\s*([\d\s]{14,20})", full_text, re.IGNORECASE)
                 if pdl_match: 
                     data['pdl'] = pdl_match.group(1).replace(" ", "").strip()
                 
-                # B. Extraction Dates (Format: du 05/04/25 au 04/10/25)
+                # B. Extraction Dates
                 date_match = re.search(r"du\s+(\d{2}/\d{2}/\d{2})\s+au\s+(\d{2}/\d{2}/\d{2})", full_text)
                 if date_match:
                     try:
@@ -113,30 +110,28 @@ class CortexFinance:
                     except Exception as e:
                         print(f"Erreur date parsing: {e}")
 
-                # C. Extraction Volume (Total Consommation)
+                # C. Extraction Volume
                 vol_match = re.search(r"Total Consommation\s+(\d+)", full_text)
                 if vol_match: 
                     data['volume_kwh'] = float(vol_match.group(1))
                 
-                # D. Extraction Pénalités (Ghost Savings)
+                # D. Extraction Pénalités
                 penalties_match = re.search(r"Pénalités.*?\s+(\d+[\.,]\d{2})\s?€", full_text, re.IGNORECASE)
                 if penalties_match: 
                     data['penalties'] = float(penalties_match.group(1).replace(',', '.'))
                 
-                # E. Montant TTC (Page 1 - Montant total)
+                # E. Montant TTC
                 total_match = re.search(r"Montant total.*?(\d+[\.,]\d{2})\s?€", full_text, re.DOTALL | re.IGNORECASE)
                 if total_match: 
                     data['amount_ttc'] = float(total_match.group(1).replace(',', '.'))
 
-                # F. Montant HT (CORRECTION MAJEURE V2.4)
-                # Stratégie 1 : Recherche explicite sur la Page 2
+                # F. Montant HT
                 ht_match = re.search(r"Total Electricité hors TVA.*?\s(\d+[\.,]\d{2})", p2_text, re.DOTALL)
                 
                 if ht_match:
                     data['amount_ht'] = float(ht_match.group(1).replace(',', '.'))
                 else:
-                    # Stratégie 2 : Fallback Mathématique CORRIGÉ
-                    # Formule : (TTC - Pénalités) / (1 + TVA)
+                    # Fallback (TTC - Pénalités) / (1 + TVA)
                     if data['amount_ttc'] > 0:
                         taxable_amount = data['amount_ttc'] - data['penalties']
                         if taxable_amount > 0:
@@ -153,12 +148,9 @@ class CortexFinance:
         return {"status": "SUCCESS", "data": data}
 
     # =========================================================
-    # 3. PARSER XML (FACTUR-X / UBL) - STRUCTURE PRÊTE
+    # 3. PARSER XML (FACTUR-X)
     # =========================================================
     def _parse_facturx_xml(self, content: bytes, data: Dict) -> Dict[str, Any]:
-        """
-        Parser dédié aux fichiers XML structurés (Chorus Pro / Factur-X).
-        """
         try:
             data["source"] = "FACTUR-X"
             data["provider"] = "CHORUS_PRO"
@@ -167,13 +159,9 @@ class CortexFinance:
             return {"status": "ERROR", "message": f"Erreur XML: {str(e)}"}
 
     # =========================================================
-    # 4. AUDIT & PERSISTANCE (LE CŒUR DU SYSTÈME)
+    # 4. AUDIT & PERSISTANCE
     # =========================================================
     def _persist_price(self, pdl, price):
-        """
-        Sauvegarde le prix calculé dans le fichier JSON du site.
-        Crucial pour que la projection utilise ce prix.
-        """
         try:
             safe_id = str(pdl).strip()
             file_path = os.path.join(self.DATA_DIR, f"{safe_id}.json")
@@ -183,24 +171,17 @@ class CortexFinance:
                     data = json.load(f)
                 
                 if 'financials' not in data: data['financials'] = {}
-                
-                # Mise à jour du prix
                 data['financials']['unit_price_computed'] = price
                 data['financials']['last_audit_date'] = datetime.now().isoformat()
                 
                 with open(file_path, 'w', encoding='utf-8') as f:
                     json.dump(data, f, indent=4, ensure_ascii=False)
-                
                 return True
         except Exception as e:
             print(f"Erreur Persistance Prix: {e}")
         return False
 
     def audit_invoice(self, invoice_wrapper: Dict, site_data: Dict) -> Dict[str, Any]:
-        """
-        AUDIT RÉEL : Compare les données extraites de la facture 
-        avec les données JSON ingérées (SGE/Linky).
-        """
         if invoice_wrapper.get("status") != "SUCCESS": 
             return {"status": "ERROR", "message": "Impossible d'auditer : Données de facture invalides."}
 
@@ -235,16 +216,14 @@ class CortexFinance:
         if inv['volume_kwh'] > 0:
             unit_price_ht = inv['amount_ht'] / inv['volume_kwh']
 
-        # 4. PERSISTANCE DU PRIX (NOUVEAU V2.7)
-        # On sauvegarde ce prix immédiatement pour que la Projection l'utilise
+        # 4. PERSISTANCE DU PRIX
         if inv['pdl'] and unit_price_ht > 0:
             self._persist_price(inv['pdl'], unit_price_ht)
 
-        # 5. GÉNÉRATION DU RAPPORT
+        # 5. RAPPORT
         status = "CONFORME"
         anomalies = []
         
-        # Règle A : Écart de Volume
         if abs(delta_pct) > 5:
             status = "ANOMALIE_VOLUME"
             anomalies.append({
@@ -253,7 +232,6 @@ class CortexFinance:
                 "message": f"Facturé: {inv['volume_kwh']} kWh vs Réel: {round(sge_real_kwh)} kWh ({delta_pct:+.1f}%)."
             })
 
-        # Règle B : Prix Unitaire Aberrant
         if unit_price_ht < 0.05 or unit_price_ht > 0.50:
             status = "ANOMALIE_PRIX"
             anomalies.append({
@@ -262,7 +240,6 @@ class CortexFinance:
                 "message": f"Prix HT calculé : {unit_price_ht:.4f} €/kWh. Vérifiez s'il s'agit d'une régularisation."
             })
             
-        # Règle C : Gaspillage
         if inv['penalties'] > 0:
             anomalies.append({
                 "severity": "MEDIUM", 
@@ -295,64 +272,114 @@ class CortexFinance:
         }
 
     # =========================================================
-    # 5. PROJECTION (SMART TWIN)
+    # 5. PROJECTION (SMART TWIN + CALENDAR) - NOUVEAU
     # =========================================================
+    
+    def _get_calendar_ratio(self, year, month, is_pro=False):
+        """
+        Calcule l'intensité calendaire du mois (Jours Ouvrés vs Calendaires).
+        Utilise Workalendar France si disponible.
+        """
+        _, num_days = calendar.monthrange(year, month)
+        
+        if not is_pro:
+            # RÉSIDENTIEL : Ratio basé sur la durée absolue du mois (vs moyenne 30.4j)
+            return num_days / 30.4375
+        else:
+            # PRO : Ratio basé sur les jours ouvrés (Lun-Ven + Fériés)
+            if CALENDAR_READY:
+                start_dt = date(year, month, 1)
+                end_dt = date(year, month, num_days)
+                # get_working_days_delta exclut la borne de fin parfois, on sécurise
+                working_days = cal_france.get_working_days_delta(start_dt, end_dt)
+                if cal_france.is_working_day(end_dt): working_days += 1
+            else:
+                # Fallback manuel
+                working_days = 0
+                for day in range(1, num_days + 1):
+                    if date(year, month, day).weekday() < 5: working_days += 1
+            
+            # Moyenne jours ouvrés par mois ~= 21.0
+            return working_days / 21.0
+
     def simulate_landing(self, site_data: Dict) -> Dict[str, Any]:
         """
-        Calcule la trajectoire annuelle (Réalisé + Projeté).
-        Utilise le prix unitaire calculé lors de l'audit pour projeter les coûts.
+        Génère une trajectoire annuelle.
+        Stratégie : Mirror N-1 + Correction Calendaire.
         """
         measurements = site_data.get('measurements', [])
-        
-        # 1. Analyse de l'existant (Réalisé)
         current_year = datetime.now().year
-        # Si on est début 2026, on regarde 2025 pour avoir une année complète ou partielle
-        if datetime.now().month < 3: current_year -= 1
-            
-        realized_by_month = {m: 0 for m in range(1, 13)}
-        total_realized_kwh = 0
-        last_real_month = 0
+        if datetime.now().month < 3: current_year = 2026 
+        prev_year = current_year - 1
+
+        # Détection Profil (pour le calendrier)
+        is_pro = False
+        segment = site_data.get('contract', {}).get('segment', '').upper()
+        if "C5" not in segment and "C4" not in segment and segment != "": 
+            is_pro = True
+
+        # 1. ANALYSE N-1
+        n_1_by_month = {m: 0 for m in range(1, 13)}
+        total_n_1 = 0
+        months_with_data_n_1 = 0
         
-        # RÉCUPÉRATION DU PRIX EXACT (C'est ici que la persistance sert)
-        avg_price = 0.20 # Fallback
-        if 'financials' in site_data and 'unit_price_computed' in site_data['financials']:
-            avg_price = float(site_data['financials']['unit_price_computed'])
-        
-        # Somme des consos réelles par mois
+        # 2. ANALYSE N
+        n_by_month = {m: 0 for m in range(1, 13)}
+        last_real_month_n = 0
+
         for m in measurements:
             try:
                 d = datetime.strptime(m['date'], "%Y-%m-%d")
-                if d.year == current_year:
-                    realized_by_month[d.month] += m['val']
-                    total_realized_kwh += m['val']
-                    if d.month > last_real_month: last_real_month = d.month
+                val = m['val']
+                if d.year == prev_year:
+                    if n_1_by_month[d.month] == 0: months_with_data_n_1 += 1
+                    n_1_by_month[d.month] += val
+                    total_n_1 += val
+                elif d.year == current_year:
+                    n_by_month[d.month] += val
+                    if d.month > last_real_month_n: last_real_month_n = d.month
             except: continue
 
-        # 2. Projection (Forecast)
+        # 3. DÉTERMINATION DU PROFIL DE BASE
+        weights = self.SEASONAL_WEIGHTS["STD"]
+        if months_with_data_n_1 >= 10 and total_n_1 > 0:
+            # On utilise le profil N-1 réel
+            weights = [n_1_by_month[m] / total_n_1 for m in range(1, 13)]
+
+        # 4. EXTRAPOLATION
+        total_realized_n = sum(n_by_month.values())
+        weight_realized_n = sum(weights[:last_real_month_n])
+        
+        if weight_realized_n > 0.1:
+            estimated_annual_vol_n = total_realized_n / weight_realized_n
+        else:
+            estimated_annual_vol_n = total_n_1 if total_n_1 > 0 else 6000
+
+        # 5. CONSTRUCTION TRAJECTOIRE
+        avg_price = 0.20
+        if 'financials' in site_data and 'unit_price_computed' in site_data['financials']:
+            avg_price = float(site_data['financials']['unit_price_computed'])
+
         trajectory_euro = []
         cumulative_euro = 0
         
-        # Estimation du volume annuel total basé sur ce qu'on a déjà
-        weight_realized = sum(self.SEASONAL_WEIGHTS["STD"][:last_real_month])
-        if weight_realized > 0:
-            estimated_annual_vol = total_realized_kwh / weight_realized
-        else:
-            estimated_annual_vol = site_data.get('kpis', {}).get('volume_mwh', 0) * 1000
-
         for month in range(1, 13):
-            # Volume mensuel
-            if month <= last_real_month:
-                vol = realized_by_month[month]
+            status = "FORECAST"
+            
+            if month <= last_real_month_n and n_by_month[month] > 0:
+                vol = n_by_month[month]
                 status = "REAL"
             else:
-                # Projection : Vol Annuel * Poids du mois
-                weight = self.SEASONAL_WEIGHTS["STD"][month-1]
-                vol = estimated_annual_vol * weight
-                # Correction jours fériés
-                if month in [5, 12]: vol *= 0.9
+                # Projection de Base
+                weight = weights[month-1]
+                base_vol = estimated_annual_vol_n * weight
+                
+                # CORRECTION CALENDAIRE
+                calendar_ratio = self._get_calendar_ratio(current_year, month, is_pro)
+                vol = base_vol * calendar_ratio
+                
                 status = "FORECAST"
 
-            # Calcul Coût avec le VRAI prix
             cost = vol * avg_price
             cumulative_euro += cost
             
@@ -366,7 +393,7 @@ class CortexFinance:
         return {
             "year": current_year,
             "landing_euro": round(cumulative_euro, 2),
-            "price_used": avg_price, # Info de debug utile
+            "profile_type": "PRO (Jours Ouvrés FR)" if is_pro else "RESID (Jours Calendaires)",
             "trajectory": trajectory_euro
         }
 
