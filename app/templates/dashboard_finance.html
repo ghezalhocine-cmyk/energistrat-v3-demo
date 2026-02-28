@@ -35,8 +35,12 @@
             border-radius: 1rem; 
             backdrop-filter: blur(12px);
         }
-        .animate-pulse-slow { animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        /* Animation pour le Drag & Drop */
+        .drag-active {
+            border-color: #00E5FF !important;
+            background-color: rgba(0, 229, 255, 0.1) !important;
+            transform: scale(1.02);
+        }
     </style>
 </head>
 <body class="flex h-screen w-screen">
@@ -71,13 +75,20 @@
             <!-- COLONNE GAUCHE (4/12) : UPLOAD & SCORES -->
             <div class="col-span-4 space-y-6">
                 
-                <!-- UPLOAD ZONE -->
-                <div class="bento-card p-8 border-2 border-dashed border-white/10 flex flex-col items-center justify-center hover:bg-white/5 hover:border-cyan/50 cursor-pointer transition group h-64 relative overflow-hidden" onclick="document.getElementById('file-input').click()">
-                    <div class="absolute inset-0 bg-cyan/5 opacity-0 group-hover:opacity-100 transition duration-500"></div>
-                    <i class="fa-solid fa-file-invoice text-5xl text-gray-600 group-hover:text-cyan mb-6 transition transform group-hover:scale-110"></i>
-                    <h3 class="font-bold text-white text-lg">Déposer Facture</h3>
-                    <p class="text-xs text-gray-500 mt-2 text-center max-w-[200px]">Supporte PDF Natif (EDF/Engie), Factur-X & Excel (Enedis)</p>
-                    <input type="file" id="file-input" class="hidden" onchange="uploadInvoice()">
+                <!-- UPLOAD ZONE (CORRIGÉE DRAG & DROP) -->
+                <div id="drop-zone" class="bento-card p-8 border-2 border-dashed border-white/10 flex flex-col items-center justify-center hover:bg-white/5 hover:border-cyan/50 cursor-pointer transition group h-64 relative overflow-hidden" onclick="document.getElementById('file-input').click()">
+                    
+                    <!-- Feedback visuel -->
+                    <div class="absolute inset-0 bg-cyan/5 opacity-0 group-hover:opacity-100 transition duration-500 pointer-events-none"></div>
+                    
+                    <i class="fa-solid fa-file-invoice text-5xl text-gray-600 group-hover:text-cyan mb-6 transition transform group-hover:scale-110 pointer-events-none"></i>
+                    <h3 class="font-bold text-white text-lg pointer-events-none">Déposer Facture</h3>
+                    <p class="text-xs text-gray-500 mt-2 text-center max-w-[200px] pointer-events-none">Glissez-déposez le PDF ici<br>(EDF, Engie, Factur-X)</p>
+                    
+                    <!-- Input caché -->
+                    <input type="file" id="file-input" class="hidden" onchange="handleFiles(this.files)">
+                    
+                    <!-- Spinner de chargement -->
                     <div id="loading-spinner" class="hidden absolute inset-0 bg-card/90 flex flex-col items-center justify-center z-20">
                         <i class="fa-solid fa-circle-notch fa-spin text-3xl text-cyan"></i>
                         <p class="text-xs text-cyan mt-3 font-mono">ANALYSE CORTEX EN COURS...</p>
@@ -172,17 +183,53 @@
     <script>
         let invoiceChartInstance = null;
 
-        async function uploadInvoice() {
-            const input = document.getElementById('file-input');
-            if(input.files.length === 0) return;
+        // --- 1. GESTION ROBUSTE DU DRAG & DROP ---
+        const dropZone = document.getElementById('drop-zone');
 
+        // Empêcher le navigateur d'ouvrir le fichier (CRUCIAL)
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false); // Sécurité supplémentaire
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Effet visuel quand on survole
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-active'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-active'), false);
+        });
+
+        // Gestion du Drop
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                uploadInvoice(files[0]);
+            }
+        }
+
+        // --- 2. LOGIQUE D'UPLOAD ---
+        async function uploadInvoice(file) {
             // UI Loading
             document.getElementById('loading-spinner').classList.remove('hidden');
             document.getElementById('chart-placeholder').classList.add('hidden');
 
             const formData = new FormData();
-            formData.append('file', input.files[0]);
-            formData.append('site_id', 'DEMO_SITE'); // ID fictif pour la démo
+            formData.append('file', file);
+            formData.append('site_id', 'DEMO_SITE');
 
             try {
                 const res = await fetch('/api/finance/upload', {
@@ -192,7 +239,8 @@
                 const response = await res.json();
                 
                 if(response.status === "ERROR") {
-                    alert("Erreur: " + response.message);
+                    alert("Erreur CORTEX : " + response.message);
+                    document.getElementById('loading-spinner').classList.add('hidden');
                     return;
                 }
 
@@ -206,37 +254,39 @@
             }
         }
 
+        // --- 3. RENDU DU DASHBOARD ---
         function renderDashboard(data) {
-            // Afficher la zone de résultats
             document.getElementById('audit-result').classList.remove('hidden');
 
-            // 1. MISE A JOUR DES CARTES
+            // SCORES & CARDS
             const score = data.trust_score;
             document.getElementById('res-score').innerText = score + "/100";
             
-            // Gestion couleur Score
             const cardScore = document.getElementById('card-score');
             const iconScore = document.getElementById('res-icon');
+            const msgScore = document.getElementById('res-message');
             
-            cardScore.className = "bento-card p-6 border-l-4"; // Reset
+            // Reset styles
+            cardScore.className = "bento-card p-6 border-l-4";
+            
             if(score < 50) {
                 cardScore.classList.add('border-danger');
                 iconScore.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-danger"></i>';
-                document.getElementById('res-message').innerText = "Facture critique. Ne pas payer.";
-                document.getElementById('res-message').className = "mt-4 text-xs font-bold text-danger";
+                msgScore.innerText = "Facture critique. Ne pas payer.";
+                msgScore.className = "mt-4 text-xs font-bold text-danger";
             } else if (score < 90) {
                 cardScore.classList.add('border-gold');
                 iconScore.innerHTML = '<i class="fa-solid fa-circle-exclamation text-gold"></i>';
-                document.getElementById('res-message').innerText = "Anomalies détectées. À vérifier.";
-                document.getElementById('res-message').className = "mt-4 text-xs font-bold text-gold";
+                msgScore.innerText = "Anomalies détectées. À vérifier.";
+                msgScore.className = "mt-4 text-xs font-bold text-gold";
             } else {
                 cardScore.classList.add('border-success');
                 iconScore.innerHTML = '<i class="fa-solid fa-check-circle text-success"></i>';
-                document.getElementById('res-message').innerText = "Facture conforme.";
-                document.getElementById('res-message').className = "mt-4 text-xs font-bold text-success";
+                msgScore.innerText = "Facture conforme.";
+                msgScore.className = "mt-4 text-xs font-bold text-success";
             }
 
-            // Ghost Savings
+            // GHOST SAVINGS
             const ghost = data.financials.ghost_savings;
             const ghostCard = document.getElementById('card-ghost');
             if(ghost > 0) {
@@ -246,27 +296,28 @@
                 ghostCard.classList.add('hidden');
             }
 
-            // Tech Specs
+            // TECH SPECS
             document.getElementById('res-pdl').innerText = data.technical.pdl_detected || "Non détecté";
             document.getElementById('res-vol').innerText = Math.round(data.technical.volume_factured).toLocaleString() + " kWh";
             document.getElementById('res-price').innerText = data.financials.unit_price_computed + " €";
 
-            // 2. CHART JS
+            // CHART JS
             const ctx = document.getElementById('invoiceChart').getContext('2d');
             if(invoiceChartInstance) invoiceChartInstance.destroy();
 
             const amountTTC = data.financials.amount_ttc || 0;
             const amountEnergy = (data.technical.volume_factured * data.financials.unit_price_computed) || 0;
             const amountGhost = ghost;
-            const amountTaxes = amountTTC - amountEnergy - amountGhost;
+            let amountTaxes = amountTTC - amountEnergy - amountGhost;
+            if(amountTaxes < 0) amountTaxes = 0;
 
             invoiceChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Énergie', 'Taxes & Abo', 'Pénalités (Gaspillage)'],
+                    labels: ['Énergie', 'Taxes & Abo', 'Pénalités'],
                     datasets: [{
                         label: 'Montant (€)',
-                        data: [amountEnergy, amountTaxes > 0 ? amountTaxes : 0, amountGhost],
+                        data: [amountEnergy, amountTaxes, amountGhost],
                         backgroundColor: ['#00E5FF', '#94A3B8', '#EF4444'],
                         borderRadius: 4,
                         barThickness: 40
@@ -283,7 +334,7 @@
                 }
             });
 
-            // 3. TABLEAU ANOMALIES
+            // TABLEAU ANOMALIES
             const tbody = document.getElementById('anomalies-list');
             tbody.innerHTML = '';
 
@@ -301,7 +352,7 @@
                             <td class="p-3"><span class="px-2 py-1 rounded text-[9px] font-bold border ${bgClass} ${colorClass}">${ano.severity}</span></td>
                             <td class="p-3 font-bold text-white">${ano.label}</td>
                             <td class="p-3 text-gray-400">${ano.message}</td>
-                            <td class="p-3 text-right font-mono ${colorClass}">Action Requise</td>
+                            <td class="p-3 text-right font-mono ${colorClass} cursor-pointer hover:underline">Action Requise</td>
                         </tr>
                     `;
                     tbody.innerHTML += row;
