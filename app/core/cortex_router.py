@@ -17,11 +17,21 @@ except ImportError:
         physics = None
         print("⚠️ ALERTE : Cortex Physics introuvable. Le calcul intelligent sera désactivé.")
 
+# Import conditionnel pour l'ingestion spécifique (Finance/Particulier)
+try:
+    from app.core.cortex_ingest import ingest
+except ImportError:
+    try:
+        import cortex_ingest as ingest
+    except:
+        ingest = None
+
 class CortexRouter:
     """
-    CORTEX ROUTER V6 - PHYSICS INTEGRATION
+    CORTEX ROUTER V6.5 - PHYSICS INTEGRATION + FINANCE EXTENSION
     Responsabilités : I/O Fichiers, Identification Client, Orchestration.
     Délègue l'analyse de la courbe à CortexPhysics.
+    Gère désormais les exports Enedis Particulier (Excel).
     """
 
     def __init__(self):
@@ -78,8 +88,20 @@ class CortexRouter:
 
         try:
             # CAS 1 : EXCEL
-            if filename.endswith('.xlsx'):
-                df = pd.read_excel(io.BytesIO(file_content), dtype=str)
+            if filename.endswith('.xlsx') or filename.endswith('.xls'):
+                # Lecture légère pour détection
+                df = pd.read_excel(io.BytesIO(file_content), dtype=str, header=None)
+                
+                # --- AJOUT FINANCE : Détection Enedis Particulier ---
+                # On scanne les premières lignes pour trouver "Point Référence Mesure"
+                preview_str = df.head(20).to_string()
+                if "Point Référence Mesure" in preview_str and ingest:
+                    # C'est un fichier Enedis Particulier -> On laisse CortexIngest gérer
+                    # On retourne un marqueur spécial pour que analyze_file_stream le sache
+                    return "ENEDIS_INDIVIDUAL", None, 0
+
+                # --- FIN AJOUT ---
+
                 for idx, row in df.head(20).iterrows():
                     row_str = " ".join([str(x) for x in row.values])
                     match = re.search(r'\d{14}', row_str)
@@ -133,10 +155,11 @@ class CortexRouter:
 
             # 2. Identification Colonne Valeur
             val_col = None
-            for col in df.columns:
-                if "Valeur" in str(col) or "Conso" in str(col) or "P (W)" in str(col):
-                    val_col = col
-                    break
+            if isinstance(df, pd.DataFrame):
+                for col in df.columns:
+                    if "Valeur" in str(col) or "Conso" in str(col) or "P (W)" in str(col):
+                        val_col = col
+                        break
             
             if not val_col: return "Colonne 'Valeur' introuvable"
 
@@ -183,6 +206,18 @@ class CortexRouter:
 
         # 1. Deep Scan
         pdl, stream, header_row = self._extract_pdl_from_content(file_content, filename)
+
+        # --- AJOUT FINANCE : Interception Enedis Particulier ---
+        if pdl == "ENEDIS_INDIVIDUAL" and ingest:
+            result = ingest.ingest_enedis_individual(file_content)
+            return {
+                "filename": filename,
+                "status": result["status"],
+                "message": result["message"],
+                "pdl": result.get("pdl", "N/A"),
+                "target_profile": "PARTICULIER"
+            }
+        # --- FIN AJOUT ---
 
         # 2. Fallback Nom
         if not pdl:
