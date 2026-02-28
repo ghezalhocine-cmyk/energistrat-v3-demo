@@ -4,13 +4,18 @@ import io
 import logging
 import chardet
 import re
+import json
+import os
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("CORTEX_INGEST_V1116")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "1116.0 (Provider Fix)"
+        self.version = "1116.0 (Provider Fix) + FINANCE EXTENSION"
+        self.DATA_DIR = os.path.join(os.getcwd(), "data")
+        if not os.path.exists(self.DATA_DIR): os.makedirs(self.DATA_DIR, exist_ok=True)
         
         self.COLUMN_MAPPING = {
             "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
@@ -239,6 +244,9 @@ class CortexIngest:
                         "storage": self._safe_float(row.get(c_stock))
                     }
                 }
+                
+                # SAUVEGARDE JSON (Appel interne)
+                self._save_site_json(pdl, site)
                 sites.append(site)
             except: continue
         return sites
@@ -296,5 +304,133 @@ class CortexIngest:
             delta = (df['date'].iloc[1] - df['date'].iloc[0]).total_seconds() / 60
             return df, int(delta), {}
         except: return None, 0, {}
+
+    # --- MÉTHODES UTILITAIRES INTERNES (POUR LE NOUVEAU MODULE) ---
+    def _save_site_json(self, pdl, data_update):
+        """Helper pour sauvegarder ou merger un JSON existant."""
+        safe_id = str(pdl).strip()
+        file_path = os.path.join(self.DATA_DIR, f"{safe_id}.json")
+        
+        current_data = {}
+        if os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                current_data = json.load(f)
+        else:
+            current_data = {
+                "identity": {"id": safe_id, "site_name": f"Site {safe_id}"},
+                "contract": {"pdl": safe_id},
+                "measurements": []
+            }
+
+        # Fusion Intelligente
+        if 'measurements' in data_update:
+            current_data['measurements'] = data_update['measurements']
+            # Recalcul Volume
+            total = sum([m['val'] for m in data_update['measurements']])
+            if 'kpis' not in current_data: current_data['kpis'] = {}
+            current_data['kpis']['volume_mwh'] = round(total / 1000, 3)
+
+        # Merge des autres sections
+        for section in ['identity', 'contract', 'location', 'technical', 'pricing']:
+            if section in data_update:
+                if section not in current_data: current_data[section] = {}
+                current_data[section].update(data_update[section])
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(current_data, f, indent=4, ensure_ascii=False)
+
+    # --- NOUVELLE FONCTION : IMPORT INDIVIDUEL ENEDIS (GREFFÉE SANS IMPACT) ---
+    def ingest_enedis_individual(self, content):
+        """
+        Parse l'Excel 'Compte Client' Enedis (Format Particulier).
+        Structure : Header (~Ligne 7) -> Tableau (~Ligne 14).
+        """
+        try:
+            # A. Extraction du PDL (Header)
+            df_head = pd.read_excel(io.BytesIO(content), header=None, nrows=15)
+            pdl = None
+            
+            # Recherche brute dans les cellules
+            for r in range(len(df_head)):
+                row_str = " ".join(df_head.iloc[r].astype(str).values)
+                if "Point Référence Mesure" in row_str or "PRM" in row_str:
+                    match = re.search(r"(\d{14})", row_str)
+                    if match:
+                        pdl = match.group(1)
+                        break
+            
+            # Fallback : Recherche cellule spécifique (souvent C7 ou D7)
+            if not pdl:
+                for col in range(10): # Scan large
+                    for row in range(10):
+                        try:
+                            val = str(df_head.iloc[row, col]).replace(" ", "")
+                            if val.isdigit() and len(val) == 14:
+                                pdl = val
+                                break
+                        except: continue
+                    if pdl: break
+
+            if not pdl:
+                return {"status": "ERROR", "message": "Impossible de trouver le PDL (PRM) dans l'en-tête."}
+
+            # B. Extraction des Données (Tableau)
+            # On cherche la ligne d'en-tête "Date"
+            df_raw = pd.read_excel(io.BytesIO(content), header=None)
+            header_idx = -1
+            for i, row in df_raw.iterrows():
+                row_values = [str(v) for v in row.values]
+                if "Date" in row_values and any("Valeur" in v for v in row_values):
+                    header_idx = i
+                    break
+            
+            if header_idx == -1:
+                return {"status": "ERROR", "message": "Tableau de données introuvable (Colonne 'Date' manquante)."}
+
+            # On recharge proprement avec le bon header
+            df_data = pd.read_excel(io.BytesIO(content), header=header_idx)
+            
+            # Normalisation des colonnes
+            cols = df_data.columns.tolist()
+            val_col = next((c for c in cols if "Valeur" in c or "Conso" in c), None)
+            
+            if not val_col:
+                return {"status": "ERROR", "message": "Colonne Valeur/Conso introuvable."}
+
+            df_data = df_data[['Date', val_col]].dropna()
+            
+            measurements = []
+            for _, row in df_data.iterrows():
+                try:
+                    # Conversion Date (DD/MM/YYYY) -> ISO
+                    d_str = row['Date']
+                    if isinstance(d_str, datetime):
+                        d_iso = d_str.strftime("%Y-%m-%d")
+                    else:
+                        d_iso = datetime.strptime(str(d_str), "%d/%m/%Y").strftime("%Y-%m-%d")
+                    
+                    # Conversion Valeur (32,86 -> 32.86)
+                    val_raw = str(row[val_col]).replace(',', '.').replace('\xa0', '')
+                    val = float(val_raw)
+                    
+                    measurements.append({"date": d_iso, "val": val})
+                except Exception as e:
+                    continue
+
+            # C. Sauvegarde
+            self._save_site_json(pdl, {
+                "measurements": measurements,
+                "identity": {"site_name": f"Domicile {pdl[-4:]}"}
+            })
+
+            return {
+                "status": "SUCCESS", 
+                "message": f"Succès : {len(measurements)} jours importés pour le PDL {pdl}",
+                "pdl": pdl,
+                "points": len(measurements)
+            }
+
+        except Exception as e:
+            return {"status": "ERROR", "message": f"Crash Parser Enedis: {str(e)}"}
 
 ingest = CortexIngest()
