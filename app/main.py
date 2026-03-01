@@ -8,7 +8,9 @@ import traceback
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-# AJOUTS SÉCURITÉ
+# ==============================================================================
+# 1. IMPORTS & SÉCURITÉ (FASTAPI)
+# ==============================================================================
 from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException, Response, Depends, status
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -24,9 +26,11 @@ except ImportError:
     PANDAS_READY = False
 
 # ==============================================================================
-# BLOC IMPORT CORTEX ROBUSTE
+# 2. BLOC IMPORT CORTEX ROBUSTE (ANTI-CRASH)
 # ==============================================================================
+# Ce bloc charge les cerveaux de l'IA (Ingest, Finance, Auth, Physics...)
 try:
+    # A. TENTATIVE PROD
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
@@ -39,7 +43,9 @@ try:
 
 except Exception as e_prod:
     print(f"⚠️ PROD IMPORT ERROR: {str(e_prod)}")
+    
     try:
+        # B. TENTATIVE LOCAL (DEV)
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
@@ -53,29 +59,40 @@ except Exception as e_prod:
     except Exception as e_local:
         print(f"⚠️ LOCAL IMPORT ERROR: {str(e_local)}")
         print("🔴 CRITICAL: ACTIVATION DU MODE DEGRADE (MOCKS)")
+
+        # C. MODE DEGRADE (POUR EVITER LE CRASH CONTAINER)
         class MockAuth:
             def authenticate_user(self, e, p, m=None): return {"id": "mock", "role": "ADMIN"}
             def create_access_token(self, d): return "mock_token"
             def decode_token(self, t): return {"sub": "admin@energistrat.com", "role": "ADMIN"}
         auth = MockAuth()
+
         class MockFinance:
             def parse_invoice(self, c, f): return {"status": "ERROR", "message": "Module Finance HS"}
             def audit_invoice(self, i, s): return {}
             def simulate_landing(self, s): return {}
         finance = MockFinance()
+
         class MockRouter:
             def get_api_status(self): return {"status": "DEGRADED", "error": str(e_local)}
             def analyze_file_stream(self, c, f): return {"status": "ERROR", "message": "Router HS"}
         router = MockRouter()
+        
         class MockMarket:
             def valoriser_strategie(self, l, b): return {"error": "Market module missing"}
         market = MockMarket()
+
         class MockAggregator:
             def aggregate_sites(self, s, y): return None
         aggregator = MockAggregator()
+        
         ingest = None; cortex = None; physics = None; forecast = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3013-DEEP-MAPPING")
+# ==============================================================================
+# 3. CONFIGURATION APP
+# ==============================================================================
+
+app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3015-INTEGRAL")
 
 app.add_middleware(
     CORSMiddleware,
@@ -97,7 +114,8 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# --- MODELES ---
+# --- MODELES DE DONNEES ---
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -117,7 +135,8 @@ class AggregationRequest(BaseModel):
     site_ids: List[str]
     years: int = 3
 
-# --- UTILS ---
+# --- FONCTIONS UTILITAIRES ---
+
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
     elif isinstance(data, list): return [json_compliant(v) for v in data]
@@ -138,7 +157,8 @@ def find_site_file(target_id):
             with open(p, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 stored_id = str(data.get('identity', {}).get('id', ''))
-                if get_safe_id(stored_id) == safe_target: return p
+                if get_safe_id(stored_id) == safe_target:
+                    return p
         except: continue
     return None
 
@@ -150,8 +170,9 @@ def get_market_ref():
         except: pass
     return {"updated_at": datetime.now().isoformat(), "elec": {"cal_n1": 85.0}}
 
-# --- MIDDLEWARE SÉCURITÉ ---
+# --- MIDDLEWARE SÉCURITÉ (DEPENDENCY) ---
 async def get_current_user(request: Request):
+    """Vérifie le Cookie de Session."""
     token = request.cookies.get("access_token")
     if not token: return None
     if token.startswith("Bearer "): token = token.split(" ")[1]
@@ -159,11 +180,13 @@ async def get_current_user(request: Request):
     if not payload: return None
     return payload
 
-# ==========================================
-# ROUTES AUTHENTIFICATION
-# ==========================================
+# ==============================================================================
+# 4. ROUTES D'AUTHENTIFICATION
+# ==============================================================================
+
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request):
+    # SMART LOGIN : Si déjà connecté, on va au dashboard
     token = request.cookies.get("access_token")
     if token: return RedirectResponse(url="/dashboard/industry")
     return templates.TemplateResponse("login.html", {"request": request})
@@ -171,10 +194,25 @@ async def view_login(request: Request):
 @app.post("/api/auth/login")
 async def api_login(credentials: LoginRequest, response: Response):
     result = auth.authenticate_user(credentials.email, credentials.password, credentials.mfa_code)
-    if result == "MFA_REQUIRED": return JSONResponse({"detail": "MFA_REQUIRED"}, status_code=403)
-    if not result: return JSONResponse({"detail": "Identifiants invalides"}, status_code=401)
+    
+    if result == "MFA_REQUIRED":
+        return JSONResponse({"detail": "MFA_REQUIRED"}, status_code=403)
+    
+    if not result:
+        return JSONResponse({"detail": "Identifiants invalides"}, status_code=401)
+    
+    # Création du Token
     access_token = auth.create_access_token(data={"sub": result["email"], "role": result["role"]})
-    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True, max_age=3600, samesite="lax")
+    
+    # Stockage dans un Cookie HTTPOnly
+    response.set_cookie(
+        key="access_token", 
+        value=f"Bearer {access_token}", 
+        httponly=True, 
+        max_age=3600, 
+        samesite="lax"
+    )
+    
     return {"access_token": access_token, "token_type": "bearer", "role": result["role"]}
 
 @app.get("/logout")
@@ -182,12 +220,16 @@ async def logout(response: Response):
     response.delete_cookie("access_token")
     return RedirectResponse(url="/login")
 
-# ==========================================
-# API PRINCIPALES
-# ==========================================
+# ==============================================================================
+# 5. API PRINCIPALES (SETTINGS & DATA)
+# ==============================================================================
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
+    """
+    SAUVEGARDE INTELLIGENTE (FIX ABAG)
+    Capture les données plates et les range dans la structure contractuelle.
+    """
     try:
         data = await request.json()
         raw_id = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
@@ -195,31 +237,45 @@ async def api_save_client(request: Request):
         safe_id = get_safe_id(raw_id)
         file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
         
-        # NORMALISATION : On s'assure que les données plates sont aussi dans les sous-objets
+        # --- NORMALISATION DES DONNÉES ---
         if 'contract' in data:
             c = data['contract']
             if 'power_details' not in c: c['power_details'] = {}
-            # Mapping forcé
-            if 'ps_hph' in c: c['power_details']['hph'] = c['ps_hph']
-            if 'ps_hch' in c: c['power_details']['hch'] = c['ps_hch']
-            if 'ps_hpe' in c: c['power_details']['hpe'] = c['ps_hpe']
-            if 'ps_hce' in c: c['power_details']['hce'] = c['ps_hce']
+            
+            # Mapping agressif des champs plats vers la structure
+            mapping = {
+                'hph': ['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph'],
+                'hch': ['ps_hch', 'p_hch', 'PS_HCH', 'puissance_hch'],
+                'hpe': ['ps_hpe', 'p_hpe', 'PS_HPE', 'puissance_hpe'],
+                'hce': ['ps_hce', 'p_hce', 'PS_HCE', 'puissance_hce']
+            }
+            
+            # On cherche dans la racine et dans contract
+            sources = [data, c]
+            if 'technical' in data: sources.append(data['technical'])
+            
+            for target, variants in mapping.items():
+                for s in sources:
+                    for v in variants:
+                        if v in s and s[v]:
+                            c['power_details'][target] = s[v]
+                            break
         
+        # --- SAUVEGARDE DISQUE ---
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
-            if 'technical' in data:
-                if 'technical' not in existing_data: existing_data['technical'] = {}
-                existing_data['technical'].update(data['technical'])
-            if 'location' in data:
-                if 'location' not in existing_data: existing_data['location'] = {}
-                existing_data['location'].update(data['location'])
+            
+            if 'contract' in data: 
+                if 'contract' not in existing_data: existing_data['contract'] = {}
+                existing_data['contract'].update(data['contract'])
             if 'identity' in data: existing_data['identity'].update(data['identity'])
-            if 'contract' in data: existing_data['contract'].update(data['contract'])
+            if 'location' in data: existing_data['location'].update(data['location'])
             if 'pricing' in data: existing_data['pricing'] = data['pricing']
             if 'kpis' in data:
                 if 'kpis' not in existing_data: existing_data['kpis'] = {}
                 existing_data['kpis'].update(data['kpis'])
             if 'financials' in data: existing_data['financials'] = data['financials']
+            
             final_data = existing_data
         else:
             final_data = data
@@ -312,9 +368,11 @@ async def get_fleet_data(response: Response):
         "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)) }
     }))
 
-# --- CORRECTION CRITIQUE V3013 : DEEP MAPPING (RECONSTITUTION DES DONNÉES) ---
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str, response: Response):
+    """
+    Récupération des données Dashboard avec FIX BUDGET et DEEP MAPPING.
+    """
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     file_path = find_site_file(client_id)
     if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
@@ -335,10 +393,10 @@ async def get_dashboard_data(client_id: str, response: Response):
     if vol_display == 0 and 'volume_mwh' in kpis_raw:
         vol_display = float(kpis_raw['volume_mwh'])
 
-    # FIX BUDGET (CORRECTION DÉLIRE MWh/kWh)
+    # FIX BUDGET (CORRECTION DÉLIRE)
     budget_display = financials['budget_annual']
     volume_multiplier = 1000
-    if vol_display > 100000: volume_multiplier = 1 
+    if vol_display > 100000: volume_multiplier = 1 # Déjà en kWh
     
     if financials['volume_mwh'] == 0 and vol_display > 0:
         p_data = data.get('pricing', {})
@@ -349,29 +407,15 @@ async def get_dashboard_data(client_id: str, response: Response):
                 except: pass
         budget_display = financials.get('budget_subscription', 0) + (vol_display * volume_multiplier * u_price)
 
-    # FIX DATA MISSING (RECONSTITUTION AGRESSIVE DES DÉTAILS)
-    # On cherche les infos dans les sous-objets ET à plat, avec toutes les variantes de clés
-    
-    # 1. Puissance
+    # FIX DATA MISSING (RECONSTITUTION DES DÉTAILS)
     power_details = contract.get('power_details', {})
-    # Liste des alias possibles pour chaque poste
-    p_map = {
-        "hph": ["ps_hph", "p_hph", "PS HPH", "puissance_hph", "hph"],
-        "hch": ["ps_hch", "p_hch", "PS HCH", "puissance_hch", "hch"],
-        "hpe": ["ps_hpe", "p_hpe", "PS HPE", "puissance_hpe", "hpe"],
-        "hce": ["ps_hce", "p_hce", "PS HCE", "puissance_hce", "hce"]
-    }
-    final_power = {}
-    for key, aliases in p_map.items():
-        val = power_details.get(key) # D'abord dans l'objet structuré
-        if not val:
-            for alias in aliases:
-                val = contract.get(alias) # Ensuite à plat
-                if val: break
-        final_power[key] = val or "-"
-
-    # 2. Prix (Même logique si besoin, mais souvent dans 'pricing')
-    # Le front utilise 'pricing' qui est déjà géré par cortex.enrich_site_financials
+    if not power_details:
+        power_details = {
+            "hph": contract.get("ps_hph") or contract.get("p_hph") or contract.get("P_HPH"),
+            "hch": contract.get("ps_hch") or contract.get("p_hch") or contract.get("P_HCH"),
+            "hpe": contract.get("ps_hpe") or contract.get("p_hpe") or contract.get("P_HPE"),
+            "hce": contract.get("ps_hce") or contract.get("p_hce") or contract.get("P_HCE")
+        }
 
     response_data = {
         "energy_type": "gaz" if financials['meta']['is_gas'] else "elec",
@@ -392,7 +436,7 @@ async def get_dashboard_data(client_id: str, response: Response):
             "cja": contract.get('cja'),
             "profil": contract.get('profil'),
             "tarif_acheminement": contract.get('tarif_acheminement'),
-            "power_details": final_power, # Version reconstruite
+            "power_details": power_details, 
             "consumption_details": contract.get('consumption_details', {})
         },
         "pricing": pricing,
@@ -460,9 +504,9 @@ async def api_solar_sim(request: Request):
         return JSONResponse(physics.simulate_solar_roi(lat, lon, surface, price))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-# ==========================================
-# OUTILS & TEMPLATES
-# ==========================================
+# ==============================================================================
+# 6. OUTILS & TEMPLATES (RESTITUÉS - LE BLOC MANQUANT)
+# ==============================================================================
 @app.get("/api/tools/template/{template_type}")
 async def download_template(template_type: str):
     if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
@@ -581,9 +625,9 @@ async def generate_tender(request: Request):
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_Energistrat_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-# ==========================================
-# ROUTES TITANIUM (INGESTION & PROFILS)
-# ==========================================
+# ==============================================================================
+# 7. ROUTES TITANIUM (INGESTION & PROFILS)
+# ==============================================================================
 
 # --- SÉCURISATION DES ROUTES SENSIBLES (OPS & FINANCE) ---
 
