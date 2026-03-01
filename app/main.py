@@ -87,7 +87,7 @@ except Exception as e_prod:
         # Objets vides pour éviter NameError
         ingest = None; cortex = None; physics = None; forecast = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3003-UX-FIX")
+app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3005-VITRINE-OPEN")
 
 app.add_middleware(
     CORSMiddleware,
@@ -193,11 +193,9 @@ async def get_current_user(request: Request):
 # ROUTES D'AUTHENTIFICATION
 # ==========================================
 
-# --- MODIFICATION UX : SMART LOGIN ---
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request):
-    # Si l'utilisateur clique sur "Connexion" mais est déjà connecté,
-    # on le redirige directement vers le Dashboard. Pas besoin de se reloguer.
+    # SMART LOGIN : Si déjà connecté, on va au dashboard
     token = request.cookies.get("access_token")
     if token: return RedirectResponse(url="/dashboard/industry")
     return templates.TemplateResponse("login.html", {"request": request})
@@ -668,12 +666,15 @@ async def generate_tender(request: Request):
 # ROUTES TITANIUM (INGESTION & PROFILS)
 # ==========================================
 
+# --- SÉCURISATION DES ROUTES SENSIBLES (OPS & FINANCE) ---
+
 @app.get("/ops/ingest", response_class=HTMLResponse)
 async def ops_ingest_page(request: Request, user = Depends(get_current_user)):
     """Page d'Ingestion Massive avec Sécurité Import."""
     # PROTECTION : Seuls les Admin/Ops peuvent ingérer
     if not user or user.get("role") not in ["ADMIN", "OPS_TECH"]: 
         return RedirectResponse(url="/login")
+        
     try:
         if 'router' not in globals() and 'router' not in locals(): raise Exception("Le module Router n'est pas chargé.")
         api_status = router.get_api_status()
@@ -747,8 +748,10 @@ async def api_aggregate_sites(payload: AggregationRequest):
 
 @app.get("/industrie", response_class=HTMLResponse)
 @app.get("/industry", response_class=HTMLResponse)
-async def view_industrie(request: Request, id: Optional[str] = None):
+async def view_industrie(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
     """Profil Industrie (Usine 4.0) - Câblé sur les vraies données."""
+    if not user: return RedirectResponse(url="/login")
+
     if id:
         file_path = find_site_file(id)
         if file_path:
@@ -771,8 +774,10 @@ async def view_industrie(request: Request, id: Optional[str] = None):
     return templates.TemplateResponse("industry.html", {"request": request, "data": data})
 
 @app.get("/syndic", response_class=HTMLResponse)
-async def view_syndic(request: Request, id: Optional[str] = None):
+async def view_syndic(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
     """Profil Syndic (Habitat) - Câblé sur les vraies données."""
+    if not user: return RedirectResponse(url="/login")
+
     if id:
         file_path = find_site_file(id)
         if file_path:
@@ -795,50 +800,61 @@ async def view_syndic(request: Request, id: Optional[str] = None):
     data = {"client_name": "RÉSIDENCE DÉMO", "dju_n": 2100, "dju_n_1": 2400, "conso_n": 450000}
     return templates.TemplateResponse("syndic.html", {"request": request, "data": data})
 
-# --- ROUTES NOUVEAUX PROFILS (CORRIGÉES) ---
+# --- ROUTES NOUVEAUX PROFILS (CORRIGÉES & SÉCURISÉES) ---
 @app.get("/mairie", response_class=HTMLResponse)
-async def view_mairie(request: Request, id: Optional[str] = None):
+async def view_mairie(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("mairie.html", {"request": request})
 
 @app.get("/retail", response_class=HTMLResponse)
-async def view_retail(request: Request, id: Optional[str] = None):
+async def view_retail(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("retail.html", {"request": request})
 
 @app.get("/pme", response_class=HTMLResponse)
-async def view_pme(request: Request, id: Optional[str] = None):
+async def view_pme(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("pme.html", {"request": request})
 
 @app.get("/sde", response_class=HTMLResponse)
-async def view_sde(request: Request, id: Optional[str] = None):
+async def view_sde(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("sde.html", {"request": request})
 
 @app.get("/oph", response_class=HTMLResponse)
-async def view_oph(request: Request, id: Optional[str] = None):
+async def view_oph(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("oph.html", {"request": request})
 
 @app.get("/citoyen", response_class=HTMLResponse)
-async def view_citoyen(request: Request, id: Optional[str] = None):
+async def view_citoyen(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("citoyen.html", {"request": request})
 
 # --- SATELLITES (NOUVEAU) ---
 @app.get("/optimization", response_class=HTMLResponse)
-async def view_optimization(request: Request):
+async def view_optimization(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("optimization.html", {"request": request})
 
 @app.get("/performance", response_class=HTMLResponse)
-async def view_performance(request: Request):
+async def view_performance(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("performance.html", {"request": request})
 
 @app.get("/carbon", response_class=HTMLResponse)
-async def view_carbon(request: Request):
+async def view_carbon(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("carbon.html", {"request": request})
 
 @app.get("/trading", response_class=HTMLResponse)
-async def view_trading(request: Request):
+async def view_trading(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("trading.html", {"request": request})
 
 @app.get("/ops/aggregator", response_class=HTMLResponse)
-async def view_aggregator(request: Request):
+async def view_aggregator(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("ops_aggregator.html", {"request": request})
 
 # --- MODULE FINANCE (NOUVEAU & SÉCURISÉ) ---
@@ -889,8 +905,7 @@ async def api_finance_landing(site_id: str):
 
 @app.get("/")
 async def view_landing(request: Request): 
-    # MODIFICATION UX : On affiche TOUJOURS la vitrine.
-    # L'utilisateur cliquera sur "Connexion" pour entrer.
+    # ACCÈS PUBLIC (Vitrine)
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/onboarding")
