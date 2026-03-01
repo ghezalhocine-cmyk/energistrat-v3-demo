@@ -87,7 +87,7 @@ except Exception as e_prod:
         # Objets vides pour éviter NameError
         ingest = None; cortex = None; physics = None; forecast = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3002-STABLE")
+app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3003-UX-FIX")
 
 app.add_middleware(
     CORSMiddleware,
@@ -171,7 +171,7 @@ def get_market_ref():
         "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 }
     }
 
-# --- AJOUT : MIDDLEWARE DE SÉCURITÉ (DEPENDENCY) ---
+# --- MIDDLEWARE SÉCURITÉ (DEPENDENCY) ---
 async def get_current_user(request: Request):
     """
     Vérifie le Cookie de Session.
@@ -190,11 +190,16 @@ async def get_current_user(request: Request):
     return payload
 
 # ==========================================
-# AJOUT : ROUTES D'AUTHENTIFICATION
+# ROUTES D'AUTHENTIFICATION
 # ==========================================
 
+# --- MODIFICATION UX : SMART LOGIN ---
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request):
+    # Si l'utilisateur clique sur "Connexion" mais est déjà connecté,
+    # on le redirige directement vers le Dashboard. Pas besoin de se reloguer.
+    token = request.cookies.get("access_token")
+    if token: return RedirectResponse(url="/dashboard/industry")
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/api/auth/login")
@@ -669,7 +674,6 @@ async def ops_ingest_page(request: Request, user = Depends(get_current_user)):
     # PROTECTION : Seuls les Admin/Ops peuvent ingérer
     if not user or user.get("role") not in ["ADMIN", "OPS_TECH"]: 
         return RedirectResponse(url="/login")
-        
     try:
         if 'router' not in globals() and 'router' not in locals(): raise Exception("Le module Router n'est pas chargé.")
         api_status = router.get_api_status()
@@ -885,9 +889,8 @@ async def api_finance_landing(site_id: str):
 
 @app.get("/")
 async def view_landing(request: Request): 
-    # Si déjà connecté, redirection Dashboard
-    token = request.cookies.get("access_token")
-    if token: return RedirectResponse(url="/dashboard/industry")
+    # MODIFICATION UX : On affiche TOUJOURS la vitrine.
+    # L'utilisateur cliquera sur "Connexion" pour entrer.
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/onboarding")
