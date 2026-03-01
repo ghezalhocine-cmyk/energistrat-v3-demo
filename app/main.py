@@ -8,7 +8,7 @@ import traceback
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-# AJOUTS SÉCURITÉ : Depends, status, RedirectResponse
+# AJOUTS SÉCURITÉ
 from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException, Response, Depends, status
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -75,7 +75,7 @@ except Exception as e_prod:
         aggregator = MockAggregator()
         ingest = None; cortex = None; physics = None; forecast = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3011-SAVE-FIX")
+app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3013-DEEP-MAPPING")
 
 app.add_middleware(
     CORSMiddleware,
@@ -183,15 +183,11 @@ async def logout(response: Response):
     return RedirectResponse(url="/login")
 
 # ==========================================
-# API PRINCIPALES (SETTINGS & DATA)
+# API PRINCIPALES
 # ==========================================
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
-    """
-    Sauvegarde intelligente : Structure les données plates (Settings) 
-    en objets complexes (Dashboard compatible).
-    """
     try:
         data = await request.json()
         raw_id = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
@@ -199,13 +195,11 @@ async def api_save_client(request: Request):
         safe_id = get_safe_id(raw_id)
         file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
         
-        # NORMALISATION DES DONNÉES (POUR COMPATIBILITÉ DASHBOARD)
-        # Si le front envoie des données plates, on les range
+        # NORMALISATION : On s'assure que les données plates sont aussi dans les sous-objets
         if 'contract' in data:
             c = data['contract']
-            # Création de power_details si absent
             if 'power_details' not in c: c['power_details'] = {}
-            # Mapping des champs plats vers la structure
+            # Mapping forcé
             if 'ps_hph' in c: c['power_details']['hph'] = c['ps_hph']
             if 'ps_hch' in c: c['power_details']['hch'] = c['ps_hch']
             if 'ps_hpe' in c: c['power_details']['hpe'] = c['ps_hpe']
@@ -213,8 +207,6 @@ async def api_save_client(request: Request):
         
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
-            
-            # Mise à jour section par section
             if 'technical' in data:
                 if 'technical' not in existing_data: existing_data['technical'] = {}
                 existing_data['technical'].update(data['technical'])
@@ -228,7 +220,6 @@ async def api_save_client(request: Request):
                 if 'kpis' not in existing_data: existing_data['kpis'] = {}
                 existing_data['kpis'].update(data['kpis'])
             if 'financials' in data: existing_data['financials'] = data['financials']
-            
             final_data = existing_data
         else:
             final_data = data
@@ -294,6 +285,7 @@ async def get_fleet_data(response: Response):
         vol_router = 0
         if 'kpis' in s and 'volume_mwh' in s['kpis']: vol_router = float(s['kpis']['volume_mwh'])
         final_vol = vol_engine if vol_engine > 0 else vol_router
+        
         final_budget = fin['budget_annual']
         if vol_engine == 0 and vol_router > 0:
             pricing = s.get('pricing', {})
@@ -305,6 +297,7 @@ async def get_fleet_data(response: Response):
             sub_cost = fin.get('budget_subscription', 0)
             energy_cost = (final_vol * 1000) * avg_price
             final_budget = sub_cost + energy_cost
+
         fleet_list.append({
             "id": safe_id, "name": fin['meta']['site_label'], "city": city,
             "zip": s.get('location', {}).get('zip_code', ''), "volume": final_vol,
@@ -319,6 +312,7 @@ async def get_fleet_data(response: Response):
         "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)) }
     }))
 
+# --- CORRECTION CRITIQUE V3013 : DEEP MAPPING (RECONSTITUTION DES DONNÉES) ---
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str, response: Response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -328,7 +322,9 @@ async def get_dashboard_data(client_id: str, response: Response):
     
     financials = cortex.enrich_site_financials(data)
     market_ref = get_market_ref()
-    market_analysis = cortex.analyze_market_position(financials['kpis']['unit_price_kwh'], market_ref, financials['meta']['is_gas'])
+    market_analysis = cortex.analyze_market_position(
+        financials['kpis']['unit_price_kwh'], market_ref, financials['meta']['is_gas']
+    )
     contract = data.get('contract', {})
     pricing = financials['pricing_details']
     display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
@@ -336,9 +332,10 @@ async def get_dashboard_data(client_id: str, response: Response):
     # FIX VOLUME
     vol_display = financials['volume_mwh']
     kpis_raw = data.get('kpis', {})
-    if vol_display == 0 and 'volume_mwh' in kpis_raw: vol_display = float(kpis_raw['volume_mwh'])
+    if vol_display == 0 and 'volume_mwh' in kpis_raw:
+        vol_display = float(kpis_raw['volume_mwh'])
 
-    # FIX BUDGET (CORRECTION DÉLIRE)
+    # FIX BUDGET (CORRECTION DÉLIRE MWh/kWh)
     budget_display = financials['budget_annual']
     volume_multiplier = 1000
     if vol_display > 100000: volume_multiplier = 1 
@@ -352,38 +349,71 @@ async def get_dashboard_data(client_id: str, response: Response):
                 except: pass
         budget_display = financials.get('budget_subscription', 0) + (vol_display * volume_multiplier * u_price)
 
-    # FIX DATA MISSING (RECONSTITUTION)
+    # FIX DATA MISSING (RECONSTITUTION AGRESSIVE DES DÉTAILS)
+    # On cherche les infos dans les sous-objets ET à plat, avec toutes les variantes de clés
+    
+    # 1. Puissance
     power_details = contract.get('power_details', {})
-    if not power_details:
-        power_details = {
-            "hph": contract.get("ps_hph") or contract.get("p_hph"),
-            "hch": contract.get("ps_hch") or contract.get("p_hch"),
-            "hpe": contract.get("ps_hpe") or contract.get("p_hpe"),
-            "hce": contract.get("ps_hce") or contract.get("p_hce")
-        }
+    # Liste des alias possibles pour chaque poste
+    p_map = {
+        "hph": ["ps_hph", "p_hph", "PS HPH", "puissance_hph", "hph"],
+        "hch": ["ps_hch", "p_hch", "PS HCH", "puissance_hch", "hch"],
+        "hpe": ["ps_hpe", "p_hpe", "PS HPE", "puissance_hpe", "hpe"],
+        "hce": ["ps_hce", "p_hce", "PS HCE", "puissance_hce", "hce"]
+    }
+    final_power = {}
+    for key, aliases in p_map.items():
+        val = power_details.get(key) # D'abord dans l'objet structuré
+        if not val:
+            for alias in aliases:
+                val = contract.get(alias) # Ensuite à plat
+                if val: break
+        final_power[key] = val or "-"
 
-    return JSONResponse(json_compliant({
+    # 2. Prix (Même logique si besoin, mais souvent dans 'pricing')
+    # Le front utilise 'pricing' qui est déjà géré par cortex.enrich_site_financials
+
+    response_data = {
         "energy_type": "gaz" if financials['meta']['is_gas'] else "elec",
-        "identity": data.get('identity', {}), "location": data.get('location', {}),
-        "technical": data.get('technical', {}), "financials": data.get('financials', {}),
+        "identity": data.get('identity', {}),
+        "location": data.get('location', {}),
+        "technical": data.get('technical', {}),
+        "financials": data.get('financials', {}),
         "contract": {
-            "pdl": contract.get('pdl'), "provider": financials['meta'].get('provider'), "segment": display_segment,
-            "start_date": contract.get('start_date'), "end_date": contract.get('end_date'),
-            "power": contract.get('power'), "p_max": contract.get('p_max'),
-            "fta": contract.get('fta'), "grd": contract.get('grd'), "cja": contract.get('cja'),
-            "profil": contract.get('profil'), "tarif_acheminement": contract.get('tarif_acheminement'),
-            "power_details": power_details, "consumption_details": contract.get('consumption_details', {})
+            "pdl": contract.get('pdl'),
+            "provider": financials['meta'].get('provider'),
+            "segment": display_segment,
+            "start_date": contract.get('start_date'),
+            "end_date": contract.get('end_date'),
+            "power": contract.get('power'),
+            "p_max": contract.get('p_max'),
+            "fta": contract.get('fta'),
+            "grd": contract.get('grd'),
+            "cja": contract.get('cja'),
+            "profil": contract.get('profil'),
+            "tarif_acheminement": contract.get('tarif_acheminement'),
+            "power_details": final_power, # Version reconstruite
+            "consumption_details": contract.get('consumption_details', {})
         },
         "pricing": pricing,
         "kpis": {
-            "volume_mwh": vol_display, "budget": budget_display,
-            "pmc": financials['kpis']['pmc_eur_mwh'], "ghost_savings": financials['kpis']['ghost_savings'],
-            "talon_kw": kpis_raw.get('talon_kw', 0), "pmax_kw": kpis_raw.get('pmax_kw', 0),
-            "cortex_advice": kpis_raw.get('cortex_advice', "Pas d'analyse disponible."), "is_alert": kpis_raw.get('is_alert', False)
+            "volume_mwh": vol_display,
+            "budget": budget_display,
+            "pmc": financials['kpis']['pmc_eur_mwh'],
+            "ghost_savings": financials['kpis']['ghost_savings'],
+            "talon_kw": kpis_raw.get('talon_kw', 0),
+            "pmax_kw": kpis_raw.get('pmax_kw', 0),
+            "cortex_advice": kpis_raw.get('cortex_advice', "Pas d'analyse disponible."),
+            "is_alert": kpis_raw.get('is_alert', False)
         },
-        "cortex_insight": { "message": "Analyse CORTEX terminée.", "conseil": "Prix optimisé." if market_analysis['status'] == 'OPTIMISÉ' else "Surveillez ce contrat." },
-        "market_analysis": market_analysis, "electricity_price": financials['kpis']['unit_price_kwh']
-    }))
+        "cortex_insight": {
+            "message": "Analyse CORTEX terminée.",
+            "conseil": "Prix optimisé." if market_analysis['status'] == 'OPTIMISÉ' else "Surveillez ce contrat."
+        },
+        "market_analysis": market_analysis,
+        "electricity_price": financials['kpis']['unit_price_kwh']
+    }
+    return JSONResponse(json_compliant(response_data))
 
 @app.get("/api/forecast/simulate/{client_id}")
 async def api_forecast_simulate(client_id: str):
