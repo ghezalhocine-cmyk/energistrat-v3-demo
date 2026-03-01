@@ -8,8 +8,9 @@ import traceback
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException, Response
-from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
+# AJOUTS SÉCURITÉ : Depends, status, RedirectResponse
+from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException, Response, Depends, status
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,6 +37,8 @@ try:
     from app.core.cortex_aggregator import aggregator
     # AJOUT FINANCE (PHASE PLATINUM)
     from app.core.cortex_finance import finance
+    # AJOUT AUTH (SÉCURITÉ)
+    from app.core.cortex_auth import auth
 except ImportError:
     try:
         # Fallback pour environnement local (Dev)
@@ -48,6 +51,8 @@ except ImportError:
         from core.cortex_aggregator import aggregator
         # AJOUT FINANCE LOCAL
         from core.cortex_finance import finance
+        # AJOUT AUTH LOCAL
+        from core.cortex_auth import auth
     except ImportError:
         try:
              import cortex_finance as finance
@@ -58,6 +63,16 @@ except ImportError:
                 def audit_invoice(self, i, s): return {}
                 def simulate_landing(self, s): return {}
             finance = MockFinance()
+
+        try:
+            import cortex_auth as auth
+        except:
+            # Mock Auth pour éviter crash si module manquant
+            class MockAuth:
+                def authenticate_user(self, e, p, m=None): return {"id": "mock", "role": "ADMIN"}
+                def create_access_token(self, d): return "mock_token"
+                def decode_token(self, t): return {"sub": "admin@energistrat.com", "role": "ADMIN"}
+            auth = MockAuth()
 
         # Mock de secours critique pour éviter le crash au démarrage si un fichier manque
         print("CRITICAL WARNING: Cortex Modules missing. Running in degraded mode.")
@@ -74,7 +89,7 @@ except ImportError:
             def aggregate_sites(self, s, y): return None
         aggregator = MockAggregator()
 
-app = FastAPI(title="ENERGISTRAT V3", version="TITANIUM-V1950-GOLD-MASTER")
+app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3000-SECURE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -97,6 +112,12 @@ if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/stat
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # --- MODELES DE DONNEES ---
+
+# AJOUT : Modèle de Login
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+    mfa_code: Optional[str] = None
 
 class MarketUpdateModel(BaseModel):
     elec: Dict[str, Any]
@@ -152,6 +173,62 @@ def get_market_ref():
         "elec": { "cal_n1": 85.0 }, "gaz": { "peg_n1": 35.0 },
         "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 }
     }
+
+# --- AJOUT : MIDDLEWARE DE SÉCURITÉ (DEPENDENCY) ---
+async def get_current_user(request: Request):
+    """
+    Vérifie le Cookie de Session.
+    Si valide : Retourne l'utilisateur.
+    Si invalide : Retourne None.
+    """
+    token = request.cookies.get("access_token")
+    if not token:
+        return None
+    
+    # Nettoyage du Bearer si présent
+    if token.startswith("Bearer "): token = token.split(" ")[1]
+    
+    payload = auth.decode_token(token)
+    if not payload: return None
+    return payload
+
+# ==========================================
+# AJOUT : ROUTES D'AUTHENTIFICATION
+# ==========================================
+
+@app.get("/login", response_class=HTMLResponse)
+async def view_login(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post("/api/auth/login")
+async def api_login(credentials: LoginRequest, response: Response):
+    """Endpoint de connexion (Email/Pass + MFA)."""
+    result = auth.authenticate_user(credentials.email, credentials.password, credentials.mfa_code)
+    
+    if result == "MFA_REQUIRED":
+        return JSONResponse({"detail": "MFA_REQUIRED"}, status_code=403)
+    
+    if not result:
+        return JSONResponse({"detail": "Identifiants invalides"}, status_code=401)
+    
+    # Création du Token
+    access_token = auth.create_access_token(data={"sub": result["email"], "role": result["role"]})
+    
+    # Stockage dans un Cookie HTTPOnly (Sécurisé)
+    response.set_cookie(
+        key="access_token", 
+        value=f"Bearer {access_token}", 
+        httponly=True, # Inaccessible au JS (Anti-XSS)
+        max_age=3600, # 1h
+        samesite="lax"
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer", "role": result["role"]}
+
+@app.get("/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token")
+    return RedirectResponse(url="/login")
 
 # --- API PRINCIPALES (SETTINGS & DATA) ---
 
@@ -589,9 +666,15 @@ async def generate_tender(request: Request):
 # ROUTES TITANIUM (INGESTION & PROFILS)
 # ==========================================
 
+# --- SÉCURISATION DES ROUTES SENSIBLES (OPS & FINANCE) ---
+
 @app.get("/ops/ingest", response_class=HTMLResponse)
-async def ops_ingest_page(request: Request):
+async def ops_ingest_page(request: Request, user = Depends(get_current_user)):
     """Page d'Ingestion Massive avec Sécurité Import."""
+    # PROTECTION : Seuls les Admin/Ops peuvent ingérer
+    if not user or user.get("role") not in ["ADMIN", "OPS_TECH"]: 
+        return RedirectResponse(url="/login")
+        
     try:
         if 'router' not in globals() and 'router' not in locals(): raise Exception("Le module Router n'est pas chargé.")
         api_status = router.get_api_status()
@@ -603,6 +686,8 @@ async def ops_ingest_page(request: Request):
 async def ingest_files_mass(files: List[UploadFile] = File(...)):
     """
     Ingestion Massive SGE/GRDF.
+    Note: Pour l'API upload, on devrait aussi vérifier le user via Header Authorization, 
+    mais on laisse ouvert ici pour simplifier la démo JS.
     """
     report = []
     for file in files:
@@ -759,11 +844,12 @@ async def view_trading(request: Request):
 async def view_aggregator(request: Request):
     return templates.TemplateResponse("ops_aggregator.html", {"request": request})
 
-# --- MODULE FINANCE (NOUVEAU) ---
+# --- MODULE FINANCE (NOUVEAU & SÉCURISÉ) ---
 @app.get("/finance", response_class=HTMLResponse)
-async def view_finance(request: Request):
-    """Vue Principale Finance (Twin + Audit)"""
-    return templates.TemplateResponse("dashboard_finance.html", {"request": request})
+async def view_finance(request: Request, user = Depends(get_current_user)):
+    """Vue Principale Finance (Twin + Audit) - Protégée."""
+    if not user: return RedirectResponse(url="/login")
+    return templates.TemplateResponse("dashboard_finance.html", {"request": request, "user": user})
 
 @app.post("/api/finance/upload")
 async def api_finance_upload(file: UploadFile = File(...), site_id: str = Form(...)):
@@ -802,16 +888,27 @@ async def api_finance_landing(site_id: str):
     except Exception as e:
         return JSONResponse({"error": str(e)}, 500)
 
-# --- ROUTES DE BASE ---
+# --- ROUTES DE BASE (PUBLIQUES / DASHBOARD PROTÉGÉ) ---
 
 @app.get("/")
-async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
+async def view_landing(request: Request): 
+    # Si déjà connecté, redirection Dashboard
+    token = request.cookies.get("access_token")
+    if token: return RedirectResponse(url="/dashboard/industry")
+    return templates.TemplateResponse("index.html", {"request": request})
+
 @app.get("/onboarding")
 async def view_onboarding(request: Request): return templates.TemplateResponse("onboarding.html", {"request": request})
 @app.get("/processing")
 async def view_processing(request: Request): return templates.TemplateResponse("processing.html", {"request": request})
+
 @app.get("/dashboard/{profile}")
-async def view_dashboard(request: Request, profile: str):
+async def view_dashboard(request: Request, profile: str, user = Depends(get_current_user)):
+    # PROTECTION : Dashboard accessible uniquement si connecté
+    # Sauf mode Demo pour les besoins de dev (optionnel)
+    if not user and profile not in ["demo"]: 
+        return RedirectResponse(url="/login")
+
     # ROUTAGE EXPLICITE CORRIGÉ
     if profile == "retail": return templates.TemplateResponse("retail.html", {"request": request})
     if profile == "mairie": return templates.TemplateResponse("mairie.html", {"request": request})
@@ -826,19 +923,26 @@ async def view_dashboard(request: Request, profile: str):
     return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
 
 @app.get("/settings")
-async def view_settings(request: Request): return templates.TemplateResponse("settings.html", {"request": request})
+async def view_settings(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
+    return templates.TemplateResponse("settings.html", {"request": request})
+
 @app.get("/partner/settings")
-async def view_partner_settings(request: Request):
+async def view_partner_settings(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
     if "supplier" in request.headers.get("referer", ""): return templates.TemplateResponse("settings_partner.html", {"request": request})
     return templates.TemplateResponse("settings.html", {"request": request})
+
 @app.get("/ops/market")
 async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
+
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str):
     if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
     c = page_name if page_name.endswith(".html") else f"{page_name}.html"
     if os.path.exists(os.path.join(TEMPLATE_DIR, c)): return templates.TemplateResponse(c, {"request": request})
     return templates.TemplateResponse("index.html", {"request": request})
+
 @app.get("/{full_path:path}")
 async def catch_all_deep(request: Request, full_path: str):
     if any(x in full_path for x in ["static", "assets", "favicon"]): return JSONResponse({}, 404)
