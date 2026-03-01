@@ -21,7 +21,8 @@
           colors: {
             abyss: "#050505",
             cyan: { 400: "#00E5FF" },
-            purple: { 500: "#A855F7" }
+            purple: { 500: "#A855F7" },
+            danger: "#EF4444"
           },
           fontFamily: {
             sans: ["Inter", "sans-serif"],
@@ -161,7 +162,6 @@
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
         <!-- COLONNE 1 : BUSINESS -->
         <div>
             <h3 class="category-title">Entreprises</h3>
@@ -180,7 +180,6 @@
                 </div>
             </div>
         </div>
-
         <!-- COLONNE 2 : PUBLIC -->
         <div>
             <h3 class="category-title">Secteur Public</h3>
@@ -199,7 +198,6 @@
                 </div>
             </div>
         </div>
-
         <!-- COLONNE 3 : HABITAT -->
         <div>
             <h3 class="category-title">Habitat & Partenaires</h3>
@@ -219,16 +217,17 @@
             </div>
         </div>
       </div>
-
       <div class="mt-8 pt-6 border-t border-white/5 text-center">
         <p class="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Déjà membre ?</p>
         <a href="index.html" class="text-cyan-400 font-bold hover:text-white transition text-sm">Se connecter</a>
       </div>
     </div>
 
-    <!-- STEP 1 : AUTHENTIFICATION -->
+    <!-- STEP 1 : AUTHENTIFICATION (CONNECTÉ AU BACKEND) -->
     <div id="step-1" class="step-container">
       <div class="max-w-sm mx-auto space-y-4">
+        
+        <!-- SSO Buttons (Placeholder pour l'instant) -->
         <button class="w-full flex items-center justify-center gap-3 bg-white text-abyss font-bold py-3.5 rounded-xl hover:bg-gray-200 transition text-sm">
           <i class="fab fa-google text-lg"></i> Continuer avec Google
         </button>
@@ -246,14 +245,21 @@
           <div class="relative flex justify-center text-[10px] uppercase tracking-widest"><span class="bg-[#0b1016] px-3 text-gray-500">Ou email</span></div>
         </div>
 
+        <!-- Login Form -->
         <div class="space-y-3">
           <input type="email" id="login-email" placeholder="Email" class="input-bento">
           <input type="password" id="login-password" placeholder="Mot de passe" class="input-bento">
         </div>
+
+        <!-- Error Msg -->
+        <div id="login-error" class="hidden text-xs text-danger font-bold text-center bg-danger/10 p-2 rounded border border-danger/20">
+            Identifiants incorrects.
+        </div>
       </div>
 
       <div class="max-w-sm mx-auto mt-8">
-        <button onclick="window.nextStep(2)" class="w-full bg-cyan-400 text-abyss font-black py-4 rounded-xl hover:scale-[1.02] transition shadow-[0_0_20px_rgba(0,229,255,0.4)] text-lg">
+        <!-- MODIFICATION : Appel à la fonction de Login -->
+        <button id="btn-login-step" onclick="window.handleOnboardingLogin()" class="w-full bg-cyan-400 text-abyss font-black py-4 rounded-xl hover:scale-[1.02] transition shadow-[0_0_20px_rgba(0,229,255,0.4)] text-lg">
             Se connecter
         </button>
         <button onclick="window.showStep(0)" class="w-full mt-4 text-xs text-gray-500 hover:text-white transition">Changer de profil</button>
@@ -284,8 +290,6 @@
     <div id="step-3" class="step-container">
       <h2 class="text-xl font-bold mb-2 text-center text-white">Identification</h2>
       <div class="max-w-md mx-auto space-y-5">
-        
-        <!-- PRO FORM -->
         <div id="form-pro" class="hidden space-y-4">
           <div class="relative">
             <input type="text" id="input-siret" placeholder="SIRET (14 chiffres)" class="input-bento font-mono" onblur="window.checkIdentity()">
@@ -293,14 +297,11 @@
           </div>
           <input type="text" id="input-company" placeholder="Raison sociale" class="input-bento bg-white/5 font-bold">
           <input type="hidden" id="input-naf">
-          
           <div class="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
             <input type="checkbox" id="multi-site" class="w-4 h-4 rounded bg-transparent border-white/30 text-cyan-400">
             <label for="multi-site" class="text-xs text-gray-300">Mode Multi-sites (CSV)</label>
           </div>
         </div>
-
-        <!-- CITIZEN FORM -->
         <div id="form-citizen" class="hidden space-y-4">
           <input type="text" id="input-pdl" placeholder="PDL Linky (14 chiffres)" class="input-bento font-mono">
           <div class="grid grid-cols-2 gap-4">
@@ -308,8 +309,6 @@
             <input type="text" placeholder="Nom" class="input-bento">
           </div>
         </div>
-
-        <!-- COMMON -->
         <div class="relative">
             <input type="text" id="input-address" placeholder="Adresse complète" class="input-bento" oninput="window.searchAddress()">
             <div id="address-suggestions" class="suggestions-list hidden"></div>
@@ -318,7 +317,6 @@
             <input type="text" id="input-zip" placeholder="Code Postal" class="input-bento">
             <input type="text" id="input-city" placeholder="Ville" class="input-bento">
         </div>
-
         <div class="flex gap-4 mt-8">
           <button onclick="window.prevStep(2)" class="px-6 py-3 rounded-xl border border-white/10 text-gray-400 hover:text-white transition font-bold text-sm">Retour</button>
           <button onclick="window.validateData()" class="flex-1 bg-white text-abyss font-black py-3 rounded-xl hover:bg-gray-200 transition shadow-lg">Suivant</button>
@@ -409,13 +407,11 @@
           document.getElementById('header-title').innerText = config.title;
           document.getElementById('header-icon').className = `fa-solid ${config.icon}`;
 
-          // Masquage sécurisé avec vérification
           ['form-pro', 'form-citizen', 'btn-microsoft', 'btn-apple'].forEach(id => {
               const el = document.getElementById(id);
               if(el) el.classList.add('hidden');
           });
 
-          // Affichage sécurisé
           if (config.type === 'pro') {
             const fp = document.getElementById('form-pro'); if(fp) fp.classList.remove('hidden');
             const bm = document.getElementById('btn-microsoft'); if(bm) bm.classList.remove('hidden');
@@ -427,9 +423,47 @@
           window.showStep(1);
       } catch(e) {
           console.error("Erreur SelectRole", e);
-          // Fallback : On passe quand même à l'étape suivante
           window.showStep(1);
       }
+    }
+
+    // --- NOUVELLE FONCTION DE LOGIN (STEP 1) ---
+    window.handleOnboardingLogin = async function() {
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const btn = document.getElementById('btn-login-step');
+        const errorMsg = document.getElementById('login-error');
+
+        // Reset UI
+        errorMsg.classList.add('hidden');
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> VERIFICATION...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email, password: password })
+            });
+
+            if (res.ok) {
+                // Succès : Utilisateur connecté, on passe à la suite
+                btn.innerHTML = 'Se connecter';
+                btn.disabled = false;
+                window.nextStep(2);
+            } else {
+                // Erreur
+                errorMsg.classList.remove('hidden');
+                btn.innerHTML = 'Se connecter';
+                btn.disabled = false;
+            }
+        } catch (e) {
+            console.error(e);
+            errorMsg.innerText = "Erreur réseau";
+            errorMsg.classList.remove('hidden');
+            btn.innerHTML = 'Se connecter';
+            btn.disabled = false;
+        }
     }
 
     window.init = function() {
@@ -555,7 +589,6 @@
             if(res.ok) {
                 const data = await res.json();
                 
-                // --- ROUTAGE INTELLIGENT (Correctif V5) ---
                 const dashboardMap = {
                     'mairie': 'mairie',
                     'citizen': 'citoyen',
@@ -564,13 +597,11 @@
                     'pme': 'retail',
                     'supplier': 'retail',
                     'sde': 'mairie',
-                    'oph': 'oph',        // Fix OPH
-                    'syndic': 'syndic'   // Fix Syndic
+                    'oph': 'oph',
+                    'syndic': 'syndic'
                 };
                 
-                // Fallback si le rôle n'est pas dans la liste
                 const target = dashboardMap[currentRole] || 'retail';
-                
                 window.location.href = `/dashboard/${target}?client=${data.id}`;
                 
             } else {
