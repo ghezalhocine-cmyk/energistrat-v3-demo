@@ -26,7 +26,6 @@ except ImportError:
 # ==============================================================================
 # BLOC IMPORT CORTEX ROBUSTE (EVOLUTION ANTI-CRASH)
 # ==============================================================================
-# Ce bloc empêche le conteneur de planter si un module (Auth/Finance) a une erreur.
 try:
     # 1. Tentative Import Structure Prod (app.core)
     from app.core.cortex_ingest import ingest
@@ -87,7 +86,7 @@ except Exception as e_prod:
         # Objets vides pour éviter NameError
         ingest = None; cortex = None; physics = None; forecast = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3005-VITRINE-OPEN")
+app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3007-FULL-SECURE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -171,7 +170,7 @@ def get_market_ref():
         "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 }
     }
 
-# --- MIDDLEWARE SÉCURITÉ (DEPENDENCY) ---
+# --- AJOUT : MIDDLEWARE DE SÉCURITÉ (DEPENDENCY) ---
 async def get_current_user(request: Request):
     """
     Vérifie le Cookie de Session.
@@ -947,11 +946,26 @@ async def view_partner_settings(request: Request, user = Depends(get_current_use
 @app.get("/ops/market")
 async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
 
+# --- PROTECTION DE LA ROUTE DYNAMIQUE ---
 @app.get("/{page_name}")
-async def serve_dynamic(request: Request, page_name: str):
+async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
+    # 1. Whitelist des pages publiques
+    PUBLIC_PAGES = ["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html"]
+
+    # 2. Check Extension
     if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
-    c = page_name if page_name.endswith(".html") else f"{page_name}.html"
-    if os.path.exists(os.path.join(TEMPLATE_DIR, c)): return templates.TemplateResponse(c, {"request": request})
+    
+    # 3. Normalisation
+    target_file = page_name if page_name.endswith(".html") else f"{page_name}.html"
+    
+    # 4. SÉCURITÉ : Si la page n'est pas publique et que l'user n'est pas connecté -> Login
+    if target_file not in PUBLIC_PAGES and not user:
+         return RedirectResponse(url="/login")
+
+    # 5. Serve
+    if os.path.exists(os.path.join(TEMPLATE_DIR, target_file)): 
+        return templates.TemplateResponse(target_file, {"request": request})
+    
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/{full_path:path}")
