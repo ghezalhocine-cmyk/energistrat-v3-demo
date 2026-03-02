@@ -29,7 +29,7 @@
                         citizen: '#8B5CF6', 
                         future: '#8B5CF6' 
                     },
-                    fontFamily: { sans:['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
                     borderRadius: { '3xl': '3rem' }
                 }
             }
@@ -507,7 +507,9 @@
                 btn.classList.remove('text-gray-400'); 
             }
             
-            // Masquer toutes les vues['view-patrimoine', 'view-budget', 'view-citizens', 'view-market', 'view-comparator'].forEach(id => {
+            // Masquer toutes les vues (CORRIGÉ - Les variables sont bien isolées)
+            const views =['view-patrimoine', 'view-budget', 'view-citizens', 'view-market', 'view-comparator'];
+            views.forEach(id => {
                 const el = document.getElementById(id);
                 if(el) el.classList.add('hidden');
             });
@@ -517,8 +519,12 @@
             if(target) target.classList.remove('hidden');
             
             // Gestion Action Bar
-            if(viewName !== 'patrimoine') document.getElementById('action-bar').classList.remove('visible');
-            else updateActionBar();
+            if(viewName !== 'patrimoine') {
+                const bar = document.getElementById('action-bar');
+                if (bar) bar.classList.remove('visible');
+            } else {
+                updateActionBar();
+            }
 
             // Init Charts spécifiques
             if(viewName === 'budget') calculateM57();
@@ -747,16 +753,20 @@
 
         // --- FILTERS & TABLE ---
         window.filterEnergy = function(type) {
-            CURRENT_ENERGY = type;['elec', 'gaz', 'all'].forEach(t => {
+            CURRENT_ENERGY = type;
+            const energies = ['elec', 'gaz', 'all'];
+            energies.forEach(t => {
                 const btn = document.getElementById('btn-' + t);
-                if(t === type) {
-                    btn.classList.add('bg-white/10', 'text-white');
-                    btn.classList.remove('text-gray-400');
-                    if(t === 'elec') btn.classList.add('text-mairie');
-                    if(t === 'gaz') btn.classList.add('text-gas');
-                    if(t === 'all') btn.classList.add('text-cyan');
-                } else {
-                    btn.className = "flex-1 rounded-xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center gap-1";
+                if(btn) {
+                    if(t === type) {
+                        btn.classList.add('bg-white/10', 'text-white');
+                        btn.classList.remove('text-gray-400');
+                        if(t === 'elec') btn.classList.add('text-mairie');
+                        if(t === 'gaz') btn.classList.add('text-gas');
+                        if(t === 'all') btn.classList.add('text-cyan');
+                    } else {
+                        btn.className = "flex-1 rounded-xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center gap-1";
+                    }
                 }
             });
             applyFilters();
@@ -764,12 +774,15 @@
 
         window.filterWaste = function() {
             const term = document.getElementById('search-input');
-            term.value = "alert:waste";
-            applyFilters();
+            if(term) {
+                term.value = "alert:waste";
+                applyFilters();
+            }
         }
 
         function updateLotSelect() { 
             const sel = document.getElementById('filter-lot'); 
+            if(!sel) return;
             sel.innerHTML = '<option value="all">Tous les Lots / Marchés</option>'; 
             LOTS.forEach(l => { 
                 const opt = document.createElement('option'); 
@@ -780,9 +793,15 @@
         }
 
         function applyFilters() {
-            const term = document.getElementById('search-input').value.toLowerCase();
-            const typeFilter = document.getElementById('filter-type').value;
-            const lotFilter = document.getElementById('filter-lot').value;
+            const termEl = document.getElementById('search-input');
+            const typeFilterEl = document.getElementById('filter-type');
+            const lotFilterEl = document.getElementById('filter-lot');
+            
+            if(!termEl || !typeFilterEl || !lotFilterEl) return;
+
+            const term = termEl.value.toLowerCase();
+            const typeFilter = typeFilterEl.value;
+            const lotFilter = lotFilterEl.value;
 
             const filtered = FLEET_DATA.filter(s => {
                 if(CURRENT_ENERGY !== 'all' && s.energy !== CURRENT_ENERGY) return false;
@@ -805,11 +824,14 @@
                 return safeName.includes(term) || safeCity.includes(term) || safeId.includes(term);
             });
             renderTable(filtered);
-            document.getElementById('visible-count').innerText = filtered.length;
+            
+            const visibleCountEl = document.getElementById('visible-count');
+            if(visibleCountEl) visibleCountEl.innerText = filtered.length;
         }
 
         function renderTable(data) {
             const tbody = document.getElementById('fleet-table-body');
+            if(!tbody) return;
             tbody.innerHTML = '';
             
             const displayData = data.slice(0, 100); 
@@ -864,13 +886,21 @@
                 if(s.ghost_savings > 100) countAlerts++; 
             });
             
-            document.getElementById('kpi-vol-elec').innerText = Math.round(volElec).toLocaleString() + " MWh";
-            document.getElementById('kpi-vol-gaz').innerText = Math.round(volGaz).toLocaleString() + " MWh";
-            document.getElementById('kpi-waste').innerText = Math.round(totalWaste).toLocaleString() + " €";
-            document.getElementById('kpi-sites').innerText = FLEET_DATA.length;
+            const kpiElecEl = document.getElementById('kpi-vol-elec');
+            const kpiGazEl = document.getElementById('kpi-vol-gaz');
+            const kpiWasteEl = document.getElementById('kpi-waste');
+            const kpiSitesEl = document.getElementById('kpi-sites');
+            const badgeEl = document.getElementById('sobriety-badge');
+
+            if(kpiElecEl) kpiElecEl.innerText = Math.round(volElec).toLocaleString() + " MWh";
+            if(kpiGazEl) kpiGazEl.innerText = Math.round(volGaz).toLocaleString() + " MWh";
+            if(kpiWasteEl) kpiWasteEl.innerText = Math.round(totalWaste).toLocaleString() + " €";
+            if(kpiSitesEl) kpiSitesEl.innerText = FLEET_DATA.length;
             
-            if(countAlerts > 0) document.getElementById('sobriety-badge').classList.remove('hidden');
-            else document.getElementById('sobriety-badge').classList.add('hidden');
+            if(badgeEl) {
+                if(countAlerts > 0) badgeEl.classList.remove('hidden');
+                else badgeEl.classList.add('hidden');
+            }
         }
 
         // --- DETAIL MODAL ---
@@ -921,11 +951,16 @@
             } catch(e) { console.error(e); alert("Erreur affichage détail"); }
         }
         
-        window.closeDetail = function() { document.getElementById('detail-modal').classList.add('hidden'); }
+        window.closeDetail = function() { 
+            const mod = document.getElementById('detail-modal');
+            if(mod) mod.classList.add('hidden'); 
+        }
 
         async function updateModalChart(mode) {
             if(!CURRENT_SITE) return;
-            const ctx = document.getElementById('modalChart').getContext('2d');
+            const canvas = document.getElementById('modalChart');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
             if(modalChartInstance) modalChartInstance.destroy();
             
             if(mode === '24h') {
@@ -960,7 +995,7 @@
         }
 
         // --- EDIT MODE ---
-        function openEditMode() {
+        window.openEditMode = function() {
             if(!CURRENT_SITE) return;
             document.getElementById('edit-id').value = CURRENT_SITE.identity.id;
             document.getElementById('edit-name').value = CURRENT_SITE.identity.site_name;
@@ -972,7 +1007,7 @@
             document.getElementById('edit-modal').classList.remove('hidden');
         }
 
-        async function saveMairieData() {
+        window.saveMairieData = async function() {
             if(!CURRENT_SITE) return;
             const original = CURRENT_SITE;
             original.identity.site_name = document.getElementById('edit-name').value;
@@ -999,10 +1034,18 @@
         }
 
         // --- MASS ACTIONS ---
-        async function uploadPatrimoine(input) { if(!input.files || input.files.length === 0) return; const file = input.files[0]; const formData = new FormData(); formData.append("file", file); const btn = document.querySelector('label[for="mass-file"]'); const originalText = btn.innerText; btn.innerText = "IMPORTATION EN COURS..."; try { const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData }); const data = await res.json(); if(data.success) { alert(`${data.saved} sites mis à jour.`); loadFleet(); } else alert("Erreur Import: " + data.error); } catch(e) { alert("Erreur réseau"); } btn.innerText = originalText; }
+        window.uploadPatrimoine = async function(input) { if(!input.files || input.files.length === 0) return; const file = input.files[0]; const formData = new FormData(); formData.append("file", file); const btn = document.querySelector('label[for="mass-file"]'); const originalText = btn.innerText; btn.innerText = "IMPORTATION EN COURS..."; try { const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData }); const data = await res.json(); if(data.success) { alert(`${data.saved} sites mis à jour.`); loadFleet(); } else alert("Erreur Import: " + data.error); } catch(e) { alert("Erreur réseau"); } btn.innerText = originalText; }
         window.toggleAll = function(source) { if(source.checked) FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); else SELECTED_IDS.clear(); applyFilters(); updateActionBar(); }
         window.toggleSelection = function(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
-        function updateActionBar() { const count = SELECTED_IDS.size; document.getElementById('selected-count').innerText = count; document.getElementById('mass-count').innerText = count; const bar = document.getElementById('action-bar'); if(bar) { bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; } }
+        function updateActionBar() { 
+            const count = SELECTED_IDS.size; 
+            const selCountEl = document.getElementById('selected-count');
+            const massCountEl = document.getElementById('mass-count');
+            const bar = document.getElementById('action-bar');
+            if(selCountEl) selCountEl.innerText = count; 
+            if(massCountEl) massCountEl.innerText = count; 
+            if(bar) { bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; } 
+        }
         window.openMassEdit = function() { if(SELECTED_IDS.size === 0) return alert("Sélectionnez des sites."); document.getElementById('mass-edit-modal').classList.remove('hidden'); }
         window.assignLot = function() { if(SELECTED_IDS.size === 0) return alert("Sélectionnez des sites."); document.getElementById('mass-edit-modal').classList.remove('hidden'); document.getElementById('mass-lot-input').focus(); }
         window.applyMassUpdate = async function() { const lotName = document.getElementById('mass-lot-input').value; const typeName = document.getElementById('mass-type').value; const chauf = document.getElementById('mass-chauffage').value; if(!lotName && !typeName && !chauf) return alert("Rien à modifier."); const btn = document.querySelector('#mass-edit-modal button:last-child'); btn.innerText = "TRAITEMENT..."; let updatedCount = 0; for (const id of SELECTED_IDS) { try { const resGet = await fetch(`/api/dashboard/data/${id}`); const site = await resGet.json(); if(site.error) continue; if(lotName) { if(!site.contract) site.contract = {}; let current = site.contract.segment || ""; if(current.includes("|")) site.contract.segment = lotName + " | " + current.split("|")[1].trim(); else site.contract.segment = lotName; } if(typeName) { if(!site.location) site.location = {}; site.location.typologie = typeName; } if(chauf) { if(!site.technical) site.technical = {}; site.technical.chauffage = chauf; } await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(site) }); updatedCount++; } catch(e) { console.error(e); } } alert(`${updatedCount} sites mis à jour.`); document.getElementById('mass-edit-modal').classList.add('hidden'); btn.innerText = "APPLIQUER"; loadFleet(); }
