@@ -42,7 +42,7 @@
         tr.site-row:hover td { background-color: rgba(59, 130, 246, 0.15) !important; color: white; }
         .nav-item.active { background: rgba(59, 130, 246, 0.1); border-right: 3px solid #3B82F6; color: white; }
         .input-edit { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 6px; width: 100%; font-size: 12px; }
-        .input-edit:focus { border-color: #3B82F6; outline: none; }
+        .input-edit:focus { border-color: #00E5FF; outline: none; }
         
         #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
         #action-bar.visible { transform: translateY(0); }
@@ -259,13 +259,13 @@
                 <div class="bento-card p-8 mb-6 relative overflow-hidden">
                     <div class="flex justify-between items-end mb-4 relative z-10">
                         <div>
-                            <span class="text-sm text-gray-400 font-bold">Consommé Estimé (À date)</span>
+                            <span class="text-sm text-gray-400 font-bold">Consommé Réel (À date)</span>
                             <div class="text-4xl font-black text-white" id="m57-consumed">-- €</div>
                         </div>
                         <div class="text-right">
                             <span class="text-sm text-gray-400 font-bold flex items-center gap-2 justify-end">
                                 Budget Primitif (BP) 
-                                <button class="text-cyan hover:text-white transition" title="Ajuster BP"><i class="fa-solid fa-pen-to-square text-[10px]"></i></button>
+                                <button onclick="openM57Modal()" class="text-cyan hover:text-white transition" title="Ajuster BP"><i class="fa-solid fa-pen-to-square text-[10px]"></i> Ajuster</button>
                             </span>
                             <div class="text-3xl font-bold text-gold" id="m57-total">-- €</div>
                         </div>
@@ -389,6 +389,42 @@
             <button onclick="exportDQE()" class="flex items-center gap-2 hover:text-mairie font-bold text-sm transition"><i class="fa-solid fa-file-excel"></i> Exporter DQE Vierge</button>
         </div>
 
+        <!-- MODAL M57 SETTINGS (NOUVEAU) -->
+        <div id="m57-edit-modal" class="fixed inset-0 bg-black/90 z-[120] hidden flex items-center justify-center backdrop-blur-sm">
+            <div class="bento-card p-8 rounded-2xl w-[600px] relative border border-cyan/30 shadow-[0_0_50px_rgba(0,229,255,0.1)]">
+                <h3 class="text-xl font-bold text-white mb-2 flex items-center gap-2"><i class="fa-solid fa-vault text-cyan"></i> Paramétrage Budget M57</h3>
+                <p class="text-xs text-gray-400 mb-6">Saisissez les données issues de votre logiciel de gestion financière (Astre, Coriolis, etc.).</p>
+                
+                <div class="space-y-6">
+                    <!-- BLOC BP -->
+                    <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                        <span class="text-xs font-bold text-white block mb-3">Budget Primitif Voté (BP)</span>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-mairie">Électricité (60612)</label>
+                            <div class="relative"><input type="number" id="m57-input-bp-elec" class="input-edit pr-6 text-right font-mono" placeholder="0"><span class="absolute right-3 top-2 text-xs text-gray-500">€</span></div></div>
+                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-gas">Gaz (60621)</label>
+                            <div class="relative"><input type="number" id="m57-input-bp-gaz" class="input-edit pr-6 text-right font-mono" placeholder="0"><span class="absolute right-3 top-2 text-xs text-gray-500">€</span></div></div>
+                        </div>
+                    </div>
+
+                    <!-- BLOC CONSOMMÉ -->
+                    <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                        <span class="text-xs font-bold text-white block mb-3">Consommé & Engagé (À date)</span>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-mairie">Électricité (60612)</label>
+                            <div class="relative"><input type="number" id="m57-input-cons-elec" class="input-edit pr-6 text-right font-mono" placeholder="0"><span class="absolute right-3 top-2 text-xs text-gray-500">€</span></div></div>
+                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-gas">Gaz (60621)</label>
+                            <div class="relative"><input type="number" id="m57-input-cons-gaz" class="input-edit pr-6 text-right font-mono" placeholder="0"><span class="absolute right-3 top-2 text-xs text-gray-500">€</span></div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-8">
+                    <button onclick="document.getElementById('m57-edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button>
+                    <button onclick="saveM57Data()" class="bg-cyan text-abysse px-6 py-2 rounded-lg text-xs font-bold hover:bg-white transition shadow-lg">ENREGISTRER</button>
+                </div>
+            </div>
+        </div>
+
         <!-- MODAL DETAIL -->
         <div id="detail-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center p-8 backdrop-blur-sm">
             <div class="bento-card w-full max-w-5xl h-full max-h-[90vh] overflow-y-auto relative flex flex-col">
@@ -491,11 +527,13 @@
         let CURRENT_ENERGY = 'all'; 
         let LOTS = new Set();
         
+        // VARIABLE GLOBALE M57
+        let M57_SETTINGS = { bp_elec: 0, bp_gaz: 0, consumed_elec: 0, consumed_gaz: 0 };
+        
         let landingChartInstance = null;
         let budgetChartInstance = null;
         let modalChartInstance = null;
         let citizenChartInstance = null;
-        
         let CURRENT_SITE = null;
 
         // --- NAVIGATION ---
@@ -507,18 +545,15 @@
                 btn.classList.remove('text-gray-400'); 
             }
             
-            // Masquer toutes les vues (CORRIGÉ - Les variables sont bien isolées)
             const views =['view-patrimoine', 'view-budget', 'view-citizens', 'view-market', 'view-comparator'];
             views.forEach(id => {
                 const el = document.getElementById(id);
                 if(el) el.classList.add('hidden');
             });
             
-            // Afficher la vue cible
             const target = document.getElementById('view-' + viewName);
             if(target) target.classList.remove('hidden');
             
-            // Gestion Action Bar
             if(viewName !== 'patrimoine') {
                 const bar = document.getElementById('action-bar');
                 if (bar) bar.classList.remove('visible');
@@ -526,20 +561,27 @@
                 updateActionBar();
             }
 
-            // Init Charts spécifiques
             if(viewName === 'budget') calculateM57();
             if(viewName === 'market') calculateMarketStrategy();
         }
 
-        // --- LOAD DATA DEPUIS LE MOTEUR ---
+        // --- FETCH M57 DATA ---
+        async function loadM57Settings() {
+            try {
+                const res = await fetch('/api/settings/m57');
+                M57_SETTINGS = await res.json();
+            } catch(e) { console.error("Erreur chargement M57", e); }
+        }
+
+        // --- LOAD DATA ---
         async function loadFleet() {
             try {
+                await loadM57Settings(); // On charge le budget d'abord
+
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
                 if(data.fleet) {
                     FLEET_DATA = data.fleet;
-                    
-                    // Extract Lots
                     LOTS.clear();
                     FLEET_DATA.forEach(s => { 
                         if(s.segment && s.segment.includes("Lot")) LOTS.add(s.segment); 
@@ -548,27 +590,23 @@
                     updateLotSelect();
                     applyFilters();
                     updateKPIs();
-                    // Pré-calculer la M57 en arrière plan
                     calculateM57();
                 }
             } catch(e) { console.error("Erreur chargement:", e); }
         }
 
-        // --- CŒUR DU CHANTIER A : LOGIQUE BUDGÉTAIRE M57 ---
+        // --- CŒUR DU CHANTIER A.2 : LOGIQUE M57 RÉELLE ---
         function calculateM57() {
             if(!FLEET_DATA || FLEET_DATA.length === 0) return;
 
-            let budgetElec = 0; let volElec = 0;
-            let budgetGaz = 0; let volGaz = 0;
-            let totalBudget = 0;
-
+            let projElec = 0; let projGaz = 0;
+            let totalProj = 0;
             let typeBudgets = { 'Écoles': 0, 'Sport': 0, 'Éclairage': 0, 'Admin': 0, 'Autres': 0 };
 
             FLEET_DATA.forEach(s => {
-                totalBudget += s.budget;
-                
-                if(s.energy === 'elec') { budgetElec += s.budget; volElec += s.volume; }
-                if(s.energy === 'gaz') { budgetGaz += s.budget; volGaz += s.volume; }
+                totalProj += s.budget;
+                if(s.energy === 'elec') projElec += s.budget;
+                if(s.energy === 'gaz') projGaz += s.budget;
 
                 const n = (s.name || "").toLowerCase();
                 if(n.includes('ecole') || n.includes('scolaire')) typeBudgets['Écoles'] += s.budget;
@@ -578,38 +616,87 @@
                 else typeBudgets['Autres'] += s.budget;
             });
 
-            const bp2026 = totalBudget > 0 ? totalBudget * 1.05 : 150000;
-            const consumedRatio = 0.35; 
-            const consumed = bp2026 * consumedRatio;
+            // LECTURE DES VRAIES DONNÉES SAISIES PAR L'UTILISATEUR
+            let bpTotal = M57_SETTINGS.bp_elec + M57_SETTINGS.bp_gaz;
+            let consTotal = M57_SETTINGS.consumed_elec + M57_SETTINGS.consumed_gaz;
+            let isMocked = false;
 
-            document.getElementById('m57-total').innerText = Math.round(bp2026).toLocaleString() + " €";
-            document.getElementById('m57-consumed').innerText = Math.round(consumed).toLocaleString() + " €";
-            document.getElementById('header-budget').innerText = Math.round(totalBudget).toLocaleString() + " €"; 
+            // SMART MOCK SI AUCUN BUDGET N'EST SAISI (Premier démarrage)
+            if (bpTotal === 0) {
+                bpTotal = totalProj > 0 ? totalProj * 1.05 : 150000;
+                consTotal = bpTotal * 0.35;
+                isMocked = true;
+            }
+
+            document.getElementById('header-budget').innerText = Math.round(totalProj).toLocaleString() + " €"; 
             
-            const pct = (consumed / bp2026) * 100;
+            const bpEl = document.getElementById('m57-total');
+            if (isMocked) {
+                bpEl.innerHTML = Math.round(bpTotal).toLocaleString() + " € <span class='text-[10px] text-gray-500 font-normal block mt-1'>*Valeur Simulée</span>";
+            } else {
+                bpEl.innerText = Math.round(bpTotal).toLocaleString() + " €";
+            }
+
+            document.getElementById('m57-consumed').innerText = Math.round(consTotal).toLocaleString() + " €";
+            
+            const pct = (consTotal / bpTotal) * 100;
             const bar = document.getElementById('m57-bar');
             bar.style.width = pct + "%";
             bar.innerText = Math.round(pct) + "%";
             
-            if (pct > 85) {
-                bar.className = "h-full bg-alert transition-all duration-1000 flex items-center justify-end pr-2 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]";
-            } else {
-                bar.className = "h-full bg-gradient-to-r from-blue-600 to-cyan transition-all duration-1000 flex items-center justify-end pr-2 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(0,229,255,0.5)]";
-            }
+            if (pct > 85) bar.className = "h-full bg-alert transition-all duration-1000 flex items-center justify-end pr-2 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]";
+            else bar.className = "h-full bg-gradient-to-r from-blue-600 to-cyan transition-all duration-1000 flex items-center justify-end pr-2 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(0,229,255,0.5)]";
 
-            document.getElementById('m57-60612-budget').innerText = Math.round(budgetElec).toLocaleString() + " €";
-            document.getElementById('m57-60621-budget').innerText = Math.round(budgetGaz).toLocaleString() + " €";
+            document.getElementById('m57-60612-budget').innerText = Math.round(projElec).toLocaleString() + " €";
+            document.getElementById('m57-60621-budget').innerText = Math.round(projGaz).toLocaleString() + " €";
 
             const cortexMsg = document.getElementById('cortex-m57-msg');
-            if (totalBudget > bp2026) {
-                const dmNeeded = totalBudget - bp2026;
-                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Alerte Atterrissage :</span> La projection de fin d'exercice dépasse le Budget Primitif alloué au Chapitre 011. Préparez une <b>Décision Modificative (DM)</b> de <span class="text-white font-mono font-bold">+${Math.round(dmNeeded).toLocaleString()} €</span> au prochain Conseil Municipal.`;
+            if (totalProj > bpTotal) {
+                const dmNeeded = totalProj - bpTotal;
+                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Alerte Atterrissage :</span> La projection de fin d'exercice dépasse le Budget Primitif (BP). Préparez une <b>Décision Modificative (DM)</b> de <span class="text-white font-mono font-bold">+${Math.round(dmNeeded).toLocaleString()} €</span>.`;
             } else {
-                const marge = bp2026 - totalBudget;
+                const marge = bpTotal - totalProj;
                 cortexMsg.innerHTML = `<span class="text-success font-bold"><i class="fa-solid fa-check-circle mr-1"></i> Atterrissage Sécurisé :</span> L'exécution budgétaire est saine. Nous projetons une marge de manœuvre de <span class="text-white font-mono font-bold">+${Math.round(marge).toLocaleString()} €</span> sur le Chapitre 011 en fin d'exercice. Aucune DM n'est requise.`;
             }
 
-            updateBudgetCharts(typeBudgets, bp2026, totalBudget);
+            updateBudgetCharts(typeBudgets, bpTotal, totalProj);
+        }
+
+        // --- GESTION DE LA MODALE M57 ---
+        window.openM57Modal = function() {
+            document.getElementById('m57-input-bp-elec').value = M57_SETTINGS.bp_elec || 0;
+            document.getElementById('m57-input-bp-gaz').value = M57_SETTINGS.bp_gaz || 0;
+            document.getElementById('m57-input-cons-elec').value = M57_SETTINGS.consumed_elec || 0;
+            document.getElementById('m57-input-cons-gaz').value = M57_SETTINGS.consumed_gaz || 0;
+            document.getElementById('m57-edit-modal').classList.remove('hidden');
+        }
+
+        window.saveM57Data = async function() {
+            const payload = {
+                bp_elec: parseFloat(document.getElementById('m57-input-bp-elec').value) || 0,
+                bp_gaz: parseFloat(document.getElementById('m57-input-bp-gaz').value) || 0,
+                consumed_elec: parseFloat(document.getElementById('m57-input-cons-elec').value) || 0,
+                consumed_gaz: parseFloat(document.getElementById('m57-input-cons-gaz').value) || 0
+            };
+            
+            const btn = document.querySelector('#m57-edit-modal button:last-child');
+            const originalText = btn.innerText;
+            btn.innerText = "SAUVEGARDE...";
+
+            try {
+                const res = await fetch('/api/settings/m57', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if(data.success) {
+                    M57_SETTINGS = payload;
+                    document.getElementById('m57-edit-modal').classList.add('hidden');
+                    calculateM57(); // Recalcul direct sans recharger la page
+                } else alert("Erreur: " + data.error);
+            } catch(e) { alert("Erreur réseau"); }
+            btn.innerText = originalText;
         }
 
         function updateBudgetCharts(typeBudgets, bp, proj) { 
@@ -754,7 +841,7 @@
         // --- FILTERS & TABLE ---
         window.filterEnergy = function(type) {
             CURRENT_ENERGY = type;
-            const energies = ['elec', 'gaz', 'all'];
+            const energies =['elec', 'gaz', 'all'];
             energies.forEach(t => {
                 const btn = document.getElementById('btn-' + t);
                 if(btn) {
@@ -980,7 +1067,7 @@
                         data: {
                             labels: data.labels,
                             datasets:[
-                                { label: 'Tendanciel (MWh)', data: data.dataset_trend, borderColor: '#94A3B8', borderDash: [5,5], tension: 0.4 },
+                                { label: 'Tendanciel (MWh)', data: data.dataset_trend, borderColor: '#94A3B8', borderDash:[5,5], tension: 0.4 },
                                 { label: 'Sobriété (MWh)', data: data.dataset_sobriety, borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4 }
                             ]
                         },
@@ -994,7 +1081,7 @@
             }
         }
 
-        // --- EDIT MODE ---
+        // --- EDIT MODE BÂTIMENT ---
         window.openEditMode = function() {
             if(!CURRENT_SITE) return;
             document.getElementById('edit-id').value = CURRENT_SITE.identity.id;
