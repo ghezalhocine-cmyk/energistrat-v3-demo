@@ -131,11 +131,18 @@ class AggregationRequest(BaseModel):
     site_ids: List[str]
     years: int = 3
 
+# NOUVEAU MODÈLE M57 (CHANTIER A.2)
+class M57SettingsModel(BaseModel):
+    bp_elec: float = 0.0
+    bp_gaz: float = 0.0
+    consumed_elec: float = 0.0
+    consumed_gaz: float = 0.0
+
 # --- FONCTIONS UTILITAIRES ---
 
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
-    elif isinstance(data, list): return [json_compliant(v) for v in data]
+    elif isinstance(data, list): return[json_compliant(v) for v in data]
     elif isinstance(data, float):
         if math.isnan(data) or math.isinf(data): return 0.0
     return data
@@ -247,12 +254,12 @@ def normalize_full_data(data):
     if 'power_details' not in c: c['power_details'] = {}
     
     # Sources possibles : Racine, Contract, Technical, Pricing
-    sources = [data, c, data.get('technical', {}), p]
+    sources =[data, c, data.get('technical', {}), p]
     
     # 2. MAPPING PUISSANCES (kW)
     power_map = {
-        'hph': ['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph'],
-        'hch': ['ps_hch', 'p_hch', 'PS_HCH', 'puissance_hch'],
+        'hph':['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph'],
+        'hch':['ps_hch', 'p_hch', 'PS_HCH', 'puissance_hch'],
         'hpe': ['ps_hpe', 'p_hpe', 'PS_HPE', 'puissance_hpe'],
         'hce': ['ps_hce', 'p_hce', 'PS_HCE', 'puissance_hce']
     }
@@ -269,10 +276,10 @@ def normalize_full_data(data):
 
     # 3. MAPPING PRIX (€/kWh) - LE FIX QUI MANQUAIT
     price_map = {
-        'hph': ['price_hph', 'prix_hph', 'P_HPH', 'tarif_hph'],
-        'hch': ['price_hch', 'prix_hch', 'P_HCH', 'tarif_hch'],
-        'hpe': ['price_hpe', 'prix_hpe', 'P_HPE', 'tarif_hpe'],
-        'hce': ['price_hce', 'prix_hce', 'P_HCE', 'tarif_hce']
+        'hph':['price_hph', 'prix_hph', 'P_HPH', 'tarif_hph'],
+        'hch':['price_hch', 'prix_hch', 'P_HCH', 'tarif_hch'],
+        'hpe':['price_hpe', 'prix_hpe', 'P_HPE', 'tarif_hpe'],
+        'hce':['price_hce', 'prix_hce', 'P_HCE', 'tarif_hce']
     }
 
     for target, variants in price_map.items():
@@ -309,7 +316,7 @@ async def api_save_client(request: Request):
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
             # Merge intelligent
-            for section in ['technical', 'location', 'identity', 'contract', 'pricing', 'kpis', 'financials', 'rgpd']:
+            for section in['technical', 'location', 'identity', 'contract', 'pricing', 'kpis', 'financials', 'rgpd']:
                 if section in data:
                     if section not in existing_data: existing_data[section] = {}
                     existing_data[section].update(data[section])
@@ -320,6 +327,28 @@ async def api_save_client(request: Request):
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(final_data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "id": raw_id})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
+
+# ==========================================
+# NOUVELLES ROUTES : PARAMÈTRES M57 (CHANTIER A.2)
+# ==========================================
+@app.get("/api/settings/m57")
+async def get_m57_settings():
+    path = os.path.join(DATA_DIR, "m57_settings.json")
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f: return json.load(f)
+        except: pass
+    return {"bp_elec": 0.0, "bp_gaz": 0.0, "consumed_elec": 0.0, "consumed_gaz": 0.0}
+
+@app.post("/api/settings/m57")
+async def save_m57_settings(data: M57SettingsModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    try:
+        path = os.path.join(DATA_DIR, "m57_settings.json")
+        with open(path, 'w', encoding='utf-8') as f: json.dump(data.dict(), f, indent=4)
+        return JSONResponse({"success": True})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, 500)
 
 @app.post("/api/settings/update_site")
 async def api_update_site(request: Request):
@@ -335,7 +364,7 @@ async def api_update_site(request: Request):
         with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
         
         # MISE A JOUR EXHAUSTIVE
-        sections_to_update = ['location', 'technical', 'identity', 'contract', 'pricing', 'financials', 'rgpd']
+        sections_to_update =['location', 'technical', 'identity', 'contract', 'pricing', 'financials', 'rgpd']
         
         for section in sections_to_update:
             if section in payload:
@@ -393,10 +422,10 @@ async def api_import_csv(file: UploadFile = File(...)):
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data(response: Response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    raw_sites = []
+    raw_sites =[]
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     for p in files:
-        if "master" in p or "market" in p: continue
+        if "master" in p or "market" in p or "m57" in p: continue
         try:
             with open(p, 'r', encoding='utf-8') as f: data = json.load(f)
             fin = cortex.enrich_site_financials(data)
@@ -404,7 +433,7 @@ async def get_fleet_data(response: Response):
             raw_sites.append(data)
         except: continue
     analysis = cortex.analyze_portfolio(raw_sites)
-    fleet_list = []
+    fleet_list =[]
     all_cities, all_providers = set(), set()
     for s in raw_sites:
         if "CLI_" in str(s.get('identity',{}).get('id')): continue
@@ -440,7 +469,7 @@ async def get_fleet_data(response: Response):
             pricing = s.get('pricing', {})
             avg_price = 0.20 # Fallback prudent
             # Recherche d'un prix unitaire renseigné
-            for k in ['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
+            for k in['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
                 if k in pricing and pricing[k]:
                     try: avg_price = float(pricing[k]); break
                     except: pass
@@ -470,7 +499,7 @@ async def get_fleet_data(response: Response):
     return JSONResponse(json_compliant({
         "fleet": fleet_list, "count": len(fleet_list),
         "green_league": analysis.get('green_league'), "global_kpis": analysis.get('global'),
-        "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments": ["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots": ["Lot 1", "Lot 2"] }
+        "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments":["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots":["Lot 1", "Lot 2"] }
     }))
 
 @app.get("/api/dashboard/data/{client_id}")
@@ -516,7 +545,7 @@ async def get_dashboard_data(client_id: str, response: Response):
     if financials['volume_mwh'] == 0 and vol_display > 0:
         p_data = data.get('pricing', {})
         u_price = 0.20
-        for k in ['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
+        for k in['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
             if k in p_data and p_data[k]: 
                 try: u_price = float(p_data[k]); break
                 except: pass
@@ -647,7 +676,7 @@ async def download_template(template_type: str):
             elif "import_patrimoine" in template_type:
                 df = pd.DataFrame(columns=["PDL", "NOM_SITE", "SURFACE_M2", "CHAUFFAGE", "ISOLATION", "REGULATION"])
                 df.to_excel(writer, index=False, sheet_name="DATA")
-                df_notice = pd.DataFrame({"CHAMP": ["CHAUFFAGE", "ISOLATION", "REGULATION"], "VALEURS_AUTORISEES": ["Gaz Condensation, Fioul, Élec Direct, PAC, Réseau Chaleur", "Non Isolé, Double Vitrage, ITE Complète", "Aucune, Thermostat Simple, GTB/GTC, Horloge"]})
+                df_notice = pd.DataFrame({"CHAMP": ["CHAUFFAGE", "ISOLATION", "REGULATION"], "VALEURS_AUTORISEES":["Gaz Condensation, Fioul, Élec Direct, PAC, Réseau Chaleur", "Non Isolé, Double Vitrage, ITE Complète", "Aucune, Thermostat Simple, GTB/GTC, Horloge"]})
                 df_notice.to_excel(writer, index=False, sheet_name="MODE_EMPLOI")
             elif "bpu" in template_type:
                 df = pd.DataFrame(columns=["PRIX_HPH", "ABONNEMENT"])
@@ -680,10 +709,10 @@ async def get_static_asset(filename: str):
 async def api_simulate_offer(file: UploadFile = File(...)):
     try:
         content = await file.read()
-        current_sites = []
+        current_sites =[]
         files = glob.glob(os.path.join(DATA_DIR, "*.json"))
         for p in files:
-            if "master" in p: continue
+            if "master" in p or "m57" in p: continue
             try:
                 with open(p, 'r', encoding='utf-8') as f: current_sites.append(json.load(f))
             except: continue
@@ -703,7 +732,7 @@ async def generate_tender(request: Request):
     try:
         body = await request.json()
         site_ids = body.get('site_ids', [])
-        selected_sites = []
+        selected_sites =[]
         for sid in site_ids:
             file_path = find_site_file(sid)
             if file_path:
@@ -759,7 +788,7 @@ async def generate_tender(request: Request):
 @app.get("/ops/ingest", response_class=HTMLResponse)
 async def ops_ingest_page(request: Request, user = Depends(get_current_user)):
     # PROTECTION
-    if not user or user.get("role") not in ["ADMIN", "OPS_TECH"]: return RedirectResponse(url="/login")
+    if not user or user.get("role") not in["ADMIN", "OPS_TECH"]: return RedirectResponse(url="/login")
     try:
         if 'router' not in globals() and 'router' not in locals(): raise Exception("Le module Router n'est pas chargé.")
         api_status = router.get_api_status()
@@ -772,7 +801,7 @@ async def ingest_files_mass(files: List[UploadFile] = File(...)):
     """
     Ingestion Massive SGE/GRDF.
     """
-    report = []
+    report =[]
     for file in files:
         try:
             content = await file.read()
@@ -795,7 +824,7 @@ async def api_simulate_strategy(payload: StrategyRequest):
     pmax = float(kpis.get('pmax_kw', 100))
     talon = float(kpis.get('talon_kw', 20))
     
-    load_curve = []
+    load_curve =[]
     for h in range(24):
         val = talon
         if 6 <= h <= 20: val = talon + (pmax - talon) * 0.8 
@@ -1010,10 +1039,10 @@ async def view_ops_market(request: Request): return templates.TemplateResponse("
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
     # 1. Whitelist des pages publiques
-    PUBLIC_PAGES = ["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html"]
+    PUBLIC_PAGES =["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html"]
 
     # 2. Check Extension
-    if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
+    if any(x in page_name for x in[".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
     
     # 3. Normalisation
     target_file = page_name if page_name.endswith(".html") else f"{page_name}.html"
