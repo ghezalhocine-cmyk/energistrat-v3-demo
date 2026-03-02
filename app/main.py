@@ -75,7 +75,7 @@ except Exception as e_prod:
         aggregator = MockAggregator()
         ingest = None; cortex = None; physics = None; forecast = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3016-DISPLAY-FIX")
+app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3017-WRITE-FIX")
 
 app.add_middleware(
     CORSMiddleware,
@@ -183,43 +183,53 @@ async def logout(response: Response):
     return RedirectResponse(url="/login")
 
 # ==========================================
-# API PRINCIPALES
+# API PRINCIPALES (SETTINGS & DATA)
 # ==========================================
+
+# --- HELPER DE NORMALISATION (POUR SAVE ET UPDATE) ---
+def normalize_contract_data(data):
+    """Range les données plates (ps_hph) dans la structure contractuelle."""
+    if 'contract' not in data: data['contract'] = {}
+    c = data['contract']
+    if 'power_details' not in c: c['power_details'] = {}
+    
+    mapping = {
+        'hph': ['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph'],
+        'hch': ['ps_hch', 'p_hch', 'PS_HCH', 'puissance_hch'],
+        'hpe': ['ps_hpe', 'p_hpe', 'PS_HPE', 'puissance_hpe'],
+        'hce': ['ps_hce', 'p_hce', 'PS_HCE', 'puissance_hce']
+    }
+    
+    # Sources possibles : Racine, Contract, Technical
+    sources = [data, c, data.get('technical', {})]
+    
+    for target, variants in mapping.items():
+        for s in sources:
+            if not s: continue
+            for v in variants:
+                if v in s and s[v]:
+                    c['power_details'][target] = s[v]
+                    break
+    return data
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
     try:
         data = await request.json()
+        data = normalize_contract_data(data) # NORMALISATION
+        
         raw_id = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
         data["identity"]["id"] = raw_id
         safe_id = get_safe_id(raw_id)
         file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
         
-        # NORMALISATION : On s'assure que les données plates sont aussi dans les sous-objets
-        if 'contract' in data:
-            c = data['contract']
-            if 'power_details' not in c: c['power_details'] = {}
-            # Mapping forcé
-            if 'ps_hph' in c: c['power_details']['hph'] = c['ps_hph']
-            if 'ps_hch' in c: c['power_details']['hch'] = c['ps_hch']
-            if 'ps_hpe' in c: c['power_details']['hpe'] = c['ps_hpe']
-            if 'ps_hce' in c: c['power_details']['hce'] = c['ps_hce']
-        
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
-            if 'technical' in data:
-                if 'technical' not in existing_data: existing_data['technical'] = {}
-                existing_data['technical'].update(data['technical'])
-            if 'location' in data:
-                if 'location' not in existing_data: existing_data['location'] = {}
-                existing_data['location'].update(data['location'])
-            if 'identity' in data: existing_data['identity'].update(data['identity'])
-            if 'contract' in data: existing_data['contract'].update(data['contract'])
-            if 'pricing' in data: existing_data['pricing'] = data['pricing']
-            if 'kpis' in data:
-                if 'kpis' not in existing_data: existing_data['kpis'] = {}
-                existing_data['kpis'].update(data['kpis'])
-            if 'financials' in data: existing_data['financials'] = data['financials']
+            # Merge intelligent
+            for section in ['technical', 'location', 'identity', 'contract', 'pricing', 'kpis', 'financials']:
+                if section in data:
+                    if section not in existing_data: existing_data[section] = {}
+                    existing_data[section].update(data[section])
             final_data = existing_data
         else:
             final_data = data
@@ -230,17 +240,32 @@ async def api_save_client(request: Request):
 
 @app.post("/api/settings/update_site")
 async def api_update_site(request: Request):
+    """
+    CORRECTION CRITIQUE V3017 : 
+    Cette fonction met désormais à jour TOUS les champs (Contrat, Prix...), 
+    et pas seulement la location/technique.
+    """
     try:
         payload = await request.json()
+        payload = normalize_contract_data(payload) # NORMALISATION AUSSI ICI
+
         site_id = payload.get('id')
         if not site_id: return JSONResponse({"error": "ID manquant"}, 400)
         file_path = find_site_file(site_id)
         if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
+        
         with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
-        if 'location' in payload: data['location'] = {**data.get('location', {}), **payload['location']}
-        if 'technical' in payload: data['technical'] = {**data.get('technical', {}), **payload['technical']}
+        
+        # MISE A JOUR EXHAUSTIVE
+        # On parcourt toutes les sections possibles du payload
+        for section in ['location', 'technical', 'identity', 'contract', 'pricing', 'financials']:
+            if section in payload:
+                if section not in data: data[section] = {}
+                # On merge les clés
+                data[section].update(payload[section])
+        
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4, ensure_ascii=False)
-        return JSONResponse({"success": True, "message": "Sauvegardé"})
+        return JSONResponse({"success": True, "message": "Sauvegarde Complète OK"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.post("/api/settings/import_csv")
@@ -310,7 +335,6 @@ async def get_fleet_data(response: Response):
         "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)) }
     }))
 
-# --- CORRECTION CRITIQUE V3016 : AFFICHAGE UNIVERSEL ---
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str, response: Response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -347,31 +371,15 @@ async def get_dashboard_data(client_id: str, response: Response):
                 except: pass
         budget_display = financials.get('budget_subscription', 0) + (vol_display * volume_multiplier * u_price)
 
-    # FIX DATA MISSING (RECONSTITUTION AGRESSIVE DES DÉTAILS)
+    # FIX DATA MISSING (RECONSTITUTION DES DÉTAILS)
     power_details = contract.get('power_details', {})
-    
-    # On reconstitue les valeurs à plat dans le contrat pour que le JS les trouve
-    # Peu importe si c'est ps_hph, P_HPH, ou power_details.hph
-    
-    # 1. HPH
-    if not contract.get('ps_hph'):
-        contract['ps_hph'] = power_details.get('hph') or contract.get('p_hph') or contract.get('P_HPH') or "-"
-    
-    # 2. HCH
-    if not contract.get('ps_hch'):
-        contract['ps_hch'] = power_details.get('hch') or contract.get('p_hch') or contract.get('P_HCH') or "-"
-
-    # 3. HPE
-    if not contract.get('ps_hpe'):
-        contract['ps_hpe'] = power_details.get('hpe') or contract.get('p_hpe') or contract.get('P_HPE') or "-"
-
-    # 4. HCE
-    if not contract.get('ps_hce'):
-        contract['ps_hce'] = power_details.get('hce') or contract.get('p_hce') or contract.get('P_HCE') or "-"
-
-    # FIX "undefined undefined" (PROVIDER & SEGMENT)
-    if not financials['meta'].get('provider'): financials['meta']['provider'] = contract.get('provider') or "Inconnu"
-    if not display_segment: display_segment = contract.get('segment') or "-"
+    if not power_details:
+        power_details = {
+            "hph": contract.get("ps_hph") or contract.get("p_hph"),
+            "hch": contract.get("ps_hch") or contract.get("p_hch"),
+            "hpe": contract.get("ps_hpe") or contract.get("p_hpe"),
+            "hce": contract.get("ps_hce") or contract.get("p_hce")
+        }
 
     response_data = {
         "energy_type": "gaz" if financials['meta']['is_gas'] else "elec",
@@ -381,8 +389,8 @@ async def get_dashboard_data(client_id: str, response: Response):
         "financials": data.get('financials', {}),
         "contract": {
             "pdl": contract.get('pdl'),
-            "provider": financials['meta'].get('provider'), # Assuré non-vide
-            "segment": display_segment, # Assuré non-vide
+            "provider": financials['meta'].get('provider'),
+            "segment": display_segment,
             "start_date": contract.get('start_date'),
             "end_date": contract.get('end_date'),
             "power": contract.get('power'),
@@ -393,11 +401,6 @@ async def get_dashboard_data(client_id: str, response: Response):
             "profil": contract.get('profil'),
             "tarif_acheminement": contract.get('tarif_acheminement'),
             "power_details": power_details, 
-            # On renvoie aussi les champs plats forcés
-            "ps_hph": contract.get('ps_hph'),
-            "ps_hch": contract.get('ps_hch'),
-            "ps_hpe": contract.get('ps_hpe'),
-            "ps_hce": contract.get('ps_hce'),
             "consumption_details": contract.get('consumption_details', {})
         },
         "pricing": pricing,
