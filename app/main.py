@@ -75,7 +75,7 @@ except Exception as e_prod:
         aggregator = MockAggregator()
         ingest = None; cortex = None; physics = None; forecast = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3020-DATA-MIRROR")
+app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3021-PRICE-FIX")
 
 app.add_middleware(
     CORSMiddleware,
@@ -186,60 +186,75 @@ async def logout(response: Response):
 # API PRINCIPALES (SETTINGS & DATA)
 # ==========================================
 
-# --- HELPER DE NORMALISATION & MIRRORING (V3020) ---
-def normalize_contract_data(data):
+# --- HELPER DE NORMALISATION UNIVERSELLE (V3021) ---
+def normalize_full_data(data):
     """
-    MIRRORING STRATEGY :
-    Assure que les données sont présentes PARTOUT (Nested & Flat).
-    Si on a P1, on remplit HPH. Si on a HPH, on remplit P1.
+    Transforme les données plates (Formulaire) en données structurées (Standard Cortex).
+    Gère Contrat (Puissances) ET Pricing (Prix).
     """
+    # 1. STRUCTURES DE BASE
     if 'contract' not in data: data['contract'] = {}
+    if 'pricing' not in data: data['pricing'] = {}
+    
     c = data['contract']
+    p = data['pricing']
+    
     if 'power_details' not in c: c['power_details'] = {}
     
-    # MAPPING ÉTENDU (Prise en compte des P1, P2...)
-    # Structure : 'clé_interne_dashboard': ['liste', 'des', 'clés', 'possibles', 'settings']
-    mapping = {
-        'hph': ['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph', 'P1', 'p1', 'hph'],
-        'hch': ['ps_hch', 'p_hch', 'PS_HCH', 'puissance_hch', 'P2', 'p2', 'hch'],
-        'hpe': ['ps_hpe', 'p_hpe', 'PS_HPE', 'puissance_hpe', 'P3', 'p3', 'hpe'],
-        'hce': ['ps_hce', 'p_hce', 'PS_HCE', 'puissance_hce', 'P4', 'p4', 'hce']
+    # Sources possibles : Racine, Contract, Technical, Pricing
+    sources = [data, c, data.get('technical', {}), p]
+    
+    # 2. MAPPING PUISSANCES (kW)
+    power_map = {
+        'hph': ['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph'],
+        'hch': ['ps_hch', 'p_hch', 'PS_HCH', 'puissance_hch'],
+        'hpe': ['ps_hpe', 'p_hpe', 'PS_HPE', 'puissance_hpe'],
+        'hce': ['ps_hce', 'p_hce', 'PS_HCE', 'puissance_hce']
     }
     
-    # On scanne les données entrantes
-    sources = [data, c, data.get('technical', {})]
-    
-    for target_key, variants in mapping.items():
-        found_value = None
-        # 1. Recherche de la valeur
+    for target, variants in power_map.items():
         for s in sources:
             if not s: continue
             for v in variants:
-                if v in s and s[v] is not None and str(s[v]).strip() != "":
-                    found_value = s[v]
+                if v in s and s[v]:
+                    c['power_details'][target] = s[v]
+                    # On force aussi la version plate dans contract pour compatibilité max
+                    c[f"ps_{target}"] = s[v] 
                     break
-            if found_value: break
-        
-        # 2. Si trouvée, on l'écrit PARTOUT (Mirroring)
-        if found_value:
-            # Dans le détail structuré (pour le Dashboard)
-            c['power_details'][target_key] = found_value
-            
-            # Dans les champs plats standards (pour Settings)
-            c[f"ps_{target_key}"] = found_value 
-            
-            # Dans les alias P1/P2 (pour compatibilité Excel)
-            p_alias = {'hph': 'P1', 'hch': 'P2', 'hpe': 'P3', 'hce': 'P4'}
-            c[p_alias[target_key]] = found_value
+
+    # 3. MAPPING PRIX (€/kWh) - LE FIX QUI MANQUAIT
+    price_map = {
+        'hph': ['price_hph', 'prix_hph', 'P_HPH', 'tarif_hph'],
+        'hch': ['price_hch', 'prix_hch', 'P_HCH', 'tarif_hch'],
+        'hpe': ['price_hpe', 'prix_hpe', 'P_HPE', 'tarif_hpe'],
+        'hce': ['price_hce', 'prix_hce', 'P_HCE', 'tarif_hce']
+    }
+
+    for target, variants in price_map.items():
+        for s in sources:
+            if not s: continue
+            for v in variants:
+                if v in s and s[v]:
+                    p[target] = s[v] # Stocké dans data['pricing']['hph']
+                    break
+
+    # 4. IDENTITÉ (SIRET)
+    if 'identity' in data:
+        i = data['identity']
+        # Si SIRET est à la racine, on le met dans identity
+        if 'siret' in data and data['siret']: i['siret'] = data['siret']
+        # Si ID est manquant mais SIRET présent, ID = SIRET
+        if not i.get('id') and i.get('siret'): i['id'] = i['siret']
 
     data['contract'] = c
+    data['pricing'] = p
     return data
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
     try:
         data = await request.json()
-        data = normalize_contract_data(data) # MIRRORING ACTIVÉ
+        data = normalize_full_data(data) # NORMALISATION COMPLETE
         
         raw_id = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
         data["identity"]["id"] = raw_id
@@ -249,14 +264,11 @@ async def api_save_client(request: Request):
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f: existing_data = json.load(f)
             
-            # MERGE COMPLET
-            sections_to_update = ['technical', 'location', 'identity', 'contract', 'pricing', 'kpis', 'financials', 'rgpd']
-            
-            for section in sections_to_update:
+            # Merge intelligent
+            for section in ['technical', 'location', 'identity', 'contract', 'pricing', 'kpis', 'financials', 'rgpd']:
                 if section in data:
                     if section not in existing_data: existing_data[section] = {}
                     existing_data[section].update(data[section])
-            
             final_data = existing_data
         else:
             final_data = data
@@ -267,9 +279,12 @@ async def api_save_client(request: Request):
 
 @app.post("/api/settings/update_site")
 async def api_update_site(request: Request):
+    """
+    Mise à jour complète (Settings V2).
+    """
     try:
         payload = await request.json()
-        payload = normalize_contract_data(payload) # MIRRORING ACTIVÉ
+        payload = normalize_full_data(payload) # NORMALISATION COMPLETE
 
         site_id = payload.get('id')
         if not site_id: return JSONResponse({"error": "ID manquant"}, 400)
@@ -278,7 +293,7 @@ async def api_update_site(request: Request):
         
         with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
         
-        # MERGE COMPLET
+        # MISE A JOUR EXHAUSTIVE
         sections_to_update = ['location', 'technical', 'identity', 'contract', 'pricing', 'financials', 'rgpd']
         
         for section in sections_to_update:
@@ -370,7 +385,19 @@ async def get_dashboard_data(client_id: str, response: Response):
         financials['kpis']['unit_price_kwh'], market_ref, financials['meta']['is_gas']
     )
     contract = data.get('contract', {})
-    pricing = financials['pricing_details']
+    pricing = financials['pricing_details'] # Ceci est calculé par cortex.enrich_site_financials
+    
+    # MAIS SI CORTEX ENRICH RATE SON COUP, ON FORCE LA LECTURE DES PRIX BRUTS
+    if not pricing.get('hph'):
+        raw_pricing = data.get('pricing', {})
+        pricing = {
+            "hph": raw_pricing.get('hph') or raw_pricing.get('price_hph') or 0.20,
+            "hch": raw_pricing.get('hch') or raw_pricing.get('price_hch') or 0.15,
+            "hpe": raw_pricing.get('hpe') or raw_pricing.get('price_hpe') or 0.12,
+            "hce": raw_pricing.get('hce') or raw_pricing.get('price_hce') or 0.08,
+            "fix": raw_pricing.get('fix') or 0
+        }
+
     display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
 
     # FIX VOLUME
@@ -385,24 +412,18 @@ async def get_dashboard_data(client_id: str, response: Response):
     if vol_display > 100000: volume_multiplier = 1 
     
     if financials['volume_mwh'] == 0 and vol_display > 0:
-        p_data = data.get('pricing', {})
-        u_price = 0.20
-        for k in ['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
-            if k in p_data and p_data[k]: 
-                try: u_price = float(p_data[k]); break
-                except: pass
+        # On recalcule le budget si manquant
+        u_price = float(pricing.get('hph', 0.20))
         budget_display = financials.get('budget_subscription', 0) + (vol_display * volume_multiplier * u_price)
 
-    # FIX DATA MISSING (RECONSTITUTION AGRESSIVE + MIRRORING READ)
+    # FIX DATA MISSING (RECONSTITUTION AGRESSIVE DES DÉTAILS)
     power_details = contract.get('power_details', {})
-    
-    # On lit partout pour être sûr
-    if not power_details.get('hph'): power_details['hph'] = contract.get('ps_hph') or contract.get('P1') or "-"
-    if not power_details.get('hch'): power_details['hch'] = contract.get('ps_hch') or contract.get('P2') or "-"
-    if not power_details.get('hpe'): power_details['hpe'] = contract.get('ps_hpe') or contract.get('P3') or "-"
-    if not power_details.get('hce'): power_details['hce'] = contract.get('ps_hce') or contract.get('P4') or "-"
+    if not contract.get('ps_hph'): contract['ps_hph'] = power_details.get('hph') or contract.get('p_hph') or contract.get('P_HPH') or "-"
+    if not contract.get('ps_hch'): contract['ps_hch'] = power_details.get('hch') or contract.get('p_hch') or contract.get('P_HCH') or "-"
+    if not contract.get('ps_hpe'): contract['ps_hpe'] = power_details.get('hpe') or contract.get('p_hpe') or contract.get('P_HPE') or "-"
+    if not contract.get('ps_hce'): contract['ps_hce'] = power_details.get('hce') or contract.get('p_hce') or contract.get('P_HCE') or "-"
 
-    # FIX PROVIDER & SEGMENT
+    # FIX "undefined undefined" (PROVIDER & SEGMENT)
     if not financials['meta'].get('provider'): financials['meta']['provider'] = contract.get('provider') or "Inconnu"
     if not display_segment: display_segment = contract.get('segment') or "-"
 
@@ -426,14 +447,13 @@ async def get_dashboard_data(client_id: str, response: Response):
             "profil": contract.get('profil'),
             "tarif_acheminement": contract.get('tarif_acheminement'),
             "power_details": power_details, 
-            # On renvoie aussi les champs plats pour le front
-            "ps_hph": power_details.get('hph'),
-            "ps_hch": power_details.get('hch'),
-            "ps_hpe": power_details.get('hpe'),
-            "ps_hce": power_details.get('hce'),
+            "ps_hph": contract.get('ps_hph'),
+            "ps_hch": contract.get('ps_hch'),
+            "ps_hpe": contract.get('ps_hpe'),
+            "ps_hce": contract.get('ps_hce'),
             "consumption_details": contract.get('consumption_details', {})
         },
-        "pricing": pricing,
+        "pricing": pricing, # Version enrichie/forcée
         "kpis": {
             "volume_mwh": vol_display,
             "budget": budget_display,
