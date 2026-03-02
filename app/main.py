@@ -86,7 +86,7 @@ except Exception as e_prod:
         # Objets vides pour éviter NameError
         ingest = None; cortex = None; physics = None; forecast = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="PLATINUM-V3026-INTEGRAL-FIX")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V3028-CARBON-FIX")
 
 app.add_middleware(
     CORSMiddleware,
@@ -137,6 +137,11 @@ class M57SettingsModel(BaseModel):
     bp_gaz: float = 0.0
     consumed_elec: float = 0.0
     consumed_gaz: float = 0.0
+
+# NOUVEAU MODÈLE CARBONE (CHANTIER B.2)
+class CarbonSettingsModel(BaseModel):
+    baseline_year: int = 2010
+    baseline_kwh_sqm: float = 0.0
 
 # --- FONCTIONS UTILITAIRES ---
 
@@ -260,8 +265,8 @@ def normalize_full_data(data):
     power_map = {
         'hph':['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph'],
         'hch':['ps_hch', 'p_hch', 'PS_HCH', 'puissance_hch'],
-        'hpe': ['ps_hpe', 'p_hpe', 'PS_HPE', 'puissance_hpe'],
-        'hce': ['ps_hce', 'p_hce', 'PS_HCE', 'puissance_hce']
+        'hpe':['ps_hpe', 'p_hpe', 'PS_HPE', 'puissance_hpe'],
+        'hce':['ps_hce', 'p_hce', 'PS_HCE', 'puissance_hce']
     }
     
     for target, variants in power_map.items():
@@ -350,6 +355,25 @@ async def save_m57_settings(data: M57SettingsModel, user = Depends(get_current_u
     except Exception as e:
         return JSONResponse({"error": str(e)}, 500)
 
+@app.get("/api/settings/carbon")
+async def get_carbon_settings():
+    path = os.path.join(DATA_DIR, "carbon_settings.json")
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f: return json.load(f)
+        except: pass
+    return {"baseline_year": 2010, "baseline_kwh_sqm": 0.0}
+
+@app.post("/api/settings/carbon")
+async def save_carbon_settings(data: CarbonSettingsModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    try:
+        path = os.path.join(DATA_DIR, "carbon_settings.json")
+        with open(path, 'w', encoding='utf-8') as f: json.dump(data.dict(), f, indent=4)
+        return JSONResponse({"success": True})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, 500)
+
 @app.post("/api/settings/update_site")
 async def api_update_site(request: Request):
     try:
@@ -425,7 +449,7 @@ async def get_fleet_data(response: Response):
     raw_sites =[]
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     for p in files:
-        if "master" in p or "market" in p or "m57" in p: continue
+        if "master" in p or "market" in p or "m57" in p or "carbon" in p: continue
         try:
             with open(p, 'r', encoding='utf-8') as f: data = json.load(f)
             fin = cortex.enrich_site_financials(data)
@@ -712,7 +736,7 @@ async def api_simulate_offer(file: UploadFile = File(...)):
         current_sites =[]
         files = glob.glob(os.path.join(DATA_DIR, "*.json"))
         for p in files:
-            if "master" in p or "m57" in p: continue
+            if any(x in p for x in["master", "m57", "carbon"]): continue
             try:
                 with open(p, 'r', encoding='utf-8') as f: current_sites.append(json.load(f))
             except: continue
@@ -779,15 +803,8 @@ async def generate_tender(request: Request):
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_Energistrat_{timestamp}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-# ==========================================
-# ROUTES TITANIUM (INGESTION & PROFILS)
-# ==========================================
-
-# --- SÉCURISATION DES ROUTES SENSIBLES (OPS & FINANCE) ---
-
 @app.get("/ops/ingest", response_class=HTMLResponse)
 async def ops_ingest_page(request: Request, user = Depends(get_current_user)):
-    # PROTECTION
     if not user or user.get("role") not in["ADMIN", "OPS_TECH"]: return RedirectResponse(url="/login")
     try:
         if 'router' not in globals() and 'router' not in locals(): raise Exception("Le module Router n'est pas chargé.")
@@ -798,9 +815,6 @@ async def ops_ingest_page(request: Request, user = Depends(get_current_user)):
 
 @app.post("/api/ingest/upload")
 async def ingest_files_mass(files: List[UploadFile] = File(...)):
-    """
-    Ingestion Massive SGE/GRDF.
-    """
     report =[]
     for file in files:
         try:
@@ -811,34 +825,24 @@ async def ingest_files_mass(files: List[UploadFile] = File(...)):
             report.append({"filename": file.filename, "status": "ERROR", "message": str(e), "pdl": "ERR"})
     return JSONResponse(content={"report": report})
 
-# NOUVEAU : Simulation Stratégie
 @app.post("/api/ops/market/simulate_strategy")
 async def api_simulate_strategy(payload: StrategyRequest):
-    """Simule une stratégie d'achat (Bloc + Spot) sur la courbe réelle du client."""
     file_path = find_site_file(payload.site_id)
     if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
-    
     with open(file_path, 'r', encoding='utf-8') as f: data = json.load(f)
-    
     kpis = data.get('kpis', {})
     pmax = float(kpis.get('pmax_kw', 100))
     talon = float(kpis.get('talon_kw', 20))
-    
     load_curve =[]
     for h in range(24):
         val = talon
         if 6 <= h <= 20: val = talon + (pmax - talon) * 0.8 
         load_curve.append(val)
-        
     result = market.valoriser_strategie(load_curve, payload.bloc_kw)
     return JSONResponse(json_compliant(result))
 
-# NOUVEAU : Route pour l'agrégateur SGE
 @app.post("/api/ops/aggregate")
 async def api_aggregate_sites(payload: AggregationRequest):
-    """
-    Génère un fichier SGE virtuel agglomérant plusieurs sites.
-    """
     try:
         csv_content = aggregator.aggregate_sites(payload.site_ids, payload.years)
         if not csv_content: return JSONResponse({"error": "Aucune donnée générée (sites introuvables ?)"}, 400)
@@ -851,9 +855,7 @@ async def api_aggregate_sites(payload: AggregationRequest):
 @app.get("/industrie", response_class=HTMLResponse)
 @app.get("/industry", response_class=HTMLResponse)
 async def view_industrie(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
-    """Profil Industrie (Usine 4.0) - Câblé sur les vraies données."""
     if not user: return RedirectResponse(url="/login")
-
     if id:
         file_path = find_site_file(id)
         if file_path:
@@ -871,9 +873,7 @@ async def view_industrie(request: Request, id: Optional[str] = None, user = Depe
 
 @app.get("/syndic", response_class=HTMLResponse)
 async def view_syndic(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
-    """Profil Syndic (Habitat) - Câblé sur les vraies données."""
     if not user: return RedirectResponse(url="/login")
-
     if id:
         file_path = find_site_file(id)
         if file_path:
@@ -889,7 +889,6 @@ async def view_syndic(request: Request, id: Optional[str] = None, user = Depends
     data = {"client_name": "RÉSIDENCE DÉMO", "dju_n": 2100, "dju_n_1": 2400, "conso_n": 450000}
     return templates.TemplateResponse("syndic.html", {"request": request, "data": data})
 
-# --- ROUTES NOUVEAUX PROFILS (CORRIGÉES & SÉCURISÉES) ---
 @app.get("/mairie", response_class=HTMLResponse)
 async def view_mairie(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
@@ -920,7 +919,6 @@ async def view_citoyen(request: Request, id: Optional[str] = None, user = Depend
     if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("citoyen.html", {"request": request})
 
-# --- SATELLITES (NOUVEAU) ---
 @app.get("/optimization", response_class=HTMLResponse)
 async def view_optimization(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
@@ -946,55 +944,37 @@ async def view_aggregator(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("ops_aggregator.html", {"request": request})
 
-# --- MODULE FINANCE (NOUVEAU & SÉCURISÉ) ---
 @app.get("/finance", response_class=HTMLResponse)
 async def view_finance(request: Request, user = Depends(get_current_user)):
-    """Vue Principale Finance (Twin + Audit) - Protégée."""
     if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("dashboard_finance.html", {"request": request, "user": user})
 
 @app.post("/api/finance/upload")
 async def api_finance_upload(file: UploadFile = File(...), site_id: str = Form(...)):
-    """Upload et Audit immédiat (Factur-X/Excel)"""
     try:
         content = await file.read()
-        
-        # 1. Parse
         parsed = finance.parse_invoice(content, file.filename)
-        if parsed.get("status") == "ERROR":
-            return JSONResponse(parsed, status_code=400)
-        
-        # 2. Récup Site Data (Pour le contrat)
+        if parsed.get("status") == "ERROR": return JSONResponse(parsed, status_code=400)
         file_path = find_site_file(site_id)
         site_data = {}
         if file_path:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                site_data = json.load(f)
-        
-        # 3. Audit
+            with open(file_path, 'r', encoding='utf-8') as f: site_data = json.load(f)
         audit_report = finance.audit_invoice(parsed, site_data)
         return JSONResponse(json_compliant(audit_report))
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, 500)
+    except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.get("/api/finance/landing/{site_id}")
 async def api_finance_landing(site_id: str):
-    """Récupère les données du Twin Financier"""
     file_path = find_site_file(site_id)
     if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            site_data = json.load(f)
+        with open(file_path, 'r', encoding='utf-8') as f: site_data = json.load(f)
         landing_data = finance.simulate_landing(site_data)
         return JSONResponse(json_compliant(landing_data))
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, 500)
+    except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-# --- ROUTES DE BASE ---
 @app.get("/")
-async def view_landing(request: Request): 
-    # ACCÈS PUBLIC (Vitrine)
-    return templates.TemplateResponse("index.html", {"request": request})
+async def view_landing(request: Request): return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/onboarding")
 async def view_onboarding(request: Request): return templates.TemplateResponse("onboarding.html", {"request": request})
@@ -1003,12 +983,7 @@ async def view_processing(request: Request): return templates.TemplateResponse("
 
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str, user = Depends(get_current_user)):
-    # PROTECTION : Dashboard accessible uniquement si connecté
-    # Sauf mode Demo pour les besoins de dev (optionnel)
-    if not user and profile not in ["demo"]: 
-        return RedirectResponse(url="/login")
-
-    # ROUTAGE EXPLICITE CORRIGÉ
+    if not user and profile not in ["demo"]: return RedirectResponse(url="/login")
     if profile == "retail": return templates.TemplateResponse("retail.html", {"request": request})
     if profile == "mairie": return templates.TemplateResponse("mairie.html", {"request": request})
     if profile == "sde": return templates.TemplateResponse("sde.html", {"request": request})
@@ -1016,7 +991,6 @@ async def view_dashboard(request: Request, profile: str, user = Depends(get_curr
     if profile == "pme": return templates.TemplateResponse("pme.html", {"request": request})
     if profile == "citoyen": return templates.TemplateResponse("citoyen.html", {"request": request})
     if profile == "forecast": return templates.TemplateResponse("forecast.html", {"request": request}) 
-    
     t = f"{profile}.html"
     if os.path.exists(os.path.join(TEMPLATE_DIR, t)): return templates.TemplateResponse(t, {"request": request, "profile": profile})
     return templates.TemplateResponse("dashboard.html", {"request": request, "profile": profile})
@@ -1035,31 +1009,18 @@ async def view_partner_settings(request: Request, user = Depends(get_current_use
 @app.get("/ops/market")
 async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
 
-# --- PROTECTION DE LA ROUTE DYNAMIQUE ---
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
-    # 1. Whitelist des pages publiques
     PUBLIC_PAGES =["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html"]
-
-    # 2. Check Extension
-    if any(x in page_name for x in[".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
-    
-    # 3. Normalisation
+    if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
     target_file = page_name if page_name.endswith(".html") else f"{page_name}.html"
-    
-    # 4. SÉCURITÉ : Si la page n'est pas publique et que l'user n'est pas connecté -> Login
-    if target_file not in PUBLIC_PAGES and not user:
-         return RedirectResponse(url="/login")
-
-    # 5. Serve
-    if os.path.exists(os.path.join(TEMPLATE_DIR, target_file)): 
-        return templates.TemplateResponse(target_file, {"request": request})
-    
+    if target_file not in PUBLIC_PAGES and not user: return RedirectResponse(url="/login")
+    if os.path.exists(os.path.join(TEMPLATE_DIR, target_file)): return templates.TemplateResponse(target_file, {"request": request})
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/{full_path:path}")
 async def catch_all_deep(request: Request, full_path: str):
-    if any(x in full_path for x in ["static", "assets", "favicon"]): return JSONResponse({}, 404)
+    if any(x in full_path for x in["static", "assets", "favicon"]): return JSONResponse({}, 404)
     return templates.TemplateResponse("index.html", {"request": request})
 
 if __name__ == "__main__":
