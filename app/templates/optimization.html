@@ -2,210 +2,329 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V3 | Optimisation TURPE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | Optimisation TURPE & CEE</title>
+    
+    <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { 
+                        abysse: '#001529', 
+                        card: '#0F172A', 
+                        sidebar: '#020617', 
+                        cyan: '#00E5FF', 
+                        success: '#10B981', 
+                        alert: '#EF4444', 
+                        warning: '#F59E0B'
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
+                    borderRadius: { '3xl': '2rem', '4xl': '3rem' }
+                }
+            }
+        }
+    </script>
     <style>
-        body { background-color: #050505; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
-        .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem; }
+        body { background-color: #001529; color: #e2e8f0; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.2s; }
+        .glass-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px 16px; border-radius: 0.75rem; transition: all 0.2s; }
+        .glass-btn:hover { background: rgba(0, 229, 255, 0.2); border-color: #00E5FF; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
-<body class="flex h-screen w-screen">
+<body class="flex h-screen w-screen font-sans">
 
-    <aside class="w-16 bg-[#020617] border-r border-white/10 flex flex-col items-center py-6 z-50">
-        <a href="/industrie" id="back-btn" class="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-white hover:bg-cyan-500 hover:text-black transition mb-6">
+    <!-- SIDEBAR ÉPURÉE -->
+    <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
+        <button onclick="history.back()" title="Retour" class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition mb-8 border border-white/5">
             <i class="fa-solid fa-arrow-left"></i>
-        </a>
-        <div class="w-10 h-10 rounded bg-cyan/20 text-cyan flex items-center justify-center border border-cyan/30 mb-2">
-            <i class="fa-solid fa-sliders"></i>
+        </button>
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan to-blue-900 flex items-center justify-center text-white font-bold shadow-[0_0_15px_rgba(0,229,255,0.4)] mb-2" title="Module Optimisation">
+            <i class="fa-solid fa-sliders text-xl"></i>
         </div>
+        <div class="text-[8px] font-bold text-cyan uppercase tracking-widest mt-1 text-center">TURPE<br>& CEE</div>
     </aside>
 
-    <main class="flex-1 flex flex-col p-8 gap-6">
-        <header class="flex justify-between items-center">
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col min-w-0 relative overflow-hidden">
+        
+        <!-- HEADER -->
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur sticky top-0 z-40">
             <div>
-                <h1 class="text-3xl font-bold text-white">Optimisation Tarifaire (TURPE)</h1>
-                <p class="text-sm text-gray-400 mt-1">Analyse détaillée 4 Quadrants (Hiver/Été x Plein/Creux)</p>
+                <h1 class="text-2xl font-black text-white italic tracking-tight">CORTEX <span class="text-cyan">OPTIMIZATION</span></h1>
+                <p class="text-xs text-gray-400 mt-1 font-mono">Ajustement TURPE 4 Quadrants & Simulations de ROI (Travaux)</p>
             </div>
-            <div class="text-right">
-                <div class="text-xs text-gray-500 uppercase font-bold">Site Actif</div>
-                <div class="text-xl font-bold text-cyan" id="site-name">Chargement...</div>
+            <div class="flex items-center gap-4">
+                <div class="text-right mr-2">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Compteur Actif</div>
+                </div>
+                <select id="site-select" onchange="changeSite()" class="bg-card border border-white/10 rounded-xl py-2 pl-4 pr-10 text-sm text-white font-bold focus:border-cyan outline-none shadow-lg cursor-pointer max-w-[300px] truncate">
+                    <option value="">Chargement de la flotte...</option>
+                </select>
             </div>
         </header>
 
-        <div class="grid grid-cols-12 gap-6 h-full">
+        <!-- DASHBOARD AREA -->
+        <div class="flex-1 overflow-y-auto p-8 pb-32">
             
-            <!-- COL 1 : ANALYSE DÉTAILLÉE 4 POSTES (NOUVEAU) -->
-            <div class="col-span-8 bento-card p-6 flex flex-col">
-                <h3 class="text-sm font-bold text-gray-400 uppercase mb-6 flex justify-between">
-                    <span>Analyse Puissance par Poste</span>
-                    <span class="text-xs text-gray-500 normal-case">Comparaison Souscrit (PS) vs Atteint (Pmax)</span>
-                </h3>
-
-                <div class="space-y-6 flex-1">
-                    <!-- HPH -->
-                    <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="font-bold text-white">HPH (Hiver Plein)</span>
-                            <span><span id="pmax-hph" class="text-cyan font-bold">--</span> / <span id="ps-hph" class="text-gray-400">--</span> kW</span>
-                        </div>
-                        <div class="w-full bg-gray-800 h-4 rounded-full overflow-hidden relative">
-                            <div id="bar-hph" class="h-full bg-cyan transition-all duration-1000" style="width: 0%"></div>
-                            <div class="absolute top-0 bottom-0 w-0.5 bg-white z-10" id="mark-hph" style="left: 0%"></div>
-                        </div>
-                        <div class="text-[10px] text-right mt-1" id="msg-hph">Analyse...</div>
-                    </div>
-
-                    <!-- HCH -->
-                    <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="font-bold text-white">HCH (Hiver Creux)</span>
-                            <span><span id="pmax-hch" class="text-cyan font-bold">--</span> / <span id="ps-hch" class="text-gray-400">--</span> kW</span>
-                        </div>
-                        <div class="w-full bg-gray-800 h-4 rounded-full overflow-hidden relative">
-                            <div id="bar-hch" class="h-full bg-cyan transition-all duration-1000" style="width: 0%"></div>
-                            <div class="absolute top-0 bottom-0 w-0.5 bg-white z-10" id="mark-hch" style="left: 0%"></div>
-                        </div>
-                        <div class="text-[10px] text-right mt-1" id="msg-hch">Analyse...</div>
-                    </div>
-
-                    <!-- HPE -->
-                    <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="font-bold text-gray-300">HPE (Été Plein)</span>
-                            <span><span id="pmax-hpe" class="text-cyan font-bold">--</span> / <span id="ps-hpe" class="text-gray-400">--</span> kW</span>
-                        </div>
-                        <div class="w-full bg-gray-800 h-4 rounded-full overflow-hidden relative">
-                            <div id="bar-hpe" class="h-full bg-cyan transition-all duration-1000" style="width: 0%"></div>
-                            <div class="absolute top-0 bottom-0 w-0.5 bg-white z-10" id="mark-hpe" style="left: 0%"></div>
-                        </div>
-                        <div class="text-[10px] text-right mt-1" id="msg-hpe">Analyse...</div>
-                    </div>
-
-                    <!-- HCE -->
-                    <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="font-bold text-gray-300">HCE (Été Creux)</span>
-                            <span><span id="pmax-hce" class="text-cyan font-bold">--</span> / <span id="ps-hce" class="text-gray-400">--</span> kW</span>
-                        </div>
-                        <div class="w-full bg-gray-800 h-4 rounded-full overflow-hidden relative">
-                            <div id="bar-hce" class="h-full bg-cyan transition-all duration-1000" style="width: 0%"></div>
-                            <div class="absolute top-0 bottom-0 w-0.5 bg-white z-10" id="mark-hce" style="left: 0%"></div>
-                        </div>
-                        <div class="text-[10px] text-right mt-1" id="msg-hce">Analyse...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- COL 2 : SYNTHÈSE & RÉACTIF -->
-            <div class="col-span-4 flex flex-col gap-6">
+            <div class="grid grid-cols-12 gap-6 h-full">
                 
-                <!-- GAIN -->
-                <div class="bento-card p-6 flex flex-col items-center justify-center text-center relative overflow-hidden flex-1">
-                    <div class="absolute top-0 right-0 p-4 opacity-10 text-8xl text-green-500"><i class="fa-solid fa-sack-dollar"></i></div>
-                    <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Potentiel d'Économie</h3>
-                    <div class="text-5xl font-black text-white mb-2" id="val-gain">-- €</div>
-                    <div class="text-xs text-green-400 font-bold uppercase border border-green-500/30 bg-green-500/10 px-3 py-1 rounded-full mb-8">Annuel</div>
-                    <button class="bg-cyan hover:bg-white text-black font-bold py-3 px-8 rounded-full transition shadow-[0_0_20px_rgba(0,229,255,0.3)] text-xs">Générer Demande Enedis</button>
+                <!-- COL 1 : ANALYSE TURPE (4 POSTES) -->
+                <div class="col-span-8 flex flex-col gap-6">
+                    <div class="bento-card p-6 flex flex-col flex-1">
+                        <h3 class="text-sm font-bold text-gray-400 uppercase mb-6 flex justify-between items-center">
+                            <span class="flex items-center gap-2"><i class="fa-solid fa-chart-gantt text-cyan"></i> Analyse Puissance par Poste</span>
+                            <span class="text-xs text-gray-500 normal-case bg-white/5 px-3 py-1 rounded-full border border-white/10">Comparaison Pmax (Réelle) vs PS (Souscrite)</span>
+                        </h3>
+
+                        <div class="space-y-6 flex-1 flex flex-col justify-center">
+                            <!-- HPH -->
+                            <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                                <div class="flex justify-between text-xs mb-2">
+                                    <span class="font-bold text-white">HPH (Hiver Pointe)</span>
+                                    <span><span id="pmax-hph" class="text-cyan font-bold text-sm">--</span> <span class="text-gray-500">kW max</span> <span class="mx-2 text-gray-700">|</span> <span id="ps-hph" class="text-white">--</span> <span class="text-gray-500">kVA souscrits</span></span>
+                                </div>
+                                <div class="w-full bg-gray-800 h-4 rounded-full overflow-hidden relative shadow-inner">
+                                    <div id="bar-hph" class="h-full bg-cyan transition-all duration-1000" style="width: 0%"></div>
+                                </div>
+                                <div class="text-[10px] text-right mt-2" id="msg-hph">Analyse en cours...</div>
+                            </div>
+
+                            <!-- HCH -->
+                            <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                                <div class="flex justify-between text-xs mb-2">
+                                    <span class="font-bold text-white">HCH (Hiver Creux)</span>
+                                    <span><span id="pmax-hch" class="text-cyan font-bold text-sm">--</span> <span class="text-gray-500">kW max</span> <span class="mx-2 text-gray-700">|</span> <span id="ps-hch" class="text-white">--</span> <span class="text-gray-500">kVA souscrits</span></span>
+                                </div>
+                                <div class="w-full bg-gray-800 h-4 rounded-full overflow-hidden relative shadow-inner">
+                                    <div id="bar-hch" class="h-full bg-cyan transition-all duration-1000" style="width: 0%"></div>
+                                </div>
+                                <div class="text-[10px] text-right mt-2" id="msg-hch">Analyse en cours...</div>
+                            </div>
+
+                            <!-- HPE -->
+                            <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                                <div class="flex justify-between text-xs mb-2">
+                                    <span class="font-bold text-gray-400">HPE (Été Plein)</span>
+                                    <span><span id="pmax-hpe" class="text-cyan font-bold text-sm">--</span> <span class="text-gray-500">kW max</span> <span class="mx-2 text-gray-700">|</span> <span id="ps-hpe" class="text-white">--</span> <span class="text-gray-500">kVA souscrits</span></span>
+                                </div>
+                                <div class="w-full bg-gray-800 h-4 rounded-full overflow-hidden relative shadow-inner">
+                                    <div id="bar-hpe" class="h-full bg-cyan transition-all duration-1000" style="width: 0%"></div>
+                                </div>
+                                <div class="text-[10px] text-right mt-2" id="msg-hpe">Analyse en cours...</div>
+                            </div>
+
+                            <!-- HCE -->
+                            <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                                <div class="flex justify-between text-xs mb-2">
+                                    <span class="font-bold text-gray-400">HCE (Été Creux)</span>
+                                    <span><span id="pmax-hce" class="text-cyan font-bold text-sm">--</span> <span class="text-gray-500">kW max</span> <span class="mx-2 text-gray-700">|</span> <span id="ps-hce" class="text-white">--</span> <span class="text-gray-500">kVA souscrits</span></span>
+                                </div>
+                                <div class="w-full bg-gray-800 h-4 rounded-full overflow-hidden relative shadow-inner">
+                                    <div id="bar-hce" class="h-full bg-cyan transition-all duration-1000" style="width: 0%"></div>
+                                </div>
+                                <div class="text-[10px] text-right mt-2" id="msg-hce">Analyse en cours...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- MODULE CEE / TRAVAUX -->
+                    <div class="bento-card p-6 border-l-4 border-success">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2"><i class="fa-solid fa-hammer text-success"></i> Simulation de Travaux (CEE)</h3>
+                                <p class="text-[10px] text-gray-400 mt-1">Impact estimé sur le talon de consommation (Fiche BAT-TH-116)</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-[10px] text-gray-500 uppercase font-bold">ROI Estimé</div>
+                                <div class="text-xl font-bold text-success font-mono" id="val-roi">-- mois</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <button onclick="simulateWork('gtb')" class="bg-white/5 border border-white/10 hover:border-success p-4 rounded-xl text-center transition group">
+                                <i class="fa-solid fa-microchip text-2xl text-gray-400 group-hover:text-success mb-2 transition"></i>
+                                <div class="text-xs font-bold text-white">Mise en place GTC</div>
+                                <div class="text-[9px] text-gray-500 mt-1">-20% sur le talon</div>
+                            </button>
+                            <button onclick="simulateWork('led')" class="bg-white/5 border border-white/10 hover:border-yellow-400 p-4 rounded-xl text-center transition group">
+                                <i class="fa-solid fa-lightbulb text-2xl text-gray-400 group-hover:text-yellow-400 mb-2 transition"></i>
+                                <div class="text-xs font-bold text-white">Relamping LED</div>
+                                <div class="text-[9px] text-gray-500 mt-1">-15% sur la puissance</div>
+                            </button>
+                            <button onclick="simulateWork('isolation')" class="bg-white/5 border border-white/10 hover:border-blue-400 p-4 rounded-xl text-center transition group">
+                                <i class="fa-solid fa-temperature-arrow-down text-2xl text-gray-400 group-hover:text-blue-400 mb-2 transition"></i>
+                                <div class="text-xs font-bold text-white">Isolation Toiture</div>
+                                <div class="text-[9px] text-gray-500 mt-1">-30% sur le chauffage</div>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- REACTIF -->
-                <div class="bento-card p-6">
-                    <h3 class="text-sm font-bold text-gray-400 uppercase mb-4">Énergie Réactive (Cos φ)</h3>
-                    <div class="relative h-32 w-full flex items-center justify-center">
-                        <canvas id="cosPhiChart"></canvas>
-                        <div class="absolute text-center"><div class="text-2xl font-bold text-white" id="val-cosphi">--</div></div>
+                <!-- COL 2 : SYNTHÈSE & RÉACTIF -->
+                <div class="col-span-4 flex flex-col gap-6">
+                    
+                    <!-- GAIN TURPE -->
+                    <div class="bento-card p-6 flex flex-col items-center justify-center text-center relative overflow-hidden h-64 border border-cyan/20">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 text-8xl text-cyan"><i class="fa-solid fa-sack-dollar"></i></div>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Gisement TURPE</h3>
+                        <div class="text-5xl font-black text-white mb-2" id="val-gain">-- €</div>
+                        <div class="text-[10px] text-cyan font-bold uppercase tracking-widest bg-cyan/10 px-3 py-1 rounded-full mb-6 border border-cyan/30">Économie Annuelle</div>
+                        <button class="w-full glass-btn text-xs font-bold text-cyan hover:bg-cyan hover:text-abysse flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-file-export"></i> Générer Fiche Enedis
+                        </button>
                     </div>
-                    <div class="mt-4 text-center">
-                        <p class="text-xs font-bold" id="cos-msg">Analyse...</p>
+
+                    <!-- REACTIF -->
+                    <div class="bento-card p-6 flex-1 flex flex-col">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Énergie Réactive (Cos φ)</h3>
+                        <div class="relative flex-1 w-full flex items-center justify-center">
+                            <canvas id="cosPhiChart"></canvas>
+                            <div class="absolute text-center"><div class="text-3xl font-black text-white" id="val-cosphi">--</div></div>
+                        </div>
+                        <div class="mt-6 text-center bg-white/5 p-3 rounded-xl border border-white/10">
+                            <p class="text-xs font-bold" id="cos-msg">Analyse de la courbe de charge...</p>
+                        </div>
                     </div>
                 </div>
+
             </div>
-
         </div>
     </main>
 
     <script>
-        async function init() {
-            const urlParams = new URLSearchParams(window.location.search);
-            let siteId = urlParams.get('id');
-            if (!siteId) {
-                try {
-                    const res = await fetch('/api/dashboard/fleet');
-                    const fleet = await res.json();
-                    if(fleet.fleet && fleet.fleet.length > 0) siteId = fleet.fleet[0].id;
-                } catch(e) {}
-            }
-            if(siteId) {
-                document.getElementById('back-btn').href = `/industrie?id=${siteId}`;
-                loadData(siteId);
+        let FLEET_DATA =[];
+        let CURRENT_SITE_DATA = null;
+        let cosPhiChartInstance = null;
+
+        // --- INIT & FETCH DATA ---
+        async function initModule() {
+            try {
+                // 1. Récupération du parc global
+                const resFleet = await fetch('/api/dashboard/fleet');
+                const data = await resFleet.json();
+                
+                if(data.fleet && data.fleet.length > 0) {
+                    // Filtrer uniquement l'élec car le TURPE gaz n'a pas 4 cadrans
+                    FLEET_DATA = data.fleet.filter(s => s.energy === 'elec');
+                    populateSiteSelector();
+                    
+                    // 2. Vérification URL
+                    const urlParams = new URLSearchParams(window.location.search);
+                    let targetId = urlParams.get('id');
+                    
+                    if (targetId && FLEET_DATA.find(s => s.id === targetId)) {
+                        document.getElementById('site-select').value = targetId;
+                    } else if (FLEET_DATA.length > 0) {
+                        targetId = FLEET_DATA[0].id;
+                        document.getElementById('site-select').value = targetId;
+                    }
+
+                    if (targetId) loadSiteData(targetId);
+                } else {
+                    document.getElementById('site-select').innerHTML = '<option value="">Aucun compteur électrique trouvé.</option>';
+                }
+            } catch(e) { console.error("Erreur d'initialisation:", e); }
+        }
+
+        function populateSiteSelector() {
+            const sel = document.getElementById('site-select');
+            sel.innerHTML = '';
+            FLEET_DATA.sort((a,b) => a.name.localeCompare(b.name)).forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.innerText = `⚡ ${s.name} (${s.pdl || 'Sans PDL'})`;
+                sel.appendChild(opt);
+            });
+        }
+
+        function changeSite() {
+            const targetId = document.getElementById('site-select').value;
+            if (targetId) loadSiteData(targetId);
+        }
+
+        // --- LOAD SPECIFIC DATA ---
+        async function loadSiteData(id) {
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                const data = await res.json();
+                
+                if(data.error) {
+                    alert("Erreur: Données inaccessibles pour ce site.");
+                    return;
+                }
+
+                CURRENT_SITE_DATA = data;
+                analyzeTurpe(data);
+
+            } catch (e) {
+                console.error("Erreur chargement site:", e);
             }
         }
 
-        async function loadData(id) {
-            const res = await fetch(`/api/dashboard/data/${id}`);
-            const data = await res.json();
-
-            const name = data.identity?.site_name || "Site";
-            document.getElementById('site-name').innerText = name;
-
-            // DONNÉES DU ROUTEUR (Calculées via Physics V61)
+        // --- MOTEUR D'ANALYSE TURPE ---
+        function analyzeTurpe(data) {
             const kpis = data.kpis || {};
             const contract = data.contract || {};
             const pd = contract.power_details || {};
 
-            // 1. Récupération des Pmax calculées
-            // Si le fichier JSON n'a pas encore les pmax_details (ancien import), on utilise la pmax globale
+            // 1. Pmax (Atteintes). Priorité aux pmax détaillées du routeur, sinon fallback
             const pmax_globale = parseFloat(kpis.pmax_kw || 0);
             const pmax_hph = kpis.pmax_details?.hph || pmax_globale;
             const pmax_hch = kpis.pmax_details?.hch || pmax_globale * 0.9;
             const pmax_hpe = kpis.pmax_details?.hpe || pmax_globale * 0.8;
             const pmax_hce = kpis.pmax_details?.hce || pmax_globale * 0.6;
 
-            // 2. Récupération des Puissances Souscrites (Settings)
-            const ps_hph = parseFloat(pd.ps_hph || contract.power || 0);
-            const ps_hch = parseFloat(pd.ps_hch || contract.power || 0);
-            const ps_hpe = parseFloat(pd.ps_hpe || contract.power || 0);
-            const ps_hce = parseFloat(pd.ps_hce || contract.power || 0);
+            // 2. Puissances Souscrites (Settings Data Unity)
+            // L'API normalise tout dans power_details OU à plat
+            const ps_hph = parseFloat(pd.hph || contract.ps_hph || contract.power || 0);
+            const ps_hch = parseFloat(pd.hch || contract.ps_hch || contract.power || 0);
+            const ps_hpe = parseFloat(pd.hpe || contract.ps_hpe || contract.power || 0);
+            const ps_hce = parseFloat(pd.hce || contract.ps_hce || contract.power || 0);
 
-            // 3. Mise à jour des Jauges
+            // 3. Mise à jour Interface
             updateGauge('hph', pmax_hph, ps_hph);
             updateGauge('hch', pmax_hch, ps_hch);
             updateGauge('hpe', pmax_hpe, ps_hpe);
             updateGauge('hce', pmax_hce, ps_hce);
 
-            // 4. Calcul Gain (Simplifié)
-            // Si on a > 20% de marge sur un poste, on peut réduire
-            let gain = 0;
-            [
+            // 4. Calcul du Gisement d'Économie
+            // Règle métier : ~12€ / an / kVA économisé
+            let gain = 0;[
                 {p: pmax_hph, s: ps_hph}, {p: pmax_hch, s: ps_hch},
                 {p: pmax_hpe, s: ps_hpe}, {p: pmax_hce, s: ps_hce}
             ].forEach(item => {
-                if(item.s > item.p * 1.2) gain += (item.s - (item.p * 1.1)) * 12; // ~12€/kVA/an d'économie
+                if(item.s > item.p * 1.2) { // Si PS est 20% + grand que Pmax
+                    const possibleReduction = item.s - (item.p * 1.1); // On garde 10% de marge de sécurité
+                    if (possibleReduction > 0) gain += possibleReduction * 12;
+                }
             });
-            document.getElementById('val-gain').innerText = Math.round(gain) + " €";
+            document.getElementById('val-gain').innerText = Math.round(gain).toLocaleString() + " €";
 
-            // 5. Cos Phi
-            const cos = kpis.cos_phi || 0.94;
-            const penalty = kpis.penalite_reactive || 0;
-            document.getElementById('val-cosphi').innerText = cos;
+            // 5. Cos Phi & Réactif
+            const cos = parseFloat(kpis.cos_phi || 0.95);
+            const penalty = parseFloat(kpis.penalite_reactive || 0);
+            document.getElementById('val-cosphi').innerText = cos.toFixed(2);
             
             const cosMsg = document.getElementById('cos-msg');
-            if(penalty > 0) {
-                cosMsg.innerText = `⚠️ Pénalité : ${penalty} €/an`;
-                cosMsg.className = "text-xs font-bold text-danger animate-pulse";
+            if (cos < 0.93 || penalty > 0) {
+                const p = penalty > 0 ? penalty : Math.round((0.93 - cos) * 100 * 50); // Simulation amende
+                cosMsg.innerHTML = `<span class="text-alert"><i class="fa-solid fa-triangle-exclamation"></i> Risque Pénalité : ~${p} €/an</span><br><span class="text-gray-400 font-normal mt-1 block">Pose d'une batterie de condensateurs recommandée.</span>`;
             } else {
-                cosMsg.innerText = "Pas de pénalité";
-                cosMsg.className = "text-xs font-bold text-success";
+                cosMsg.innerHTML = `<span class="text-success"><i class="fa-solid fa-check"></i> Excellent profil réactif.</span><br><span class="text-gray-400 font-normal mt-1 block">Aucune pénalité Enedis projetée.</span>`;
             }
 
-            // Chart
-            new Chart(document.getElementById('cosPhiChart'), {
-                type: 'doughnut',
-                data: { labels: ['Actif', 'Réactif'], datasets: [{ data: [cos*100, (1-cos)*100], backgroundColor: [penalty > 0 ? '#EF4444' : '#00E5FF', '#1F2937'], borderWidth: 0 }] },
-                options: { cutout: '80%', responsive: true, plugins: { legend: { display: false } } }
-            });
+            drawCosPhiChart(cos);
+            
+            // Reset de la simulation CEE
+            document.getElementById('val-roi').innerText = "--";
         }
 
         function updateGauge(id, pmax, ps) {
@@ -214,40 +333,98 @@
             
             const bar = document.getElementById(`bar-${id}`);
             const msg = document.getElementById(`msg-${id}`);
-            const mark = document.getElementById(`mark-${id}`);
 
             if (ps <= 0) {
                 bar.style.width = "0%";
-                msg.innerText = "Non souscrit";
+                msg.innerText = "Donnée PS manquante dans les Settings";
+                msg.className = "text-[10px] text-right mt-2 text-warning";
                 return;
             }
 
-            // Calcul % remplissage (Max 100%)
-            const pct = Math.min((pmax / ps) * 100, 100);
+            // Calcul %
+            const rawPct = (pmax / ps) * 100;
+            const pct = Math.min(rawPct, 100);
             bar.style.width = `${pct}%`;
-
-            // Position du marqueur seuil (toujours à la fin si pmax < ps, ou dépassé)
-            // Ici on simplifie : la barre représente Pmax par rapport à PS (100%)
             
-            if (pmax > ps) {
-                // Dépassement
-                bar.className = "h-full bg-danger transition-all duration-1000";
-                msg.innerText = `⚠️ Dépassement de ${Math.round(pmax - ps)} kW`;
-                msg.className = "text-[10px] text-right mt-1 text-danger font-bold";
-            } else if (pmax < ps * 0.7) {
-                // Sur-optimisé (Gaspillage abo)
-                bar.className = "h-full bg-blue-500 transition-all duration-1000";
-                msg.innerText = `📉 Marge excessive (${Math.round(ps - pmax)} kVA inutiles)`;
-                msg.className = "text-[10px] text-right mt-1 text-blue-400";
+            if (rawPct > 100) {
+                bar.className = "h-full bg-alert transition-all duration-1000 shadow-[0_0_10px_rgba(239,68,68,0.5)]";
+                msg.innerText = `Dépassement pénalisé (+${Math.round(pmax - ps)} kW)`;
+                msg.className = "text-[10px] text-right mt-2 text-alert font-bold uppercase tracking-widest";
+            } else if (rawPct < 70) {
+                bar.className = "h-full bg-warning transition-all duration-1000 shadow-[0_0_10px_rgba(245,158,11,0.5)]";
+                msg.innerText = `Sur-abonnement. Baisse de puissance recommandée.`;
+                msg.className = "text-[10px] text-right mt-2 text-warning font-bold";
             } else {
-                // OK
                 bar.className = "h-full bg-success transition-all duration-1000";
-                msg.innerText = "✅ Optimisé";
-                msg.className = "text-[10px] text-right mt-1 text-success";
+                msg.innerText = "Contrat optimisé";
+                msg.className = "text-[10px] text-right mt-2 text-success font-bold";
             }
         }
 
-        init();
+        function drawCosPhiChart(cos) {
+            const ctx = document.getElementById('cosPhiChart').getContext('2d');
+            if (cosPhiChartInstance) cosPhiChartInstance.destroy();
+
+            const isBad = cos < 0.93;
+
+            cosPhiChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: { 
+                    labels:['Énergie Active (Utile)', 'Énergie Réactive (Perdue)'], 
+                    datasets: [{ 
+                        data:[cos*100, (1-cos)*100], 
+                        backgroundColor:[isBad ? '#EF4444' : '#00E5FF', 'rgba(255,255,255,0.05)'], 
+                        borderWidth: 0 
+                    }] 
+                },
+                options: { 
+                    cutout: '85%', 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    animation: { duration: 1500, animateRotate: true }
+                }
+            });
+        }
+
+        // --- SIMULATION IA (Boutons CEE) ---
+        function simulateWork(type) {
+            if(!CURRENT_SITE_DATA) return;
+            
+            const vol = CURRENT_SITE_DATA.kpis?.volume_mwh || 100;
+            const price = CURRENT_SITE_DATA.kpis?.unit_price_kwh || 0.18;
+            const budget = (vol * 1000) * price;
+            
+            let roi = 0;
+            let el = document.getElementById('val-roi');
+
+            // Logique mathématique simplifiée de ROI (Coût estimé / Économie annuelle)
+            if (type === 'gtb') {
+                const cost = 15000; // Coût moyen GTC
+                const save = budget * 0.15; // 15% d'économie
+                roi = cost / save;
+            } else if (type === 'led') {
+                const cost = 8000;
+                const save = budget * 0.05;
+                roi = cost / save;
+            } else if (type === 'isolation') {
+                const cost = 40000;
+                const save = budget * 0.25;
+                roi = cost / save;
+            }
+
+            // Affichage en mois
+            const mois = Math.round(roi * 12);
+            el.innerText = mois + " mois";
+            
+            // Animation
+            el.classList.remove('text-success');
+            el.classList.add('text-white');
+            setTimeout(() => { el.classList.remove('text-white'); el.classList.add('text-success'); }, 200);
+        }
+
+        // Démarrage
+        document.addEventListener('DOMContentLoaded', initModule);
     </script>
 </body>
 </html>
