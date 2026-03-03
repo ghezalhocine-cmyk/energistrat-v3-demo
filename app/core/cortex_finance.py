@@ -28,7 +28,7 @@ except ImportError:
 
 class CortexFinance:
     """
-    CORTEX FINANCE ENGINE V3.2 (DIAMOND ROBUST)
+    CORTEX FINANCE ENGINE V3.3 (DIAMOND ROBUST - FIX PDL)
     Module dédié à l'Audit Financier et à la Triangulation.
     
     CAPACITÉS :
@@ -98,18 +98,24 @@ class CortexFinance:
 
                 data["source"] = "PDF_NATIVE"
 
-                # G. Identification Fournisseur (En premier pour orienter l'algo)
+                # G. Identification Fournisseur
                 full_text_upper = full_text.upper()
                 if "EDF" in full_text_upper: data['provider'] = "EDF"
                 elif "ENGIE" in full_text_upper: data['provider'] = "ENGIE"
                 elif "TOTAL" in full_text_upper: data['provider'] = "TOTALENERGIES"
 
-                # A. Extraction PDL / PRM (Gère "PDL" et "Référence acheminement" pour les PROS)
+                # A. Extraction PDL / PRM (FIX: Nettoyage strict 14 chiffres)
                 pdl_match = re.search(r"(?:PDL|Point de livraison|Référence acheminement|Réf Acheminement Electricité)\s*[:.]?\s*([\d\s]{14,20})", full_text, re.IGNORECASE)
                 if pdl_match: 
-                    data['pdl'] = pdl_match.group(1).replace(" ", "").strip()
+                    raw_pdl = pdl_match.group(1)
+                    # On supprime absolument tout ce qui n'est pas un chiffre (espaces, sauts de ligne, lettres)
+                    clean_pdl = re.sub(r'\D', '', raw_pdl)
+                    if len(clean_pdl) >= 14:
+                        data['pdl'] = clean_pdl[:14] # Force 14 caractères (Norme ENEDIS)
+                    else:
+                        data['pdl'] = clean_pdl
                 
-                # B. Extraction Dates (Gère années sur 2 ou 4 chiffres, et prend la période la plus large du tableau)
+                # B. Extraction Dates
                 date_matches = re.findall(r"du\s+(\d{2}/\d{2}/\d{2,4})\s+au\s+(\d{2}/\d{2}/\d{2,4})", full_text, re.IGNORECASE)
                 if date_matches:
                     try:
@@ -126,7 +132,7 @@ class CortexFinance:
                     except Exception as e:
                         print(f"Erreur date parsing: {e}")
 
-                # C. Extraction Volume (Résidentiel : "Total Consommation" | Pro : "Conso 1 732 kWh")
+                # C. Extraction Volume
                 vol_match = re.search(r"(?:Total Consommation|Conso)\s+([\d\s]+)\s*(?:kWh)", full_text, re.IGNORECASE)
                 if vol_match: 
                     clean_vol = vol_match.group(1).replace(" ", "")
@@ -137,7 +143,7 @@ class CortexFinance:
                 if penalties_match: 
                     data['penalties'] = float(penalties_match.group(1).replace(',', '.'))
                 
-                # E. Montant TTC (Accepte les espaces dans les milliers, ex: "1 033,67")
+                # E. Montant TTC
                 total_match = re.search(r"(?:Montant total à payer\s*\(TTC\)|Facture TTC|Montant total)[^\d]*?([\d\s]+[\.,]\d{2})\s?€", full_text, re.DOTALL | re.IGNORECASE)
                 if total_match: 
                     clean_ttc = total_match.group(1).replace(" ", "").replace(",", ".")
