@@ -2,203 +2,194 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ENERGISTRAT V3 | OPH Social (Master)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script>
         tailwind.config = { 
-            theme: { 
-                extend: { 
-                    colors: { 
-                        abysse: '#001529', card: '#0F172A', oph: '#F97316', cyan: '#00E5FF', 
-                        alert: '#EF4444', success: '#10B981', gold: '#F59E0B'
-                    }, 
-                    borderRadius: { 'bento': '1.5rem' },
-                    boxShadow: { 'neon-oph': '0 0 20px rgba(249, 115, 22, 0.25)' }
-                } 
-            } 
+            theme: { extend: { colors: { abysse: '#001529', card: '#0F172A', oph: '#F97316', cyan: '#00E5FF', alert: '#EF4444', success: '#10B981', gold: '#F59E0B' }, fontFamily: { sans:['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } } 
         }
     </script>
     <style>
         body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
         .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
         .nav-item.active { background: rgba(249, 115, 22, 0.1); border-left: 4px solid #F97316; color: white; }
-        .view-section { display: none; } .view-section.active { display: grid; animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        select { background-color: rgba(255,255,255,0.05) !important; color: white !important; -webkit-appearance: none; }
-        select option { background-color: #0F172A !important; color: white !important; padding: 10px; }
+        .view-section { display: none; } .view-section.active { display: flex; flex-direction: column; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
 <body class="flex h-screen w-screen text-sm">
 
-    <!-- SIDEBAR -->
     <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
         <div class="p-6">
             <div class="flex items-center gap-3 mb-8">
-                <div class="w-10 h-10 rounded-xl border border-oph bg-oph/10 flex items-center justify-center text-oph font-bold shadow-neon-oph">🏢</div>
+                <div class="w-10 h-10 rounded-xl border border-oph bg-oph/10 flex items-center justify-center text-oph font-bold shadow-[0_0_20px_rgba(249,115,22,0.3)]"><i class="fa-solid fa-city"></i></div>
                 <div><h1 class="font-bold tracking-wider text-base text-white">OPH<span class="text-oph">.OS</span></h1><p class="text-[10px] text-gray-500 font-mono">Bailleur Social</p></div>
             </div>
             
             <nav class="space-y-2">
-                <div class="text-[10px] text-gray-500 uppercase font-bold px-4 mb-2 mt-4">Pilotage Budget</div>
-                <button onclick="switchView('charges')" id="btn-charges" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-file-invoice-dollar w-5 text-center"></i> P1 (Énergie)
+                <button onclick="switchView('appels')" id="btn-appels" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs uppercase tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-file-signature w-4 text-center"></i> Usine à DQE
                 </button>
-                <button onclick="switchView('nilm')" id="btn-nilm" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-microchip w-5 text-center text-cyan"></i> Auto-Tagging
+                <button onclick="switchView('factures')" id="btn-factures" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs uppercase tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-file-invoice-dollar w-4 text-center text-alert"></i> Facturation & Anomalies
                 </button>
-                
-                <div class="text-[10px] text-gray-500 uppercase font-bold px-4 mt-6 mb-2">Concertation</div>
-                <button onclick="switchView('social')" id="btn-social" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-hand-holding-heart w-5 text-center text-success"></i> Bouclier Locataire
+                <button onclick="switchView('cee')" id="btn-cee" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs uppercase tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-hammer w-4 text-center text-success"></i> Plan Rénovation CEE
+                </button>
+                <button onclick="switchView('locataires')" id="btn-locataires" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs uppercase tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-bullhorn w-4 text-center text-cyan"></i> Archives SRU
                 </button>
             </nav>
         </div>
-        
         <div class="p-6 border-t border-white/5">
-            <a href="/settings" class="flex items-center gap-3 text-gray-400 hover:text-white transition text-xs"><i class="fa-solid fa-gear"></i> Data Unity</a>
+            <a href="/settings" class="flex items-center gap-3 text-gray-400 hover:text-white transition text-xs"><i class="fa-solid fa-gear"></i> Data Unity Settings</a>
         </div>
     </aside>
 
-    <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         
-        <!-- HEADER -->
-        <div class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
             <div>
-                <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight">Pilotage P1</h2>
-                <p class="text-xs text-gray-400 font-mono mt-1">Consolidation du patrimoine</p>
+                <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight">Générateur de DQE</h2>
+                <p class="text-xs text-gray-400 font-mono mt-1">Génération automatique des bordereaux de marchés publics</p>
             </div>
             <div class="flex items-center gap-3">
-                <span class="text-[10px] text-gray-500 uppercase font-bold">Périmètre :</span>
-                <div class="relative">
-                    <select id="site-selector" onchange="switchSite(this.value)" class="border border-white/20 text-xs font-bold rounded-xl p-2.5 focus:outline-none focus:border-oph bg-card text-white min-w-[250px] shadow-inner cursor-pointer">
-                        <option value="">Chargement...</option>
-                    </select>
-                    <div class="absolute right-3 top-3 pointer-events-none text-gray-400 text-xs">▼</div>
-                </div>
+                <button onclick="triggerDQE()" id="btn-dqe" class="bg-oph text-abysse px-6 py-2.5 rounded-xl font-bold text-xs shadow-[0_0_15px_rgba(249,115,22,0.4)] hover:bg-white transition flex items-center gap-2">
+                    <i class="fa-solid fa-file-excel"></i> Exporter le DQE (.xlsx)
+                </button>
             </div>
-        </div>
+        </header>
 
         <div class="p-8 overflow-y-auto h-full pb-20">
             
-            <!-- VUE 1 : CHARGES & DJU -->
-            <div id="view-charges" class="view-section active grid grid-cols-12 gap-6 auto-rows-min">
-                
-                <div class="col-span-12 grid grid-cols-4 gap-6">
+            <!-- VUE 1 : USINE À DQE -->
+            <div id="view-appels" class="view-section active gap-6">
+                <div class="grid grid-cols-3 gap-6 mb-6">
                     <div class="bento-card p-6 border-l-4 border-oph">
-                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Total P1 (Énergie)</div>
-                        <div class="text-3xl font-black text-white font-mono" id="total-p1">-- €</div>
-                        <div class="text-xs text-green-400 mt-1">Projection d'atterrissage</div>
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Volume Lot 1 (Élec)</div>
+                        <div class="text-3xl font-black text-white font-mono" id="dqe-vol-elec">-- MWh</div>
                     </div>
-                    
-                    <div class="bento-card p-6 border-l-4 border-alert relative overflow-hidden">
-                        <div class="absolute -right-4 -bottom-4 text-alert opacity-10 text-8xl"><i class="fa-solid fa-temperature-empty"></i></div>
-                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Rigueur Climatique (DJU)</div>
-                        <div class="flex items-end gap-2">
-                            <div class="text-3xl font-black text-white font-mono" id="dju-value">--</div>
-                            <div class="text-sm font-bold text-alert mb-1" id="dju-var">--</div>
-                        </div>
-                        <div class="text-[10px] text-gray-400 mt-1" id="dju-desc">Météo Live...</div>
+                    <div class="bento-card p-6 border-l-4 border-alert">
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Volume Lot 2 (Gaz)</div>
+                        <div class="text-3xl font-black text-white font-mono" id="dqe-vol-gaz">-- MWh</div>
                     </div>
-
-                    <div class="bento-card p-6 border-l-4 border-cyan">
-                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Ratio d'Efficacité</div>
-                        <div class="text-3xl font-black text-white font-mono" id="avg-cost">-- €<span class="text-sm text-gray-500 font-normal">/m²</span></div>
-                        <div class="text-[10px] text-gray-400 mt-1">Coût P1 moyen du périmètre</div>
-                    </div>
-                    
-                    <div class="bento-card p-6 bg-gradient-to-br from-card to-oph/20 border border-oph/30 flex flex-col justify-center items-center cursor-pointer hover:bg-oph/30 transition">
-                        <i class="fa-solid fa-file-export text-2xl text-oph mb-2"></i>
-                        <span class="text-xs font-bold text-white">Export Régularisation (ERP)</span>
+                    <div class="bento-card p-6 bg-white/5 flex flex-col justify-center text-center">
+                        <span class="text-xs font-bold text-gray-400 uppercase mb-2">Sélection DQE</span>
+                        <div class="text-4xl font-black text-white font-mono" id="dqe-selected-count">0</div>
                     </div>
                 </div>
 
-                <div class="col-span-8 bento-card p-6 h-[400px] flex flex-col">
-                    <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4">Courbe de Mandatement P1</h3>
-                    <div class="flex-1 relative w-full"><canvas id="chartCharges"></canvas></div>
-                </div>
-
-                <div class="col-span-4 bento-card p-6 flex flex-col justify-center">
-                    <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-6">Récupération des Charges</h3>
-                    <div class="space-y-6">
-                        <div>
-                            <div class="flex justify-between text-xs mb-2"><span class="text-gray-400 font-bold">Récupérable (Quittance Locataire)</span><span class="text-white font-mono text-lg font-black">78%</span></div>
-                            <div class="w-full bg-gray-800 h-3 rounded-full overflow-hidden shadow-inner"><div class="bg-success h-full" style="width: 78%"></div></div>
+                <div class="bento-card p-0 overflow-hidden flex flex-col h-[500px]">
+                    <div class="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-white">Sélection du Périmètre de l'Appel d'Offres</h3>
+                        <div class="flex gap-2">
+                            <button onclick="selectAll('elec')" class="bg-oph/20 text-oph border border-oph/50 px-3 py-1 rounded text-xs font-bold hover:bg-oph hover:text-white transition">Tout Élec</button>
+                            <button onclick="selectAll('gaz')" class="bg-alert/20 text-alert border border-alert/50 px-3 py-1 rounded text-xs font-bold hover:bg-alert hover:text-white transition">Tout Gaz</button>
+                            <button onclick="selectAll('none')" class="bg-white/10 text-white px-3 py-1 rounded text-xs font-bold hover:bg-white/20 transition">Vider</button>
                         </div>
-                        <div>
-                            <div class="flex justify-between text-xs mb-2"><span class="text-gray-400 font-bold">Non-Récupérable (Charge Bailleur)</span><span class="text-white font-mono text-lg font-black">22%</span></div>
-                            <div class="w-full bg-gray-800 h-3 rounded-full overflow-hidden shadow-inner"><div class="bg-alert h-full" style="width: 22%"></div></div>
-                        </div>
-                        <p class="text-[10px] text-gray-500 mt-4 leading-relaxed">Selon le décret n°82-955, les dépenses de combustible (P1) et le petit entretien (P2) sont récupérables. Le gros entretien (P3) reste à la charge exclusive de l'OPH.</p>
                     </div>
-                </div>
-            </div>
-
-            <!-- VUE 2 : AUTO-TAGGING NILM -->
-            <div id="view-nilm" class="view-section grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-0 overflow-hidden flex flex-col">
-                    <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
-                        <div>
-                            <h3 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-microchip text-cyan"></i> Auto-Tagging du Patrimoine (NILM)</h3>
-                            <p class="text-xs text-gray-400 mt-1">Analyse des courbes SGE pour déterminer l'usage exact de vos centaines de compteurs.</p>
-                        </div>
-                        <button class="bg-cyan text-abysse px-6 py-2 rounded-xl text-xs font-bold shadow-[0_0_15px_rgba(0,229,255,0.4)] hover:bg-white transition">Valider l'inventaire</button>
-                    </div>
-                    <div class="overflow-x-auto p-4">
-                        <table class="w-full text-left text-sm text-gray-300">
-                            <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold">
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-left text-xs text-gray-300">
+                            <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold sticky top-0 z-10">
                                 <tr>
-                                    <th class="px-4 py-3">Bâtiment</th>
-                                    <th class="px-4 py-3">Point de Livraison</th>
-                                    <th class="px-4 py-3 text-right">Vol (MWh)</th>
-                                    <th class="px-4 py-3 text-right">Talon (Nuit)</th>
-                                    <th class="px-4 py-3">Détection IA (Usage)</th>
+                                    <th class="px-4 py-3 w-10 text-center"><input type="checkbox" onclick="toggleAllRows(this)" class="accent-oph"></th>
+                                    <th class="px-4 py-3">Site / Bâtiment</th>
+                                    <th class="px-4 py-3">PDL / PCE</th>
+                                    <th class="px-4 py-3">Énergie</th>
+                                    <th class="px-4 py-3 text-right">Volume (MWh)</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-white/5" id="oph-meter-list">
-                                <!-- JS -->
-                            </tbody>
+                            <tbody class="divide-y divide-white/5" id="dqe-list"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- VUE 3 : VEILLE SOCIALE & CONCERTATION -->
-            <div id="view-social" class="view-section grid grid-cols-12 gap-6 auto-rows-min">
-                
-                <!-- GADGET CONCERTATION -->
-                <div class="col-span-12 bento-card p-8 bg-gradient-to-r from-card to-success/10 border border-success/30">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h3 class="text-xl font-black text-white mb-2"><i class="fa-solid fa-bullhorn text-success mr-2"></i> Campagne de Transparence (Loi SRU)</h3>
-                            <p class="text-sm text-gray-300">Générez une note d'information pour justifier l'évolution de la provision pour charges P1 auprès de vos locataires.</p>
-                        </div>
-                        <button onclick="simulateConcertation()" id="btn-sru" class="bg-white text-success px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-gray-100 transition">
-                            <i class="fa-solid fa-envelope-open-text mr-2"></i> Générer Note d'Information
-                        </button>
+            <!-- VUE 2 : CONTRÔLE FACTURATION VS SGE (NOUVEAU) -->
+            <div id="view-factures" class="view-section gap-6">
+                <div class="bento-card p-0 overflow-hidden flex flex-col h-[700px] border-t-4 border-alert">
+                    <div class="p-6 border-b border-white/5 bg-white/5">
+                        <h3 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-file-invoice-dollar text-alert"></i> Rapprochement SGE / Factures (Détection Anomalies)</h3>
+                        <p class="text-xs text-gray-400 mt-1">Calcul du PMP (€/kWh) par site. Détection des compteurs muets ou surfacturés.</p>
                     </div>
-                    <div class="mt-6 p-4 bg-abysse/50 rounded-xl border border-white/5 text-sm text-gray-400 italic hidden" id="sru-text">
-                        "Madame, Monsieur, votre provision pour charge de chauffage va augmenter de 4%. Le prix de notre contrat de gaz a pourtant baissé, mais l'hiver a été 8.5% plus rigoureux (données Météo certifiées). Nous avons donc protégé votre pouvoir d'achat..."
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-left text-xs text-gray-300">
+                            <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold sticky top-0">
+                                <tr>
+                                    <th class="px-6 py-4">Point de Livraison</th>
+                                    <th class="px-6 py-4">Bâtiment</th>
+                                    <th class="px-6 py-4 text-right">Vol SGE (MWh)</th>
+                                    <th class="px-6 py-4 text-right">PMP Calculé</th>
+                                    <th class="px-6 py-4">Statut d'Audit IA</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5" id="flux-list"></tbody>
+                        </table>
                     </div>
                 </div>
+            </div>
 
-                <div class="col-span-12 bento-card p-0 overflow-hidden border-t-4 border-alert mt-4">
-                    <div class="p-6 border-b border-white/5 bg-alert/5">
-                        <h3 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-temperature-arrow-down text-alert"></i> Détection Sous-Chauffe (Précarité Énergétique)</h3>
-                        <p class="text-xs text-gray-400 mt-1">Locataires ou bâtiments dont la consommation hivernale est anormalement basse (risque d'impayé ou de froid).</p>
+            <!-- VUE 3 : PLAN RÉNOVATION CEE (NOUVEAU) -->
+            <div id="view-cee" class="view-section gap-6">
+                <div class="grid grid-cols-12 gap-6 mb-6">
+                    <div class="col-span-8 bento-card p-8 border-t-4 border-success flex flex-col justify-center">
+                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Plan Stratégique de Patrimoine (PSP)</h3>
+                        <div class="flex items-center gap-8">
+                            <div>
+                                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Cible GTB (Fiche BAT-TH-116)</div>
+                                <div class="text-3xl font-mono font-bold text-cyan" id="psp-gtb">-- €</div>
+                            </div>
+                            <div class="text-2xl text-gray-600"><i class="fa-solid fa-plus"></i></div>
+                            <div>
+                                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Cible Isolation (Fiche BAT-EN-101)</div>
+                                <div class="text-3xl font-mono font-bold text-blue-400" id="psp-iso">-- €</div>
+                            </div>
+                            <div class="text-2xl text-gray-600"><i class="fa-solid fa-equals"></i></div>
+                            <div class="flex-1 text-right">
+                                <div class="text-[10px] text-success font-bold uppercase mb-1">Enveloppe Subventions Globale</div>
+                                <div class="text-5xl font-mono font-black text-success" id="psp-total">-- €</div>
+                            </div>
+                        </div>
                     </div>
-                    <table class="w-full text-left text-sm text-gray-300 m-4 w-[calc(100%-2rem)]">
-                        <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold">
-                            <tr><th class="px-4 py-3">Site / Logement</th><th class="px-4 py-3 text-right">Conso Hiver N</th><th class="px-4 py-3 text-right">Historique N-1</th><th class="px-4 py-3 text-center">Alerte</th></tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5" id="social-list"></tbody>
-                    </table>
+                    <div class="col-span-4 bento-card p-6 bg-white/5">
+                        <h3 class="text-sm font-bold text-white mb-2"><i class="fa-solid fa-hand-holding-dollar text-success mr-2"></i> Financement Garanti</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed">Le calcul s'appuie sur la surface des bâtiments classés F ou G (Intensité > 250 kWh/m²) et sur les bâtiments présentant un gaspillage (Talon SGE) important.</p>
+                    </div>
+                </div>
+                
+                <div class="bento-card p-0 overflow-hidden flex flex-col h-[400px]">
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-left text-xs text-gray-300">
+                            <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold sticky top-0">
+                                <tr>
+                                    <th class="px-6 py-4">Bâtiment Critique</th>
+                                    <th class="px-6 py-4">Raison</th>
+                                    <th class="px-6 py-4">Type de Travaux CEE</th>
+                                    <th class="px-6 py-4 text-right">Prime Estimée</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5" id="cee-list"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VUE 4 : TRANSPARENCE SRU -->
+            <div id="view-locataires" class="view-section gap-6">
+                <div class="grid grid-cols-12 gap-6">
+                    <div class="col-span-12 bento-card p-8 border-t-4 border-cyan">
+                        <div class="flex justify-between items-center mb-8 border-b border-white/10 pb-4">
+                            <h3 class="text-xl font-black text-white"><i class="fa-solid fa-bullhorn text-cyan mr-2"></i> Campagnes de Concertation (Loi SRU)</h3>
+                            <span class="text-xs text-gray-400">Archives Légales</span>
+                        </div>
+                        <div class="space-y-4" id="loc-report-list"></div>
+                    </div>
                 </div>
             </div>
 
@@ -207,152 +198,172 @@
 
     <script>
         let FLEET_DATA =[];
-        let CURRENT_SITE = null;
-        let ophChart = null;
+        let SELECTED_FOR_DQE = new Set();
 
         window.switchView = function(viewId) {
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
             const btn = document.getElementById('btn-' + viewId);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             
-            document.querySelectorAll('.view-section').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             const target = document.getElementById('view-' + viewId);
-            if(target) { target.style.display = 'grid'; target.classList.add('active'); }
+            if(target) target.classList.add('active');
             
-            const titles = {'charges': 'Pilotage P1', 'nilm': 'Intelligence Patrimoine', 'social': 'Concertation Locative'};
-            document.getElementById('page-title').innerText = titles[viewId] || 'OPH.OS';
+            const titles = {'appels': "Générateur de DQE", 'factures': "Contrôle de Gestion SGE", 'cee': "Plan Stratégique CEE", 'locataires': "Transparence & Concertation"};
+            document.getElementById('page-title').innerText = titles[viewId];
         }
 
-        async function initSelector() {
+        async function initOph() {
             try {
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
                 if(data.fleet) {
                     FLEET_DATA = data.fleet;
-                    const sel = document.getElementById('site-selector');
-                    sel.innerHTML = '<option value="ALL">🏢 Parc Global (Agrégé)</option>';
-                    FLEET_DATA.sort((a,b) => a.name.localeCompare(b.name)).forEach(s => {
-                        const opt = document.createElement('option');
-                        opt.value = s.id;
-                        opt.innerText = s.name;
-                        sel.appendChild(opt);
-                    });
-                    switchSite("ALL");
+                    runDqeFactory();
+                    runMathEngines();
+                    generateLocataireReport();
                 }
-            } catch(e) {}
+            } catch(e) { console.error(e); }
         }
 
-        window.switchSite = async function(id) {
-            let dataToAnalyze =[];
-            if(id === "ALL") {
-                dataToAnalyze = FLEET_DATA;
-                CURRENT_SITE = { city: "Paris" }; // Default for global weather
-            } else {
-                try {
-                    const res = await fetch(`/api/dashboard/data/${id}`);
-                    const siteData = await res.json();
-                    CURRENT_SITE = siteData;
-                    dataToAnalyze =[{ 
-                        budget: siteData.kpis?.budget || 0, 
-                        surface: siteData.location?.surface || 1500,
-                        volume: siteData.kpis?.volume_mwh || 0,
-                        id: id,
-                        name: siteData.identity?.site_name,
-                        energy: siteData.energy_type,
-                        power: siteData.contract?.power,
-                        ghost_savings: siteData.kpis?.ghost_savings
-                    }];
-                } catch(e) { return; }
-            }
+        // --- MOTEUR 1 : DQE ---
+        function runDqeFactory() {
+            let volElec = 0; let volGaz = 0;
+            const tbody = document.getElementById('dqe-list');
+            tbody.innerHTML = '';
 
-            let totalP1 = 0; let totalSurf = 0;
-            dataToAnalyze.forEach(s => { totalP1 += s.budget; totalSurf += (s.surface || 1000); });
-
-            document.getElementById('total-p1').innerText = Math.round(totalP1).toLocaleString() + " €";
-            const ratio = totalSurf > 0 ? (totalP1 / totalSurf).toFixed(1) : 0;
-            document.getElementById('avg-cost').innerHTML = `${ratio} €<span class="text-sm text-gray-500 font-normal">/m²</span>`;
-
-            renderChart(totalP1);
-            fetchWeather(CURRENT_SITE.city || CURRENT_SITE.location?.city);
-            runAutoTagging(dataToAnalyze, id === "ALL");
-            runSocial(dataToAnalyze);
+            FLEET_DATA.sort((a,b) => a.name.localeCompare(b.name)).forEach(s => {
+                if(s.energy === 'elec') volElec += s.volume; else volGaz += s.volume;
+                const isChecked = SELECTED_FOR_DQE.has(s.id) ? 'checked' : '';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-white/5 border-b border-white/5 cursor-pointer" onclick="toggleDqeRow('${s.id}')">
+                        <td class="px-4 py-3 text-center" onclick="event.stopPropagation()"><input type="checkbox" class="accent-oph w-4 h-4 cursor-pointer dqe-chk" value="${s.id}" onchange="window.toggleDqeRow('${s.id}')" ${isChecked}></td>
+                        <td class="px-4 py-3 font-bold text-white">${s.name}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-cyan">${s.pdl || '-'}</td>
+                        <td class="px-4 py-3"><span class="text-[9px] bg-white/10 px-2 py-1 rounded font-bold">${(s.energy||'ELEC').toUpperCase()}</span></td>
+                        <td class="px-4 py-3 text-right font-mono text-white font-bold">${Math.round(s.volume)}</td>
+                    </tr>
+                `;
+            });
+            document.getElementById('dqe-vol-elec').innerText = Math.round(volElec).toLocaleString() + " MWh";
+            document.getElementById('dqe-vol-gaz').innerText = Math.round(volGaz).toLocaleString() + " MWh";
+            updateDqeCount();
         }
 
-        async function fetchWeather(city) {
-            if(!city) city = "Paris";
+        window.toggleDqeRow = function(id) {
+            if(SELECTED_FOR_DQE.has(id)) SELECTED_FOR_DQE.delete(id); else SELECTED_FOR_DQE.add(id);
+            const chk = document.querySelector(`.dqe-chk[value="${id}"]`); if(chk) chk.checked = SELECTED_FOR_DQE.has(id);
+            updateDqeCount();
+        }
+        window.toggleAllRows = function(source) {
+            document.querySelectorAll('.dqe-chk').forEach(chk => { chk.checked = source.checked; if(source.checked) SELECTED_FOR_DQE.add(chk.value); else SELECTED_FOR_DQE.delete(chk.value); });
+            updateDqeCount();
+        }
+        window.selectAll = function(type) {
+            SELECTED_FOR_DQE.clear();
+            if(type !== 'none') FLEET_DATA.forEach(s => { if(s.energy === type) SELECTED_FOR_DQE.add(s.id); });
+            runDqeFactory();
+        }
+        function updateDqeCount() { document.getElementById('dqe-selected-count').innerText = SELECTED_FOR_DQE.size; }
+        
+        window.triggerDQE = async function() {
+            if(SELECTED_FOR_DQE.size === 0) return alert("Cochez au moins un compteur.");
+            const ids = Array.from(SELECTED_FOR_DQE);
+            const btn = document.getElementById('btn-dqe'); const orig = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Génération Excel...`;
             try {
-                // Fake delay to show API connection
-                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&language=fr&format=json`);
-                const data = await res.json();
-                const lat = data.results ? data.results[0].latitude : 48;
-                
-                let baseDju = 2000;
-                if(lat > 48) baseDju = 2400; if(lat < 45) baseDju = 1600;
-                const variation = 8.5; // Simulé : hiver plus froid
-                
-                document.getElementById('dju-value').innerText = Math.round(baseDju);
-                document.getElementById('dju-var').innerText = "+" + variation + "%";
-                document.getElementById('dju-desc').innerHTML = `Calculé via géolocalisation de <b>${city}</b>. Impact haussier naturel justifié.`;
+                const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: ids }) });
+                if(res.ok) {
+                    const blob = await res.blob(); const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = `DQE_OPH_${ids.length}_sites.xlsx`;
+                    document.body.appendChild(a); a.click(); a.remove();
+                } else alert("Erreur génération.");
             } catch(e) {}
+            btn.innerHTML = orig;
         }
 
-        function runAutoTagging(sites, isGlobal) {
-            const tbody = document.getElementById('oph-meter-list');
-            tbody.innerHTML = '';
+        // --- MOTEUR 2 : FACTURES & CEE ---
+        function runMathEngines() {
+            const fluxList = document.getElementById('flux-list');
+            const ceeList = document.getElementById('cee-list');
+            fluxList.innerHTML = ''; ceeList.innerHTML = '';
             
-            let meters = sites;
-            if(!isGlobal) {
-                // Eclatement fictif si on a qu'un site pour montrer l'algo
-                meters =[
-                    { name: "Bat A - Chaufferie", id: "1960001", energy: CURRENT_SITE.energy_type, volume: CURRENT_SITE.kpis?.volume_mwh, power: 150, ghost_savings: 0 },
-                    { name: "Bat A - Communs", id: "1960002", energy: "elec", volume: 12, power: 36, ghost_savings: 400 },
-                    { name: "Parking Ext.", id: "1960003", energy: "elec", volume: 3, power: 6, ghost_savings: 0 }
-                ];
-            }
+            let totalGtb = 0; let totalIso = 0;
 
-            meters.slice(0, 20).forEach(m => {
-                let tag = "Inconnu"; let icon = "fa-bolt"; let color = "text-gray-400"; let proba = 50;
+            FLEET_DATA.sort((a,b) => b.budget - a.budget).forEach(s => {
                 
-                if (m.energy === 'gaz' || m.volume > 100) { tag = "Chaufferie"; icon = "fa-fire"; color = "text-alert"; proba = 98; } 
-                else if (m.volume < 5 && m.power <= 12) { tag = "Éclairage"; icon = "fa-lightbulb"; color = "text-gold"; proba = 92; } 
-                else if (m.ghost_savings > 200) { tag = "VMC"; icon = "fa-fan"; color = "text-cyan"; proba = 88; } 
-                else { tag = "Communs (Mixte)"; icon = "fa-building"; color = "text-oph"; proba = 60; }
+                // AUDIT FACTURES PMP
+                const pmp_kwh = s.volume > 0 ? s.budget / (s.volume * 1000) : 0;
+                let auditStatus = `<span class="text-success font-bold"><i class="fa-solid fa-check mr-1"></i> SGE Conforme</span>`;
+                let pmpColor = "text-white";
 
-                tbody.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-4 py-3 font-bold text-white truncate max-w-[150px]">${m.name || "Compteur"}</td><td class="px-4 py-3 font-mono text-xs text-gray-500">${m.id}</td><td class="px-4 py-3 text-right font-mono">${Math.round(m.volume)}</td><td class="px-4 py-3 text-right font-mono text-alert">${Math.round(m.ghost_savings || 0)} €</td><td class="px-4 py-3"><span class="${color} font-bold text-[10px] bg-white/5 px-2 py-1 rounded"><i class="fa-solid ${icon} mr-1"></i> ${tag} (${proba}%)</span></td></tr>`;
+                if (s.volume < 1 && s.energy === 'elec') {
+                    auditStatus = `<span class="text-gray-500 font-bold"><i class="fa-solid fa-ghost mr-1"></i> Logement Vacant SGE</span>`;
+                } else if (s.volume > 0 && s.budget === 0) {
+                    auditStatus = `<span class="bg-gold/20 text-gold px-2 py-1 rounded font-bold border border-gold/50">Facture Manquante</span>`;
+                    pmpColor = "text-gray-500";
+                } else if (pmp_kwh > 0.25) {
+                    auditStatus = `<span class="bg-alert/20 text-alert px-2 py-1 rounded font-bold border border-alert/50 animate-pulse">Prix Aberrant</span>`;
+                    pmpColor = "text-alert font-bold";
+                }
+
+                fluxList.innerHTML += `
+                    <tr class="hover:bg-white/5 border-b border-white/5">
+                        <td class="px-6 py-4 font-mono text-cyan text-xs">${s.pdl || s.id}</td>
+                        <td class="px-6 py-4 font-bold text-white">${s.name}</td>
+                        <td class="px-6 py-4 text-right font-mono">${Math.round(s.volume)}</td>
+                        <td class="px-6 py-4 text-right font-mono ${pmpColor}">${pmp_kwh > 0 ? pmp_kwh.toFixed(3) + ' €' : '-'}</td>
+                        <td class="px-6 py-4">${auditStatus}</td>
+                    </tr>
+                `;
+
+                // CEE FACTORY
+                const surface = s.surface > 0 ? s.surface : 1500;
+                const intensity = (s.volume * 1000) / surface;
+                let ceeAmount = 0;
+                let ceeHtml = "";
+
+                if (intensity > 250) { 
+                    ceeAmount = surface * 30; totalIso += ceeAmount;
+                    ceeHtml = `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white">${s.name}</td><td class="px-6 py-4 text-alert text-xs">Passoire Thermique (${Math.round(intensity)} kWh/m²)</td><td class="px-6 py-4 font-mono text-xs text-blue-400">BAT-EN-101</td><td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(ceeAmount).toLocaleString()} €</td></tr>`;
+                } else if (s.ghost_savings > 500) { 
+                    ceeAmount = surface * 15; totalGtb += ceeAmount;
+                    ceeHtml = `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white">${s.name}</td><td class="px-6 py-4 text-gold text-xs">Gaspillage SGE (${Math.round(s.ghost_savings)} €)</td><td class="px-6 py-4 font-mono text-xs text-cyan">BAT-TH-116</td><td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(ceeAmount).toLocaleString()} €</td></tr>`;
+                }
+                if(ceeAmount > 0) ceeList.innerHTML += ceeHtml;
+            });
+
+            document.getElementById('psp-gtb').innerText = Math.round(totalGtb).toLocaleString() + " €";
+            document.getElementById('psp-iso').innerText = Math.round(totalIso).toLocaleString() + " €";
+            document.getElementById('psp-total').innerText = Math.round(totalGtb + totalIso).toLocaleString() + " €";
+        }
+
+        // --- MOTEUR 3 : SRU ---
+        window.generateLocataireReport = function() {
+            const vault = document.getElementById('loc-report-list');
+            vault.innerHTML = '';
+            const currentYear = new Date().getFullYear();
+            
+            const history =[
+                { year: currentYear, label: `Campagne Quittances ${currentYear}`, txt: "Justification de la hausse par les données météo.", color: "text-success", icon:"fa-pen-to-square" },
+                { year: currentYear - 1, label: `Rapport Loi SRU ${currentYear-1}`, txt: "Bouclier tarifaire appliqué par l'OPH.", color: "text-white", icon:"fa-file-pdf" },
+                { year: currentYear - 2, label: `Bilan Concertation ${currentYear-2}`, txt: "Baisse des charges P1 (Énergie).", color: "text-gray-400", icon:"fa-file-pdf" }
+            ];
+
+            history.forEach(h => {
+                vault.innerHTML += `
+                    <div class="bg-white/5 border border-white/10 rounded-xl p-4 flex justify-between items-center hover:bg-white/10 transition group">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded bg-black/50 flex items-center justify-center border border-white/10 ${h.color} font-bold"><i class="fa-solid ${h.icon}"></i></div>
+                            <div><h4 class="font-bold ${h.color}">${h.label}</h4><div class="text-[10px] text-gray-400 mt-1">${h.txt}</div></div>
+                        </div>
+                        <button class="text-xs font-bold text-gray-400 hover:text-cyan transition border border-transparent hover:border-cyan/30 px-3 py-2 rounded">Ouvrir</button>
+                    </div>
+                `;
             });
         }
 
-        function runSocial(sites) {
-            const tbody = document.getElementById('social-list');
-            tbody.innerHTML = '';
-            // On simule des locataires en précarité
-            tbody.innerHTML += `
-                <tr class="hover:bg-white/5"><td class="px-4 py-3 font-bold text-white">Logement 14 (T3)</td><td class="px-4 py-3 text-right font-mono">0.8 MWh</td><td class="px-4 py-3 text-right font-mono text-gray-500">4.2 MWh</td><td class="px-4 py-3 text-center"><span class="bg-alert/20 text-alert px-2 py-1 rounded text-[10px] font-bold">SOUS-CHAUFFE</span></td></tr>
-                <tr class="hover:bg-white/5"><td class="px-4 py-3 font-bold text-white">Logement 02 (T2)</td><td class="px-4 py-3 text-right font-mono">1.1 MWh</td><td class="px-4 py-3 text-right font-mono text-gray-500">3.8 MWh</td><td class="px-4 py-3 text-center"><span class="bg-alert/20 text-alert px-2 py-1 rounded text-[10px] font-bold">SOUS-CHAUFFE</span></td></tr>
-            `;
-        }
-
-        window.simulateConcertation = function() {
-            const btn = document.getElementById('btn-sru');
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Génération...`;
-            setTimeout(() => {
-                btn.innerHTML = `<i class="fa-solid fa-check mr-2"></i> Prêt pour envoi`;
-                document.getElementById('sru-text').classList.remove('hidden');
-            }, 1000);
-        }
-
-        function renderChart(totalBudget) {
-            const ctx = document.getElementById('chartCharges').getContext('2d');
-            if (ophChart) ophChart.destroy();
-            const monthly =[0.15, 0.14, 0.12, 0.08, 0.05, 0.04, 0.03, 0.03, 0.05, 0.09, 0.10, 0.12].map(f => totalBudget * f);
-            ophChart = new Chart(ctx, {
-                type: 'line',
-                data: { labels:['Jan','Fev','Mar','Avr','Mai','Juin','Juil','Aou','Sep','Oct','Nov','Dec'], datasets:[{ label: 'Mandaté P1 (€)', data: monthly, borderColor: '#F97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', borderWidth: 3, fill: true, tension:0.4 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,0.05)'}}} }
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', initSelector);
+        document.addEventListener('DOMContentLoaded', initOph);
     </script>
 </body>
 </html>
