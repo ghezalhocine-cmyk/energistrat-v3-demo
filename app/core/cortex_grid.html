@@ -12,7 +12,7 @@
     
     <script>
         tailwind.config = { 
-            theme: { extend: { colors: { abysse: '#001529', card: '#0F172A', grid: '#8B5CF6', cyan: '#00E5FF', success: '#10B981', alert: '#EF4444', gold: '#F59E0B' }, fontFamily: { sans:['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } } 
+            theme: { extend: { colors: { abysse: '#001529', card: '#0F172A', grid: '#8B5CF6', cyan: '#00E5FF', success: '#10B981', alert: '#EF4444', gold: '#F59E0B' }, fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] } } } 
         }
     </script>
     <style>
@@ -23,7 +23,7 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         select { background-color: rgba(255,255,255,0.05) !important; color: white !important; -webkit-appearance: none; border: 1px solid rgba(255,255,255,0.1); }
         select option { background-color: #0F172A !important; color: white !important; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
 <body class="flex h-screen w-screen text-sm">
@@ -182,7 +182,6 @@
             const pmax = CURRENT_SITE.kpis?.pmax_kw || 18;
             const ps = CURRENT_SITE.contract?.power || 36;
             
-            // Simule l'ajout de la borne lors du pic du soir (19h)
             const newPmax = pmax + borneKw;
             document.getElementById('irve-new-pmax').innerText = Math.round(newPmax) + " kW";
 
@@ -205,15 +204,13 @@
             const pmax = CURRENT_SITE.kpis?.pmax_kw || 18;
             const ps = CURRENT_SITE.contract?.power || 36;
             
-            // Courbe en cloche basique (pic à 19h)
             const baseCurve = labels.map(h => {
                 let hour = parseInt(h);
                 if(hour >= 8 && hour <= 17) return pmax * 0.6;
-                if(hour >= 18 && hour <= 21) return pmax; // Pic soir
-                return pmax * 0.3; // Nuit
+                if(hour >= 18 && hour <= 21) return pmax; 
+                return pmax * 0.3; 
             });
 
-            // Impact Borne (Branchée le soir)
             const evCurve = labels.map(h => {
                 let hour = parseInt(h);
                 if(hour >= 18 && hour <= 22) return borneKw;
@@ -229,7 +226,7 @@
                     datasets:[
                         { label: 'Conso Bâtiment (kW)', data: baseCurve, backgroundColor: '#334155' },
                         { label: `Impact Borne IRVE (${borneKw}kW)`, data: evCurve, backgroundColor: '#8B5CF6' },
-                        { type: 'line', label: 'Puissance Souscrite (Contrat)', data: psCurve, borderColor: '#EF4444', borderWidth: 2, borderDash: [5, 5], pointRadius: 0 }
+                        { type: 'line', label: 'Puissance Souscrite (Contrat)', data: psCurve, borderColor: '#EF4444', borderWidth: 2, borderDash:[5, 5], pointRadius: 0 }
                     ]
                 },
                 options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' } } } }
@@ -241,22 +238,18 @@
             if (autoChartInstance) autoChartInstance.destroy();
             
             const labels = Array.from({length: 24}, (_, i) => i + 'h');
+            const volJour = (CURRENT_SITE.kpis?.volume_mwh || 10) * 1000 / 365; 
             
-            // MATHS ZÉRO MOCK : On simule mathématiquement la prod avec le volume du site
-            const volJour = (CURRENT_SITE.kpis?.volume_mwh || 10) * 1000 / 365; // Conso moy par jour
-            
-            // Courbe Conso
             const consoCurve = labels.map(h => {
                 let hour = parseInt(h);
                 return (volJour / 24) * (hour >= 8 && hour <= 18 ? 1.5 : 0.5);
             });
 
-            // Courbe Production (Cloche solaire 10h - 16h)
             const prodCurve = labels.map(h => {
                 let hour = parseInt(h);
                 if(hour >= 10 && hour <= 16) {
                     const dist = Math.abs(13 - hour);
-                    return (volJour / 6) * (1 - dist*0.2); // Pic à 13h
+                    return (volJour / 6) * (1 - dist*0.2); 
                 }
                 return 0;
             });
