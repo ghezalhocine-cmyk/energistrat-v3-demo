@@ -28,11 +28,11 @@ except ImportError:
 
 class CortexFinance:
     """
-    CORTEX FINANCE ENGINE V3.1 (PLATINUM ROBUST)
+    CORTEX FINANCE ENGINE V3.2 (DIAMOND ROBUST)
     Module dédié à l'Audit Financier et à la Triangulation.
     
     CAPACITÉS :
-    1. Parsing PDF Natif (EDF Particulier & Pro).
+    1. Parsing PDF Natif Avancé (EDF Particulier & PRO C5).
     2. Audit Financier (Facture vs SGE Réel).
     3. Persistance du Prix ET du Volume (pour pallier l'absence de SGE).
     4. Projection Financière "Smart Twin" (N-1 Mirroring + Effet Calendrier France + Fallback).
@@ -47,7 +47,7 @@ class CortexFinance:
         
         # PROFILS DE SAISONNALITÉ (Pondération mensuelle type - Hiver fort)
         self.SEASONAL_WEIGHTS = {
-            "STD": [0.13, 0.12, 0.10, 0.08, 0.06, 0.05, 0.04, 0.04, 0.06, 0.08, 0.11, 0.13]
+            "STD":[0.13, 0.12, 0.10, 0.08, 0.06, 0.05, 0.04, 0.04, 0.06, 0.08, 0.11, 0.13]
         }
 
     # =========================================================
@@ -85,68 +85,80 @@ class CortexFinance:
         return {"status": "ERROR", "message": "Format de fichier non supporté (PDF ou XML requis)."}
 
     # =========================================================
-    # 2. MOTEUR D'EXTRACTION PDF (CHIRURGICAL)
+    # 2. MOTEUR D'EXTRACTION PDF (CHIRURGICAL B2B & B2C)
     # =========================================================
     def _parse_pdf_native(self, content: bytes, data: Dict) -> Dict[str, Any]:
         try:
             with pdfplumber.open(io.BytesIO(content)) as pdf:
                 full_text = ""
-                p2_text = ""
                 
-                for i, page in enumerate(pdf.pages):
+                for page in pdf.pages:
                     text = page.extract_text()
-                    if text:
-                        full_text += text + "\n"
-                        if i == 1: p2_text = text 
+                    if text: full_text += text + "\n"
 
                 data["source"] = "PDF_NATIVE"
 
-                # A. Extraction PDL
-                pdl_match = re.search(r"(?:PDL|Point de livraison)\s*[:.]?\s*([\d\s]{14,20})", full_text, re.IGNORECASE)
+                # G. Identification Fournisseur (En premier pour orienter l'algo)
+                full_text_upper = full_text.upper()
+                if "EDF" in full_text_upper: data['provider'] = "EDF"
+                elif "ENGIE" in full_text_upper: data['provider'] = "ENGIE"
+                elif "TOTAL" in full_text_upper: data['provider'] = "TOTALENERGIES"
+
+                # A. Extraction PDL / PRM (Gère "PDL" et "Référence acheminement" pour les PROS)
+                pdl_match = re.search(r"(?:PDL|Point de livraison|Référence acheminement|Réf Acheminement Electricité)\s*[:.]?\s*([\d\s]{14,20})", full_text, re.IGNORECASE)
                 if pdl_match: 
                     data['pdl'] = pdl_match.group(1).replace(" ", "").strip()
                 
-                # B. Extraction Dates
-                date_match = re.search(r"du\s+(\d{2}/\d{2}/\d{2})\s+au\s+(\d{2}/\d{2}/\d{2})", full_text)
-                if date_match:
+                # B. Extraction Dates (Gère années sur 2 ou 4 chiffres, et prend la période la plus large du tableau)
+                date_matches = re.findall(r"du\s+(\d{2}/\d{2}/\d{2,4})\s+au\s+(\d{2}/\d{2}/\d{2,4})", full_text, re.IGNORECASE)
+                if date_matches:
                     try:
-                        def to_iso(d): return datetime.strptime(d, "%d/%m/%y").strftime("%Y-%m-%d")
-                        data['period_start'] = to_iso(date_match.group(1))
-                        data['period_end'] = to_iso(date_match.group(2))
+                        dates_start =[]
+                        dates_end =[]
+                        for d_start, d_end in date_matches:
+                            fmt_start = "%d/%m/%Y" if len(d_start.split('/')[-1]) == 4 else "%d/%m/%y"
+                            fmt_end = "%d/%m/%Y" if len(d_end.split('/')[-1]) == 4 else "%d/%m/%y"
+                            dates_start.append(datetime.strptime(d_start, fmt_start))
+                            dates_end.append(datetime.strptime(d_end, fmt_end))
+                        
+                        data['period_start'] = min(dates_start).strftime("%Y-%m-%d")
+                        data['period_end'] = max(dates_end).strftime("%Y-%m-%d")
                     except Exception as e:
                         print(f"Erreur date parsing: {e}")
 
-                # C. Extraction Volume
-                vol_match = re.search(r"Total Consommation\s+(\d+)", full_text)
+                # C. Extraction Volume (Résidentiel : "Total Consommation" | Pro : "Conso 1 732 kWh")
+                vol_match = re.search(r"(?:Total Consommation|Conso)\s+([\d\s]+)\s*(?:kWh)", full_text, re.IGNORECASE)
                 if vol_match: 
-                    data['volume_kwh'] = float(vol_match.group(1))
+                    clean_vol = vol_match.group(1).replace(" ", "")
+                    data['volume_kwh'] = float(clean_vol)
                 
                 # D. Extraction Pénalités
-                penalties_match = re.search(r"Pénalités.*?\s+(\d+[\.,]\d{2})\s?€", full_text, re.IGNORECASE)
+                penalties_match = re.search(r"Pénalités[^\n]*?\s+(\d+[\.,]\d{2})\s?€", full_text, re.IGNORECASE)
                 if penalties_match: 
                     data['penalties'] = float(penalties_match.group(1).replace(',', '.'))
                 
-                # E. Montant TTC
-                total_match = re.search(r"Montant total.*?(\d+[\.,]\d{2})\s?€", full_text, re.DOTALL | re.IGNORECASE)
+                # E. Montant TTC (Accepte les espaces dans les milliers, ex: "1 033,67")
+                total_match = re.search(r"(?:Montant total à payer\s*\(TTC\)|Facture TTC|Montant total)[^\d]*?([\d\s]+[\.,]\d{2})\s?€", full_text, re.DOTALL | re.IGNORECASE)
                 if total_match: 
-                    data['amount_ttc'] = float(total_match.group(1).replace(',', '.'))
+                    clean_ttc = total_match.group(1).replace(" ", "").replace(",", ".")
+                    data['amount_ttc'] = float(clean_ttc)
 
                 # F. Montant HT
-                ht_match = re.search(r"Total Electricité hors TVA.*?\s(\d+[\.,]\d{2})", p2_text, re.DOTALL)
-                
+                ht_match = re.search(r"(?:Montant Hors TVA|Total Hors TVA(?: pour ce site)?|Total Electricité hors TVA)[^\d]*?([\d\s]+[\.,]\d{2})", full_text, re.DOTALL | re.IGNORECASE)
                 if ht_match:
-                    data['amount_ht'] = float(ht_match.group(1).replace(',', '.'))
+                    clean_ht = ht_match.group(1).replace(" ", "").replace(",", ".")
+                    data['amount_ht'] = float(clean_ht)
                 else:
-                    # Fallback (TTC - Pénalités) / (1 + TVA)
+                    # Fallback mathématique (TTC - Pénalités) / (1 + TVA)
                     if data['amount_ttc'] > 0:
                         taxable_amount = data['amount_ttc'] - data['penalties']
                         if taxable_amount > 0:
                             data['amount_ht'] = round(taxable_amount / (1 + self.VAT_RATE), 2)
 
-                # G. Identification Fournisseur
-                if "EDF" in full_text: data['provider'] = "EDF"
-                elif "ENGIE" in full_text: data['provider'] = "ENGIE"
-                elif "TOTAL" in full_text: data['provider'] = "TOTALENERGIES"
+                # H. Puissance Souscrite (Pour Profils PRO)
+                power_match = re.search(r"Puissance souscrite.*?(?:kW|kVA).*?:\s*(\d+[\.,]?\d*)", full_text, re.IGNORECASE)
+                if power_match:
+                    data['power_subscribed'] = float(power_match.group(1).replace(',', '.'))
 
         except Exception as e: 
             return {"status": "ERROR", "message": f"Erreur critique lors de l'analyse PDF : {str(e)}"}
@@ -165,7 +177,7 @@ class CortexFinance:
             return {"status": "ERROR", "message": f"Erreur XML: {str(e)}"}
 
     # =========================================================
-    # 4. AUDIT & PERSISTANCE (AMÉLIORÉ : SAUVEGARDE VOLUME)
+    # 4. AUDIT & PERSISTANCE
     # =========================================================
     def _persist_data(self, pdl, price, volume_facture):
         """
@@ -184,7 +196,7 @@ class CortexFinance:
                 data = {
                     "identity": {"id": safe_id, "site_name": f"Site {safe_id}"},
                     "contract": {"pdl": safe_id},
-                    "measurements": [],
+                    "measurements":[],
                     "kpis": {}
                 }
             
@@ -195,15 +207,9 @@ class CortexFinance:
             
             # Mise à jour KPI Volume (Fallback Projection)
             if 'kpis' not in data: data['kpis'] = {}
-            # On stocke le volume de la dernière facture comme référence
             data['kpis']['volume_invoice_ref'] = volume_facture
             
-            # Si le site n'a pas de volume annuel estimé, on en crée un grossier
-            # (Hypothèse : Facture = 2 mois -> x6, Facture = 6 mois -> x2)
-            # Pour être prudent, si on ne sait pas, on met une valeur par défaut
             if 'volume_mwh' not in data['kpis'] or data['kpis']['volume_mwh'] == 0:
-                # On suppose que la facture couvre une période significative, on annualise arbitrairement x4
-                # Ce sera corrigé par l'import SGE plus tard
                 data['kpis']['volume_mwh'] = (volume_facture * 4) / 1000 
 
             with open(file_path, 'w', encoding='utf-8') as f:
@@ -248,13 +254,13 @@ class CortexFinance:
         if inv['volume_kwh'] > 0:
             unit_price_ht = inv['amount_ht'] / inv['volume_kwh']
 
-        # 4. PERSISTANCE (APPEL À LA NOUVELLE MÉTHODE)
+        # 4. PERSISTANCE
         if inv['pdl'] and unit_price_ht > 0:
             self._persist_data(inv['pdl'], unit_price_ht, inv['volume_kwh'])
 
         # 5. RAPPORT
         status = "CONFORME"
-        anomalies = []
+        anomalies =[]
         
         if abs(delta_pct) > 5:
             status = "ANOMALIE_VOLUME"
@@ -315,10 +321,8 @@ class CortexFinance:
         _, num_days = calendar.monthrange(year, month)
         
         if not is_pro:
-            # RÉSIDENTIEL : Ratio basé sur la durée absolue du mois
             return num_days / 30.4375
         else:
-            # PRO : Ratio basé sur les jours ouvrés
             if CALENDAR_READY:
                 start_dt = date(year, month, 1)
                 end_dt = date(year, month, num_days)
@@ -336,23 +340,20 @@ class CortexFinance:
         Génère une trajectoire annuelle.
         Stratégie : Mirror N-1 + Correction Calendaire + Fallback Volume Facture.
         """
-        measurements = site_data.get('measurements', [])
+        measurements = site_data.get('measurements',[])
         current_year = datetime.now().year
         if datetime.now().month < 3: current_year = 2026 
         prev_year = current_year - 1
 
-        # Détection Profil
         is_pro = False
         segment = site_data.get('contract', {}).get('segment', '').upper()
         if "C5" not in segment and "C4" not in segment and segment != "": 
             is_pro = True
 
-        # 1. ANALYSE N-1
         n_1_by_month = {m: 0 for m in range(1, 13)}
         total_n_1 = 0
         months_with_data_n_1 = 0
         
-        # 2. ANALYSE N
         n_by_month = {m: 0 for m in range(1, 13)}
         last_real_month_n = 0
 
@@ -369,41 +370,31 @@ class CortexFinance:
                     if d.month > last_real_month_n: last_real_month_n = d.month
             except: continue
 
-        # 3. DÉTERMINATION DU PROFIL DE BASE
         weights = self.SEASONAL_WEIGHTS["STD"]
         if months_with_data_n_1 >= 10 and total_n_1 > 0:
-            # On utilise le profil N-1 réel
             weights = [n_1_by_month[m] / total_n_1 for m in range(1, 13)]
 
-        # 4. EXTRAPOLATION (AVEC FALLBACK ROBUSTE)
         total_realized_n = sum(n_by_month.values())
         weight_realized_n = sum(weights[:last_real_month_n])
         
         estimated_annual_vol_n = 0
         
-        # Cas 1 : On a assez de données N pour extrapoler
         if weight_realized_n > 0.1:
             estimated_annual_vol_n = total_realized_n / weight_realized_n
-        # Cas 2 : On a des données N-1
         elif total_n_1 > 0:
             estimated_annual_vol_n = total_n_1
-        # Cas 3 : FALLBACK - On utilise le volume de la facture qu'on vient d'uploader
         else:
             ref_inv = site_data.get('kpis', {}).get('volume_invoice_ref', 0)
             if ref_inv > 0:
-                # On suppose que la facture couvre une partie de l'année. 
-                # Hypothèse conservatrice : on annualise x2 (si facture semestrielle) ou x4
-                # Ici on prend x4 arbitrairement pour avoir une base visuelle
                 estimated_annual_vol_n = ref_inv * 4 
             else:
-                estimated_annual_vol_n = 6000 # Défaut ultime
+                estimated_annual_vol_n = 6000 
 
-        # 5. CONSTRUCTION TRAJECTOIRE
         avg_price = 0.20
         if 'financials' in site_data and 'unit_price_computed' in site_data['financials']:
             avg_price = float(site_data['financials']['unit_price_computed'])
 
-        trajectory_euro = []
+        trajectory_euro =[]
         cumulative_euro = 0
         
         for month in range(1, 13):
@@ -413,14 +404,10 @@ class CortexFinance:
                 vol = n_by_month[month]
                 status = "REAL"
             else:
-                # Projection de Base
                 weight = weights[month-1]
                 base_vol = estimated_annual_vol_n * weight
-                
-                # CORRECTION CALENDAIRE
                 calendar_ratio = self._get_calendar_ratio(current_year, month, is_pro)
                 vol = base_vol * calendar_ratio
-                
                 status = "FORECAST"
 
             cost = vol * avg_price
