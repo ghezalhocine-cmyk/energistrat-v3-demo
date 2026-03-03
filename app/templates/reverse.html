@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | Simulateur Budgétaire Inversé</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = { 
+            theme: { extend: { colors: { abysse: '#001529', card: '#0F172A', reverse: '#EAB308', cyan: '#00E5FF', success: '#10B981', alert: '#EF4444' }, fontFamily: { sans:['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } } 
+        }
+    </script>
+    <style>
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
+        select, input[type=number] { background-color: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1); outline: none; }
+        select option { background-color: #0F172A; }
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: #EAB308; cursor: pointer; margin-top: -10px; box-shadow: 0 0 15px rgba(234, 179, 8, 0.6); border: 2px solid white; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    </style>
+</head>
+<body class="flex h-screen w-screen text-sm">
+
+    <!-- SIDEBAR -->
+    <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
+        <button onclick="history.back()" title="Retour au Dashboard" class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition mb-8 border border-white/5">
+            <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-700 flex items-center justify-center text-white font-bold shadow-[0_0_15px_rgba(234,179,8,0.4)] mb-2" title="Simulateur Inversé">
+            <i class="fa-solid fa-calculator text-xl"></i>
+        </div>
+        <div class="text-[8px] font-bold text-reverse uppercase tracking-widest mt-1 text-center">SIMU<br>REVERSE</div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
+        
+        <!-- HEADER -->
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
+            <div>
+                <h2 class="text-2xl font-black text-white italic tracking-tight">CORTEX <span class="text-reverse">REVERSE</span></h2>
+                <p class="text-xs text-gray-400 font-mono mt-1">Simulateur d'Objectif de Consommation par Budget</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-[10px] text-gray-500 uppercase font-bold">Sélection du Compteur :</span>
+                <div class="relative">
+                    <select id="site-selector" onchange="loadSite(this.value)" class="text-xs font-bold rounded-xl p-2.5 focus:border-reverse min-w-[250px] shadow-inner cursor-pointer appearance-none">
+                        <option value="">Chargement de la flotte...</option>
+                    </select>
+                    <div class="absolute right-3 top-3 pointer-events-none text-reverse text-xs">▼</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="p-8 overflow-y-auto h-full pb-20">
+            
+            <div class="grid grid-cols-12 gap-8 h-full">
+                
+                <!-- COLONNE GAUCHE : L'INPUT & LES MATHS -->
+                <div class="col-span-5 flex flex-col gap-6">
+                    
+                    <div class="bento-card p-8 border-l-4 border-cyan">
+                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">Réalité Actuelle (Année N)</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <div class="text-[10px] text-gray-500 uppercase mb-1">Budget Actuel</div>
+                                <div class="text-2xl font-black text-white font-mono" id="current-budget">-- €</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] text-gray-500 uppercase mb-1">Volume Actuel</div>
+                                <div class="text-2xl font-black text-cyan font-mono" id="current-vol">-- MWh</div>
+                            </div>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
+                            <span class="text-xs text-gray-400">Prix Moyen Pondéré (PMP)</span>
+                            <span class="text-lg font-bold text-white font-mono" id="current-pmp">-- €/MWh</span>
+                        </div>
+                    </div>
+
+                    <div class="bento-card p-8 border-l-4 border-reverse flex-1 flex flex-col justify-center bg-gradient-to-br from-card to-reverse/5">
+                        <h3 class="text-sm font-black text-white uppercase tracking-widest mb-2"><i class="fa-solid fa-bullseye text-reverse mr-2"></i> Fixer le Budget Cible (N+1)</h3>
+                        <p class="text-xs text-gray-400 mb-8">Définissez l'enveloppe financière maximale allouée. CORTEX calculera le volume autorisé correspondant.</p>
+                        
+                        <div class="mb-8 relative">
+                            <input type="number" id="target-budget-input" class="w-full text-center text-5xl font-black text-reverse font-mono bg-transparent border-b-2 border-reverse/30 focus:border-reverse pb-2" value="0" oninput="syncSlider(); calculateReverse();">
+                            <span class="absolute right-4 bottom-4 text-2xl font-bold text-gray-500">€</span>
+                        </div>
+
+                        <div class="mb-6">
+                            <input type="range" id="target-budget-slider" min="0" max="100000" step="100" value="0" oninput="syncInput(); calculateReverse();">
+                            <div class="flex justify-between text-[10px] text-gray-500 mt-2 font-mono">
+                                <span>0 €</span>
+                                <span>-50%</span>
+                                <span>Budget Actuel</span>
+                                <span>+50%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- COLONNE DROITE : L'OUTPUT & CORTEX IA -->
+                <div class="col-span-7 flex flex-col gap-6">
+                    
+                    <!-- LE RÉSULTAT REVERSE -->
+                    <div class="bento-card p-10 flex flex-col items-center justify-center text-center relative overflow-hidden" id="result-card">
+                        <div class="absolute -right-10 -bottom-10 opacity-5 text-[15rem]"><i class="fa-solid fa-bolt"></i></div>
+                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Volume Maximum Autorisé</h3>
+                        <div class="text-7xl font-black text-white font-mono mb-4" id="target-vol">-- MWh</div>
+                        
+                        <div class="inline-flex items-center gap-3 px-4 py-2 rounded-full border font-bold text-sm" id="delta-badge">
+                            <!-- JS Injection -->
+                            <span>En attente de simulation...</span>
+                        </div>
+                    </div>
+
+                    <!-- LE GRAPHIQUE -->
+                    <div class="bento-card p-6 h-64 flex flex-col">
+                        <div class="flex-1 relative w-full"><canvas id="reverseChart"></canvas></div>
+                    </div>
+
+                    <!-- CORTEX IA ACTION PLAN -->
+                    <div class="bento-card p-6 bg-abysse/50 border border-white/5">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-8 h-8 rounded-full bg-reverse text-abysse flex items-center justify-center font-black"><i class="fa-solid fa-brain"></i></div>
+                            <h3 class="text-sm font-black text-reverse uppercase tracking-widest">Plan d'Action CORTEX</h3>
+                        </div>
+                        <div class="text-sm text-gray-300 leading-relaxed" id="cortex-advice">
+                            Modifiez le budget cible pour générer un plan d'action d'efficacité énergétique.
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let FLEET_DATA =[];
+        let CURRENT_SITE = null;
+        let chartInstance = null;
+
+        // --- INIT & CHARGEMENT ---
+        async function initReverse() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                if(data.fleet) {
+                    FLEET_DATA = data.fleet;
+                    const sel = document.getElementById('site-selector');
+                    sel.innerHTML = '<option value="">-- Sélectionnez un bâtiment --</option>';
+                    FLEET_DATA.sort((a,b) => a.name.localeCompare(b.name)).forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.innerText = s.name;
+                        sel.appendChild(opt);
+                    });
+                    // Auto-load first site if exists
+                    if(FLEET_DATA.length > 0) {
+                        sel.value = FLEET_DATA[0].id;
+                        loadSite(FLEET_DATA[0].id);
+                    }
+                }
+            } catch(e) { console.error("Erreur Init:", e); }
+        }
+
+        window.loadSite = async function(id) {
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                CURRENT_SITE = await res.json();
+                
+                // Récupération des VRAIES données de la base
+                const budget = CURRENT_SITE.kpis?.budget || 0;
+                const vol = CURRENT_SITE.kpis?.volume_mwh || 0;
+                const pmp = vol > 0 ? (budget / vol) : 0.20;
+
+                // Set Globals for Math
+                CURRENT_SITE.computed_pmp = pmp;
+
+                // Update UI (Current State)
+                document.getElementById('current-budget').innerText = Math.round(budget).toLocaleString() + " €";
+                document.getElementById('current-vol').innerText = Math.round(vol).toLocaleString() + " MWh";
+                document.getElementById('current-pmp').innerText = pmp.toFixed(3) + " €/MWh";
+
+                // Setup Inputs limits based on current budget
+                const slider = document.getElementById('target-budget-slider');
+                const input = document.getElementById('target-budget-input');
+                
+                slider.max = Math.round(budget * 1.5); // Max +50%
+                slider.value = Math.round(budget);
+                input.value = Math.round(budget);
+
+                calculateReverse();
+
+            } catch(e) { console.error("Erreur Load Site:", e); }
+        }
+
+        // --- SYNCHRONISATION UI ---
+        window.syncSlider = function() {
+            const val = document.getElementById('target-budget-input').value;
+            document.getElementById('target-budget-slider').value = val;
+        }
+        window.syncInput = function() {
+            const val = document.getElementById('target-budget-slider').value;
+            document.getElementById('target-budget-input').value = val;
+        }
+
+        // --- LE MOTEUR MATHÉMATIQUE INVERSÉ ---
+        window.calculateReverse = function() {
+            if(!CURRENT_SITE) return;
+
+            const targetBudget = parseFloat(document.getElementById('target-budget-input').value) || 0;
+            const currentBudget = CURRENT_SITE.kpis?.budget || 0;
+            const currentVol = CURRENT_SITE.kpis?.volume_mwh || 0;
+            const pmp = CURRENT_SITE.computed_pmp || 0.20;
+
+            // Formule Cœur : V = B / P
+            const targetVol = pmp > 0 ? (targetBudget / pmp) : 0;
+            
+            // Calculs Différentiels
+            const deltaVol = targetVol - currentVol;
+            const deltaPct = currentVol > 0 ? (deltaVol / currentVol) * 100 : 0;
+
+            // Update UI
+            document.getElementById('target-vol').innerText = Math.round(targetVol).toLocaleString() + " MWh";
+
+            const badge = document.getElementById('delta-badge');
+            const resultCard = document.getElementById('result-card');
+            
+            if (deltaPct < -0.5) {
+                // Contrainte
+                badge.className = "inline-flex items-center gap-3 px-4 py-2 rounded-full border border-alert/50 bg-alert/20 text-alert font-bold text-sm shadow-[0_0_15px_rgba(239,68,68,0.4)]";
+                badge.innerHTML = `<i class="fa-solid fa-arrow-down"></i> Effort Requis : ${Math.round(deltaVol)} MWh (${deltaPct.toFixed(1)}%)`;
+                resultCard.className = "bento-card p-10 flex flex-col items-center justify-center text-center relative overflow-hidden border-t-4 border-alert";
+            } else if (deltaPct > 0.5) {
+                // Marge
+                badge.className = "inline-flex items-center gap-3 px-4 py-2 rounded-full border border-success/50 bg-success/20 text-success font-bold text-sm shadow-[0_0_15px_rgba(16,185,129,0.4)]";
+                badge.innerHTML = `<i class="fa-solid fa-arrow-up"></i> Marge Disponible : +${Math.round(deltaVol)} MWh (+${deltaPct.toFixed(1)}%)`;
+                resultCard.className = "bento-card p-10 flex flex-col items-center justify-center text-center relative overflow-hidden border-t-4 border-success";
+            } else {
+                // Équilibre
+                badge.className = "inline-flex items-center gap-3 px-4 py-2 rounded-full border border-gray-500 bg-white/5 text-white font-bold text-sm";
+                badge.innerHTML = `<i class="fa-solid fa-equals"></i> Budget équivalent à la consommation actuelle`;
+                resultCard.className = "bento-card p-10 flex flex-col items-center justify-center text-center relative overflow-hidden border-t-4 border-white/10";
+            }
+
+            updateChart(currentVol, targetVol);
+            generateAIAdvice(deltaPct, Math.abs(deltaVol));
+        }
+
+        // --- GÉNÉRATEUR IA ---
+        function generateAIAdvice(deltaPct, gapMwh) {
+            const el = document.getElementById('cortex-advice');
+            
+            if (deltaPct > 0) {
+                el.innerHTML = `Votre enveloppe budgétaire est <b>supérieure</b> à vos besoins actuels. Vous avez la capacité d'ajouter de nouveaux équipements (ex: Bornes IRVE, Climatisation) jusqu'à hauteur de <span class="text-success font-mono font-bold">${Math.round(gapMwh)} MWh</span> sans dépasser votre budget cible.`;
+                return;
+            }
+
+            if (deltaPct === 0) {
+                el.innerHTML = "Votre budget cible correspond exactement à votre profil SGE actuel. Maintenez vos réglages.";
+                return;
+            }
+
+            // Cas de réduction (Le vrai cas d'usage)
+            const reduction = Math.abs(deltaPct);
+            let actionHtml = `<p class="mb-3">Pour tenir ce budget restreint, vous devez "effacer" <span class="text-alert font-mono font-bold">${Math.round(gapMwh)} MWh</span> de votre profil actuel.</p>`;
+            
+            actionHtml += `<ul class="space-y-2 text-xs">`;
+            
+            if (reduction <= 5) {
+                actionHtml += `<li><i class="fa-solid fa-check text-success mr-2"></i> <b>Niveau 1 (Éco-gestes) :</b> Une simple sensibilisation des occupants et la baisse de 1°C du chauffage (≈7% d'économie) suffira à atteindre cet objectif.</li>`;
+            } else if (reduction <= 15) {
+                actionHtml += `<li><i class="fa-solid fa-microchip text-cyan mr-2"></i> <b>Niveau 2 (Régulation) :</b> Cet effort nécessite des outils actifs. Recommandation : Installation d'une GTB (Gestion Technique du Bâtiment) pour couper automatiquement la VMC et le chauffage la nuit. <a href='/optimization' class='text-cyan underline'>Simuler prime CEE BAT-TH-116.</a></li>`;
+            } else if (reduction <= 30) {
+                actionHtml += `<li><i class="fa-solid fa-solar-panel text-reverse mr-2"></i> <b>Niveau 3 (Autoconsommation) :</b> La baisse demandée est drastique. Recommandation : Installation de panneaux solaires en toiture pour écraser la facture diurne. <a href='/solar?origin=reverse' class='text-reverse underline'>Ouvrir Solar Studio.</a></li>`;
+            } else {
+                actionHtml += `<li><i class="fa-solid fa-hammer text-alert mr-2"></i> <b>Niveau 4 (Rénovation Globale) :</b> Un tel budget cible (-${Math.round(reduction)}%) est inatteignable avec le bâtiment actuel. Il faut lancer un plan d'Isolation Thermique par l'Extérieur (ITE) ou changer le vecteur énergétique (Passage du gaz à la PAC).</li>`;
+            }
+            actionHtml += `</ul>`;
+            
+            el.innerHTML = actionHtml;
+        }
+
+        // --- GRAPHIQUE HORIZONTAL ---
+        function updateChart(currentVol, targetVol) {
+            const ctx = document.getElementById('reverseChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Comparatif Volumétrique (MWh)'],
+                    datasets:[
+                        { label: 'Volume Actuel', data: [currentVol], backgroundColor: '#00E5FF', borderRadius: 4, barPercentage: 0.5 },
+                        { label: 'Objectif Autorisé', data: [targetVol], backgroundColor: targetVol >= currentVol ? '#10B981' : '#EF4444', borderRadius: 4, barPercentage: 0.5 }
+                    ]
+                },
+                options: { 
+                    indexAxis: 'y', 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { position: 'bottom', labels: { color: 'white' } } }, 
+                    scales: { 
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'gray' }, beginAtZero: true }, 
+                        y: { grid: { display: false }, ticks: { color: 'white' } } 
+                    } 
+                }
+            });
+        }
+
+        // Boot
+        document.addEventListener('DOMContentLoaded', initReverse);
+    </script>
+</body>
+</html>
