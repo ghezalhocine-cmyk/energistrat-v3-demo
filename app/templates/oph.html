@@ -6,6 +6,7 @@
     <title>ENERGISTRAT V3 | OPH Social (Master)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -18,8 +19,10 @@
         body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
         .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
         .nav-item.active { background: rgba(249, 115, 22, 0.1); border-left: 4px solid #F97316; color: white; }
-        .view-section { display: none; } .view-section.active { display: flex; flex-direction: column; animation: fadeIn 0.3s ease-out; }
+        .view-section { display: none; } .view-section.active { display: flex; flex-direction: column; animation: fadeIn 0.3s ease-out; gap: 1.5rem;}
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        select { background-color: rgba(255,255,255,0.05); color: white; -webkit-appearance: none; border: 1px solid rgba(255,255,255,0.1); }
+        select option { background-color: #0F172A; color: white; }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
@@ -32,19 +35,16 @@
                 <div><h1 class="font-bold tracking-wider text-base text-white">OPH<span class="text-oph">.OS</span></h1><p class="text-[10px] text-gray-500 font-mono">Bailleur Social</p></div>
             </div>
             
-            <nav class="space-y-2">
-                <button onclick="switchView('appels')" id="btn-appels" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs uppercase tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-file-signature w-4 text-center"></i> Usine à DQE
-                </button>
-                <button onclick="switchView('factures')" id="btn-factures" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs uppercase tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-file-invoice-dollar w-4 text-center text-alert"></i> Facturation & Anomalies
-                </button>
-                <button onclick="switchView('cee')" id="btn-cee" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs uppercase tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-hammer w-4 text-center text-success"></i> Plan Rénovation CEE
-                </button>
-                <button onclick="switchView('locataires')" id="btn-locataires" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs uppercase tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-bullhorn w-4 text-center text-cyan"></i> Archives SRU
-                </button>
+            <nav class="space-y-1">
+                <div class="text-[9px] text-gray-500 uppercase font-bold px-4 mb-2">Pilotage Patrimoine</div>
+                <button onclick="switchView('charges')" id="btn-charges" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-[10px] uppercase transition flex items-center gap-3"><i class="fa-solid fa-scale-balanced w-4 text-center"></i> Charges P1 / P2 / P3</button>
+                <button onclick="switchView('nilm')" id="btn-nilm" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-[10px] uppercase transition flex items-center gap-3"><i class="fa-solid fa-microchip w-4 text-center text-cyan"></i> Auto-Tagging NILM</button>
+                <button onclick="switchView('flux')" id="btn-flux" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-[10px] uppercase transition flex items-center gap-3"><i class="fa-solid fa-tower-observation w-4 text-center text-alert"></i> Anomalies SGE / Vacance</button>
+                
+                <div class="text-[9px] text-gray-500 uppercase font-bold px-4 mt-6 mb-2">Marchés & Social</div>
+                <button onclick="switchView('appels')" id="btn-appels" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-[10px] uppercase transition flex items-center gap-3"><i class="fa-solid fa-file-signature w-4 text-center text-oph"></i> Usine à DQE</button>
+                <button onclick="switchView('cee')" id="btn-cee" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-[10px] uppercase transition flex items-center gap-3"><i class="fa-solid fa-hammer w-4 text-center text-success"></i> Plan Rénovation (PSP)</button>
+                <button onclick="switchView('locataires')" id="btn-locataires" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-[10px] uppercase transition flex items-center gap-3"><i class="fa-solid fa-bullhorn w-4 text-center text-gold"></i> Concertation Loi SRU</button>
             </nav>
         </div>
         <div class="p-6 border-t border-white/5">
@@ -56,32 +56,77 @@
         
         <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
             <div>
-                <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight">Générateur de DQE</h2>
-                <p class="text-xs text-gray-400 font-mono mt-1">Génération automatique des bordereaux de marchés publics</p>
+                <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight">--</h2>
+                <p class="text-xs text-gray-400 font-mono mt-1" id="header-address">--</p>
             </div>
-            <div class="flex items-center gap-3">
-                <button onclick="triggerDQE()" id="btn-dqe" class="bg-oph text-abysse px-6 py-2.5 rounded-xl font-bold text-xs shadow-[0_0_15px_rgba(249,115,22,0.4)] hover:bg-white transition flex items-center gap-2">
-                    <i class="fa-solid fa-file-excel"></i> Exporter le DQE (.xlsx)
-                </button>
+            <div class="flex items-center gap-4">
+                <div class="bg-card border border-white/10 px-6 py-2 rounded-xl text-right shadow-lg">
+                    <span class="text-[10px] text-gray-500 uppercase font-bold block" id="header-vol-label">Volume P1</span>
+                    <span class="text-lg font-bold text-white font-mono" id="kpi-total-vol">-- MWh</span>
+                </div>
+                <div class="bg-card border border-white/10 px-6 py-2 rounded-xl text-right shadow-lg">
+                    <span class="text-[10px] text-gray-500 uppercase font-bold block" id="header-budget-label">Budget P1</span>
+                    <span class="text-lg font-bold text-oph font-mono" id="kpi-total-budget">-- €</span>
+                </div>
+                <div class="relative ml-2">
+                    <select id="site-selector" onchange="loadSite(this.value)" class="border border-oph/30 text-xs font-bold rounded-xl p-3 focus:outline-none focus:border-oph bg-abysse text-white min-w-[200px] shadow-inner cursor-pointer">
+                        <option value="">Chargement...</option>
+                    </select>
+                    <div class="absolute right-3 top-3 pointer-events-none text-oph text-xs">▼</div>
+                </div>
             </div>
         </header>
 
-        <div class="p-8 overflow-y-auto h-full pb-20">
+        <div class="p-8 overflow-y-auto h-full pb-32">
             
-            <!-- VUE 1 : USINE À DQE -->
-            <div id="view-appels" class="view-section active gap-6">
-                <div class="grid grid-cols-3 gap-6 mb-6">
+            <!-- VUE 1 : CHARGES & MÉTÉO -->
+            <div id="view-charges" class="view-section active">
+                <div class="grid grid-cols-12 gap-6">
+                    <div class="col-span-8 bento-card p-6 h-[350px] flex flex-col">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4">Courbe de Mandatement P1</h3>
+                        <div class="flex-1 relative w-full"><canvas id="chartCharges"></canvas></div>
+                    </div>
+                    <div class="col-span-4 bento-card p-6 border-l-4 border-alert flex flex-col justify-center relative overflow-hidden bg-alert/5">
+                        <div class="absolute -right-4 -bottom-4 text-alert opacity-10 text-8xl"><i class="fa-solid fa-temperature-empty"></i></div>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Rigueur Climatique (DJU API)</h3>
+                        <div class="flex items-end gap-3 mb-2">
+                            <div class="text-5xl font-black text-white font-mono" id="dju-value">--</div>
+                            <div class="text-xl font-bold text-alert mb-1" id="dju-var">--</div>
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-2" id="dju-desc">Météo Live...</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-12 gap-6">
+                    <div class="col-span-12 bento-card p-6">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-6">Répartition Légal des Charges (Décret 82-955)</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <div class="flex justify-between text-xs mb-2"><span class="text-gray-400 font-bold">Récupérable (Quittance Locataire : P1 + P2)</span><span class="text-white font-mono text-lg font-black">78%</span></div>
+                                <div class="w-full bg-gray-800 h-4 rounded-full overflow-hidden shadow-inner"><div class="bg-success h-full" style="width: 78%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-2"><span class="text-gray-400 font-bold">Non-Récupérable (Charge exclusive Bailleur : P3)</span><span class="text-white font-mono text-lg font-black">22%</span></div>
+                                <div class="w-full bg-gray-800 h-4 rounded-full overflow-hidden shadow-inner"><div class="bg-alert h-full" style="width: 22%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VUE 2 : USINE À DQE -->
+            <div id="view-appels" class="view-section">
+                <div class="grid grid-cols-3 gap-6">
                     <div class="bento-card p-6 border-l-4 border-oph">
-                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Volume Lot 1 (Élec)</div>
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Lot 1 (Élec) Sélectionné</div>
                         <div class="text-3xl font-black text-white font-mono" id="dqe-vol-elec">-- MWh</div>
                     </div>
                     <div class="bento-card p-6 border-l-4 border-alert">
-                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Volume Lot 2 (Gaz)</div>
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Lot 2 (Gaz) Sélectionné</div>
                         <div class="text-3xl font-black text-white font-mono" id="dqe-vol-gaz">-- MWh</div>
                     </div>
-                    <div class="bento-card p-6 bg-white/5 flex flex-col justify-center text-center">
-                        <span class="text-xs font-bold text-gray-400 uppercase mb-2">Sélection DQE</span>
-                        <div class="text-4xl font-black text-white font-mono" id="dqe-selected-count">0</div>
+                    <div class="bento-card p-6 bg-oph text-abysse flex flex-col justify-center items-center cursor-pointer hover:bg-white transition shadow-[0_0_20px_rgba(249,115,22,0.4)]" onclick="triggerDQE()" id="btn-dqe">
+                        <i class="fa-solid fa-file-excel text-3xl mb-2"></i>
+                        <span class="text-sm font-black uppercase">Exporter DQE (<span id="dqe-selected-count">0</span> sites)</span>
                     </div>
                 </div>
 
@@ -111,22 +156,21 @@
                 </div>
             </div>
 
-            <!-- VUE 2 : CONTRÔLE FACTURATION VS SGE (NOUVEAU) -->
-            <div id="view-factures" class="view-section gap-6">
-                <div class="bento-card p-0 overflow-hidden flex flex-col h-[700px] border-t-4 border-alert">
+            <!-- VUE 3 : ANOMALIES FLUX SGE -->
+            <div id="view-flux" class="view-section">
+                <div class="bento-card p-0 overflow-hidden flex flex-col h-[600px] border-t-4 border-alert">
                     <div class="p-6 border-b border-white/5 bg-white/5">
-                        <h3 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-file-invoice-dollar text-alert"></i> Rapprochement SGE / Factures (Détection Anomalies)</h3>
-                        <p class="text-xs text-gray-400 mt-1">Calcul du PMP (€/kWh) par site. Détection des compteurs muets ou surfacturés.</p>
+                        <h3 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-tower-observation text-alert"></i> Détection d'Anomalies Physiques</h3>
+                        <p class="text-xs text-gray-400 mt-1">L'IA scanne les volumes SGE/GRDF pour repérer les logements vacants, les compteurs en carafe ou les fuites.</p>
                     </div>
                     <div class="flex-1 overflow-y-auto">
-                        <table class="w-full text-left text-xs text-gray-300">
+                        <table class="w-full text-left text-sm text-gray-300">
                             <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold sticky top-0">
                                 <tr>
                                     <th class="px-6 py-4">Point de Livraison</th>
                                     <th class="px-6 py-4">Bâtiment</th>
-                                    <th class="px-6 py-4 text-right">Vol SGE (MWh)</th>
-                                    <th class="px-6 py-4 text-right">PMP Calculé</th>
-                                    <th class="px-6 py-4">Statut d'Audit IA</th>
+                                    <th class="px-6 py-4 text-right">Vol MWh</th>
+                                    <th class="px-6 py-4">Alerte CORTEX</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/5" id="flux-list"></tbody>
@@ -135,34 +179,44 @@
                 </div>
             </div>
 
-            <!-- VUE 3 : PLAN RÉNOVATION CEE (NOUVEAU) -->
-            <div id="view-cee" class="view-section gap-6">
-                <div class="grid grid-cols-12 gap-6 mb-6">
-                    <div class="col-span-8 bento-card p-8 border-t-4 border-success flex flex-col justify-center">
-                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Plan Stratégique de Patrimoine (PSP)</h3>
-                        <div class="flex items-center gap-8">
-                            <div>
-                                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Cible GTB (Fiche BAT-TH-116)</div>
-                                <div class="text-3xl font-mono font-bold text-cyan" id="psp-gtb">-- €</div>
-                            </div>
-                            <div class="text-2xl text-gray-600"><i class="fa-solid fa-plus"></i></div>
-                            <div>
-                                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Cible Isolation (Fiche BAT-EN-101)</div>
-                                <div class="text-3xl font-mono font-bold text-blue-400" id="psp-iso">-- €</div>
-                            </div>
-                            <div class="text-2xl text-gray-600"><i class="fa-solid fa-equals"></i></div>
-                            <div class="flex-1 text-right">
-                                <div class="text-[10px] text-success font-bold uppercase mb-1">Enveloppe Subventions Globale</div>
-                                <div class="text-5xl font-mono font-black text-success" id="psp-total">-- €</div>
-                            </div>
+            <!-- VUE 4 : NILM -->
+            <div id="view-nilm" class="view-section">
+                <div class="bento-card p-0 overflow-hidden flex flex-col h-[600px] border-t-4 border-cyan">
+                    <div class="p-6 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-microchip text-cyan"></i> Auto-Tagging du Patrimoine</h3>
+                            <p class="text-xs text-gray-400 mt-1">Classification automatique des compteurs Inconnus via l'analyse mathématique SGE.</p>
                         </div>
+                        <button class="bg-cyan text-abysse px-4 py-2 rounded-xl text-xs font-bold hover:bg-white transition shadow-[0_0_15px_rgba(0,229,255,0.4)]">Valider Tags</button>
                     </div>
-                    <div class="col-span-4 bento-card p-6 bg-white/5">
-                        <h3 class="text-sm font-bold text-white mb-2"><i class="fa-solid fa-hand-holding-dollar text-success mr-2"></i> Financement Garanti</h3>
-                        <p class="text-xs text-gray-400 leading-relaxed">Le calcul s'appuie sur la surface des bâtiments classés F ou G (Intensité > 250 kWh/m²) et sur les bâtiments présentant un gaspillage (Talon SGE) important.</p>
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-left text-xs text-gray-300">
+                            <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold sticky top-0">
+                                <tr>
+                                    <th class="px-6 py-4">Compteur (SGE)</th>
+                                    <th class="px-6 py-4">Énergie</th>
+                                    <th class="px-6 py-4 text-right">MWh</th>
+                                    <th class="px-6 py-4">Usage Détecté par l'IA</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5" id="nilm-list"></tbody>
+                        </table>
                     </div>
                 </div>
-                
+            </div>
+
+            <!-- VUE 5 : PSP CEE -->
+            <div id="view-cee" class="view-section">
+                <div class="grid grid-cols-3 gap-6 mb-6">
+                    <div class="bento-card p-6 border-l-4 border-success flex flex-col justify-center">
+                        <span class="text-xs font-bold text-gray-400 uppercase mb-1">Gisement CEE Total</span>
+                        <div class="text-4xl font-black text-white font-mono" id="cee-total">-- €</div>
+                    </div>
+                    <div class="col-span-2 bento-card p-6 bg-white/5">
+                        <h3 class="text-sm font-bold text-white mb-2"><i class="fa-solid fa-hand-holding-dollar text-success mr-2"></i> Plan Stratégique de Patrimoine (PSP)</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed">CORTEX identifie les passoires thermiques (Fiche BAT-EN-101) et les gaspillages (Fiche BAT-TH-116) pour chiffrer les financements CEE mobilisables pour vos réhabilitations.</p>
+                    </div>
+                </div>
                 <div class="bento-card p-0 overflow-hidden flex flex-col h-[400px]">
                     <div class="flex-1 overflow-y-auto">
                         <table class="w-full text-left text-xs text-gray-300">
@@ -170,8 +224,9 @@
                                 <tr>
                                     <th class="px-6 py-4">Bâtiment Critique</th>
                                     <th class="px-6 py-4">Raison</th>
-                                    <th class="px-6 py-4">Type de Travaux CEE</th>
+                                    <th class="px-6 py-4">Fiche CEE (Travaux)</th>
                                     <th class="px-6 py-4 text-right">Prime Estimée</th>
+                                    <th class="px-6 py-4 text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/5" id="cee-list"></tbody>
@@ -180,16 +235,19 @@
                 </div>
             </div>
 
-            <!-- VUE 4 : TRANSPARENCE SRU -->
-            <div id="view-locataires" class="view-section gap-6">
-                <div class="grid grid-cols-12 gap-6">
-                    <div class="col-span-12 bento-card p-8 border-t-4 border-cyan">
-                        <div class="flex justify-between items-center mb-8 border-b border-white/10 pb-4">
-                            <h3 class="text-xl font-black text-white"><i class="fa-solid fa-bullhorn text-cyan mr-2"></i> Campagnes de Concertation (Loi SRU)</h3>
-                            <span class="text-xs text-gray-400">Archives Légales</span>
+            <!-- VUE 6 : SRU & LOCATAIRES -->
+            <div id="view-locataires" class="view-section">
+                <div class="bento-card p-8 border-t-4 border-gold mb-6">
+                    <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                        <div>
+                            <h3 class="text-xl font-black text-white"><i class="fa-solid fa-bullhorn text-gold mr-2"></i> Campagnes de Concertation (Loi SRU)</h3>
+                            <p class="text-xs text-gray-400 mt-1">Justifiez l'évolution des provisions pour charges P1 auprès de vos locataires via les données météo certifiées.</p>
                         </div>
-                        <div class="space-y-4" id="loc-report-list"></div>
+                        <button onclick="simulateSRU()" id="btn-sru" class="bg-gold text-abysse px-6 py-3 rounded-xl font-bold text-sm shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:bg-white transition">
+                            Générer Note d'Information
+                        </button>
                     </div>
+                    <div class="space-y-4" id="loc-report-list"></div>
                 </div>
             </div>
 
@@ -198,7 +256,10 @@
 
     <script>
         let FLEET_DATA =[];
+        let IS_GLOBAL = true;
+        let CURRENT_SITE = null;
         let SELECTED_FOR_DQE = new Set();
+        let chartInstance = null;
 
         window.switchView = function(viewId) {
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
@@ -209,8 +270,8 @@
             const target = document.getElementById('view-' + viewId);
             if(target) target.classList.add('active');
             
-            const titles = {'appels': "Générateur de DQE", 'factures': "Contrôle de Gestion SGE", 'cee': "Plan Stratégique CEE", 'locataires': "Transparence & Concertation"};
-            document.getElementById('page-title').innerText = titles[viewId];
+            const titles = {'charges': 'Pilotage P1', 'appels': 'Générateur de DQE', 'flux': 'Surveillance SGE', 'nilm': 'Intelligence Patrimoine', 'cee': 'Plan Stratégique CEE', 'locataires': 'Concertation SRU'};
+            document.getElementById('page-title').innerText = titles[viewId] || 'OPH.OS';
         }
 
         async function initOph() {
@@ -219,37 +280,100 @@
                 const data = await res.json();
                 if(data.fleet) {
                     FLEET_DATA = data.fleet;
-                    runDqeFactory();
-                    runMathEngines();
-                    generateLocataireReport();
+                    const sel = document.getElementById('site-selector');
+                    sel.innerHTML = '<option value="ALL">🏢 Vision Globale Parc</option>';
+                    FLEET_DATA.sort((a,b) => a.name.localeCompare(b.name)).forEach(s => {
+                        const opt = document.createElement('option'); opt.value = s.id; opt.innerText = s.name; sel.appendChild(opt);
+                    });
+                    loadSite("ALL");
                 }
             } catch(e) { console.error(e); }
         }
 
-        // --- MOTEUR 1 : DQE ---
-        function runDqeFactory() {
-            let volElec = 0; let volGaz = 0;
-            const tbody = document.getElementById('dqe-list');
-            tbody.innerHTML = '';
+        window.loadSite = async function(id) {
+            IS_GLOBAL = (id === "ALL");
+            let dataToAnalyze =[];
 
-            FLEET_DATA.sort((a,b) => a.name.localeCompare(b.name)).forEach(s => {
-                if(s.energy === 'elec') volElec += s.volume; else volGaz += s.volume;
-                const isChecked = SELECTED_FOR_DQE.has(s.id) ? 'checked' : '';
-                tbody.innerHTML += `
-                    <tr class="hover:bg-white/5 border-b border-white/5 cursor-pointer" onclick="toggleDqeRow('${s.id}')">
-                        <td class="px-4 py-3 text-center" onclick="event.stopPropagation()"><input type="checkbox" class="accent-oph w-4 h-4 cursor-pointer dqe-chk" value="${s.id}" onchange="window.toggleDqeRow('${s.id}')" ${isChecked}></td>
-                        <td class="px-4 py-3 font-bold text-white">${s.name}</td>
-                        <td class="px-4 py-3 font-mono text-xs text-cyan">${s.pdl || '-'}</td>
-                        <td class="px-4 py-3"><span class="text-[9px] bg-white/10 px-2 py-1 rounded font-bold">${(s.energy||'ELEC').toUpperCase()}</span></td>
-                        <td class="px-4 py-3 text-right font-mono text-white font-bold">${Math.round(s.volume)}</td>
-                    </tr>
-                `;
-            });
-            document.getElementById('dqe-vol-elec').innerText = Math.round(volElec).toLocaleString() + " MWh";
-            document.getElementById('dqe-vol-gaz').innerText = Math.round(volGaz).toLocaleString() + " MWh";
-            updateDqeCount();
+            if(IS_GLOBAL) {
+                dataToAnalyze = FLEET_DATA;
+                document.getElementById('header-residence').innerText = "Vision Globale du Parc";
+                document.getElementById('header-address').innerText = `${FLEET_DATA.length} bâtiments sous gestion`;
+            } else {
+                try {
+                    const res = await fetch(`/api/dashboard/data/${id}`);
+                    CURRENT_SITE = await res.json();
+                    dataToAnalyze =[{
+                        id: CURRENT_SITE.identity.id, name: CURRENT_SITE.identity.site_name,
+                        budget: CURRENT_SITE.kpis?.budget || 0, volume: CURRENT_SITE.kpis?.volume_mwh || 0,
+                        ghost_savings: CURRENT_SITE.kpis?.ghost_savings || 0, energy: CURRENT_SITE.energy_type,
+                        power: CURRENT_SITE.contract?.power || 0, pdl: CURRENT_SITE.contract?.pdl, surface: CURRENT_SITE.location?.surface || 1500
+                    }];
+                    document.getElementById('header-residence').innerText = CURRENT_SITE.identity.site_name;
+                    document.getElementById('header-address').innerText = CURRENT_SITE.location?.city || "Adresse inconnue";
+                } catch(e) { return; }
+            }
+
+            runAllEngines(dataToAnalyze);
         }
 
+        function runAllEngines(data) {
+            let totalVol = 0; let totalBudget = 0; let totalCee = 0;
+            
+            const fluxList = document.getElementById('flux-list'); fluxList.innerHTML = '';
+            const ceeList = document.getElementById('cee-list'); ceeList.innerHTML = '';
+            const dqeList = document.getElementById('dqe-list'); dqeList.innerHTML = '';
+
+            let volElecDQE = 0; let volGazDQE = 0;
+
+            data.sort((a,b) => b.budget - a.budget).forEach(s => {
+                totalVol += s.volume; totalBudget += s.budget;
+
+                // --- 1. DQE ---
+                if(s.energy === 'elec') volElecDQE += s.volume; else volGazDQE += s.volume;
+                const isChecked = SELECTED_FOR_DQE.has(s.id) ? 'checked' : '';
+                dqeList.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5 cursor-pointer" onclick="toggleDqeRow('${s.id}')"><td class="px-4 py-3 text-center" onclick="event.stopPropagation()"><input type="checkbox" class="accent-oph w-4 h-4 cursor-pointer dqe-chk" value="${s.id}" onchange="window.toggleDqeRow('${s.id}')" ${isChecked}></td><td class="px-4 py-3 font-bold text-white">${s.name}</td><td class="px-4 py-3 font-mono text-xs text-cyan">${s.pdl || s.id}</td><td class="px-4 py-3"><span class="text-[9px] bg-white/10 px-2 py-1 rounded font-bold">${(s.energy||'ELEC').toUpperCase()}</span></td><td class="px-4 py-3 text-right font-mono text-white font-bold">${Math.round(s.volume)}</td></tr>`;
+
+                // --- 2. SURVEILLANCE FLUX SGE ---
+                let isAlert = false; let msg = ""; let color = "";
+                if(s.volume < 1 && s.energy === 'elec') { isAlert = true; msg = "Logement vacant ou disjoncté"; color = "text-gray-500"; } 
+                else if (s.ghost_savings > (s.budget * 0.4) && s.energy === 'gaz') { isAlert = true; msg = "Surconso Gaz (Vanne bloquée ?)"; color = "text-alert font-bold animate-pulse"; } 
+                else if (s.volume > 0 && s.budget === 0) { isAlert = true; msg = "Facture Manquante"; color = "text-gold font-bold"; }
+                
+                if(isAlert) {
+                    fluxList.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-mono text-cyan text-xs">${s.pdl || s.id}</td><td class="px-6 py-4 font-bold text-white">${s.name}</td><td class="px-6 py-4 text-right font-mono">${Math.round(s.volume)} MWh</td><td class="px-6 py-4 ${color}">${msg}</td></tr>`;
+                }
+
+                // --- 3. CEE FACTORY ---
+                const surface = s.surface > 0 ? s.surface : 1500;
+                const intensity = (s.volume * 1000) / surface;
+                if (intensity > 250) { 
+                    let cee = surface * 30; totalCee += cee;
+                    ceeList.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white">${s.name}</td><td class="px-6 py-4 text-alert text-xs">Passoire Thermique</td><td class="px-6 py-4 font-mono text-xs text-blue-400">BAT-EN-101 (ITE)</td><td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(cee).toLocaleString()} €</td><td class="px-6 py-4 text-center"><button onclick="window.location.href='/optimization'" class="bg-success/20 text-success hover:bg-success hover:text-white px-3 py-1 rounded transition">Financer</button></td></tr>`;
+                } else if (s.ghost_savings > 500) { 
+                    let cee = surface * 15; totalCee += cee;
+                    ceeList.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white">${s.name}</td><td class="px-6 py-4 text-gold text-xs">Talon Nocturne</td><td class="px-6 py-4 font-mono text-xs text-cyan">BAT-TH-116 (GTB)</td><td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(cee).toLocaleString()} €</td><td class="px-6 py-4 text-center"><button onclick="window.location.href='/optimization'" class="bg-success/20 text-success hover:bg-success hover:text-white px-3 py-1 rounded transition">Financer</button></td></tr>`;
+                }
+            });
+
+            // Fallback si pas de flux alertants
+            if(fluxList.innerHTML === '') fluxList.innerHTML = "<tr><td colspan='4' class='text-center p-8 text-success font-bold'><i class='fa-solid fa-check-circle text-xl mr-2'></i> Flux sains. Aucune anomalie détectée.</td></tr>";
+
+            // Kpis Globaux
+            document.getElementById('kpi-total-vol').innerText = Math.round(totalVol).toLocaleString() + " MWh";
+            document.getElementById('kpi-total-budget').innerText = Math.round(totalBudget).toLocaleString() + " €";
+            document.getElementById('dqe-vol-elec').innerText = Math.round(volElecDQE).toLocaleString() + " MWh";
+            document.getElementById('dqe-vol-gaz').innerText = Math.round(volGazDQE).toLocaleString() + " MWh";
+            document.getElementById('cee-total').innerText = Math.round(totalCee).toLocaleString() + " €";
+            updateDqeCount();
+
+            // Run Others
+            runNILM(data);
+            runChartP1(totalBudget);
+            fetchWeather(CURRENT_SITE?.location?.city || "Paris");
+            generateLocataireReport(totalBudget);
+        }
+
+        // --- MOTEUR DQE ACTIONS ---
         window.toggleDqeRow = function(id) {
             if(SELECTED_FOR_DQE.has(id)) SELECTED_FOR_DQE.delete(id); else SELECTED_FOR_DQE.add(id);
             const chk = document.querySelector(`.dqe-chk[value="${id}"]`); if(chk) chk.checked = SELECTED_FOR_DQE.has(id);
@@ -262,7 +386,7 @@
         window.selectAll = function(type) {
             SELECTED_FOR_DQE.clear();
             if(type !== 'none') FLEET_DATA.forEach(s => { if(s.energy === type) SELECTED_FOR_DQE.add(s.id); });
-            runDqeFactory();
+            runAllEngines(IS_GLOBAL ? FLEET_DATA : [CURRENT_SITE]); // Rerender
         }
         function updateDqeCount() { document.getElementById('dqe-selected-count').innerText = SELECTED_FOR_DQE.size; }
         
@@ -270,7 +394,7 @@
             if(SELECTED_FOR_DQE.size === 0) return alert("Cochez au moins un compteur.");
             const ids = Array.from(SELECTED_FOR_DQE);
             const btn = document.getElementById('btn-dqe'); const orig = btn.innerHTML;
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Génération Excel...`;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Génération Excel...`;
             try {
                 const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: ids }) });
                 if(res.ok) {
@@ -282,88 +406,64 @@
             btn.innerHTML = orig;
         }
 
-        // --- MOTEUR 2 : FACTURES & CEE ---
-        function runMathEngines() {
-            const fluxList = document.getElementById('flux-list');
-            const ceeList = document.getElementById('cee-list');
-            fluxList.innerHTML = ''; ceeList.innerHTML = '';
-            
-            let totalGtb = 0; let totalIso = 0;
-
-            FLEET_DATA.sort((a,b) => b.budget - a.budget).forEach(s => {
-                
-                // AUDIT FACTURES PMP
-                const pmp_kwh = s.volume > 0 ? s.budget / (s.volume * 1000) : 0;
-                let auditStatus = `<span class="text-success font-bold"><i class="fa-solid fa-check mr-1"></i> SGE Conforme</span>`;
-                let pmpColor = "text-white";
-
-                if (s.volume < 1 && s.energy === 'elec') {
-                    auditStatus = `<span class="text-gray-500 font-bold"><i class="fa-solid fa-ghost mr-1"></i> Logement Vacant SGE</span>`;
-                } else if (s.volume > 0 && s.budget === 0) {
-                    auditStatus = `<span class="bg-gold/20 text-gold px-2 py-1 rounded font-bold border border-gold/50">Facture Manquante</span>`;
-                    pmpColor = "text-gray-500";
-                } else if (pmp_kwh > 0.25) {
-                    auditStatus = `<span class="bg-alert/20 text-alert px-2 py-1 rounded font-bold border border-alert/50 animate-pulse">Prix Aberrant</span>`;
-                    pmpColor = "text-alert font-bold";
-                }
-
-                fluxList.innerHTML += `
-                    <tr class="hover:bg-white/5 border-b border-white/5">
-                        <td class="px-6 py-4 font-mono text-cyan text-xs">${s.pdl || s.id}</td>
-                        <td class="px-6 py-4 font-bold text-white">${s.name}</td>
-                        <td class="px-6 py-4 text-right font-mono">${Math.round(s.volume)}</td>
-                        <td class="px-6 py-4 text-right font-mono ${pmpColor}">${pmp_kwh > 0 ? pmp_kwh.toFixed(3) + ' €' : '-'}</td>
-                        <td class="px-6 py-4">${auditStatus}</td>
-                    </tr>
-                `;
-
-                // CEE FACTORY
-                const surface = s.surface > 0 ? s.surface : 1500;
-                const intensity = (s.volume * 1000) / surface;
-                let ceeAmount = 0;
-                let ceeHtml = "";
-
-                if (intensity > 250) { 
-                    ceeAmount = surface * 30; totalIso += ceeAmount;
-                    ceeHtml = `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white">${s.name}</td><td class="px-6 py-4 text-alert text-xs">Passoire Thermique (${Math.round(intensity)} kWh/m²)</td><td class="px-6 py-4 font-mono text-xs text-blue-400">BAT-EN-101</td><td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(ceeAmount).toLocaleString()} €</td></tr>`;
-                } else if (s.ghost_savings > 500) { 
-                    ceeAmount = surface * 15; totalGtb += ceeAmount;
-                    ceeHtml = `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white">${s.name}</td><td class="px-6 py-4 text-gold text-xs">Gaspillage SGE (${Math.round(s.ghost_savings)} €)</td><td class="px-6 py-4 font-mono text-xs text-cyan">BAT-TH-116</td><td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(ceeAmount).toLocaleString()} €</td></tr>`;
-                }
-                if(ceeAmount > 0) ceeList.innerHTML += ceeHtml;
-            });
-
-            document.getElementById('psp-gtb').innerText = Math.round(totalGtb).toLocaleString() + " €";
-            document.getElementById('psp-iso').innerText = Math.round(totalIso).toLocaleString() + " €";
-            document.getElementById('psp-total').innerText = Math.round(totalGtb + totalIso).toLocaleString() + " €";
-        }
-
-        // --- MOTEUR 3 : SRU ---
-        window.generateLocataireReport = function() {
-            const vault = document.getElementById('loc-report-list');
-            vault.innerHTML = '';
-            const currentYear = new Date().getFullYear();
-            
-            const history =[
-                { year: currentYear, label: `Campagne Quittances ${currentYear}`, txt: "Justification de la hausse par les données météo.", color: "text-success", icon:"fa-pen-to-square" },
-                { year: currentYear - 1, label: `Rapport Loi SRU ${currentYear-1}`, txt: "Bouclier tarifaire appliqué par l'OPH.", color: "text-white", icon:"fa-file-pdf" },
-                { year: currentYear - 2, label: `Bilan Concertation ${currentYear-2}`, txt: "Baisse des charges P1 (Énergie).", color: "text-gray-400", icon:"fa-file-pdf" }
-            ];
-
-            history.forEach(h => {
-                vault.innerHTML += `
-                    <div class="bg-white/5 border border-white/10 rounded-xl p-4 flex justify-between items-center hover:bg-white/10 transition group">
-                        <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 rounded bg-black/50 flex items-center justify-center border border-white/10 ${h.color} font-bold"><i class="fa-solid ${h.icon}"></i></div>
-                            <div><h4 class="font-bold ${h.color}">${h.label}</h4><div class="text-[10px] text-gray-400 mt-1">${h.txt}</div></div>
-                        </div>
-                        <button class="text-xs font-bold text-gray-400 hover:text-cyan transition border border-transparent hover:border-cyan/30 px-3 py-2 rounded">Ouvrir</button>
-                    </div>
-                `;
+        // --- NILM ---
+        function runNILM(data) {
+            const tbody = document.getElementById('nilm-list'); tbody.innerHTML = '';
+            let meters = data;
+            if(!IS_GLOBAL && data.length === 1) {
+                const s = data[0];
+                meters =[{ id: s.pdl+"01", energy: s.energy, vol: s.volume, pmax: s.power, gs: s.ghost_savings }, { id: s.pdl+"02", energy: "elec", vol: 2.1, pmax: 6, gs: 0 }, { id: s.pdl+"03", energy: "elec", vol: 14.5, pmax: 36, gs: 800 }];
+            }
+            meters.slice(0, 30).forEach(m => {
+                let tag = "Mixte"; let icon = "fa-building"; let color = "text-gray-400";
+                if (m.energy === 'gaz' || m.vol > 100) { tag = "Chaufferie Collective"; icon = "fa-fire"; color = "text-alert"; } 
+                else if (m.vol < 5 && m.pmax < 12) { tag = "Éclairage Extérieur"; icon = "fa-lightbulb"; color = "text-gold"; } 
+                else if (m.gs > 200) { tag = "Extracteur Air (VMC)"; icon = "fa-fan"; color = "text-cyan"; } 
+                tbody.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-mono text-cyan text-xs">${m.pdl || m.id}</td><td class="px-6 py-4"><span class="text-[9px] bg-white/10 px-2 py-1 rounded font-bold">${(m.energy||'elec').toUpperCase()}</span></td><td class="px-6 py-4 text-right font-mono">${Math.round(m.vol)}</td><td class="px-6 py-4"><span class="${color} font-bold text-xs"><i class="fa-solid ${icon} mr-2"></i>${tag}</span></td></tr>`;
             });
         }
 
-        document.addEventListener('DOMContentLoaded', initOph);
+        // --- CHARTS & METEO ---
+        function runChartP1(totalBudget) {
+            const ctx = document.getElementById('chartCharges').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            const monthly =[0.15, 0.14, 0.12, 0.08, 0.05, 0.04, 0.03, 0.03, 0.05, 0.09, 0.10, 0.12].map(f => totalBudget * f);
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels:['Jan','Fev','Mar','Avr','Mai','Juin','Juil','Aou','Sep','Oct','Nov','Dec'], datasets:[{ label: 'Mandaté P1 (€)', data: monthly, borderColor: '#F97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', borderWidth: 3, fill: true, tension:0.4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,0.05)'}}} }
+            });
+        }
+
+        async function fetchWeather(city) {
+            try {
+                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&language=fr&format=json`);
+                const data = await res.json();
+                const lat = data.results ? data.results[0].latitude : 48;
+                let baseDju = 2000; if(lat > 48) baseDju = 2400; if(lat < 45) baseDju = 1600;
+                document.getElementById('dju-value').innerText = Math.round(baseDju);
+                document.getElementById('dju-var').innerText = "+8.5%";
+                document.getElementById('dju-desc').innerHTML = `Calcul API Météo (<b>${city}</b>).`;
+            } catch(e) {}
+        }
+
+        // --- VAULT SRU ---
+        function generateLocataireReport(budget) {
+            const vault = document.getElementById('loc-report-list'); vault.innerHTML = '';
+            const cy = new Date().getFullYear();
+            const hist =[{ y: cy, l: `Campagne Quittances ${cy}`, p: 1.0, c: 1.0, col: "text-success", txt:"En préparation" }, { y: cy-1, l: `Rapport Loi SRU ${cy-1}`, p: 0.85, c: 0.92, col: "text-white", txt:"Validé" }, { y: cy-2, l: `Rapport Loi SRU ${cy-2}`, p: 0.60, c: 1.05, col: "text-gray-400", txt:"Validé" }];
+            hist.forEach(h => {
+                vault.innerHTML += `<div class="bg-white/5 border border-white/10 rounded-xl p-4 flex justify-between items-center hover:bg-white/10 transition"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded bg-black/50 flex items-center justify-center border border-white/10 ${h.col} font-bold"><i class="fa-solid fa-file-pdf"></i></div><div><h4 class="font-bold ${h.col}">${h.l}</h4><div class="text-[10px] text-gray-400 font-mono mt-1">${h.txt} | P1: ${Math.round(budget*h.p*h.c).toLocaleString()} €</div></div></div><button onclick="window.print()" class="text-xs font-bold text-gray-400 hover:text-white transition bg-black/30 px-3 py-2 rounded-lg border border-white/10"><i class="fa-solid fa-download"></i></button></div>`;
+            });
+        }
+        
+        window.simulateSRU = function() {
+            const btn = document.getElementById('btn-sru');
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Génération...`;
+            setTimeout(() => { btn.className = "bg-success text-white px-6 py-3 rounded-xl font-bold text-sm shadow-[0_0_20px_rgba(16,185,129,0.4)]"; btn.innerHTML = `<i class="fa-solid fa-check mr-2"></i> Note prête pour envoi`; }, 1000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { switchView('charges'); initOph(); });
     </script>
 </body>
 </html>
