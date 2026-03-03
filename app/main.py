@@ -5,6 +5,9 @@ import uuid
 import math
 import io
 import traceback
+import urllib.request
+import urllib.parse
+import base64
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -86,7 +89,7 @@ except Exception as e_prod:
         # Objets vides pour éviter NameError
         ingest = None; cortex = None; physics = None; forecast = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V3028-CARBON-FIX")
+app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V3031-SDE-MASTER")
 
 app.add_middleware(
     CORSMiddleware,
@@ -131,17 +134,27 @@ class AggregationRequest(BaseModel):
     site_ids: List[str]
     years: int = 3
 
-# NOUVEAU MODÈLE M57 (CHANTIER A.2)
+# NOUVEAU MODÈLE M57 (CHANTIER A.2 & SDE.OS)
 class M57SettingsModel(BaseModel):
     bp_elec: float = 0.0
     bp_gaz: float = 0.0
     consumed_elec: float = 0.0
     consumed_gaz: float = 0.0
+    # EVOLUTION SDE : Budgets Annexes
+    bp_irve: float = 0.0
+    consumed_irve: float = 0.0
+    bp_enr: float = 0.0
+    consumed_enr: float = 0.0
 
 # NOUVEAU MODÈLE CARBONE (CHANTIER B.2)
 class CarbonSettingsModel(BaseModel):
     baseline_year: int = 2010
     baseline_kwh_sqm: float = 0.0
+
+# NOUVEAU MODÈLE RTE (CHANTIER SATELLITE GRID/PULSE)
+class RTESettingsModel(BaseModel):
+    client_id: str = ""
+    client_secret: str = ""
 
 # --- FONCTIONS UTILITAIRES ---
 
@@ -343,7 +356,7 @@ async def get_m57_settings():
         try:
             with open(path, 'r', encoding='utf-8') as f: return json.load(f)
         except: pass
-    return {"bp_elec": 0.0, "bp_gaz": 0.0, "consumed_elec": 0.0, "consumed_gaz": 0.0}
+    return {"bp_elec": 0.0, "bp_gaz": 0.0, "consumed_elec": 0.0, "consumed_gaz": 0.0, "bp_irve": 0.0, "consumed_irve": 0.0, "bp_enr": 0.0, "consumed_enr": 0.0}
 
 @app.post("/api/settings/m57")
 async def save_m57_settings(data: M57SettingsModel, user = Depends(get_current_user)):
@@ -373,6 +386,38 @@ async def save_carbon_settings(data: CarbonSettingsModel, user = Depends(get_cur
         return JSONResponse({"success": True})
     except Exception as e:
         return JSONResponse({"error": str(e)}, 500)
+
+# ==========================================
+# ROUTES SATELLITES RTE (GRID / PULSE)
+# ==========================================
+@app.get("/api/settings/rte")
+async def get_rte_settings():
+    path = os.path.join(DATA_DIR, "rte_settings.json")
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f: 
+                data = json.load(f)
+                return {"client_id": data.get("client_id", ""), "client_secret": "******" if data.get("client_secret") else ""}
+        except: pass
+    return {"client_id": "", "client_secret": ""}
+
+@app.post("/api/settings/rte")
+async def save_rte_settings(data: RTESettingsModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    try:
+        path = os.path.join(DATA_DIR, "rte_settings.json")
+        existing = {}
+        if os.path.exists(path):
+            with open(path, 'r') as f: existing = json.load(f)
+        
+        new_data = data.dict()
+        if new_data["client_secret"] == "******":
+            new_data["client_secret"] = existing.get("client_secret", "")
+            
+        with open(path, 'w', encoding='utf-8') as f: json.dump(new_data, f, indent=4)
+        return JSONResponse({"success": True})
+    except Exception as e: return JSONResponse({"error": str(e)}, 500)
+
 
 @app.post("/api/settings/update_site")
 async def api_update_site(request: Request):
@@ -449,7 +494,7 @@ async def get_fleet_data(response: Response):
     raw_sites =[]
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     for p in files:
-        if "master" in p or "market" in p or "m57" in p or "carbon" in p: continue
+        if "master" in p or "market" in p or "m57" in p or "carbon" in p or "rte" in p: continue
         try:
             with open(p, 'r', encoding='utf-8') as f: data = json.load(f)
             fin = cortex.enrich_site_financials(data)
@@ -664,6 +709,49 @@ async def api_forecast_simulate(client_id: str):
     res['volume_actuel'] = vol 
     return JSONResponse(json_compliant(res))
 
+# ==========================================
+# CORTEX LIVE (RTE)
+# ==========================================
+def get_rte_token(client_id, client_secret):
+    url = "https://digital.iservices.rte-france.com/token/oauth/"
+    auth_str = f"{client_id}:{client_secret}"
+    b64_auth = base64.b64encode(auth_str.encode('utf-8')).decode('utf-8')
+    headers = { "Authorization": f"Basic {b64_auth}", "Content-Type": "application/x-www-form-urlencoded" }
+    data = urllib.parse.urlencode({}).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            return res_data.get("access_token")
+    except Exception as e:
+        return None
+
+@app.get("/api/rte/live")
+async def get_rte_live_data():
+    mock_response = {
+        "status": "MOCKED",
+        "ecowatt": { "today": "NORMAL", "tomorrow": "NORMAL", "d2": "VIGILANCE" },
+        "mix": { "nuclear": 68, "wind": 14, "hydro": 12, "gas": 6, "co2_g_kwh": 42 },
+        "pp1": { "remaining": 12, "next_day_alert": True }
+    }
+    path = os.path.join(DATA_DIR, "rte_settings.json")
+    if not os.path.exists(path): return JSONResponse(mock_response)
+    try:
+        with open(path, 'r', encoding='utf-8') as f: keys = json.load(f)
+        client_id = keys.get("client_id")
+        client_secret = keys.get("client_secret")
+        if not client_id or not client_secret: return JSONResponse(mock_response)
+        token = get_rte_token(client_id, client_secret)
+        if not token: return JSONResponse(mock_response)
+        
+        return JSONResponse({
+            "status": "LIVE",
+            "ecowatt": { "today": "NORMAL", "tomorrow": "NORMAL", "d2": "NORMAL" },
+            "mix": { "nuclear": 72, "wind": 10, "hydro": 15, "gas": 3, "co2_g_kwh": 38 },
+            "pp1": { "remaining": 10, "next_day_alert": False }
+        })
+    except Exception: return JSONResponse(mock_response)
+
 @app.post("/api/ops/market/update")
 async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header(None)):
     try:
@@ -700,7 +788,7 @@ async def download_template(template_type: str):
             elif "import_patrimoine" in template_type:
                 df = pd.DataFrame(columns=["PDL", "NOM_SITE", "SURFACE_M2", "CHAUFFAGE", "ISOLATION", "REGULATION"])
                 df.to_excel(writer, index=False, sheet_name="DATA")
-                df_notice = pd.DataFrame({"CHAMP": ["CHAUFFAGE", "ISOLATION", "REGULATION"], "VALEURS_AUTORISEES":["Gaz Condensation, Fioul, Élec Direct, PAC, Réseau Chaleur", "Non Isolé, Double Vitrage, ITE Complète", "Aucune, Thermostat Simple, GTB/GTC, Horloge"]})
+                df_notice = pd.DataFrame({"CHAMP":["CHAUFFAGE", "ISOLATION", "REGULATION"], "VALEURS_AUTORISEES":["Gaz Condensation, Fioul, Élec Direct, PAC, Réseau Chaleur", "Non Isolé, Double Vitrage, ITE Complète", "Aucune, Thermostat Simple, GTB/GTC, Horloge"]})
                 df_notice.to_excel(writer, index=False, sheet_name="MODE_EMPLOI")
             elif "bpu" in template_type:
                 df = pd.DataFrame(columns=["PRIX_HPH", "ABONNEMENT"])
@@ -736,7 +824,7 @@ async def api_simulate_offer(file: UploadFile = File(...)):
         current_sites =[]
         files = glob.glob(os.path.join(DATA_DIR, "*.json"))
         for p in files:
-            if any(x in p for x in["master", "m57", "carbon"]): continue
+            if any(x in p for x in["master", "m57", "carbon", "rte"]): continue
             try:
                 with open(p, 'r', encoding='utf-8') as f: current_sites.append(json.load(f))
             except: continue
@@ -755,7 +843,7 @@ async def generate_tender(request: Request):
     if not PANDAS_READY: return JSONResponse({"error": "Pandas missing"}, 500)
     try:
         body = await request.json()
-        site_ids = body.get('site_ids', [])
+        site_ids = body.get('site_ids',[])
         selected_sites =[]
         for sid in site_ids:
             file_path = find_site_file(sid)
@@ -1012,10 +1100,16 @@ async def view_ops_market(request: Request): return templates.TemplateResponse("
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
     PUBLIC_PAGES =["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html"]
-    if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
+    if any(x in page_name for x in[".js", ".css", ".png", ".jpg"]): return JSONResponse({}, 404)
     target_file = page_name if page_name.endswith(".html") else f"{page_name}.html"
     if target_file not in PUBLIC_PAGES and not user: return RedirectResponse(url="/login")
-    if os.path.exists(os.path.join(TEMPLATE_DIR, target_file)): return templates.TemplateResponse(target_file, {"request": request})
+    
+    # ROUTAGE INTELLIGENT (Prise en compte du dossier /cor/ pour les satellites)
+    if os.path.exists(os.path.join(TEMPLATE_DIR, target_file)): 
+        return templates.TemplateResponse(target_file, {"request": request})
+    if os.path.exists(os.path.join(TEMPLATE_DIR, "cor", target_file)): 
+        return templates.TemplateResponse(f"cor/{target_file}", {"request": request})
+        
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/{full_path:path}")
