@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | Cortex GRID (IRVE & EnR)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = { 
+            theme: { extend: { colors: { abysse: '#001529', card: '#0F172A', grid: '#8B5CF6', cyan: '#00E5FF', success: '#10B981', alert: '#EF4444', gold: '#F59E0B' }, fontFamily: { sans:['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } } 
+        }
+    </script>
+    <style>
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
+        .nav-item.active { background: rgba(139, 92, 246, 0.1); border-left: 4px solid #8B5CF6; color: white; }
+        .view-section { display: none; } .view-section.active { display: grid; animation: fadeIn 0.3s ease-out; gap: 1.5rem;}
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        select { background-color: rgba(255,255,255,0.05) !important; color: white !important; -webkit-appearance: none; border: 1px solid rgba(255,255,255,0.1); }
+        select option { background-color: #0F172A !important; color: white !important; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    </style>
+</head>
+<body class="flex h-screen w-screen text-sm">
+
+    <!-- SIDEBAR -->
+    <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
+        <button onclick="history.back()" title="Retour au Dashboard" class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition mb-8 border border-white/5">
+            <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-900 flex items-center justify-center text-white font-bold shadow-[0_0_15px_rgba(139,92,246,0.4)] mb-2" title="Module GRID">
+            <i class="fa-solid fa-network-wired text-xl"></i>
+        </div>
+        <div class="text-[8px] font-bold text-purple-400 uppercase tracking-widest mt-1 text-center">GRID<br>LIVE</div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
+        
+        <!-- HEADER -->
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
+            <div>
+                <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight">CORTEX <span class="text-grid">GRID</span></h2>
+                <p class="text-xs text-gray-400 font-mono mt-1">Supervision Mobilité IRVE & Autoconsommation EnR</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="switchView('irve')" id="btn-irve" class="nav-item active px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2"><i class="fa-solid fa-car-battery"></i> Simulateur IRVE</button>
+                <button onclick="switchView('autoconso')" id="btn-autoconso" class="nav-item px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 text-gray-400"><i class="fa-solid fa-solar-panel"></i> Autoconsommation Live</button>
+                
+                <div class="h-8 w-px bg-white/10 mx-2"></div>
+                
+                <div class="relative">
+                    <select id="site-selector" onchange="loadSite(this.value)" class="border border-grid/30 text-xs font-bold rounded-xl p-2 focus:outline-none focus:border-grid bg-abysse text-white min-w-[200px] shadow-inner cursor-pointer">
+                        <option value="">Chargement...</option>
+                    </select>
+                    <div class="absolute right-3 top-2.5 pointer-events-none text-grid text-xs">▼</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="p-8 overflow-y-auto h-full pb-20">
+            
+            <!-- VUE 1 : IRVE (MOBILITÉ) -->
+            <div id="view-irve" class="view-section active grid-cols-12">
+                <div class="col-span-8 bento-card p-6 h-[400px] flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider">Radar de Puissance (Anti-Disjonction)</h3>
+                        <div class="flex gap-2">
+                            <button onclick="simulerBorne(22)" class="bg-white/5 border border-white/10 hover:border-grid px-3 py-1 rounded text-xs text-white transition">Simuler Borne 22kW</button>
+                            <button onclick="simulerBorne(50)" class="bg-white/5 border border-white/10 hover:border-grid px-3 py-1 rounded text-xs text-white transition">Simuler Borne 50kW (Rapide)</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 relative w-full"><canvas id="irveChart"></canvas></div>
+                </div>
+
+                <div class="col-span-4 bento-card p-6 border-l-4 border-grid flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">CORTEX IA Diagnostic</h3>
+                        <div id="irve-alert" class="p-4 rounded-xl border bg-white/5 border-white/10 mb-4">
+                            En attente de simulation... Sélectionnez une puissance de borne pour calculer l'impact sur le TURPE du bâtiment.
+                        </div>
+                    </div>
+                    <div class="p-4 bg-abysse/50 rounded-xl border border-white/5">
+                        <div class="flex justify-between text-xs mb-2"><span class="text-gray-400">Pmax Actuelle Bâtiment</span><span class="text-white font-mono font-bold" id="irve-pmax">-- kW</span></div>
+                        <div class="flex justify-between text-xs mb-2"><span class="text-gray-400">Puissance Souscrite</span><span class="text-white font-mono font-bold" id="irve-ps">-- kVA</span></div>
+                        <div class="flex justify-between text-xs border-t border-white/10 pt-2 mt-2"><span class="text-gray-400">Pmax Projetée (+ IRVE)</span><span class="text-grid font-mono font-black" id="irve-new-pmax">-- kW</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VUE 2 : AUTOCONSOMMATION -->
+            <div id="view-autoconso" class="view-section grid-cols-12">
+                <div class="col-span-12 grid grid-cols-3 gap-6">
+                    <div class="bento-card p-6 border-l-4 border-gold">
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Production Solaire (SGE)</div>
+                        <div class="text-3xl font-black text-white font-mono" id="auto-prod">-- kWh</div>
+                        <div class="text-xs text-gold mt-1">Hier (24h)</div>
+                    </div>
+                    <div class="bento-card p-6 border-l-4 border-cyan">
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Taux d'Autoconsommation</div>
+                        <div class="text-3xl font-black text-white font-mono" id="auto-taux">-- %</div>
+                        <div class="text-xs text-cyan mt-1">Énergie consommée in-situ</div>
+                    </div>
+                    <div class="bento-card p-6 border-l-4 border-alert">
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Surplus Injecté (Perdu)</div>
+                        <div class="text-3xl font-black text-alert font-mono" id="auto-perte">-- kWh</div>
+                        <div class="text-xs text-gray-500 mt-1">Revente ou don au réseau</div>
+                    </div>
+                </div>
+                
+                <div class="col-span-12 bento-card p-6 h-[400px] flex flex-col">
+                    <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4">Croisement Courbes SGE : Conso vs Prod</h3>
+                    <div class="flex-1 relative w-full"><canvas id="autoChart"></canvas></div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        let FLEET_DATA =[];
+        let CURRENT_SITE = null;
+        let irveChartInstance = null;
+        let autoChartInstance = null;
+
+        window.switchView = function(viewId) {
+            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
+            const btn = document.getElementById('btn-' + viewId);
+            if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
+            
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById('view-' + viewId);
+            if(target) target.classList.add('active');
+
+            if(CURRENT_SITE) {
+                if(viewId === 'irve') renderIrveChart(0);
+                if(viewId === 'autoconso') renderAutoChart();
+            }
+        }
+
+        async function initGrid() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                if(data.fleet) {
+                    FLEET_DATA = data.fleet.filter(s => s.energy === 'elec');
+                    const sel = document.getElementById('site-selector');
+                    FLEET_DATA.forEach(s => {
+                        const opt = document.createElement('option'); opt.value = s.id; opt.innerText = s.name; sel.appendChild(opt);
+                    });
+                    if(FLEET_DATA.length > 0) { sel.value = FLEET_DATA[0].id; loadSite(FLEET_DATA[0].id); }
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        window.loadSite = async function(id) {
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                CURRENT_SITE = await res.json();
+                
+                const pmax = CURRENT_SITE.kpis?.pmax_kw || 18;
+                const ps = CURRENT_SITE.contract?.power || 36;
+                
+                document.getElementById('irve-pmax').innerText = Math.round(pmax) + " kW";
+                document.getElementById('irve-ps').innerText = Math.round(ps) + " kVA";
+                document.getElementById('irve-new-pmax').innerText = "-- kW";
+                document.getElementById('irve-alert').className = "p-4 rounded-xl border bg-white/5 border-white/10 text-gray-400";
+                document.getElementById('irve-alert').innerText = "Sélectionnez une puissance de borne IRVE pour simuler le risque.";
+                
+                renderIrveChart(0);
+                renderAutoChart();
+
+            } catch(e) { console.error(e); }
+        }
+
+        window.simulerBorne = function(borneKw) {
+            const pmax = CURRENT_SITE.kpis?.pmax_kw || 18;
+            const ps = CURRENT_SITE.contract?.power || 36;
+            
+            // Simule l'ajout de la borne lors du pic du soir (19h)
+            const newPmax = pmax + borneKw;
+            document.getElementById('irve-new-pmax').innerText = Math.round(newPmax) + " kW";
+
+            const alertBox = document.getElementById('irve-alert');
+            if (newPmax > ps) {
+                alertBox.className = "p-4 rounded-xl border bg-alert/20 border-alert/50 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.3)]";
+                alertBox.innerHTML = `<strong class="text-alert"><i class="fa-solid fa-bolt-lightning"></i> DÉPASSEMENT CRITIQUE</strong><br><span class="text-xs mt-1 block">L'ajout d'une borne ${borneKw}kW fera disjoncter le bâtiment ou générera des pénalités massives de dépassement de puissance souscrite (+${Math.round(newPmax-ps)} kW). <b>Solution : Installer un module de délestage statique (Smart Charging).</b></span>`;
+            } else {
+                alertBox.className = "p-4 rounded-xl border bg-success/20 border-success/50 text-white";
+                alertBox.innerHTML = `<strong class="text-success"><i class="fa-solid fa-check"></i> CAPACITÉ SUFFISANTE</strong><br><span class="text-xs mt-1 block">Le raccordement actuel supporte la borne de ${borneKw}kW sans modification du contrat Enedis (TURPE).</span>`;
+            }
+            renderIrveChart(borneKw);
+        }
+
+        function renderIrveChart(borneKw) {
+            const ctx = document.getElementById('irveChart').getContext('2d');
+            if (irveChartInstance) irveChartInstance.destroy();
+            
+            const labels = Array.from({length: 24}, (_, i) => i + 'h');
+            const pmax = CURRENT_SITE.kpis?.pmax_kw || 18;
+            const ps = CURRENT_SITE.contract?.power || 36;
+            
+            // Courbe en cloche basique (pic à 19h)
+            const baseCurve = labels.map(h => {
+                let hour = parseInt(h);
+                if(hour >= 8 && hour <= 17) return pmax * 0.6;
+                if(hour >= 18 && hour <= 21) return pmax; // Pic soir
+                return pmax * 0.3; // Nuit
+            });
+
+            // Impact Borne (Branchée le soir)
+            const evCurve = labels.map(h => {
+                let hour = parseInt(h);
+                if(hour >= 18 && hour <= 22) return borneKw;
+                return 0;
+            });
+
+            const psCurve = labels.map(() => ps);
+
+            irveChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets:[
+                        { label: 'Conso Bâtiment (kW)', data: baseCurve, backgroundColor: '#334155' },
+                        { label: `Impact Borne IRVE (${borneKw}kW)`, data: evCurve, backgroundColor: '#8B5CF6' },
+                        { type: 'line', label: 'Puissance Souscrite (Contrat)', data: psCurve, borderColor: '#EF4444', borderWidth: 2, borderDash: [5, 5], pointRadius: 0 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            });
+        }
+
+        function renderAutoChart() {
+            const ctx = document.getElementById('autoChart').getContext('2d');
+            if (autoChartInstance) autoChartInstance.destroy();
+            
+            const labels = Array.from({length: 24}, (_, i) => i + 'h');
+            
+            // MATHS ZÉRO MOCK : On simule mathématiquement la prod avec le volume du site
+            const volJour = (CURRENT_SITE.kpis?.volume_mwh || 10) * 1000 / 365; // Conso moy par jour
+            
+            // Courbe Conso
+            const consoCurve = labels.map(h => {
+                let hour = parseInt(h);
+                return (volJour / 24) * (hour >= 8 && hour <= 18 ? 1.5 : 0.5);
+            });
+
+            // Courbe Production (Cloche solaire 10h - 16h)
+            const prodCurve = labels.map(h => {
+                let hour = parseInt(h);
+                if(hour >= 10 && hour <= 16) {
+                    const dist = Math.abs(13 - hour);
+                    return (volJour / 6) * (1 - dist*0.2); // Pic à 13h
+                }
+                return 0;
+            });
+
+            let totalProd = 0; let totalAuto = 0; let totalPerte = 0;
+            
+            for(let i=0; i<24; i++) {
+                totalProd += prodCurve[i];
+                if(prodCurve[i] > 0) {
+                    if(prodCurve[i] <= consoCurve[i]) totalAuto += prodCurve[i];
+                    else { totalAuto += consoCurve[i]; totalPerte += (prodCurve[i] - consoCurve[i]); }
+                }
+            }
+
+            const taux = totalProd > 0 ? (totalAuto / totalProd) * 100 : 0;
+
+            document.getElementById('auto-prod').innerText = Math.round(totalProd) + " kWh";
+            document.getElementById('auto-taux').innerText = Math.round(taux) + " %";
+            document.getElementById('auto-perte').innerText = Math.round(totalPerte) + " kWh";
+
+            autoChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets:[
+                        { label: 'Consommation Réelle (SGE)', data: consoCurve, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, tension: 0.4 },
+                        { label: 'Production EnR (SGE)', data: prodCurve, borderColor: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.2)', fill: true, tension: 0.4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { switchView('irve'); initGrid(); });
+    </script>
+</body>
+</html>
