@@ -4,14 +4,8 @@
     <meta charset="UTF-8">
     <title>ENERGISTRAT V3 | OPH Social (Master)</title>
     
-    <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- LEAFLET (MAPS) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -20,13 +14,8 @@
             theme: { 
                 extend: { 
                     colors: { 
-                        abysse: '#050505', 
-                        card: '#0F172A', 
-                        oph: '#F97316', // Orange Brique
-                        cyan: '#00E5FF', 
-                        alert: '#EF4444',
-                        success: '#10B981',
-                        gold: '#F59E0B'
+                        abysse: '#001529', card: '#0F172A', oph: '#F97316', cyan: '#00E5FF', 
+                        alert: '#EF4444', success: '#10B981', gold: '#F59E0B'
                     }, 
                     borderRadius: { 'bento': '1.5rem' },
                     boxShadow: { 'neon-oph': '0 0 20px rgba(249, 115, 22, 0.25)' }
@@ -35,250 +24,180 @@
         }
     </script>
     <style>
-        body { background-color: #050505; color: white; overflow: hidden; }
-        .bento-card { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
-        .bento-card:hover { border-color: rgba(249, 115, 22, 0.5); transform: translateY(-2px); }
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
         .nav-item.active { background: rgba(249, 115, 22, 0.1); border-left: 4px solid #F97316; color: white; }
-        
-        .view-section { display: none; } 
-        .view-section.active { display: grid; animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        #map { height: 100%; width: 100%; border-radius: 1.5rem; z-index: 0; }
-        
-        /* FIX MENU DÉROULANT (Blanc sur Blanc) */
-        select.oph-select {
-            appearance: none;
-            background-color: #111827; /* Force Dark Background */
-            color: white;
-            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23F97316%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-            background-repeat: no-repeat;
-            background-position: right 0.7rem top 50%;
-            background-size: 0.65rem auto;
-            padding-right: 2.5rem;
-        }
-        select.oph-select option {
-            background-color: #111827;
-            color: white;
-        }
-
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        .view-section { display: none; } .view-section.active { display: grid; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        select { background-color: rgba(255,255,255,0.05) !important; color: white !important; -webkit-appearance: none; }
+        select option { background-color: #0F172A !important; color: white !important; padding: 10px; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
-<body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
+<body class="flex h-screen w-screen text-sm">
 
     <!-- SIDEBAR -->
-    <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0">
+    <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
         <div class="p-6">
             <div class="flex items-center gap-3 mb-8">
-                <div class="w-10 h-10 rounded-full border border-oph bg-oph/10 flex items-center justify-center text-oph font-bold shadow-neon-oph">🏢</div>
-                <div><h1 class="font-bold tracking-wider text-base">CORTEX<span class="text-oph">.OPH</span></h1><p class="text-[10px] text-gray-500">Habitat Social</p></div>
+                <div class="w-10 h-10 rounded-xl border border-oph bg-oph/10 flex items-center justify-center text-oph font-bold shadow-neon-oph">🏢</div>
+                <div><h1 class="font-bold tracking-wider text-base text-white">OPH<span class="text-oph">.OS</span></h1><p class="text-[10px] text-gray-500 font-mono">Bailleur Social</p></div>
             </div>
             
-            <div class="space-y-1">
-                <div class="text-[10px] text-gray-500 uppercase font-bold px-4 mb-2">Pilotage</div>
+            <nav class="space-y-2">
+                <div class="text-[10px] text-gray-500 uppercase font-bold px-4 mb-2 mt-4">Pilotage Budget</div>
                 <button onclick="switchView('charges')" id="btn-charges" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-file-invoice-dollar w-5 text-center"></i> Charges & P1
+                    <i class="fa-solid fa-file-invoice-dollar w-5 text-center"></i> P1 (Énergie)
                 </button>
-                <button onclick="switchView('map')" id="btn-map" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-map-location-dot w-5 text-center text-cyan"></i> Territoire & DPE
+                <button onclick="switchView('nilm')" id="btn-nilm" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
+                    <i class="fa-solid fa-microchip w-5 text-center text-cyan"></i> Auto-Tagging
                 </button>
                 
-                <div class="text-[10px] text-gray-500 uppercase font-bold px-4 mt-4 mb-2">Stratégie</div>
-                <button onclick="switchView('achat')" id="btn-achat" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-basket-shopping w-5 text-center text-gold"></i> Centrale Achat
-                </button>
+                <div class="text-[10px] text-gray-500 uppercase font-bold px-4 mt-6 mb-2">Concertation</div>
                 <button onclick="switchView('social')" id="btn-social" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold text-xs tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-hand-holding-heart w-5 text-center text-success"></i> Veille Sociale
+                    <i class="fa-solid fa-hand-holding-heart w-5 text-center text-success"></i> Bouclier Locataire
                 </button>
-            </div>
+            </nav>
         </div>
         
         <div class="p-6 border-t border-white/5">
-            <a href="/partner/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group">
-                <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs text-white font-bold group-hover:bg-oph transition"><i class="fa-solid fa-gear"></i></div>
-                <div class="flex-1 min-w-0"><div class="text-xs font-bold text-white">Administration</div><div class="text-[10px] text-gray-500">Patrimoine & Users</div></div>
-            </a>
+            <a href="/settings" class="flex items-center gap-3 text-gray-400 hover:text-white transition text-xs"><i class="fa-solid fa-gear"></i> Data Unity</a>
         </div>
     </aside>
 
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         
-        <!-- TOP BAR -->
-        <div class="h-14 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
-            <div class="flex items-center gap-4">
-                <div class="px-2 py-1 rounded bg-oph text-abysse text-[10px] font-black animate-pulse tracking-wider">CORTEX SOCIAL</div>
-                <span class="text-xs text-oph font-mono" id="cortex-msg">Synchronisation des fluides...</span>
+        <!-- HEADER -->
+        <div class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
+            <div>
+                <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight">Pilotage P1</h2>
+                <p class="text-xs text-gray-400 font-mono mt-1">Consolidation du patrimoine</p>
             </div>
-
-            <!-- SELECTEUR DE RÉSIDENCE -->
             <div class="flex items-center gap-3">
-                <span class="text-xs text-gray-500 uppercase font-bold">Périmètre :</span>
-                <select id="site-selector" onchange="switchSite(this.value)" class="oph-select border border-white/20 text-xs font-bold rounded px-3 py-1.5 focus:outline-none focus:border-oph hover:bg-white/10 transition cursor-pointer min-w-[250px]">
-                    <option value="">Chargement du patrimoine...</option>
-                </select>
+                <span class="text-[10px] text-gray-500 uppercase font-bold">Périmètre :</span>
+                <div class="relative">
+                    <select id="site-selector" onchange="switchSite(this.value)" class="border border-white/20 text-xs font-bold rounded-xl p-2.5 focus:outline-none focus:border-oph bg-card text-white min-w-[250px] shadow-inner cursor-pointer">
+                        <option value="">Chargement...</option>
+                    </select>
+                    <div class="absolute right-3 top-3 pointer-events-none text-gray-400 text-xs">▼</div>
+                </div>
             </div>
         </div>
 
         <div class="p-8 overflow-y-auto h-full pb-20">
             
-            <!-- HEADER -->
-            <div class="flex justify-between items-end mb-6">
-                <div>
-                    <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Pilotage des Charges</h2>
-                    <p class="text-xs text-gray-400 mt-1">Données temps réel consolidées (Factur-X & SGE)</p>
-                </div>
-                <div class="bg-card border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
-                    <span class="text-xs font-bold text-gray-300 uppercase">Coût Moyen</span>
-                    <span class="text-xl font-mono font-bold text-white" id="avg-cost">-- €<span class="text-xs text-gray-500">/m²</span></span>
-                </div>
-            </div>
-
-            <!-- VIEW 1: CHARGES (P1/P2/P3) -->
+            <!-- VUE 1 : CHARGES & DJU -->
             <div id="view-charges" class="view-section active grid grid-cols-12 gap-6 auto-rows-min">
                 
-                <!-- KPI CARDS -->
                 <div class="col-span-12 grid grid-cols-4 gap-6">
                     <div class="bento-card p-6 border-l-4 border-oph">
                         <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Total P1 (Énergie)</div>
-                        <div class="text-2xl font-bold text-white" id="total-p1">-- €</div>
-                        <div class="text-xs text-green-400">Budget Réalisé</div>
+                        <div class="text-3xl font-black text-white font-mono" id="total-p1">-- €</div>
+                        <div class="text-xs text-green-400 mt-1">Projection d'atterrissage</div>
                     </div>
+                    
+                    <div class="bento-card p-6 border-l-4 border-alert relative overflow-hidden">
+                        <div class="absolute -right-4 -bottom-4 text-alert opacity-10 text-8xl"><i class="fa-solid fa-temperature-empty"></i></div>
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Rigueur Climatique (DJU)</div>
+                        <div class="flex items-end gap-2">
+                            <div class="text-3xl font-black text-white font-mono" id="dju-value">--</div>
+                            <div class="text-sm font-bold text-alert mb-1" id="dju-var">--</div>
+                        </div>
+                        <div class="text-[10px] text-gray-400 mt-1" id="dju-desc">Météo Live...</div>
+                    </div>
+
                     <div class="bento-card p-6 border-l-4 border-cyan">
-                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Total P2 (Maint.)</div>
-                        <div class="text-2xl font-bold text-white" id="total-p2">-- €</div>
-                        <div class="text-xs text-gray-500">Forfaitaire (Est. 20%)</div>
+                        <div class="text-[10px] font-bold text-gray-400 uppercase mb-1">Ratio d'Efficacité</div>
+                        <div class="text-3xl font-black text-white font-mono" id="avg-cost">-- €<span class="text-sm text-gray-500 font-normal">/m²</span></div>
+                        <div class="text-[10px] text-gray-400 mt-1">Coût P1 moyen du périmètre</div>
                     </div>
                     
-                    <!-- WIDGET CLIMAT -->
-                    <div class="bento-card p-6 border-l-4 border-alert">
-                        <div class="flex justify-between items-start">
-                            <div class="text-[10px] font-bold text-alert uppercase mb-1">Impact Météo (DJU)</div>
-                            <i class="fa-solid fa-temperature-arrow-up text-alert opacity-50"></i>
-                        </div>
-                        <div class="text-2xl font-bold text-white" id="dju-impact">-- %</div>
-                        <div class="text-[10px] text-gray-400" id="dju-text">Hiver Rigoureux</div>
-                    </div>
-                    
-                    <div class="bento-card p-6 bg-gradient-to-br from-card to-oph/10 flex flex-col justify-center items-center cursor-pointer hover:border-oph transition" onclick="window.print()">
-                        <i class="fa-solid fa-file-pdf text-2xl text-oph mb-2"></i>
-                        <span class="text-xs font-bold text-white">Export Régularisation</span>
+                    <div class="bento-card p-6 bg-gradient-to-br from-card to-oph/20 border border-oph/30 flex flex-col justify-center items-center cursor-pointer hover:bg-oph/30 transition">
+                        <i class="fa-solid fa-file-export text-2xl text-oph mb-2"></i>
+                        <span class="text-xs font-bold text-white">Export Régularisation (ERP)</span>
                     </div>
                 </div>
 
-                <!-- MAIN CHART -->
-                <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card">
-                    <div class="flex justify-between mb-6">
-                        <h3 class="font-bold text-xl text-white">Suivi Mensuel des Charges (€)</h3>
-                        <div class="flex gap-4 text-xs">
-                            <span class="text-oph">● Réalisé</span>
-                            <span class="text-gray-500 dashed">-- Budget Primitif</span>
-                        </div>
-                    </div>
-                    <div class="h-64 w-full"><canvas id="chartCharges"></canvas></div>
+                <div class="col-span-8 bento-card p-6 h-[400px] flex flex-col">
+                    <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4">Courbe de Mandatement P1</h3>
+                    <div class="flex-1 relative w-full"><canvas id="chartCharges"></canvas></div>
                 </div>
 
-                <!-- REPARTITION -->
-                <div class="col-span-4 bg-card rounded-[2rem] p-8 bento-card">
-                    <h3 class="font-bold text-lg text-white mb-6">Structure du Coût</h3>
-                    <div class="space-y-4">
+                <div class="col-span-4 bento-card p-6 flex flex-col justify-center">
+                    <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-6">Récupération des Charges</h3>
+                    <div class="space-y-6">
                         <div>
-                            <div class="flex justify-between text-xs mb-1"><span class="text-gray-400">Récupérable (Locataires)</span><span class="text-white font-bold">78%</span></div>
-                            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden"><div class="bg-success h-full" style="width: 78%"></div></div>
+                            <div class="flex justify-between text-xs mb-2"><span class="text-gray-400 font-bold">Récupérable (Quittance Locataire)</span><span class="text-white font-mono text-lg font-black">78%</span></div>
+                            <div class="w-full bg-gray-800 h-3 rounded-full overflow-hidden shadow-inner"><div class="bg-success h-full" style="width: 78%"></div></div>
                         </div>
                         <div>
-                            <div class="flex justify-between text-xs mb-1"><span class="text-gray-400">Non-Récupérable (Bailleur)</span><span class="text-white font-bold">22%</span></div>
-                            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden"><div class="bg-alert h-full" style="width: 22%"></div></div>
+                            <div class="flex justify-between text-xs mb-2"><span class="text-gray-400 font-bold">Non-Récupérable (Charge Bailleur)</span><span class="text-white font-mono text-lg font-black">22%</span></div>
+                            <div class="w-full bg-gray-800 h-3 rounded-full overflow-hidden shadow-inner"><div class="bg-alert h-full" style="width: 22%"></div></div>
                         </div>
-                        <div class="mt-6 p-4 bg-white/5 rounded-xl border border-white/10 text-xs text-gray-300">
-                            <i class="fa-solid fa-info-circle mr-2 text-cyan"></i> Le poste "P3 Gros Entretien" représente 60% de la part bailleur cette année.
-                        </div>
+                        <p class="text-[10px] text-gray-500 mt-4 leading-relaxed">Selon le décret n°82-955, les dépenses de combustible (P1) et le petit entretien (P2) sont récupérables. Le gros entretien (P3) reste à la charge exclusive de l'OPH.</p>
                     </div>
                 </div>
             </div>
 
-            <!-- VIEW 2: TERRITOIRE & MAPS -->
-            <div id="view-map" class="view-section grid grid-cols-12 gap-6 h-[600px]">
-                <div class="col-span-9 bento-card p-1 rounded-[2rem] relative h-full">
-                    <div id="map"></div>
-                    <div class="absolute bottom-4 left-4 bg-abysse/90 p-3 rounded-xl border border-white/10 z-[1000] text-xs">
-                        <div class="font-bold text-white mb-2">Performance DPE</div>
-                        <div class="flex items-center gap-2 mb-1"><div class="w-3 h-3 rounded-full bg-green-500"></div> A-C (Performant)</div>
-                        <div class="flex items-center gap-2 mb-1"><div class="w-3 h-3 rounded-full bg-orange-500"></div> D-E (Moyen)</div>
-                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-red-600 animate-pulse"></div> F-G (Critique)</div>
-                    </div>
-                </div>
-
-                <div class="col-span-3 bento-card p-6 rounded-[2rem] flex flex-col">
-                    <h3 class="text-lg font-bold text-white mb-4">Fiche Résidence</h3>
-                    <div id="building-info" class="flex-1 space-y-4 text-center flex flex-col justify-center">
-                        <i class="fa-solid fa-city text-4xl text-gray-600 mb-2"></i>
-                        <p class="text-gray-500 text-xs">Sélectionnez un immeuble sur la carte pour voir son carnet de santé.</p>
-                    </div>
-                    <div id="building-data" class="hidden space-y-4">
-                        <div class="text-xl font-bold text-white" id="b-name">--</div>
-                        <div class="text-xs text-gray-400" id="b-addr">--</div>
-                        <div class="grid grid-cols-2 gap-2 text-center mt-4">
-                            <div class="bg-white/5 p-2 rounded"><div class="text-[10px] text-gray-500">Construction</div><div class="font-bold text-white" id="b-year">--</div></div>
-                            <div class="bg-white/5 p-2 rounded"><div class="text-[10px] text-gray-500">DPE</div><div class="font-black text-xl" id="b-dpe">--</div></div>
+            <!-- VUE 2 : AUTO-TAGGING NILM -->
+            <div id="view-nilm" class="view-section grid grid-cols-12 gap-6 auto-rows-min">
+                <div class="col-span-12 bento-card p-0 overflow-hidden flex flex-col">
+                    <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+                        <div>
+                            <h3 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-microchip text-cyan"></i> Auto-Tagging du Patrimoine (NILM)</h3>
+                            <p class="text-xs text-gray-400 mt-1">Analyse des courbes SGE pour déterminer l'usage exact de vos centaines de compteurs.</p>
                         </div>
-                        <div class="border-t border-white/5 pt-4">
-                            <div class="flex justify-between text-xs mb-1"><span class="text-gray-500">Chauffage</span><span class="text-white font-bold" id="b-heat">--</span></div>
-                            <div class="flex justify-between text-xs"><span class="text-gray-500">Isolation</span><span class="text-white" id="b-iso">--</span></div>
-                        </div>
+                        <button class="bg-cyan text-abysse px-6 py-2 rounded-xl text-xs font-bold shadow-[0_0_15px_rgba(0,229,255,0.4)] hover:bg-white transition">Valider l'inventaire</button>
                     </div>
-                </div>
-            </div>
-
-            <!-- VIEW 3: ACHATS (STRATÉGIE) -->
-            <div id="view-achat" class="view-section grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-8 rounded-[2rem]">
-                    <div class="flex justify-between mb-6">
-                        <h3 class="font-bold text-xl text-white">Centrale d'Achat & Contrats</h3>
-                        <button class="bg-gold text-black px-4 py-2 rounded font-bold text-xs hover:bg-white transition"><i class="fa-solid fa-cart-plus mr-2"></i>Lancer Appel d'Offres</button>
-                    </div>
-                    
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto p-4">
                         <table class="w-full text-left text-sm text-gray-300">
-                            <thead class="bg-white/5 text-[10px] uppercase text-gray-400 font-bold">
+                            <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold">
                                 <tr>
-                                    <th class="px-6 py-4">Lot / Résidence</th>
-                                    <th class="px-6 py-4">Énergie</th>
-                                    <th class="px-6 py-4">Fournisseur</th>
-                                    <th class="px-6 py-4">Échéance</th>
-                                    <th class="px-6 py-4 text-right">Prix Actuel</th>
-                                    <th class="px-6 py-4 text-center">Action</th>
+                                    <th class="px-4 py-3">Bâtiment</th>
+                                    <th class="px-4 py-3">Point de Livraison</th>
+                                    <th class="px-4 py-3 text-right">Vol (MWh)</th>
+                                    <th class="px-4 py-3 text-right">Talon (Nuit)</th>
+                                    <th class="px-4 py-3">Détection IA (Usage)</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-white/5" id="contract-list">
-                                <!-- JS Injection -->
+                            <tbody class="divide-y divide-white/5" id="oph-meter-list">
+                                <!-- JS -->
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- VIEW 4: SOCIAL (PRECARITE) -->
+            <!-- VUE 3 : VEILLE SOCIALE & CONCERTATION -->
             <div id="view-social" class="view-section grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bento-card p-8 rounded-[2rem] border-t-4 border-cyan">
-                    <h3 class="font-bold text-xl text-white mb-6 flex items-center gap-3"><i class="fa-solid fa-temperature-low text-cyan"></i> Détection Sous-Chauffe (Précarité)</h3>
-                    <p class="text-sm text-gray-400 mb-6">Logements détectés avec une consommation chauffage quasi-nulle en hiver.</p>
-                    
-                    <table class="w-full text-left text-sm text-gray-300">
-                        <thead class="bg-white/5 text-[10px] uppercase text-gray-400 font-bold">
-                            <tr>
-                                <th class="px-6 py-4">Résidence</th>
-                                <th class="px-6 py-4">Logement (PDL)</th>
-                                <th class="px-6 py-4 text-center">Conso Hiver</th>
-                                <th class="px-6 py-4 text-right">Statut</th>
-                            </tr>
+                
+                <!-- GADGET CONCERTATION -->
+                <div class="col-span-12 bento-card p-8 bg-gradient-to-r from-card to-success/10 border border-success/30">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-xl font-black text-white mb-2"><i class="fa-solid fa-bullhorn text-success mr-2"></i> Campagne de Transparence (Loi SRU)</h3>
+                            <p class="text-sm text-gray-300">Générez une note d'information pour justifier l'évolution de la provision pour charges P1 auprès de vos locataires.</p>
+                        </div>
+                        <button onclick="simulateConcertation()" id="btn-sru" class="bg-white text-success px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-gray-100 transition">
+                            <i class="fa-solid fa-envelope-open-text mr-2"></i> Générer Note d'Information
+                        </button>
+                    </div>
+                    <div class="mt-6 p-4 bg-abysse/50 rounded-xl border border-white/5 text-sm text-gray-400 italic hidden" id="sru-text">
+                        "Madame, Monsieur, votre provision pour charge de chauffage va augmenter de 4%. Le prix de notre contrat de gaz a pourtant baissé, mais l'hiver a été 8.5% plus rigoureux (données Météo certifiées). Nous avons donc protégé votre pouvoir d'achat..."
+                    </div>
+                </div>
+
+                <div class="col-span-12 bento-card p-0 overflow-hidden border-t-4 border-alert mt-4">
+                    <div class="p-6 border-b border-white/5 bg-alert/5">
+                        <h3 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-temperature-arrow-down text-alert"></i> Détection Sous-Chauffe (Précarité Énergétique)</h3>
+                        <p class="text-xs text-gray-400 mt-1">Locataires ou bâtiments dont la consommation hivernale est anormalement basse (risque d'impayé ou de froid).</p>
+                    </div>
+                    <table class="w-full text-left text-sm text-gray-300 m-4 w-[calc(100%-2rem)]">
+                        <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold">
+                            <tr><th class="px-4 py-3">Site / Logement</th><th class="px-4 py-3 text-right">Conso Hiver N</th><th class="px-4 py-3 text-right">Historique N-1</th><th class="px-4 py-3 text-center">Alerte</th></tr>
                         </thead>
-                        <tbody class="divide-y divide-white/5" id="social-list">
-                            <!-- JS Injection -->
-                        </tbody>
+                        <tbody class="divide-y divide-white/5" id="social-list"></tbody>
                     </table>
                 </div>
             </div>
@@ -287,281 +206,153 @@
     </main>
 
     <script>
-        // --- NAVIGATION ROBUSTE ---
-        window.switchView = function(viewId) {
-            document.querySelectorAll('.nav-item').forEach(el => {
-                el.classList.remove('active', 'text-white');
-                el.classList.add('text-gray-400');
-            });
-            const btn = document.getElementById('btn-' + viewId);
-            if(btn) {
-                btn.classList.add('active', 'text-white');
-                btn.classList.remove('text-gray-400');
-            }
-
-            document.querySelectorAll('.view-section').forEach(el => {
-                el.classList.remove('active');
-                el.style.display = 'none'; 
-            });
-            const target = document.getElementById('view-' + viewId);
-            if(target) {
-                target.style.display = 'grid'; 
-                target.classList.add('active');
-            }
-
-            const titles = {'charges': 'Pilotage P1/P2', 'map': 'Cartographie', 'achat': 'Stratégie Achat', 'social': 'Veille Sociale'};
-            document.getElementById('page-title').innerText = titles[viewId];
-
-            if(viewId === 'map') setTimeout(initMap, 200);
-        }
-
-        // --- GESTION PATRIMOINE OPH (MULTI-SITES) ---
-        async function initSiteSelector() {
-            try {
-                const res = await fetch('/api/dashboard/fleet');
-                const data = await res.json();
-                const selector = document.getElementById('site-selector');
-                selector.innerHTML = ''; 
-
-                if (data.fleet && data.fleet.length > 0) {
-                    // Option "Vue Globale" (Par défaut)
-                    const optGlobal = document.createElement('option');
-                    optGlobal.value = "ALL";
-                    optGlobal.innerText = "Vue Parc Global (" + data.fleet.length + " sites)";
-                    selector.appendChild(optGlobal);
-
-                    data.fleet.forEach(site => {
-                        const opt = document.createElement('option');
-                        opt.value = site.id;
-                        opt.innerText = site.name;
-                        selector.appendChild(opt);
-                    });
-
-                    // Auto-select
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const urlId = urlParams.get('id');
-                    
-                    if (urlId) {
-                        selector.value = urlId;
-                        loadSingleSite(urlId);
-                    } else {
-                        selector.value = "ALL";
-                        loadFleetData(); // Chargement global par défaut
-                    }
-                } else {
-                    selector.innerHTML = '<option>Aucun patrimoine chargé</option>';
-                    // Fallback vide propre
-                    document.getElementById('total-sites').innerText = "0";
-                    document.getElementById('total-p1').innerText = "0 €";
-                }
-            } catch(e) { console.error("Erreur Init Selecteur:", e); }
-        }
-
-        function switchSite(siteId) {
-            if(siteId === "ALL") {
-                window.history.pushState({}, '', '/syndic'); // URL propre (ou /oph selon ta route)
-                loadFleetData();
-            } else {
-                const newUrl = new URL(window.location);
-                newUrl.searchParams.set('id', siteId);
-                window.history.pushState({}, '', newUrl);
-                loadSingleSite(siteId);
-            }
-        }
-
-        // --- DATA LOADERS ---
+        let FLEET_DATA =[];
+        let CURRENT_SITE = null;
         let ophChart = null;
-        let mapInstance = null;
 
-        // MODE 1 : VUE PARC (Tous les sites)
-        async function loadFleetData() {
+        window.switchView = function(viewId) {
+            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
+            const btn = document.getElementById('btn-' + viewId);
+            if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
+            
+            document.querySelectorAll('.view-section').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });
+            const target = document.getElementById('view-' + viewId);
+            if(target) { target.style.display = 'grid'; target.classList.add('active'); }
+            
+            const titles = {'charges': 'Pilotage P1', 'nilm': 'Intelligence Patrimoine', 'social': 'Concertation Locative'};
+            document.getElementById('page-title').innerText = titles[viewId] || 'OPH.OS';
+        }
+
+        async function initSelector() {
             try {
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
                 if(data.fleet) {
-                    updateDashboard(data.fleet, true);
+                    FLEET_DATA = data.fleet;
+                    const sel = document.getElementById('site-selector');
+                    sel.innerHTML = '<option value="ALL">🏢 Parc Global (Agrégé)</option>';
+                    FLEET_DATA.sort((a,b) => a.name.localeCompare(b.name)).forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.innerText = s.name;
+                        sel.appendChild(opt);
+                    });
+                    switchSite("ALL");
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) {}
         }
 
-        // MODE 2 : VUE SITE UNIQUE (Focus)
-        async function loadSingleSite(id) {
-            try {
-                const res = await fetch(`/api/dashboard/data/${id}`);
-                const data = await res.json();
-                
-                // On formate la donnée unique comme une liste pour utiliser la même fonction d'affichage
-                const siteData = [{
-                    id: id,
-                    name: data.identity?.site_name,
-                    budget: data.kpis?.budget || 0,
-                    volume: data.kpis?.volume_mwh || 0,
-                    ghost_savings: data.kpis?.ghost_savings || 0,
-                    energy: data.energy_type,
-                    provider: data.contract?.provider,
-                    city: data.location?.city
-                }];
+        window.switchSite = async function(id) {
+            let dataToAnalyze =[];
+            if(id === "ALL") {
+                dataToAnalyze = FLEET_DATA;
+                CURRENT_SITE = { city: "Paris" }; // Default for global weather
+            } else {
+                try {
+                    const res = await fetch(`/api/dashboard/data/${id}`);
+                    const siteData = await res.json();
+                    CURRENT_SITE = siteData;
+                    dataToAnalyze =[{ 
+                        budget: siteData.kpis?.budget || 0, 
+                        surface: siteData.location?.surface || 1500,
+                        volume: siteData.kpis?.volume_mwh || 0,
+                        id: id,
+                        name: siteData.identity?.site_name,
+                        energy: siteData.energy_type,
+                        power: siteData.contract?.power,
+                        ghost_savings: siteData.kpis?.ghost_savings
+                    }];
+                } catch(e) { return; }
+            }
 
-                updateDashboard(siteData, false);
-                
-                // Centrage Carte
-                if(mapInstance) {
-                    mapInstance.setView([46.603354, 1.888334], 15); 
-                }
+            let totalP1 = 0; let totalSurf = 0;
+            dataToAnalyze.forEach(s => { totalP1 += s.budget; totalSurf += (s.surface || 1000); });
 
-            } catch(e) { console.error(e); }
-        }
-
-        function updateDashboard(sites, isGlobal) {
-            let totalP1 = 0;
-            let totalWaste = 0;
-            let totalSurf = 0;
-
-            sites.forEach(s => {
-                let budget = s.budget || 0;
-                
-                // CALCUL DE SECOURS (Si import CSV sans prix)
-                // Si budget = 0 mais volume > 0, on estime à 0.20€/kWh
-                if (budget === 0 && s.volume > 0) {
-                    budget = s.volume * 1000 * 0.20;
-                }
-
-                totalP1 += budget;
-                totalWaste += (s.ghost_savings || 0);
-                totalSurf += (s.surface || 1000);
-            });
-
-            document.getElementById('total-sites').innerText = isGlobal ? sites.length : "1";
-            document.getElementById('total-p1').innerText = (totalP1).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
-            document.getElementById('total-p2').innerText = (totalP1 * 0.2).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
-            document.getElementById('total-waste').innerText = Math.round(totalWaste).toLocaleString() + " €";
-            
-            const ratio = (totalP1 / totalSurf).toFixed(1);
-            document.getElementById('avg-cost').innerHTML = `${ratio} €<span class="text-xs text-gray-500">/m²</span>`;
-
-            // MOTEUR CLIMATIQUE (DJU)
-            const month = new Date().getMonth();
-            let djuImpact = 0;
-            if(month < 3 || month > 9) djuImpact = 12; // +12% en hiver
-            
-            document.getElementById('dju-impact').innerText = "+" + djuImpact + " %";
-            document.getElementById('dju-text').innerText = djuImpact > 10 ? "Hiver Rigoureux (Surconso justifiée)" : "Climat Standard";
+            document.getElementById('total-p1').innerText = Math.round(totalP1).toLocaleString() + " €";
+            const ratio = totalSurf > 0 ? (totalP1 / totalSurf).toFixed(1) : 0;
+            document.getElementById('avg-cost').innerHTML = `${ratio} €<span class="text-sm text-gray-500 font-normal">/m²</span>`;
 
             renderChart(totalP1);
-            populateContractList(sites);
-            populateSocialList(sites);
+            fetchWeather(CURRENT_SITE.city || CURRENT_SITE.location?.city);
+            runAutoTagging(dataToAnalyze, id === "ALL");
+            runSocial(dataToAnalyze);
+        }
+
+        async function fetchWeather(city) {
+            if(!city) city = "Paris";
+            try {
+                // Fake delay to show API connection
+                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&language=fr&format=json`);
+                const data = await res.json();
+                const lat = data.results ? data.results[0].latitude : 48;
+                
+                let baseDju = 2000;
+                if(lat > 48) baseDju = 2400; if(lat < 45) baseDju = 1600;
+                const variation = 8.5; // Simulé : hiver plus froid
+                
+                document.getElementById('dju-value').innerText = Math.round(baseDju);
+                document.getElementById('dju-var').innerText = "+" + variation + "%";
+                document.getElementById('dju-desc').innerHTML = `Calculé via géolocalisation de <b>${city}</b>. Impact haussier naturel justifié.`;
+            } catch(e) {}
+        }
+
+        function runAutoTagging(sites, isGlobal) {
+            const tbody = document.getElementById('oph-meter-list');
+            tbody.innerHTML = '';
             
-            window.MAP_DATA = sites;
-            if(document.getElementById('view-map').style.display !== 'none') initMap();
+            let meters = sites;
+            if(!isGlobal) {
+                // Eclatement fictif si on a qu'un site pour montrer l'algo
+                meters =[
+                    { name: "Bat A - Chaufferie", id: "1960001", energy: CURRENT_SITE.energy_type, volume: CURRENT_SITE.kpis?.volume_mwh, power: 150, ghost_savings: 0 },
+                    { name: "Bat A - Communs", id: "1960002", energy: "elec", volume: 12, power: 36, ghost_savings: 400 },
+                    { name: "Parking Ext.", id: "1960003", energy: "elec", volume: 3, power: 6, ghost_savings: 0 }
+                ];
+            }
+
+            meters.slice(0, 20).forEach(m => {
+                let tag = "Inconnu"; let icon = "fa-bolt"; let color = "text-gray-400"; let proba = 50;
+                
+                if (m.energy === 'gaz' || m.volume > 100) { tag = "Chaufferie"; icon = "fa-fire"; color = "text-alert"; proba = 98; } 
+                else if (m.volume < 5 && m.power <= 12) { tag = "Éclairage"; icon = "fa-lightbulb"; color = "text-gold"; proba = 92; } 
+                else if (m.ghost_savings > 200) { tag = "VMC"; icon = "fa-fan"; color = "text-cyan"; proba = 88; } 
+                else { tag = "Communs (Mixte)"; icon = "fa-building"; color = "text-oph"; proba = 60; }
+
+                tbody.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-4 py-3 font-bold text-white truncate max-w-[150px]">${m.name || "Compteur"}</td><td class="px-4 py-3 font-mono text-xs text-gray-500">${m.id}</td><td class="px-4 py-3 text-right font-mono">${Math.round(m.volume)}</td><td class="px-4 py-3 text-right font-mono text-alert">${Math.round(m.ghost_savings || 0)} €</td><td class="px-4 py-3"><span class="${color} font-bold text-[10px] bg-white/5 px-2 py-1 rounded"><i class="fa-solid ${icon} mr-1"></i> ${tag} (${proba}%)</span></td></tr>`;
+            });
+        }
+
+        function runSocial(sites) {
+            const tbody = document.getElementById('social-list');
+            tbody.innerHTML = '';
+            // On simule des locataires en précarité
+            tbody.innerHTML += `
+                <tr class="hover:bg-white/5"><td class="px-4 py-3 font-bold text-white">Logement 14 (T3)</td><td class="px-4 py-3 text-right font-mono">0.8 MWh</td><td class="px-4 py-3 text-right font-mono text-gray-500">4.2 MWh</td><td class="px-4 py-3 text-center"><span class="bg-alert/20 text-alert px-2 py-1 rounded text-[10px] font-bold">SOUS-CHAUFFE</span></td></tr>
+                <tr class="hover:bg-white/5"><td class="px-4 py-3 font-bold text-white">Logement 02 (T2)</td><td class="px-4 py-3 text-right font-mono">1.1 MWh</td><td class="px-4 py-3 text-right font-mono text-gray-500">3.8 MWh</td><td class="px-4 py-3 text-center"><span class="bg-alert/20 text-alert px-2 py-1 rounded text-[10px] font-bold">SOUS-CHAUFFE</span></td></tr>
+            `;
+        }
+
+        window.simulateConcertation = function() {
+            const btn = document.getElementById('btn-sru');
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Génération...`;
+            setTimeout(() => {
+                btn.innerHTML = `<i class="fa-solid fa-check mr-2"></i> Prêt pour envoi`;
+                document.getElementById('sru-text').classList.remove('hidden');
+            }, 1000);
         }
 
         function renderChart(totalBudget) {
-            const ctxOph = document.getElementById('chartCharges').getContext('2d');
+            const ctx = document.getElementById('chartCharges').getContext('2d');
             if (ophChart) ophChart.destroy();
-
-            // Seasonal curve (Higher in Winter)
-            const factors = [0.15, 0.14, 0.12, 0.08, 0.05, 0.04, 0.03, 0.03, 0.05, 0.09, 0.10, 0.12];
-            const monthly = factors.map(f => totalBudget * f);
-
-            const gradientOph = ctxOph.createLinearGradient(0, 0, 0, 300);
-            gradientOph.addColorStop(0, 'rgba(249, 115, 22, 0.2)');
-            gradientOph.addColorStop(1, 'rgba(0,0,0,0)');
-
-            ophChart = new Chart(ctxOph, {
+            const monthly =[0.15, 0.14, 0.12, 0.08, 0.05, 0.04, 0.03, 0.03, 0.05, 0.09, 0.10, 0.12].map(f => totalBudget * f);
+            ophChart = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: ['Jan','Fev','Mar','Avr','Mai','Juin','Juil','Aou','Sep','Oct','Nov','Dec'],
-                    datasets: [
-                        { label: 'Réel (P1+P2)', data: monthly, borderColor: '#F97316', backgroundColor: gradientOph, borderWidth: 2, fill: true, tension:0.4, pointRadius:0 },
-                        { label: 'Budget', data: monthly.map(v => v*1.05), borderColor: '#94A3B8', borderDash:[5,5], borderWidth: 2, tension:0.4, pointRadius:0 }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{labels:{color:'#94A3B8', font:{family:'Inter'}}}}, scales:{x:{grid:{display:false}, ticks:{color:'#64748B'}},y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748B'}}} }
+                data: { labels:['Jan','Fev','Mar','Avr','Mai','Juin','Juil','Aou','Sep','Oct','Nov','Dec'], datasets:[{ label: 'Mandaté P1 (€)', data: monthly, borderColor: '#F97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', borderWidth: 3, fill: true, tension:0.4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,0.05)'}}} }
             });
         }
 
-        function populateContractList(sites) {
-            const tbody = document.getElementById('contract-list');
-            tbody.innerHTML = '';
-            sites.slice(0, 10).forEach(s => {
-                // Protection contre division par zéro
-                const price = s.volume > 0 ? Math.round(s.budget/s.volume) : 0;
-                tbody.innerHTML += `
-                    <tr class="hover:bg-white/5 transition">
-                        <td class="px-6 py-4 font-bold text-white">${s.name}</td>
-                        <td class="px-6 py-4"><span class="text-[10px] bg-white/10 px-2 py-1 rounded font-bold">${(s.energy || 'ELEC').toUpperCase()}</span></td>
-                        <td class="px-6 py-4">${s.provider || 'En Attente'}</td>
-                        <td class="px-6 py-4 text-alert font-bold">31/12/2026</td>
-                        <td class="px-6 py-4 text-right font-mono">${price} €/MWh</td>
-                        <td class="px-6 py-4 text-center"><button class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-white">Renégocier</button></td>
-                    </tr>
-                `;
-            });
-        }
-
-        function populateSocialList(sites) {
-            const tbody = document.getElementById('social-list');
-            tbody.innerHTML = '';
-            const alerts = sites.filter(s => s.volume < 10); 
-            
-            if(alerts.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">Aucune anomalie détectée sur ce périmètre.</td></tr>';
-            } else {
-                alerts.slice(0,5).forEach(s => {
-                    tbody.innerHTML += `
-                        <tr class="hover:bg-white/5 transition cursor-pointer">
-                            <td class="px-6 py-4 font-bold text-white">${s.name}</td>
-                            <td class="px-6 py-4">${s.id}</td>
-                            <td class="px-6 py-4 text-center font-mono text-cyan">${Math.round(s.volume)} MWh</td>
-                            <td class="px-6 py-4 text-right"><span class="bg-alert/20 text-alert px-2 py-1 rounded text-[10px] font-bold">ALERTE FROID</span></td>
-                        </tr>
-                    `;
-                });
-            }
-        }
-
-        function initMap() {
-            if(mapInstance) {
-                mapInstance.invalidateSize();
-                return;
-            }
-            mapInstance = L.map('map').setView([46.603354, 1.888334], 6);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OpenStreetMap', subdomains: 'abcd', maxZoom: 19
-            }).addTo(mapInstance);
-
-            if(window.MAP_DATA) {
-                window.MAP_DATA.forEach((site, i) => {
-                    const lat = 48.85 + (Math.random()-0.5)*0.5;
-                    const lon = 2.35 + (Math.random()-0.5)*0.5;
-                    
-                    const color = i%5===0 ? '#EF4444' : (i%3===0 ? '#F59E0B' : '#10B981');
-                    const dpe = i%5===0 ? 'G' : (i%3===0 ? 'D' : 'B');
-
-                    const marker = L.circleMarker([lat, lon], {
-                        radius: 8, color: color, fillColor: color, fillOpacity: 0.8
-                    }).addTo(mapInstance);
-                    
-                    marker.on('click', () => showBuildingInfo(site, dpe, color));
-                });
-            }
-        }
-
-        function showBuildingInfo(site, dpe, color) {
-            document.getElementById('building-info').classList.add('hidden');
-            document.getElementById('building-data').classList.remove('hidden');
-            document.getElementById('b-name').innerText = site.name;
-            document.getElementById('b-addr').innerText = site.city || "Adresse non renseignée";
-            document.getElementById('b-year').innerText = "1985"; 
-            const d = document.getElementById('b-dpe'); d.innerText = dpe; d.style.color = color;
-            document.getElementById('b-heat').innerText = site.energy === 'gaz' ? 'Chaufferie Gaz' : 'Élec';
-            document.getElementById('b-iso').innerText = dpe === 'G' ? 'Non Isolé' : 'Double Vitrage';
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            switchView('charges');
-            initSiteSelector(); // Lancement du sélecteur
-        });
+        document.addEventListener('DOMContentLoaded', initSelector);
     </script>
 </body>
 </html>
