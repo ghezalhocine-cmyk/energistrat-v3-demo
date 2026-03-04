@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration Pro | ENERGISTRAT V3</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { abysse: '#001529', card: '#0F172A', pme: '#EAB308', cyan: '#00E5FF', success: '#10B981', alert: '#EF4444' },
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #001529; color: white; -webkit-tap-highlight-color: transparent; }
+        .input-cyber { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: white; transition: all 0.3s ease; border-radius: 1rem; padding: 1rem 1.2rem; width: 100%; font-size: 0.875rem; outline: none; }
+        .input-cyber:focus { border-color: #EAB308; box-shadow: 0 0 15px rgba(234, 179, 8, 0.15); background: rgba(234, 179, 8, 0.05); }
+        .input-cyber::placeholder { color: #64748B; }
+        select.input-cyber { appearance: none; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748B' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; }
+        select.input-cyber option { background-color: #0F172A; color: white; }
+        
+        .site-block { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Custom Checkbox */
+        .checkbox-container { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+        .checkbox-container input { display: none; }
+        .checkmark { width: 24px; height: 24px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; mt-1;}
+        .checkbox-container input:checked ~ .checkmark { background: #EAB308; border-color: #EAB308; box-shadow: 0 0 10px rgba(234, 179, 8, 0.4); }
+        .checkmark::after { content: '\f00c'; font-family: 'Font Awesome 6 Free'; font-weight: 900; color: #001529; font-size: 12px; opacity: 0; transition: opacity 0.2s; }
+        .checkbox-container input:checked ~ .checkmark::after { opacity: 1; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- HEADER MOBILE-FIRST -->
+    <header class="h-16 flex items-center px-6 border-b border-white/5 bg-abysse/90 backdrop-blur sticky top-0 z-50">
+        <button onclick="history.back()" class="text-gray-400 hover:text-white transition p-2 -ml-2">
+            <i class="fa-solid fa-arrow-left text-lg"></i>
+        </button>
+        <div class="flex-1 text-center font-black text-lg tracking-tight">PROFIL <span class="text-pme">ENTREPRISE</span></div>
+        <div class="w-8"></div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-6 pb-24">
+        <div class="max-w-2xl mx-auto space-y-8">
+
+            <div class="text-center mb-8">
+                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-pme to-orange-600 mx-auto flex items-center justify-center text-abysse font-black text-3xl mb-4 shadow-[0_0_20px_rgba(234,179,8,0.3)]">
+                    <i class="fa-solid fa-briefcase"></i>
+                </div>
+                <h2 class="text-xl font-bold">Configuration Multi-Sites</h2>
+                <p class="text-sm text-gray-400 mt-1">Renseignez votre SIRET et jusqu'à 5 locaux/compteurs.</p>
+            </div>
+
+            <form id="pme-settings-form" onsubmit="saveProfile(event)" class="space-y-6">
+                
+                <!-- BLOC 1 : IDENTITÉ DE L'ENTREPRISE -->
+                <div class="bg-card p-6 rounded-3xl border-t-4 border-pme shadow-lg space-y-4">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-building text-pme"></i> Fiche Entreprise (Statistiques)
+                    </h3>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-300 mb-2 pl-1">Raison Sociale</label>
+                        <input type="text" id="company_name" class="input-cyber" placeholder="Boulangerie Dupont SAS" required>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-300 mb-2 pl-1 flex justify-between">
+                                <span>Numéro SIRET</span>
+                                <span class="text-gray-500 font-normal">14 chiffres</span>
+                            </label>
+                            <input type="text" id="siret" class="input-cyber font-mono" placeholder="12345678901234" maxlength="14" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-300 mb-2 pl-1 flex justify-between">
+                                <span>Code NAF / APE</span>
+                                <span class="text-pme font-bold">Crucial</span>
+                            </label>
+                            <input type="text" id="naf" class="input-cyber font-mono uppercase" placeholder="ex: 1071C" maxlength="5" required>
+                            <p class="text-[9px] text-gray-500 mt-1 pl-1">Requis pour la ligue de benchmarking sectoriel.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONTENEUR DES SITES -->
+                <div id="sites-container" class="space-y-6">
+                    <!-- Le Site 1 est généré par JS au chargement -->
+                </div>
+
+                <!-- BOUTON AJOUTER UN SITE -->
+                <button type="button" onclick="addSiteBlock()" id="btn-add-site" class="w-full py-4 rounded-2xl border-2 border-dashed border-gray-600 text-gray-400 font-bold hover:border-pme hover:text-pme transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Ajouter un autre local (Max 5)
+                </button>
+
+                <!-- BLOC 3 : CONSENTEMENT RGPD & SGE -->
+                <div class="bg-card p-6 rounded-3xl border border-white/5 space-y-4">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-file-shield text-cyan"></i> Mandat & Accès aux données
+                    </h3>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="consent_sge" required>
+                        <div class="checkmark mt-1"></div>
+                        <div class="text-xs text-gray-300 leading-relaxed">
+                            En cochant cette case, j'autorise <b>ENERGISTRAT V3</b>, en qualité de tiers de confiance, à interroger les systèmes d'information des gestionnaires de réseaux (SGE Enedis / GRDF) pour récupérer l'historique des courbes de charge (au pas de 30 minutes) et les puissances souscrites associées aux PDL renseignés ci-dessus.<br>
+                            <span class="text-[10px] text-gray-500 block mt-2">Conformément au RGPD, ces données seront chiffrées et conservées pendant 5 ans à des fins strictes d'audit et d'optimisation. Vous pouvez révoquer ce mandat à tout moment.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- SUBMIT -->
+                <div class="pt-4">
+                    <button type="submit" id="submit-btn" class="w-full bg-pme text-abysse font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(234,179,8,0.4)] hover:bg-white transition-transform flex items-center justify-center gap-2 text-lg">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> ENREGISTRER LE PARC
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </main>
+
+    <!-- TOAST -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none"></div>
+
+    <script>
+        let siteCount = 0;
+        const maxSites = 5;
+
+        // Fonction Toast
+        const App = {
+            toast: function(msg) {
+                const container = document.getElementById('toast-container');
+                const el = document.createElement('div');
+                el.className = `bg-success text-black px-6 py-3 rounded-full font-bold text-sm shadow-2xl flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0`;
+                el.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${msg}`;
+                container.appendChild(el);
+                requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
+                setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 3000);
+            }
+        };
+
+        // Ajout dynamique d'un site
+        function addSiteBlock() {
+            if (siteCount >= maxSites) return;
+            siteCount++;
+
+            const container = document.getElementById('sites-container');
+            const block = document.createElement('div');
+            block.className = "site-block bg-card p-6 rounded-3xl border border-white/5 space-y-4 relative overflow-hidden";
+            
+            // Bouton supprimer (sauf pour le premier site)
+            const deleteBtn = siteCount > 1 ? `<button type="button" onclick="this.parentElement.remove(); siteCount--; checkSiteCount();" class="absolute top-6 right-6 text-gray-600 hover:text-alert"><i class="fa-solid fa-trash"></i></button>` : '';
+
+            block.innerHTML = `
+                ${deleteBtn}
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <span class="bg-white/10 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px]">${siteCount}</span> 
+                    Local / Compteur
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1 pl-1">Nom du Site</label>
+                        <input type="text" class="input-cyber site-name" placeholder="ex: Magasin Centre-Ville" required>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1 pl-1">Ville</label>
+                        <input type="text" class="input-cyber site-city" placeholder="Lyon" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1 pl-1">PDL / PRM (14 chiffres)</label>
+                        <input type="text" class="input-cyber font-mono text-cyan site-pdl" placeholder="12345678901234" maxlength="14" required>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1 pl-1">Surface (m²)</label>
+                        <input type="number" class="input-cyber font-mono site-surface" placeholder="150" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-white/5 pt-4 mt-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1 pl-1">Puissance</label>
+                        <select class="input-cyber font-mono site-power text-xs">
+                            <option value="9">9 kVA</option>
+                            <option value="12">12 kVA</option>
+                            <option value="18">18 kVA</option>
+                            <option value="36" selected>36 kVA (Tarif Bleu Pro)</option>
+                            <option value="42">42 kVA (Tarif Jaune)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1 pl-1">Fournisseur</label>
+                        <select class="input-cyber site-provider text-xs">
+                            <option value="EDF">EDF Pro</option>
+                            <option value="ENGIE">ENGIE</option>
+                            <option value="TOTAL">TotalEnergies</option>
+                            <option value="GEG">Régie Locale (ex: GEG)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1 pl-1">Prix TTC estimé</label>
+                        <div class="relative">
+                            <input type="number" step="0.001" class="input-cyber font-mono site-price text-xs" placeholder="0.220">
+                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">€</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(block);
+            checkSiteCount();
+        }
+
+        function checkSiteCount() {
+            const currentBlocks = document.querySelectorAll('.site-block').length;
+            const btnAdd = document.getElementById('btn-add-site');
+            if(currentBlocks >= maxSites) {
+                btnAdd.style.display = 'none';
+            } else {
+                btnAdd.style.display = 'flex';
+                btnAdd.innerHTML = `<i class="fa-solid fa-plus"></i> Ajouter un autre local (${currentBlocks}/5)`;
+            }
+        }
+
+        // Sauvegarde de Masse (Zéro Mock - Appelle ton API réelle)
+        async function saveProfile(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submit-btn');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> CRÉATION DU PARC...';
+            btn.disabled = true;
+            
+            const companyName = document.getElementById('company_name').value;
+            const siret = document.getElementById('siret').value;
+            const naf = document.getElementById('naf').value.toUpperCase();
+            
+            // RGPD
+            const consentSge = document.getElementById('consent_sge').checked;
+
+            const siteBlocks = document.querySelectorAll('.site-block');
+            let promises =
