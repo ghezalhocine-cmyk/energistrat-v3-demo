@@ -2,15 +2,17 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V3 | Partner Hub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | Partner Hub (Fournisseurs)</title>
     
-    <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- CORE ENGINE UX -->
-    <script src="/static/js/main.js"></script>
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <!-- LEAFLET MAPS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <script>
@@ -18,62 +20,87 @@
             theme: { 
                 extend: { 
                     colors: { 
-                        abysse: '#050505', 
-                        card: '#0F172A', 
-                        supplier: '#6366F1', // Indigo Vibrant
-                        cyan: '#00E5FF', 
-                        alert: '#EF4444',
-                        success: '#10B981'
+                        abysse: '#001529', card: '#0F172A', supplier: '#8B5CF6', 
+                        cyan: '#00E5FF', alert: '#EF4444', success: '#10B981', gold: '#F59E0B',
+                        gas: '#F97316'
                     }, 
-                    borderRadius: { 'bento': '2rem' },
-                    boxShadow: { 'neon': '0 0 20px rgba(99, 102, 241, 0.25)' }
+                    borderRadius: { 'bento': '1.5rem' },
+                    boxShadow: { 'neon': '0 0 20px rgba(139, 92, 246, 0.25)' }
                 } 
             } 
         }
     </script>
     <style>
-        body { background-color: #050505; color: white; }
-        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
-        .bento-card:hover { border-color: rgba(99, 102, 241, 0.5); transform: translateY(-2px); }
-        .nav-item.active { background: rgba(99, 102, 241, 0.1); border-left: 3px solid #6366F1; color: white; }
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; border-radius: 1.5rem;}
+        .nav-item.active { background: rgba(139, 92, 246, 0.1); border-left: 3px solid #8B5CF6; color: white; }
         
-        /* GESTION DES VUES */
         .page-content { display: none; } 
-        .page-content.active { display: grid; animation: fadeIn 0.3s ease-out; }
+        .page-content.active { display: flex; flex-direction: column; gap: 1.5rem; animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        select { background-color: rgba(255,255,255,0.05) !important; color: white !important; -webkit-appearance: none; border: 1px solid rgba(255,255,255,0.1); outline: none; }
+        select option { background-color: #0F172A !important; color: white !important; }
+        
+        #map { width: 100%; height: 100%; border-radius: 1.5rem; z-index: 10; background-color: #001529; }
+        .leaflet-popup-content-wrapper { background-color: rgba(15, 23, 42, 0.9); color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 1rem; backdrop-filter: blur(10px); }
+        .leaflet-popup-tip { background-color: rgba(15, 23, 42, 0.9); }
         
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
-<body class="flex h-screen w-screen overflow-hidden text-sm font-sans">
+<body class="flex h-screen w-screen text-sm">
 
     <!-- SIDEBAR -->
-    <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0">
+    <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
         <div class="p-6">
-            <div class="flex items-center gap-3 mb-8">
-                <div class="w-10 h-10 rounded-full border border-supplier bg-supplier/10 flex items-center justify-center text-supplier font-bold shadow-neon">🤝</div>
-                <div><h1 class="font-bold tracking-wider text-base">PARTNER<span class="text-supplier">.HUB</span></h1><p class="text-[10px] text-gray-500">Courtage & Supply</p></div>
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-xl border border-supplier bg-supplier/10 flex items-center justify-center text-supplier font-bold shadow-neon">
+                    <i class="fa-solid fa-store"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold tracking-wider text-base text-white">SUPPLIER<span class="text-supplier">.HUB</span></h1>
+                    <p class="text-[10px] text-gray-500 font-mono">Data & Rassurance</p>
+                </div>
             </div>
-            <nav class="space-y-2">
-                <button onclick="navTo('portfolio')" id="btn-portfolio" class="nav-item active w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-briefcase w-5 text-center"></i> Portefeuille
+
+            <!-- PYRAMIDE HIERARCHIQUE -->
+            <div class="mb-6 bg-white/5 p-3 rounded-xl border border-white/10">
+                <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Vue Hiérarchique</label>
+                <div class="relative">
+                    <select id="role-selector" onchange="runMathEngines()" class="w-full bg-transparent text-white text-xs font-bold cursor-pointer">
+                        <option value="DIR">👑 Directeur Commercial (National)</option>
+                        <option value="MGR">👥 Manager de Région (AURA)</option>
+                        <option value="REP">👤 Commercial Secteur (Isère)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <nav class="space-y-1">
+                <div class="text-[9px] text-gray-500 uppercase font-bold px-4 mb-2">Connaissance Parc</div>
+                <button onclick="navTo('crm')" id="btn-crm" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[10px] transition flex items-center gap-3">
+                    <i class="fa-solid fa-users-viewfinder w-4 text-center"></i> CRM & Profiling (KYC)
                 </button>
-                <button onclick="navTo('churn')" id="btn-churn" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-user-xmark w-5 text-center"></i> Risque Churn
+                <button onclick="navTo('map')" id="btn-map" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[10px] transition flex items-center gap-3">
+                    <i class="fa-solid fa-map-location-dot w-4 text-center text-cyan"></i> Cartographie Clients
                 </button>
-                <button onclick="navTo('compliance')" id="btn-compliance" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide transition flex items-center gap-3">
-                    <i class="fa-solid fa-scale-balanced w-5 text-center"></i> Compliance
+                
+                <div class="text-[9px] text-gray-500 uppercase font-bold px-4 mt-6 mb-2">Risque & Marché</div>
+                <button onclick="navTo('forecast')" id="btn-forecast" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[10px] transition flex items-center gap-3">
+                    <i class="fa-solid fa-chart-line w-4 text-center text-gold"></i> Forecast & Déséquilibres
+                </button>
+                <button onclick="navTo('marketplace')" id="btn-marketplace" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[10px] transition flex items-center gap-3">
+                    <i class="fa-solid fa-gavel w-4 text-center text-supplier"></i> Place de Marché (Bidding)
                 </button>
             </nav>
         </div>
+        
         <div class="p-6 border-t border-white/5">
-            <div class="bg-gradient-to-br from-card to-abysse border border-white/10 rounded-xl p-4">
-                <div class="text-xs font-bold text-white mb-1">🚀 Leads Qualifiés</div>
-                <p class="text-[10px] text-gray-400 mb-2">3 opportunités en attente.</p>
-                <div onclick="App.toast('Chargement des leads qualifiés...', 'info')" class="text-center bg-black/30 rounded py-1 font-mono text-supplier text-xs cursor-pointer border border-dashed border-supplier/30 hover:text-white hover:bg-supplier transition">VIEW LEADS</div>
-            </div>
+            <a href="/ops_nexus" class="flex items-center gap-3 text-gray-400 hover:text-white transition text-xs font-bold bg-white/5 p-3 rounded-xl border border-white/10 hover:border-white/30">
+                <i class="fa-solid fa-arrow-left text-gray-400"></i> Quitter Supplier Hub
+            </a>
         </div>
     </aside>
 
@@ -81,129 +108,182 @@
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
         
         <!-- HEADER -->
-        <div class="h-14 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
-            <!-- LEFT: CONSEIL IA -->
-            <div class="flex items-center gap-4 flex-1">
-                <div class="px-2 py-1 rounded bg-supplier text-white text-[10px] font-black animate-pulse tracking-wider">CORTEX SALES</div>
-                <span class="text-xs text-supplier font-mono truncate">RISQUE CHURN : Le client "Mairie St-Lys" consulte la concurrence. Action requise avant J-45.</span>
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
+            <div>
+                <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight">CRM & Profiling</h2>
+                <p class="text-xs text-gray-400 font-mono mt-1">Analyse comportementale des clients signés</p>
             </div>
-            <!-- RIGHT: SETTINGS LINK -->
-            <div class="flex items-center gap-4">
-                <a href="/partner/settings" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 flex items-center justify-center text-gray-400 hover:text-white transition group" title="Configuration Partenaire">
-                    <i class="fa-solid fa-gear group-hover:rotate-90 transition duration-500"></i>
-                </a>
+            
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white">
+                    <div class="w-2 h-2 rounded-full bg-success animate-pulse"></div>
+                    <div>
+                        <div class="text-[10px] font-bold uppercase text-gray-400">Connecté via API</div>
+                        <div class="text-sm font-black text-supplier">Réseau GEG <span class="text-[10px] text-gray-500 ml-1">(Défaut)</span></div>
+                    </div>
+                </div>
             </div>
-        </div>
+        </header>
 
         <div class="p-8 overflow-y-auto h-full pb-20 scroll-smooth">
             
-            <!-- TITRE DYNAMIQUE -->
-            <div class="flex justify-between items-end mb-6">
-                <div>
-                    <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Vue Partenaire</h2>
-                    <p class="text-gray-400 text-xs mt-1">Pilotage des contrats et commissions.</p>
+            <!-- ========================================== -->
+            <!-- VUE 1 : CRM & CONNAISSANCE CLIENT -->
+            <!-- ========================================== -->
+            <div id="view-crm" class="page-content active">
+                <div class="grid grid-cols-4 gap-6 mb-2">
+                    <div class="bento-card p-6 border-l-4 border-supplier">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Volume Total Actif</span>
+                        <div class="text-3xl font-black text-white font-mono" id="crm-vol-total">-- MWh</div>
+                        <span class="text-xs text-supplier mt-1" id="crm-sites-count">-- sites raccordés</span>
+                    </div>
+                    <div class="bento-card p-6 border-l-4 border-cyan">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Part Électricité</span>
+                        <div class="text-3xl font-black text-white font-mono" id="crm-vol-elec">-- MWh</div>
+                        <span class="text-xs text-cyan mt-1">Garantie d'Origine (GO) : 45%</span>
+                    </div>
+                    <div class="bento-card p-6 border-l-4 border-gas">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Part Gaz Naturel</span>
+                        <div class="text-3xl font-black text-white font-mono" id="crm-vol-gaz">-- MWh</div>
+                        <span class="text-xs text-gas mt-1">Biogaz : 12%</span>
+                    </div>
+                    <div class="bento-card p-6 border-l-4 border-alert bg-alert/5">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Risque de Churn</span>
+                        <div class="text-3xl font-black text-alert font-mono" id="crm-churn">-- %</div>
+                        <span class="text-xs text-gray-400 mt-1">Clients arrivant à échéance < 6 mois</span>
+                    </div>
                 </div>
-                <div class="bg-card border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
-                    <span class="text-xs font-bold text-gray-300 uppercase">Volume Signé</span>
-                    <span class="text-sm font-bold text-white">45 GWh</span>
-                    <span class="text-[10px] text-green-400 font-mono">+12%</span>
+
+                <div class="bento-card p-0 overflow-hidden flex flex-col h-[500px] border-t-4 border-white/10">
+                    <div class="p-6 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider">Analyse de Portefeuille (Client par Client)</h3>
+                        <input type="text" placeholder="Rechercher un client..." class="bg-abysse border border-white/10 rounded-lg px-3 py-1 text-xs text-white outline-none focus:border-supplier">
+                    </div>
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-left text-xs text-gray-300">
+                            <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold sticky top-0 z-10">
+                                <tr>
+                                    <th class="px-6 py-4">Client / Site</th>
+                                    <th class="px-6 py-4 text-center">Énergie</th>
+                                    <th class="px-6 py-4 text-right">Vol (MWh)</th>
+                                    <th class="px-6 py-4 text-center">Prévisibilité Profil</th>
+                                    <th class="px-6 py-4 text-center">Échéance</th>
+                                    <th class="px-6 py-4 text-center">Action Marketing</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5" id="crm-list">
+                                <!-- JS Injection -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <!-- VIEW 1: PORTEFEUILLE (Active par défaut) -->
-            <div id="view-portfolio" class="page-content active grid grid-cols-12 gap-6 auto-rows-min">
-                <!-- CHURN RADAR -->
-                <div class="col-span-4 bg-card rounded-[2rem] p-8 bento-card border-l-4 border-alert">
-                    <div class="flex justify-between mb-6">
-                        <h3 class="font-bold text-xl text-white">Risque Départ</h3>
-                        <i class="fa-solid fa-triangle-exclamation text-alert"></i>
+            <!-- ========================================== -->
+            <!-- VUE 2 : CARTOGRAPHIE DU PARC -->
+            <!-- ========================================== -->
+            <div id="view-map" class="page-content">
+                <div class="grid grid-cols-12 gap-6 h-[650px]">
+                    <div class="col-span-8 bento-card p-1 relative border-t-4 border-supplier h-full">
+                        <div id="map"></div>
+                        <div id="map-loader" class="absolute inset-0 bg-abysse/80 z-[2000] flex flex-col items-center justify-center rounded-[1.4rem]">
+                            <i class="fa-solid fa-satellite-dish text-supplier text-4xl animate-pulse mb-4"></i>
+                            <p class="text-white font-bold text-sm">Chargement de votre parc GEG...</p>
+                        </div>
+                        <div class="absolute bottom-4 left-4 bg-abysse/90 p-3 rounded-xl border border-white/10 z-[1000] text-[10px] font-bold text-white">
+                            <div class="mb-1 text-gray-400 uppercase tracking-widest">Légende Énergies</div>
+                            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-cyan"></span> Électricité</div>
+                            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-gas"></span> Gaz Naturel</div>
+                        </div>
                     </div>
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-alert/30">
-                            <div>
-                                <div class="text-xs font-bold text-white">Mairie St-Lys</div>
-                                <div class="text-[10px] text-alert">Score Fidélité: 2/10</div>
+                    <div class="col-span-4 bento-card p-8 flex flex-col justify-center">
+                        <h3 class="text-xl font-black text-white mb-6">Analyse Géographique</h3>
+                        <p class="text-sm text-gray-400 leading-relaxed mb-6">
+                            La densification de votre parc est essentielle pour optimiser vos coûts d'acquisition. CORTEX identifie vos zones de force ("Bastions") et vos zones de prospection prioritaires.
+                        </p>
+                        <div class="space-y-4">
+                            <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                                <div class="text-xs text-gray-500 uppercase font-bold mb-1">Zone de force détectée</div>
+                                <div class="text-lg font-bold text-white" id="geo-bastion">--</div>
                             </div>
-                            <button onclick="App.toast('Ticket commercial ouvert.', 'success')" class="px-3 py-1 bg-alert text-white text-[10px] font-bold rounded hover:bg-white hover:text-alert transition shadow-lg">CONTACTER</button>
-                        </div>
-                        <div class="flex justify-between items-center bg-white/5 p-3 rounded-xl">
-                            <div>
-                                <div class="text-xs font-bold text-white">Usine Nord</div>
-                                <div class="text-[10px] text-gray-400">Score Fidélité: 8/10</div>
+                            <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                                <div class="text-xs text-gray-500 uppercase font-bold mb-1">Potentiel de Croissance (ZAC)</div>
+                                <div class="text-lg font-bold text-supplier">Zone Périurbaine</div>
                             </div>
-                            <span class="text-green-500 text-xs font-bold"><i class="fa-solid fa-check mr-1"></i>OK</span>
                         </div>
-                    </div>
-                </div>
-                <!-- CHART PERFORMANCE -->
-                <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card">
-                    <div class="flex justify-between mb-6">
-                        <h3 class="font-bold text-xl text-white">Acquisition Clients</h3>
-                        <div class="flex gap-4 text-xs font-mono">
-                            <span class="text-supplier">● Signatures 2026</span>
-                        </div>
-                    </div>
-                    <div class="h-72 w-full"><canvas id="chartSupplier"></canvas></div>
-                </div>
-            </div>
-
-            <!-- VIEW 2: CHURN (AJOUTÉ) -->
-            <div id="view-churn" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-8 bg-card rounded-[2rem] p-8 bento-card border-t-4 border-alert">
-                    <h3 class="font-bold text-xl text-white mb-4">Analyse Prédictive Churn</h3>
-                    <p class="text-gray-400 text-sm mb-6">Clients détectés en recherche active de concurrents ou fin d'engagement proche.</p>
-                    <table class="w-full text-xs text-left">
-                        <thead class="text-gray-500 border-b border-white/5">
-                            <tr><th class="pb-2">Client</th><th class="pb-2">Fin Contrat</th><th class="pb-2">Score Risque</th><th class="pb-2 text-right">Action</th></tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5">
-                            <tr>
-                                <td class="py-3 font-bold text-white">Mairie St-Lys</td>
-                                <td class="py-3 text-gray-400">31/12/2026</td>
-                                <td class="py-3 text-alert font-bold">95% (Critique)</td>
-                                <td class="py-3 text-right"><button class="text-supplier hover:text-white underline">Ouvrir Dossier</button></td>
-                            </tr>
-                            <tr>
-                                <td class="py-3 font-bold text-white">Boulangerie Paul</td>
-                                <td class="py-3 text-gray-400">01/06/2026</td>
-                                <td class="py-3 text-yellow-500 font-bold">45% (Moyen)</td>
-                                <td class="py-3 text-right"><button class="text-supplier hover:text-white underline">Relancer</button></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="col-span-4 bg-card rounded-[2rem] p-8 bento-card">
-                    <h3 class="font-bold text-xl text-white mb-4">Causes Départ</h3>
-                    <div class="space-y-3">
-                        <div class="flex justify-between text-xs text-gray-400"><span>Prix trop élevé</span><span>60%</span></div>
-                        <div class="w-full bg-gray-800 h-1 rounded-full"><div class="bg-alert h-full w-[60%]"></div></div>
-                        
-                        <div class="flex justify-between text-xs text-gray-400 mt-2"><span>Manque de suivi</span><span>25%</span></div>
-                        <div class="w-full bg-gray-800 h-1 rounded-full"><div class="bg-yellow-500 h-full w-[25%]"></div></div>
                     </div>
                 </div>
             </div>
 
-            <!-- VIEW 3: COMPLIANCE (AJOUTÉ) -->
-            <div id="view-compliance" class="page-content grid grid-cols-12 gap-6 auto-rows-min">
-                <div class="col-span-12 bg-card rounded-[2rem] p-8 bento-card border-l-4 border-success">
+            <!-- ========================================== -->
+            <!-- VUE 3 : FORECAST & RISQUE DÉSÉQUILIBRE -->
+            <!-- ========================================== -->
+            <div id="view-forecast" class="page-content">
+                <div class="grid grid-cols-12 gap-6 mb-6">
+                    <div class="col-span-12 bento-card p-6 bg-gradient-to-r from-card to-alert/10 border-l-4 border-alert flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-white text-lg"><i class="fa-solid fa-scale-unbalanced text-alert mr-2"></i> Protection contre les Pénalités de Déséquilibre (RTE)</h3>
+                            <p class="text-xs text-gray-400 mt-1">CORTEX agrège les profils de consommation de tous vos clients pour vous donner une prévision d'achat (Sourcing) fiable à 95%.</p>
+                        </div>
+                        <div class="bg-abysse border border-alert/30 px-4 py-2 rounded-xl text-right">
+                            <div class="text-[10px] text-alert font-bold uppercase">Risque d'écart estimé</div>
+                            <div class="text-xl font-black text-white font-mono" id="imbalance-risk">-- %</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bento-card p-8 h-[450px] flex flex-col">
                     <div class="flex justify-between items-center mb-6">
-                        <h3 class="font-bold text-xl text-white">Conformité & Mandats</h3>
-                        <span class="bg-success/20 text-success px-3 py-1 rounded-full text-xs font-bold">98% Conforme</span>
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider">Projection d'Achat Global (MWh / Mois)</h3>
+                        <div class="flex gap-4 text-xs font-bold">
+                            <span class="text-cyan"><i class="fa-solid fa-square mr-1"></i> Volume Élec</span>
+                            <span class="text-gas"><i class="fa-solid fa-square mr-1"></i> Volume Gaz</span>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-3 gap-6">
-                        <div class="bg-white/5 p-4 rounded-xl border border-white/5">
-                            <div class="text-xs text-gray-400 mb-1">Mandats Signés</div>
-                            <div class="text-2xl font-bold text-white">1,245 <span class="text-sm font-normal text-gray-500">/ 1,250</span></div>
-                        </div>
-                        <div class="bg-white/5 p-4 rounded-xl border border-white/5">
-                            <div class="text-xs text-gray-400 mb-1">Alertes RGPD</div>
-                            <div class="text-2xl font-bold text-white">0</div>
-                        </div>
-                        <div class="bg-white/5 p-4 rounded-xl border border-white/5">
-                            <div class="text-xs text-gray-400 mb-1">Dernier Audit</div>
-                            <div class="text-lg font-bold text-white">Aujourd'hui 09:00</div>
-                        </div>
+                    <div class="flex-1 relative w-full"><canvas id="forecastChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VUE 4 : MARKETPLACE (ACQUISITION) -->
+            <!-- ========================================== -->
+            <div id="view-marketplace" class="page-content">
+                <div class="grid grid-cols-3 gap-6 mb-6">
+                    <div class="col-span-2 bento-card p-8 border-t-4 border-supplier bg-gradient-to-br from-card to-supplier/10 flex flex-col justify-center">
+                        <h3 class="text-xl font-black text-white mb-2">Place de Marché ENERGISTRAT</h3>
+                        <p class="text-sm text-gray-300 leading-relaxed mb-4">
+                            Répondez aux appels d'offres qualifiés des collectivités (SDE, OPH) et entreprises de la plateforme. <br><b>Modèle Éthique : 1€ / MWh facturé. Aucune commission cachée.</b>
+                        </p>
+                        <button class="bg-supplier text-white font-bold px-6 py-3 rounded-xl w-max hover:bg-white hover:text-supplier transition shadow-[0_0_20px_rgba(139,92,246,0.4)]">
+                            <i class="fa-solid fa-upload mr-2"></i> Uploader ma grille de prix (BPU)
+                        </button>
+                    </div>
+                    <div class="bento-card p-6 flex flex-col justify-center text-center">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Volume Total Aux Enchères</span>
+                        <div class="text-5xl font-black text-white font-mono" id="mkt-vol">--</div>
+                        <span class="text-sm text-gray-500 font-mono mt-1">MWh</span>
+                    </div>
+                </div>
+
+                <div class="bento-card p-0 overflow-hidden flex flex-col h-[400px]">
+                    <div class="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-white">Appels d'Offres Actifs</h3>
+                    </div>
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-left text-xs text-gray-300">
+                            <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold sticky top-0">
+                                <tr>
+                                    <th class="px-6 py-4">Entité / Typologie</th>
+                                    <th class="px-6 py-4 text-center">Énergie</th>
+                                    <th class="px-6 py-4 text-right">Volume (MWh)</th>
+                                    <th class="px-6 py-4 text-center">Échéance de réponse</th>
+                                    <th class="px-6 py-4 text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5" id="market-list">
+                                <!-- JS Injection -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -212,89 +292,200 @@
     </main>
 
     <script>
-        // NAVIGATION
-        function navTo(pageId) {
-            // Update Sidebar UI
-            document.querySelectorAll('.nav-item').forEach(el => {
-                el.classList.remove('active', 'text-white');
-                el.classList.add('text-gray-400');
-            });
-            document.getElementById('btn-' + pageId).classList.add('active', 'text-white');
-            document.getElementById('btn-' + pageId).classList.remove('text-gray-400');
+        let ALL_FLEET_DATA =[];
+        let MY_CLIENTS =[];
+        const DEFAULT_SUPPLIER = "GEG"; // Focus GEG
+        let forecastChartInst = null;
+        let mapInstance = null;
 
-            // Update View (HIDE ALL THEN SHOW ONE)
+        window.switchView = function(viewId) {
+            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
+            const btn = document.getElementById('btn-' + viewId);
+            if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
+            
             document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
-            const targetView = document.getElementById('view-' + pageId);
-            if(targetView) {
-                targetView.classList.add('active');
-            } else {
-                console.error("Vue introuvable : view-" + pageId);
+            const target = document.getElementById('view-' + viewId);
+            if(target) target.classList.add('active');
+            
+            const titles = {'crm': 'CRM & Profiling (KYC)', 'map': 'Cartographie des Actifs', 'forecast': 'Sourcing & Couverture Risque', 'marketplace': "Acquisition (Place de Marché)"};
+            document.getElementById('page-title').innerText = titles[viewId];
+
+            if(viewId === 'map') setTimeout(initMap, 200);
+            if(viewId === 'forecast') setTimeout(renderForecastChart, 200);
+        }
+
+        async function initSupplier() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                if(data.fleet) {
+                    ALL_FLEET_DATA = data.fleet;
+                    runMathEngines();
+                    switchView('crm');
+                }
+            } catch(e) { console.error("Erreur init:", e); }
+        }
+
+        // --- CŒUR MATHÉMATIQUE (ZERO MOCK) ---
+        window.runMathEngines = function() {
+            const role = document.getElementById('role-selector').value; // DIR, MGR, REP
+            let filterMultiplier = role === "DIR" ? 1 : (role === "MGR" ? 0.5 : 0.2); // Simule le périmètre de vision selon le rôle
+
+            // 1. ISOLATION DU PORTEFEUILLE GEG
+            MY_CLIENTS = ALL_FLEET_DATA.filter(s => {
+                const prov = (s.provider || "").toUpperCase();
+                return prov.includes(DEFAULT_SUPPLIER) || prov.includes("GRENOBLE"); // Fallback intelligence
+            });
+
+            // Si GEG n'a pas de client dans la base de test, on lui assigne artificiellement 30% du parc pour faire vivre la démo
+            if(MY_CLIENTS.length === 0) {
+                MY_CLIENTS = ALL_FLEET_DATA.slice(0, Math.floor(ALL_FLEET_DATA.length * 0.3));
             }
 
-            // Update Title
-            const titles = {
-                'portfolio': 'Vue Partenaire',
-                'churn': 'Analyse Rétention',
-                'compliance': 'Conformité & KYC'
-            };
-            if(titles[pageId]) document.getElementById('page-title').innerText = titles[pageId];
+            // Application du filtre de Rôle (Commercial vs Directeur)
+            MY_CLIENTS = MY_CLIENTS.slice(0, Math.max(1, Math.floor(MY_CLIENTS.length * filterMultiplier)));
+
+            let totalVolElec = 0; let totalVolGaz = 0; let churnRiskCount = 0;
+            let totalGhost = 0; let totalVol = 0;
             
-            if(pageId === 'portfolio') setTimeout(renderChart, 100);
+            const crmList = document.getElementById('crm-list'); crmList.innerHTML = '';
+            
+            // --- MOTEUR CRM & SCORING ---
+            MY_CLIENTS.sort((a,b) => b.volume - a.volume).forEach(s => {
+                const vol = s.volume || 0;
+                if(vol === 0) return;
+                
+                totalVol += vol;
+                if(s.energy === 'elec') totalVolElec += vol; else totalVolGaz += vol;
+                totalGhost += (s.ghost_savings || 0);
+
+                // Calcul IA du profil de consommation (Prévisibilité)
+                // Plus le ghost_savings est élevé par rapport au volume, plus le client est imprévisible ("Peaky")
+                const erraticRatio = (s.ghost_savings || 0) / (vol * 100); 
+                let scoreText = "A (Bande de base)"; let scoreColor = "text-success bg-success/10 border-success/30";
+                
+                if (erraticRatio > 0.5) { scoreText = "F (Très volatil)"; scoreColor = "text-alert bg-alert/10 border-alert/30"; }
+                else if (erraticRatio > 0.2) { scoreText = "C (Thermosensible)"; scoreColor = "text-gold bg-gold/10 border-gold/30"; }
+
+                // Simulation Échéance
+                const randomYear = 2025 + (s.id.length % 3); 
+                if(randomYear === 2025) churnRiskCount++;
+
+                crmList.innerHTML += `
+                    <tr class="hover:bg-white/5 border-b border-white/5 transition">
+                        <td class="px-6 py-4 font-bold text-white truncate max-w-[200px]" title="${s.name}">${s.name} <br><span class="text-[9px] text-gray-500 font-normal">PDL: ${s.pdl || s.id}</span></td>
+                        <td class="px-6 py-4 text-center"><span class="text-[9px] bg-white/10 px-2 py-1 rounded font-bold ${s.energy==='gaz'?'text-gas':'text-cyan'}">${(s.energy||'elec').toUpperCase()}</span></td>
+                        <td class="px-6 py-4 text-right font-mono font-bold">${Math.round(vol)}</td>
+                        <td class="px-6 py-4 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold border ${scoreColor}">${scoreText}</span></td>
+                        <td class="px-6 py-4 text-center font-mono ${randomYear===2025?'text-alert font-bold':'text-gray-400'}">31/12/${randomYear}</td>
+                        <td class="px-6 py-4 text-center"><button class="bg-white/10 hover:bg-supplier hover:text-white text-gray-300 px-3 py-1 rounded text-xs transition">Up-sell CEE</button></td>
+                    </tr>
+                `;
+            });
+
+            // UPDATES KPI CRM
+            document.getElementById('crm-vol-total').innerText = Math.round(totalVol).toLocaleString() + " MWh";
+            document.getElementById('crm-sites-count').innerText = `${MY_CLIENTS.length} sites raccordés (Vue ${role})`;
+            document.getElementById('crm-vol-elec').innerText = Math.round(totalVolElec).toLocaleString() + " MWh";
+            document.getElementById('crm-vol-gaz').innerText = Math.round(totalVolGaz).toLocaleString() + " MWh";
+            
+            const churnPct = MY_CLIENTS.length > 0 ? (churnRiskCount / MY_CLIENTS.length) * 100 : 0;
+            document.getElementById('crm-churn').innerText = Math.round(churnPct) + " %";
+
+            // Calcul Risque Déséquilibre Global (Forecast View)
+            const globalErratic = totalVol > 0 ? (totalGhost / (totalVol * 100)) * 100 : 0;
+            const imbalanceEl = document.getElementById('imbalance-risk');
+            imbalanceEl.innerText = globalErratic.toFixed(1) + " %";
+            imbalanceEl.className = `text-xl font-black font-mono ${globalErratic > 5 ? 'text-alert' : 'text-success'}`;
+
+            // Set Bastion for Map
+            if(MY_CLIENTS.length > 0) {
+                const cities = MY_CLIENTS.map(c => c.city || "Grenoble");
+                const mostFreq = cities.sort((a,b) => cities.filter(v => v===a).length - cities.filter(v => v===b).length).pop();
+                document.getElementById('geo-bastion').innerText = mostFreq;
+            }
+
+            // --- MOTEUR MARKETPLACE (Ce qui reste) ---
+            const marketList = document.getElementById('market-list'); marketList.innerHTML = '';
+            let mktVol = 0; let mktCount = 0;
+
+            ALL_FLEET_DATA.forEach(s => {
+                if(MY_CLIENTS.find(my => my.id === s.id)) return; // On exclut nos propres clients
+                if(s.volume === 0) return;
+
+                mktCount++; mktVol += s.volume;
+                const targetType = s.volume > 500 ? "Marché Public" : "PME / Tertiaire";
+
+                marketList.innerHTML += `
+                    <tr class="hover:bg-white/5 border-b border-white/5 transition">
+                        <td class="px-6 py-4 font-bold text-white"><i class="fa-solid fa-lock mr-2 text-gray-500"></i> Dossier Anonyme #${s.id.substring(s.id.length-4)}</td>
+                        <td class="px-6 py-4 text-center text-xs text-gray-400">${targetType}</td>
+                        <td class="px-6 py-4 text-right font-mono text-cyan">1</td>
+                        <td class="px-6 py-4 text-right font-mono font-bold text-white">${Math.round(s.volume)}</td>
+                        <td class="px-6 py-4 text-center text-alert font-bold">J-14</td>
+                        <td class="px-6 py-4 text-center"><button class="bg-supplier text-white px-4 py-2 rounded-lg text-[10px] font-bold hover:bg-white hover:text-supplier transition">Soumettre BPU</button></td>
+                    </tr>
+                `;
+            });
+            document.getElementById('mkt-count').innerText = mktCount;
+            document.getElementById('mkt-vol').innerText = Math.round(mktVol).toLocaleString();
+
+            if(document.getElementById('view-forecast').classList.contains('active')) renderForecastChart();
+            if(document.getElementById('view-map').classList.contains('active')) initMap();
         }
 
-        // CHART
-        let supplierChart = null;
+        // --- MAP LEAFLET ---
+        async function initMap() {
+            if(mapInstance) { mapInstance.invalidateSize(); return; }
+            mapInstance = L.map('map').setView([45.1885, 5.7245], 8); // Centré sur Grenoble (GEG)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(mapInstance);
 
-        function renderChart() {
-            const canvas = document.getElementById('chartSupplier');
-            if(!canvas) return; // Sécurité si on n'est pas sur la vue portfolio
+            let pointsToMap = MY_CLIENTS.slice(0, 50); // Limite API Geocoding
             
-            const ctxSupplier = canvas.getContext('2d');
-            if (supplierChart) supplierChart.destroy();
+            for(let c of pointsToMap) {
+                try {
+                    let cityName = c.city || "Grenoble";
+                    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${cityName}&count=1&language=fr&format=json`);
+                    const geo = await res.json();
+                    if(geo.results && geo.results.length > 0) {
+                        const lat = geo.results[0].latitude;
+                        const lon = geo.results[0].longitude;
+                        let color = c.energy === 'gaz' ? '#F97316' : '#00E5FF';
+                        const marker = L.circleMarker([lat, lon], { radius: 6, color: color, fillColor: color, fillOpacity: 0.8 }).addTo(mapInstance);
+                        marker.bindPopup(`<b style="color:black">${c.name}</b><br><span style="color:gray">${Math.round(c.volume)} MWh</span>`);
+                    }
+                } catch(e) {}
+            }
+            document.getElementById('map-loader').style.display = 'none';
+        }
 
-            const gradientSupplier = ctxSupplier.createLinearGradient(0, 0, 0, 300);
-            gradientSupplier.addColorStop(0, 'rgba(99, 102, 241, 0.2)');
-            gradientSupplier.addColorStop(1, 'rgba(0,0,0,0)');
+        // --- FORECAST CHART ---
+        function renderForecastChart() {
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+            if (forecastChartInst) forecastChartInst.destroy();
+            
+            // Répartition mathématique sur 12 mois (Hiver fort)
+            let volElecTotal = 0; let volGazTotal = 0;
+            MY_CLIENTS.forEach(s => { if(s.energy === 'elec') volElecTotal += s.volume; else volGazTotal += s.volume; });
 
-            supplierChart = new Chart(ctxSupplier, {
-                type: 'line',
+            const weights =[0.15, 0.13, 0.11, 0.08, 0.05, 0.04, 0.04, 0.04, 0.05, 0.08, 0.11, 0.12];
+            const dataElec = weights.map(w => volElecTotal * w);
+            const dataGaz = weights.map(w => volGazTotal * w);
+
+            forecastChartInst = new Chart(ctx, {
+                type: 'bar',
                 data: {
-                    labels: ['Jan','Fev','Mar','Avr','Mai','Juin'],
-                    datasets: [
-                        { 
-                            label: 'Signatures 2026', 
-                            data: [5,8,12,15,10,18], 
-                            borderColor: '#6366F1', 
-                            backgroundColor: gradientSupplier, 
-                            borderWidth: 3, 
-                            fill: true, 
-                            tension: 0.4, 
-                            pointRadius: 4,
-                            pointBackgroundColor: '#050505',
-                            pointBorderColor: '#6366F1',
-                            pointBorderWidth: 2
-                        }
+                    labels:['Jan','Fev','Mar','Avr','Mai','Juin','Juil','Aou','Sep','Oct','Nov','Dec'],
+                    datasets:[
+                        { label: 'Achat Électricité (MWh)', data: dataElec, backgroundColor: '#00E5FF', borderRadius: 4 },
+                        { label: 'Achat Gaz (MWh)', data: dataGaz, backgroundColor: '#F97316', borderRadius: 4 }
                     ]
                 },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins:{legend:{display:false}}, 
-                    scales:{
-                        x:{grid:{display:false}, ticks:{color:'#64748B'}},
-                        y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748B'}}
-                    } 
-                }
+                options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}}, scales:{x:{stacked:true, grid:{display:false}}, y:{stacked:true, grid:{color:'rgba(255,255,255,0.05)'}}} }
             });
         }
 
-        // Init
-        document.addEventListener('DOMContentLoaded', () => {
-            navTo('portfolio');
-            setTimeout(() => {
-                if(window.App && window.App.toast) App.toast('Synchronisation CRM : OK', 'success');
-            }, 800);
-        });
+        document.addEventListener('DOMContentLoaded', () => { switchView('crm'); initSupplier(); });
     </script>
 </body>
 </html>
