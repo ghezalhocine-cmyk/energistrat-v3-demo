@@ -90,8 +90,8 @@
             </nav>
         </div>
         <div class="p-6 space-y-4">
-            <!-- AJOUT DU BOUTON SETTINGS -->
-            <a href="/settings" class="flex items-center gap-3 text-gray-400 hover:text-white transition text-xs font-bold p-3 bg-white/5 rounded-xl border border-white/10 hover:border-tech">
+            <!-- AJOUT DU BOUTON SETTINGS LIGHT (DESKTOP) -->
+            <a href="/settings_light" class="flex items-center gap-3 text-gray-400 hover:text-white transition text-xs font-bold p-3 bg-white/5 rounded-xl border border-white/10 hover:border-tech">
                 <i class="fa-solid fa-gear text-tech"></i> Mon Profil & PDL
             </a>
             <div class="bg-white/5 rounded-xl p-4 border border-white/10">
@@ -112,8 +112,8 @@
         <header class="h-16 flex items-center justify-between px-6 z-20 lg:hidden border-b border-white/5">
             <div class="font-black text-lg text-white">MY<span class="text-tech">.HOME</span></div>
             <div class="flex items-center gap-4">
-                <!-- ICONE SETTINGS MOBILE -->
-                <a href="/settings" class="text-gray-400 hover:text-white text-lg"><i class="fa-solid fa-gear"></i></a>
+                <!-- ICONE SETTINGS LIGHT (MOBILE) -->
+                <a href="/settings_light" class="text-gray-400 hover:text-white text-lg"><i class="fa-solid fa-gear"></i></a>
                 <div class="w-8 h-8 rounded-full bg-gray-800 border border-white/10 overflow-hidden">
                     <img src="https://ui-avatars.com/api/?name=Citoyen&background=00E5FF&color=000" alt="Avatar">
                 </div>
@@ -121,6 +121,16 @@
         </header>
 
         <div class="flex-1 overflow-y-auto p-4 lg:p-10 pb-24 scroll-smooth max-w-3xl mx-auto w-full">
+
+            <!-- MESSAGE SI AUCUN SITE N'EST CONFIGURÉ -->
+            <div id="empty-state" class="hidden flex-col items-center justify-center h-[400px] border-2 border-dashed border-white/10 rounded-3xl bg-white/5">
+                <i class="fa-solid fa-house-crack text-6xl text-gray-600 mb-6"></i>
+                <h3 class="text-2xl font-bold text-white mb-2">Aucun logement lié</h3>
+                <p class="text-gray-400 mb-6 max-w-sm text-center text-sm">Renseignez votre PDL Linky pour afficher votre consommation, participer à la ligue et voter pour votre copropriété.</p>
+                <a href="/settings_light" class="bg-tech text-abysse font-bold px-8 py-3 rounded-xl hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.4)]">
+                    Configurer mon logement
+                </a>
+            </div>
 
             <!-- ========================================== -->
             <!-- TAB 1: COCKPIT & ÉCO-GESTES -->
@@ -398,28 +408,41 @@
                 let myCityName = "Votre Commune";
                 
                 if(data.fleet && data.fleet.length > 0) {
-                    const site = data.fleet[0];
-                    if(site.volume > 0) baseVol = 3000 + (Math.round(site.volume * 1000) % 3000); 
-                    myCityName = site.city || "Votre Commune";
+                    // Filtrer pour éviter les anomalies de calcul. S'il n'y a pas de donnée, on utilise un fallback mathématique.
+                    const userSites = data.fleet;
+                    if(userSites.length > 0) {
+                        document.getElementById('empty-state').classList.add('hidden');
+                        document.getElementById('tab-cockpit').classList.add('active');
+                        
+                        const site = userSites[0];
+                        if(site.volume > 0) baseVol = 3000 + (Math.round(site.volume * 1000) % 3000); 
+                        myCityName = site.city || "Votre Commune";
 
-                    // CALCUL SCORE MAIRIE (Data Unity)
-                    let cityScores = {};
-                    data.fleet.forEach(s => {
-                        const cName = s.city || "Votre Commune";
-                        if(!cityScores[cName]) cityScores[cName] = { vol: 0, budget: 0, ghost: 0 };
-                        cityScores[cName].vol += s.volume;
-                        cityScores[cName].budget += s.budget;
-                        cityScores[cName].ghost += (s.ghost_savings || 0);
-                    });
-                    
-                    let myCityData = cityScores[myCityName];
-                    let cityScore = 85; // Default good score
-                    if (myCityData && myCityData.budget > 0) {
-                        cityScore = Math.max(0, Math.round(100 - ((myCityData.ghost / myCityData.budget) * 100)));
+                        // CALCUL SCORE MAIRIE (Data Unity)
+                        let cityScores = {};
+                        data.fleet.forEach(s => {
+                            const cName = s.city || "Votre Commune";
+                            if(!cityScores[cName]) cityScores[cName] = { vol: 0, budget: 0, ghost: 0 };
+                            cityScores[cName].vol += s.volume;
+                            cityScores[cName].budget += s.budget;
+                            cityScores[cName].ghost += (s.ghost_savings || 0);
+                        });
+                        
+                        let myCityData = cityScores[myCityName];
+                        let cityScore = 85; // Default good score
+                        if (myCityData && myCityData.budget > 0) {
+                            cityScore = Math.max(0, Math.round(100 - ((myCityData.ghost / myCityData.budget) * 100)));
+                        }
+                        
+                        document.getElementById('city-name').innerText = myCityName;
+                        document.getElementById('city-score').innerText = `${cityScore}/100`;
                     }
-                    
-                    document.getElementById('city-name').innerText = myCityName;
-                    document.getElementById('city-score').innerText = `${cityScore}/100`;
+                } else {
+                    // SI LA BASE EST VIDE (Premier Onboarding)
+                    document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
+                    document.getElementById('empty-state').classList.remove('hidden');
+                    document.getElementById('empty-state').classList.add('flex');
+                    return; // Stoppe le chargement des graphiques
                 }
                 
                 CURRENT_CITIZEN_VOL = baseVol;
@@ -441,7 +464,7 @@
                 document.getElementById('swap-new').innerText = Math.round(costNew).toLocaleString() + " €";
 
                 initChart(baseVol);
-            } catch(e) { console.error(e); }
+            } catch(e) { console.error("Erreur chargement:", e); }
         }
 
         function initChart(annualVolKwh) {
