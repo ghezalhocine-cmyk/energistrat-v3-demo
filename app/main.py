@@ -8,11 +8,12 @@ import traceback
 import urllib.request
 import urllib.parse
 import base64
+import asyncio # AJOUT CORTEX : Pour le Daemon Sentinel
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-# AJOUTS SÉCURITÉ : Depends, status, RedirectResponse
-from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException, Response, Depends, status
+# AJOUTS SÉCURITÉ : Depends, status, RedirectResponse, BackgroundTasks (Pour Sentinel)
+from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException, Response, Depends, status, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -156,6 +157,100 @@ class RTESettingsModel(BaseModel):
     client_id: str = ""
     client_secret: str = ""
 
+# ==============================================================================
+# DAEMON CORTEX SENTINEL (CHANTIER 2 - TÂCHE DE FOND ASYNCHRONE)
+# ==============================================================================
+async def run_sentinel_scan():
+    """Moteur IA Asynchrone : Analyse de vacance SGE et mouvements de parc."""
+    print("[CORTEX SENTINEL] Démarrage du scan de mouvements et dérives...")
+    alerts =[]
+    try:
+        files = glob.glob(os.path.join(DATA_DIR, "*.json"))
+        for p in files:
+            # Ignorer les fichiers de configuration système
+            if any(x in p for x in["master_", "market_", "m57_", "carbon_", "rte_", "sentinel_"]):
+                continue
+            try:
+                with open(p, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                # Nécessite l'enrichissement de Cortex pour les données calculées
+                if cortex is None: continue
+                fin = cortex.enrich_site_financials(data)
+                
+                identity = data.get('identity', {})
+                contract = data.get('contract', {})
+                vol = fin.get('volume_mwh', 0)
+                budget = fin.get('budget_annual', 0)
+                ghost = fin.get('kpis', {}).get('ghost_savings', 0)
+                
+                city = data.get('location', {}).get('city', 'Inconnue')
+                name = identity.get('site_name') or identity.get('name', 'Site Inconnu')
+                pdl = contract.get('pdl') or contract.get('pce') or identity.get('id', 'N/A')
+                
+                action = ""
+                motif = ""
+                color = ""
+
+                # ALGORITHME DE DÉTECTION "ZÉRO MOCK"
+                if vol > 0 and budget == 0:
+                    action = "🟢 Entrée Orpheline"
+                    motif = "Raccordement détecté (volume actif) mais hors marché public (aucun contrat)."
+                    color = "text-success bg-success/10 border-success/30"
+                elif vol == 0 and budget > 0:
+                    action = "🔴 Sortie de Parc"
+                    motif = "Facturation active (Abonnement) mais conso nulle. Bâtiment potentiellement vacant."
+                    color = "text-alert bg-alert/10 border-alert/30"
+                elif budget > 0 and ghost > (budget * 0.4):
+                    action = "🟡 Dérive Majeure"
+                    motif = f"Surconsommation (Talon). Gaspillage estimé à {int(ghost)} €/an. Audit requis."
+                    color = "text-gold bg-gold/10 border-gold/30"
+                
+                if action:
+                    alerts.append({
+                        "id": identity.get("id", ""),
+                        "city": city,
+                        "name": name,
+                        "pdl": pdl,
+                        "action": action,
+                        "motif": motif,
+                        "color": color,
+                        "timestamp": datetime.now().isoformat()
+                    })
+            except Exception:
+                continue
+
+        # Sauvegarde sécurisée des alertes pour l'API
+        system_dir = os.path.join(DATA_DIR, "system")
+        os.makedirs(system_dir, exist_ok=True)
+        out_path = os.path.join(system_dir, "sentinel_alerts.json")
+        
+        with open(out_path, 'w', encoding='utf-8') as f:
+            json.dump({
+                "last_scan": datetime.now().isoformat(),
+                "alert_count": len(alerts),
+                "alerts": alerts
+            }, f, indent=4, ensure_ascii=False)
+            
+        print(f"[CORTEX SENTINEL] Scan terminé. {len(alerts)} anomalies détectées et stockées.")
+        return len(alerts)
+    except Exception as e:
+        print(f"[CORTEX SENTINEL] ERREUR CRITIQUE: {str(e)}")
+        return 0
+
+async def sentinel_daemon_loop():
+    """Boucle infinie du Cron (Compatible Cloud Run)."""
+    await asyncio.sleep(10) # Attente initiale pour boot FastAPI
+    while True:
+        await run_sentinel_scan()
+        await asyncio.sleep(43200) # Rotation toutes les 12 heures
+
+@app.on_event("startup")
+async def startup_event():
+    """Démarre les routines asynchrones en tâche de fond au boot."""
+    print("🚀 [ENERGISTRAT V3] Lancement des daemons CORTEX...")
+    asyncio.create_task(sentinel_daemon_loop())
+
 # --- FONCTIONS UTILITAIRES ---
 
 def json_compliant(data):
@@ -254,6 +349,28 @@ async def logout(response: Response):
     response.delete_cookie("access_token")
     return RedirectResponse(url="/login")
 
+# ==========================================
+# ROUTES CORTEX SENTINEL (CHANTIER 2)
+# ==========================================
+
+@app.get("/api/ops/sentinel/alerts")
+async def get_sentinel_alerts():
+    """Retourne la dernière cartographie de vacance calculée par le Daemon."""
+    path = os.path.join(DATA_DIR, "system", "sentinel_alerts.json")
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
+
+@app.post("/api/ops/sentinel/run")
+async def trigger_sentinel_scan(background_tasks: BackgroundTasks):
+    """Force un recalcul immédiat du parc (On-Demand)."""
+    background_tasks.add_task(run_sentinel_scan)
+    return JSONResponse({"success": True, "message": "Scan Sentinel déclenché en arrière-plan."})
+
 # --- API PRINCIPALES (SETTINGS & DATA) ---
 
 # --- HELPER DE NORMALISATION UNIVERSELLE (FIX ABAG) ---
@@ -347,7 +464,7 @@ async def api_save_client(request: Request):
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 # ==========================================
-# NOUVELLES ROUTES : PARAMÈTRES M57 (CHANTIER A.2)
+# PARAMÈTRES M57 & CARBONE
 # ==========================================
 @app.get("/api/settings/m57")
 async def get_m57_settings():
@@ -494,7 +611,7 @@ async def get_fleet_data(response: Response):
     raw_sites =[]
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
     for p in files:
-        if "master" in p or "market" in p or "m57" in p or "carbon" in p or "rte" in p: continue
+        if "master" in p or "market" in p or "m57" in p or "carbon" in p or "rte" in p or "sentinel" in p: continue
         try:
             with open(p, 'r', encoding='utf-8') as f: data = json.load(f)
             fin = cortex.enrich_site_financials(data)
