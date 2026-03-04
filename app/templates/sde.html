@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V3 | SDE Territoire (Master)</title>
+    <title>ENERGISTRAT V3 | SDE Territoire (Master - Sentinel Actif)</title>
     
     <!-- TAILWIND & CHART.JS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -216,7 +216,7 @@
             </div>
 
             <!-- ========================================== -->
-            <!-- VUE 2 : RADAR MOUVEMENTS (SENTINEL) -->
+            <!-- VUE 2 : RADAR MOUVEMENTS (SENTINEL API CONNECTED) -->
             <!-- ========================================== -->
             <div id="view-mouvements" class="view-section">
                 <div class="bento-card p-0 overflow-hidden flex flex-col h-[700px] border-t-4 border-cyan">
@@ -225,11 +225,16 @@
                             <h3 class="text-lg font-black text-white flex items-center gap-2">
                                 <i class="fa-solid fa-radar text-cyan"></i> CORTEX Sentinel (Mouvements de Parc)
                             </h3>
-                            <p class="text-xs text-gray-400 mt-1">L'IA compare en permanence le périmètre du marché public avec la réalité SGE pour détecter les entrées/sorties illicites.</p>
+                            <p class="text-xs text-gray-400 mt-1">L'IA tracke la vacance SGE en tâche de fond (Cron) et génère les alertes automatiquement.</p>
                         </div>
-                        <button class="bg-cyan text-abysse font-bold px-4 py-2 rounded-xl text-xs hover:bg-white transition shadow-[0_0_15px_rgba(0,229,255,0.4)]">
-                            Générer Avenants Founisseurs
-                        </button>
+                        <div class="flex gap-3">
+                            <button onclick="triggerSentinelScan()" id="btn-sentinel-scan" class="bg-white/10 text-white font-bold px-4 py-2 rounded-xl text-xs hover:bg-white/20 transition border border-white/20">
+                                <i class="fa-solid fa-rotate"></i> Forcer le Scan SGE
+                            </button>
+                            <button class="bg-cyan text-abysse font-bold px-4 py-2 rounded-xl text-xs hover:bg-white transition shadow-[0_0_15px_rgba(0,229,255,0.4)]">
+                                Générer Avenants Founisseurs
+                            </button>
+                        </div>
                     </div>
                     <div class="flex-1 overflow-y-auto">
                         <table class="w-full text-left text-xs text-gray-300">
@@ -238,11 +243,11 @@
                                     <th class="px-6 py-4">Commune (Périmètre)</th>
                                     <th class="px-6 py-4">Point de Livraison</th>
                                     <th class="px-6 py-4 text-center">Détection IA</th>
-                                    <th class="px-6 py-4">Motif Technique Probable</th>
+                                    <th class="px-6 py-4">Motif Financier Probable</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/5" id="sentinel-list">
-                                <!-- JS Injection -->
+                                <!-- Données chargées via API -->
                             </tbody>
                         </table>
                     </div>
@@ -311,7 +316,7 @@
                             <h3 class="text-lg font-black text-white flex items-center gap-2">
                                 <i class="fa-solid fa-file-invoice text-alert"></i> Bridge Chorus Pro (Validation Service Fait)
                             </h3>
-                            <p class="text-xs text-gray-400 mt-1">Audit financier massif : Le moteur croise [Volume SGE Enedis] vs [Montant Réclamé sur Chorus] pour valider le PMP de votre accord-cadre.</p>
+                            <p class="text-xs text-gray-400 mt-1">Audit financier massif : Le moteur croise [Volume SGE Enedis] vs[Montant Réclamé sur Chorus] pour valider le PMP de votre accord-cadre.</p>
                         </div>
                         <div class="bg-alert/20 text-alert px-6 py-3 rounded-xl text-sm font-bold border border-alert/50 shadow-[0_0_15px_rgba(239,68,68,0.3)]" id="chorus-litiges">
                             0 Litiges
@@ -414,6 +419,7 @@
             document.getElementById('page-title').innerText = titles[viewId];
 
             if(viewId === 'map') setTimeout(initMap, 200);
+            if(viewId === 'mouvements') runSentinelAPI();
         }
 
         // --- INITIALISATION SDE ---
@@ -439,7 +445,7 @@
             FLEET_DATA.forEach(s => {
                 const city = s.city && s.city !== "" ? s.city : "Commune Inconnue";
                 if(!CITY_DATA[city]) {
-                    CITY_DATA[city] = { name: city, vol: 0, budget: 0, ghost: 0, count: 0, ids: [], provider: s.provider };
+                    CITY_DATA[city] = { name: city, vol: 0, budget: 0, ghost: 0, count: 0, ids:[], provider: s.provider };
                 }
                 CITY_DATA[city].vol += s.volume;
                 CITY_DATA[city].budget += s.budget;
@@ -470,7 +476,7 @@
 
         function runAllEngines() {
             runLeague();
-            runSentinel();
+            runSentinelAPI(); // API BACKGROUND TASK
             filterM57('PRINCIPAL');
             runChorus();
             runDqeUI();
@@ -555,52 +561,47 @@
             document.getElementById('map-loader').style.display = 'none';
         }
 
-        // --- MOTEUR 3 : CORTEX SENTINEL (FLUX & MOUVEMENTS) ---
-        function runSentinel() {
-            const list = document.getElementById('sentinel-list'); 
-            list.innerHTML = '';
-            let alertCount = 0;
+        // --- MOTEUR 3 : CORTEX SENTINEL (FLUX & MOUVEMENTS VIA API) ---
+        async function runSentinelAPI() {
+            const list = document.getElementById('sentinel-list');
+            list.innerHTML = `<tr><td colspan="4" class="text-center p-12 text-cyan"><i class="fa-solid fa-spinner fa-spin text-4xl mb-4 block"></i> Analyse CORTEX Sentinel en cours...</td></tr>`;
             
-            // Analyse des dérives sur les premiers compteurs de la flotte
-            FLEET_DATA.slice(0, 30).forEach(s => {
-                let action = ""; let motif = ""; let color = "";
-                
-                // Algorithme de détection
-                if(s.volume > 0 && s.budget === 0) { 
-                    action = "🟢 Entrée Orpheline"; motif = "Raccordement détecté (hors marché)"; color = "text-success bg-success/10 border-success/30"; 
+            try {
+                const res = await fetch('/api/ops/sentinel/alerts');
+                const data = await res.json();
+                list.innerHTML = '';
+
+                if (!data.alerts || data.alerts.length === 0) {
+                    list.innerHTML = `<tr><td colspan='4' class='text-center p-12 text-cyan font-bold'><i class='fa-solid fa-shield-check text-4xl mb-4 block'></i> Le Sentinel scanne la Data Unity en tâche de fond.<br>Aucune anomalie SGE détectée à ce jour.</td></tr>`;
+                    return;
                 }
-                else if(s.volume === 0 && s.budget > 0) { 
-                    action = "🔴 Sortie de Parc"; motif = "Bâtiment détruit ou vendu. Facturation à bloquer."; color = "text-alert bg-alert/10 border-alert/30"; 
-                }
-                else if(s.ghost_savings > (s.budget * 0.5) && s.budget > 0) { 
-                    action = "🟡 Dérive Majeure"; motif = "Surconsommation anormale (Talon). Vérification requise."; color = "text-gold bg-gold/10 border-gold/30"; 
-                }
-                
-                if(action !== "") {
-                    alertCount++;
+
+                data.alerts.forEach(alert => {
                     list.innerHTML += `
                         <tr class="hover:bg-white/5 border-b border-white/5 transition">
-                            <td class="px-6 py-4 font-bold text-white">${s.city || 'Inconnue'}</td>
-                            <td class="px-6 py-4 font-mono text-xs text-cyan">${s.pdl || s.id}</td>
-                            <td class="px-6 py-4 text-center">
-                                <span class="px-3 py-1 rounded text-[10px] font-bold border ${color}">${action}</span>
-                            </td>
-                            <td class="px-6 py-4 text-xs text-gray-400">${motif}</td>
+                            <td class="px-6 py-4 font-bold text-white">${alert.city}</td>
+                            <td class="px-6 py-4 font-mono text-xs text-cyan">${alert.pdl}</td>
+                            <td class="px-6 py-4 text-center"><span class="px-3 py-1 rounded text-[10px] font-bold border ${alert.color}">${alert.action}</span></td>
+                            <td class="px-6 py-4 text-xs text-gray-400">${alert.motif}</td>
                         </tr>
                     `;
-                }
-            });
-            
-            if(alertCount === 0) {
-                list.innerHTML = `
-                    <tr>
-                        <td colspan='4' class='text-center p-12 text-cyan font-bold'>
-                            <i class='fa-solid fa-shield-check text-4xl mb-4 block'></i> 
-                            Le Sentinel scanne les flux Enedis en continu.<br>Aucun mouvement illicite ce jour.
-                        </td>
-                    </tr>
-                `;
+                });
+            } catch(e) {
+                console.error(e);
+                list.innerHTML = `<tr><td colspan='4' class='text-center p-12 text-alert font-bold'><i class='fa-solid fa-triangle-exclamation text-4xl mb-4 block'></i> Erreur de communication avec le noeud CORTEX.</td></tr>`;
             }
+        }
+
+        window.triggerSentinelScan = async function() {
+            const btn = document.getElementById('btn-sentinel-scan');
+            const orig = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Trigger API en cours...`;
+            try {
+                await fetch('/api/ops/sentinel/run', { method: 'POST' });
+                // On laisse 2 secondes au daemon backend pour écrire le JSON
+                setTimeout(runSentinelAPI, 2000);
+            } catch(e) { console.error(e); }
+            btn.innerHTML = orig;
         }
 
         // --- MOTEUR 4 : COMPTABILITÉ M57 MULTI-BUDGET ---
@@ -705,7 +706,7 @@
             }
         }
 
-        // --- MOTEUR 6 : USINE DQE (MASS ACTIONS) ---
+        // --- MOTEUR 6 : USINE DQE (APPELS D'OFFRES MASSIFS) ---
         function runDqeUI() {
             const list = document.getElementById('dqe-city-list'); 
             list.innerHTML = '';
