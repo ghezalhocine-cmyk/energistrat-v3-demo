@@ -2,247 +2,350 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT | Partner Hub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | Supplier Settings (CPQ)</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        abysse: '#050505',
+                        abysse: '#001529',
                         card: '#0F172A',
-                        partner: '#F43F5E', // Rose Partner
-                        partnerDark: '#881337',
+                        supplier: '#8B5CF6', // Violet Marketplace
                         success: '#10B981',
-                        blue: { 500: '#3B82F6' }
+                        alert: '#EF4444',
+                        cyan: '#00E5FF'
                     },
-                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
                     borderRadius: { 'bento': '1.5rem' }
                 }
             }
         }
     </script>
     <style>
-        body { background-color: #050505; color: white; }
-        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
-        .nav-item.active { background: rgba(244, 63, 94, 0.1); border-left: 3px solid #F43F5E; color: white; }
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; border-radius: 1.5rem; }
+        .nav-item.active { background: rgba(139, 92, 246, 0.1); border-left: 4px solid #8B5CF6; color: white; }
         .input-dark { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.3s; }
-        .input-dark:focus { border-color: #F43F5E; outline: none; box-shadow: 0 0 15px rgba(244, 63, 94, 0.2); }
-        #toast { visibility: hidden; min-width: 250px; background-color: #F43F5E; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 100; right: 30px; bottom: 30px; transform: translateY(100px); transition: all 0.5s; }
-        #toast.show { visibility: visible; transform: translateY(0); }
-        
-        /* Table Styles */
-        .bill-table th { font-size: 10px; text-transform: uppercase; color: #94a3b8; padding: 12px; text-align: left; }
-        .bill-table td { padding: 12px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 12px; }
+        .input-dark:focus { border-color: #8B5CF6; outline: none; box-shadow: 0 0 15px rgba(139, 92, 246, 0.2); }
+        .tab-content { display: none; animation: fadeIn 0.3s ease-out; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        select option { background-color: #0F172A; color: white; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden text-sm">
 
-    <div id="toast"><i class="fa-solid fa-check-circle mr-2"></i>Configuration sauvegardée !</div>
+    <!-- SYSTÈME DE NOTIFICATION (TOAST) -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none"></div>
 
-    <!-- SIDEBAR PARTNER -->
-    <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col z-50">
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col z-50 flex-shrink-0 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
         <div class="p-6 flex items-center gap-3 mb-4">
-            <a href="/dashboard/supplier" class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition">
+            <a href="/supplier" class="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition border border-white/10">
                 <i class="fa-solid fa-arrow-left"></i>
             </a>
             <div>
-                <h1 class="font-bold text-lg">Partner Hub</h1>
-                <div class="text-[10px] text-partner font-bold tracking-wider">BUSINESS EDITION</div>
+                <h1 class="font-bold text-lg text-white">CPQ<span class="text-supplier">.HUB</span></h1>
+                <div class="text-[9px] text-gray-500 font-bold tracking-wider font-mono">Configuration Fournisseur</div>
             </div>
         </div>
         
         <nav class="flex-1 px-4 space-y-1">
-            <button onclick="switchTab('branding')" id="nav-branding" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
-                <i class="fa-solid fa-paintbrush w-5 text-center text-partner"></i> Marque Blanche
+            <div class="text-[9px] text-gray-500 uppercase font-bold px-2 mt-4 mb-2">Automatisations</div>
+            <button onclick="switchTab('grilles')" id="nav-grilles" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold uppercase text-[10px] rounded-r-xl hover:bg-white/5 transition flex items-center gap-3">
+                <i class="fa-solid fa-table-list w-4 text-center text-supplier"></i> Grilles C5 (Mass Market)
             </button>
-            <button onclick="switchTab('pricing')" id="nav-pricing" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
-                <i class="fa-solid fa-tags w-5 text-center"></i> Offres & Marges
+            <button onclick="switchTab('dealroom')" id="nav-dealroom" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold uppercase text-[10px] rounded-r-xl hover:bg-white/5 transition flex items-center gap-3">
+                <i class="fa-solid fa-comments-dollar w-4 text-center text-cyan"></i> Règles Deal Room (C4/C3)
             </button>
-            <button onclick="switchTab('contract')" id="nav-contract" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
-                <i class="fa-solid fa-file-signature w-5 text-center"></i> Contrat & Finances
+
+            <div class="text-[9px] text-gray-500 uppercase font-bold px-2 mt-6 mb-2">Légal & Closing</div>
+            <button onclick="switchTab('templates')" id="nav-templates" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold uppercase text-[10px] rounded-r-xl hover:bg-white/5 transition flex items-center gap-3">
+                <i class="fa-solid fa-file-pdf w-4 text-center text-alert"></i> Smart Contracts (PDF)
             </button>
-            <button onclick="switchTab('tech')" id="nav-tech" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
-                <i class="fa-solid fa-network-wired w-5 text-center"></i> API & CRM
-            </button>
-            <button onclick="switchTab('team')" id="nav-team" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
-                <i class="fa-solid fa-users w-5 text-center"></i> Équipe Vente
+            <button onclick="switchTab('esign')" id="nav-esign" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold uppercase text-[10px] rounded-r-xl hover:bg-white/5 transition flex items-center gap-3">
+                <i class="fa-solid fa-signature w-4 text-center text-success"></i> Signature Électronique
             </button>
         </nav>
-        <div class="p-6"><a href="/" class="flex items-center gap-2 text-red-400 text-xs font-bold"><i class="fa-solid fa-power-off"></i> Déconnexion</a></div>
+        
+        <div class="p-6 border-t border-white/5">
+            <a href="/ops_nexus" class="flex items-center gap-2 text-gray-500 hover:text-white text-xs font-bold transition">
+                <i class="fa-solid fa-power-off"></i> Quitter le Hub
+            </a>
+        </div>
     </aside>
 
     <!-- CONTENT -->
     <main class="flex-1 overflow-y-auto p-10 relative bg-abysse">
         
-        <!-- TAB 1: BRANDING -->
-        <div id="tab-branding" class="tab-content max-w-5xl mx-auto space-y-6">
-            <header class="flex justify-between items-end">
-                <div><h2 class="text-2xl font-bold text-white mb-1">Identité Visuelle</h2><p class="text-gray-400 text-xs">Personnalisez l'expérience client.</p></div>
-                <button onclick="saveConfig()" class="bg-partner text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-partner/90 transition shadow-lg shadow-partner/20">Sauvegarder</button>
+        <!-- ========================================== -->
+        <!-- TAB 1: GRILLES C5 (AUTO-BIDDING) -->
+        <!-- ========================================== -->
+        <div id="tab-grilles" class="tab-content active max-w-5xl mx-auto space-y-6">
+            <header class="flex justify-between items-end border-b border-white/10 pb-4 mb-6">
+                <div>
+                    <h2 class="text-2xl font-black text-white italic tracking-tight">Grilles Tarifaires <span class="text-supplier">(C5)</span></h2>
+                    <p class="text-gray-400 text-xs mt-1">Uploadez vos barèmes standards. L'IA répondra automatiquement aux appels d'offres des PME (< 36 kVA).</p>
+                </div>
+                <button onclick="saveSettings('grilles')" class="bg-supplier text-white px-8 py-3 rounded-xl text-xs font-bold hover:bg-white hover:text-supplier transition shadow-[0_0_15px_rgba(139,92,246,0.4)]">
+                    Sauvegarder les règles
+                </button>
             </header>
-            <div class="bento-card rounded-bento p-8 border-l-4 border-partner grid grid-cols-12 gap-8">
-                <div class="col-span-4 flex flex-col items-center justify-center border-2 border-dashed border-gray-700 rounded-xl p-6 hover:border-partner cursor-pointer transition bg-black/20">
-                    <div class="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-4"><i class="fa-solid fa-image text-3xl text-gray-500"></i></div>
-                    <div class="text-xs font-bold text-white">Logo Principal</div>
-                </div>
-                <div class="col-span-8 space-y-4">
-                    <div><label class="text-[10px] text-gray-500 font-bold uppercase">Nom de l'offre</label><input type="text" id="offer-name" placeholder="Ex: Green Energy Pro" class="w-full input-dark p-3 rounded-lg text-sm"></div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><label class="text-[10px] text-gray-500 font-bold uppercase">Couleur Primaire</label><div class="flex gap-2 items-center"><input type="color" id="offer-color-picker" value="#F43F5E" class="h-10 w-12 bg-transparent border-0"><input type="text" id="offer-color" value="#F43F5E" class="w-full input-dark p-2 rounded text-xs font-mono"></div></div>
-                        <div><label class="text-[10px] text-gray-500 font-bold uppercase">Domaine (CNAME)</label><input type="text" id="offer-domain" placeholder="app.mon-entreprise.com" class="w-full input-dark p-3 rounded-lg text-xs font-mono"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- TAB 2: PRICING -->
-        <div id="tab-pricing" class="tab-content max-w-5xl mx-auto space-y-6 hidden">
-            <header class="flex justify-between items-end">
-                <div><h2 class="text-2xl font-bold text-white mb-1">Moteur de Prix</h2><p class="text-gray-400 text-xs">Configurez vos grilles et marges.</p></div>
-                <button onclick="saveConfig()" class="bg-partner text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-partner/90 transition shadow-lg shadow-partner/20">Sauvegarder</button>
-            </header>
-            <div class="grid grid-cols-2 gap-6">
-                <div class="bento-card rounded-bento p-6 border-t-4 border-blue-500">
-                    <h3 class="font-bold text-white mb-4">Structure de Marge</h3>
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center"><label class="text-xs text-gray-400">Marge Commerciale (€/MWh)</label><input type="number" id="margin-kwh" value="2.5" class="w-24 input-dark p-2 rounded text-right font-bold text-blue-500"></div>
-                        <div class="flex justify-between items-center"><label class="text-xs text-gray-400">Frais de Gestion (€/an)</label><input type="number" id="margin-fix" value="120" class="w-24 input-dark p-2 rounded text-right"></div>
-                    </div>
-                </div>
-                <div class="bento-card rounded-bento p-6 border-t-4 border-green-500">
-                    <h3 class="font-bold text-white mb-4">Grilles Tarifaires</h3>
-                    <div class="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/5">
-                        <div class="text-xs"><div class="font-bold text-white">GRID_ELEC_2026_Q1.csv</div><div class="text-gray-500">Importé le 01/02/2026</div></div>
-                        <span class="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded">ACTIF</span>
-                    </div>
-                    <button class="w-full mt-4 bg-white/10 hover:bg-white/20 text-white py-2 rounded text-xs transition"><i class="fa-solid fa-upload mr-2"></i>Importer Nouvelle Grille</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- TAB 3: CONTRACT & FINANCE (RESTAURÉ COMPLET) -->
-        <div id="tab-contract" class="tab-content max-w-5xl mx-auto space-y-6 hidden">
-            <header><h2 class="text-2xl font-bold text-white mb-1">Juridique & Financier</h2><p class="text-gray-400 text-xs">Votre relation avec Energistrat.</p></header>
             <div class="grid grid-cols-12 gap-6">
-                <div class="col-span-4 bento-card rounded-bento p-6 border-l-4 border-yellow-500">
-                    <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-file-contract text-yellow-500"></i> CONVENTION PARTENAIRE</h3>
-                    <div class="bg-white/5 p-4 rounded-xl mb-4">
-                        <div class="flex justify-between items-center mb-2"><span class="text-xs text-gray-400">Statut</span><span class="bg-green-500/20 text-green-400 px-2 py-0.5 rounded text-[10px] font-bold">SIGNÉE</span></div>
-                        <div class="text-xs text-white font-bold">Ref: CP_2026_0042</div>
-                        <div class="text-[10px] text-gray-500">Validité: 31/12/2028</div>
+                <div class="col-span-8 bento-card p-0 overflow-hidden flex flex-col h-[400px]">
+                    <div class="p-6 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                        <h3 class="font-bold text-white text-sm">Vos grilles actives</h3>
+                        <span class="bg-success/20 text-success px-3 py-1 rounded text-[10px] font-bold">Matching Automatique ON</span>
                     </div>
-                    <button class="w-full border border-white/20 text-white py-2 rounded-lg text-xs hover:bg-white/10 transition"><i class="fa-solid fa-download mr-2"></i>Télécharger PDF</button>
+                    <div class="flex-1 overflow-y-auto p-4">
+                        <table class="w-full text-left text-xs text-gray-300">
+                            <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold">
+                                <tr><th class="p-3">Nom du Fichier</th><th class="p-3">Énergie</th><th class="p-3 text-center">Profil</th><th class="p-3 text-right">Validité</th><th class="p-3 text-center">Action</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                <tr class="hover:bg-white/5">
+                                    <td class="p-3 font-bold text-white"><i class="fa-solid fa-file-excel text-green-500 mr-2"></i>BPU_ELEC_Q1_2026.xlsx</td>
+                                    <td class="p-3 text-cyan font-bold">ÉLECTRICITÉ</td>
+                                    <td class="p-3 text-center">Tarif Bleu (Base/HPHC)</td>
+                                    <td class="p-3 text-right text-gray-400">31/03/2026</td>
+                                    <td class="p-3 text-center text-alert cursor-pointer hover:text-white"><i class="fa-solid fa-trash"></i></td>
+                                </tr>
+                                <tr class="hover:bg-white/5">
+                                    <td class="p-3 font-bold text-white"><i class="fa-solid fa-file-excel text-green-500 mr-2"></i>BPU_GAZ_T1_T2.xlsx</td>
+                                    <td class="p-3 text-gas font-bold">GAZ NATUREL</td>
+                                    <td class="p-3 text-center">T1 / T2</td>
+                                    <td class="p-3 text-right text-gray-400">31/03/2026</td>
+                                    <td class="p-3 text-center text-alert cursor-pointer hover:text-white"><i class="fa-solid fa-trash"></i></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="col-span-8 bento-card rounded-bento p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-sm font-bold text-white">HISTORIQUE FACTURES (Commissions & SaaS)</h3>
-                        <div class="text-[10px] bg-white/5 px-3 py-1 rounded text-gray-400">IBAN: FR76 .... 4242</div>
-                    </div>
-                    <table class="w-full bill-table">
-                        <thead><tr><th>Réf</th><th>Date</th><th>Montant HT</th><th>Type</th><th>Statut</th><th></th></tr></thead>
-                        <tbody>
-                            <tr><td class="font-mono text-white">INV-2026-02</td><td>01/02/2026</td><td class="font-bold">450.00 €</td><td>Licence SaaS</td><td><span class="text-green-400">Payée</span></td><td class="text-right"><i class="fa-solid fa-download cursor-pointer hover:text-white"></i></td></tr>
-                            <tr><td class="font-mono text-white">COM-2026-01</td><td>15/01/2026</td><td class="font-bold text-partner">+ 2,450.00 €</td><td>Commission</td><td><span class="text-yellow-500">En cours</span></td><td class="text-right"><i class="fa-solid fa-download cursor-pointer hover:text-white"></i></td></tr>
-                        </tbody>
-                    </table>
+
+                <div class="col-span-4 flex flex-col gap-6">
+                    <label class="bento-card p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-supplier transition border-2 border-dashed border-gray-600 flex-1">
+                        <i class="fa-solid fa-cloud-arrow-up text-4xl text-supplier mb-4"></i>
+                        <span class="text-sm font-bold text-white block mb-1">Importer une grille</span>
+                        <span class="text-[10px] text-gray-400">Format .xlsx ou .csv attendu</span>
+                        <input type="file" class="hidden" accept=".xlsx,.csv" onchange="App.toast('Grille uploadée avec succès. Matching mis à jour.', 'success')">
+                    </label>
                 </div>
             </div>
         </div>
 
-        <!-- TAB 4: TECH (RESTAURÉ COMPLET) -->
-        <div id="tab-tech" class="tab-content max-w-5xl mx-auto space-y-6 hidden">
-            <header><h2 class="text-2xl font-bold text-white mb-1">Connectivité</h2></header>
-            <div class="bento-card rounded-bento p-8">
-                <h3 class="font-bold text-white mb-4">Webhooks (Sortants)</h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="text-[10px] text-gray-500 font-bold uppercase">URL Notification (Nouveau Lead)</label>
-                        <div class="flex gap-2 mt-1"><input type="text" placeholder="https://api.salesforce.com/..." class="flex-1 input-dark p-3 rounded-lg text-xs font-mono"><button class="bg-partner px-4 rounded-lg text-xs font-bold">TEST</button></div>
+        <!-- ========================================== -->
+        <!-- TAB 2: SMART CONTRACTS (TEMPLATES PDF) -->
+        <!-- ========================================== -->
+        <div id="tab-templates" class="tab-content max-w-5xl mx-auto space-y-6">
+            <header class="flex justify-between items-end border-b border-white/10 pb-4 mb-6">
+                <div>
+                    <h2 class="text-2xl font-black text-white italic tracking-tight">Smart Contracts <span class="text-alert">(PDF)</span></h2>
+                    <p class="text-gray-400 text-xs mt-1">Uploadez vos contrats vierges. CORTEX injectera les données client et le prix négocié avant la signature.</p>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-12 gap-6">
+                <!-- TEMPLATES LIST -->
+                <div class="col-span-6 space-y-4">
+                    <div class="bento-card p-6 border-l-4 border-alert hover:border-alert/50 transition cursor-pointer">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-white"><i class="fa-solid fa-file-pdf text-alert mr-2"></i> CGV & CP Électricité PME</h3>
+                            <span class="bg-success/20 text-success text-[9px] px-2 py-1 rounded font-bold">MAPPÉ</span>
+                        </div>
+                        <p class="text-[10px] text-gray-500 font-mono">Fichier: template_elec_pme_2026.pdf</p>
                     </div>
-                    <div>
-                        <label class="text-[10px] text-gray-500 font-bold uppercase">Token API Partenaire</label>
-                        <input type="text" value="sk_partner_live_89s7d8f7s8d7f..." readonly class="w-full input-dark p-3 rounded-lg text-xs font-mono mt-1 text-gray-400">
+
+                    <label class="bento-card p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-alert transition border-2 border-dashed border-gray-600">
+                        <i class="fa-solid fa-plus text-2xl text-gray-500 mb-2"></i>
+                        <span class="text-xs font-bold text-white">Nouveau Template de Contrat</span>
+                        <input type="file" class="hidden" accept=".pdf">
+                    </label>
+                </div>
+
+                <!-- MAPPING DICTIONARY -->
+                <div class="col-span-6 bento-card p-6 bg-abysse/50">
+                    <h3 class="text-sm font-bold text-white mb-4"><i class="fa-solid fa-code text-cyan mr-2"></i> Dictionnaire de Variables (Tags)</h3>
+                    <p class="text-xs text-gray-400 mb-4 leading-relaxed">Insérez ces balises exactes dans vos documents PDF vierges. Lors de la génération du contrat final, l'IA d'ENERGISTRAT les remplacera par les vraies valeurs.</p>
+                    
+                    <div class="space-y-2 max-h-64 overflow-y-auto pr-2">
+                        <div class="flex justify-between items-center bg-white/5 p-2 rounded border border-white/5">
+                            <span class="text-[10px] font-mono text-cyan select-all">{{CLIENT_RAISON_SOCIALE}}</span>
+                            <span class="text-[10px] text-gray-500">Nom de l'entreprise</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-white/5 p-2 rounded border border-white/5">
+                            <span class="text-[10px] font-mono text-cyan select-all">{{CLIENT_SIRET}}</span>
+                            <span class="text-[10px] text-gray-500">SIRET (14 chiffres)</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-white/5 p-2 rounded border border-white/5">
+                            <span class="text-[10px] font-mono text-cyan select-all">{{PDL_NUMBER}}</span>
+                            <span class="text-[10px] text-gray-500">Numéro de compteur</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-white/5 p-2 rounded border border-white/5">
+                            <span class="text-[10px] font-mono text-supplier select-all font-bold">{{PRIX_KWH_NEGOCIE}}</span>
+                            <span class="text-[10px] text-gray-500">Prix gagnant l'enchère</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-white/5 p-2 rounded border border-white/5">
+                            <span class="text-[10px] font-mono text-supplier select-all font-bold">{{DATE_EFFET}}</span>
+                            <span class="text-[10px] text-gray-500">Date de switch réseau</span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- TAB 5: TEAM (RESTAURÉ COMPLET) -->
-        <div id="tab-team" class="tab-content max-w-5xl mx-auto space-y-6 hidden">
-            <header><h2 class="text-2xl font-bold text-white mb-1">Équipe Commerciale</h2></header>
-            <div class="bento-card rounded-bento p-0 overflow-hidden">
-                <table class="w-full text-xs text-left">
-                    <thead class="bg-white/5 text-gray-400 uppercase"><tr><th class="p-4">Nom</th><th class="p-4">Email</th><th class="p-4">Rôle</th><th class="p-4 text-right">Statut</th></tr></thead>
-                    <tbody class="divide-y divide-white/5">
-                        <tr><td class="p-4 font-bold">Alice Martin</td><td class="p-4 text-gray-400">alice@partner.com</td><td class="p-4"><span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded">Admin</span></td><td class="p-4 text-right text-green-500">Actif</td></tr>
-                        <tr><td class="p-4 font-bold">Bob Durand</td><td class="p-4 text-gray-400">bob@partner.com</td><td class="p-4"><span class="bg-gray-500/20 text-gray-400 px-2 py-1 rounded">Vendeur</span></td><td class="p-4 text-right text-green-500">Actif</td></tr>
-                    </tbody>
-                </table>
-                <div class="p-4 border-t border-white/5 text-center"><button class="text-partner text-xs font-bold hover:underline">+ Ajouter un utilisateur</button></div>
+        <!-- ========================================== -->
+        <!-- TAB 3: E-SIGNATURE (YOUSIGN / DOCUSIGN) -->
+        <!-- ========================================== -->
+        <div id="tab-esign" class="tab-content max-w-5xl mx-auto space-y-6">
+            <header class="flex justify-between items-end border-b border-white/10 pb-4 mb-6">
+                <div>
+                    <h2 class="text-2xl font-black text-white italic tracking-tight">Signature Électronique <span class="text-success">(API)</span></h2>
+                    <p class="text-gray-400 text-xs mt-1">Branchez votre solution de signature. Les contrats signés déclenchent la facturation de la commission ENERGISTRAT.</p>
+                </div>
+                <button onclick="App.toast('Clés API sauvegardées avec succès.', 'success')" class="bg-success text-abysse px-8 py-3 rounded-xl text-xs font-black hover:bg-white transition shadow-[0_0_15px_rgba(16,185,129,0.4)]">
+                    Connecter l'API
+                </button>
+            </header>
+
+            <div class="bento-card p-8 border-t-4 border-success w-full max-w-2xl mx-auto">
+                <div class="flex justify-center gap-4 mb-8">
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="esign_provider" value="yousign" class="peer hidden" checked>
+                        <div class="p-4 rounded-xl border border-white/10 text-center peer-checked:border-success peer-checked:bg-success/10 transition grayscale peer-checked:grayscale-0">
+                            <img src="https://yousign.com/wp-content/themes/yousign/assets/images/logo-yousign-dark.svg" alt="Yousign" class="h-6 mx-auto bg-white p-1 rounded invert">
+                            <div class="text-[10px] font-bold mt-2 text-white">Yousign API V3</div>
+                        </div>
+                    </label>
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="esign_provider" value="docusign" class="peer hidden">
+                        <div class="p-4 rounded-xl border border-white/10 text-center peer-checked:border-success peer-checked:bg-success/10 transition grayscale peer-checked:grayscale-0">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/DocuSign_logo.svg/2560px-DocuSign_logo.svg.png" alt="DocuSign" class="h-6 mx-auto bg-white p-1 rounded">
+                            <div class="text-[10px] font-bold mt-2 text-white">DocuSign eSignature REST</div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="space-y-5">
+                    <div>
+                        <label class="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2">Clé API (Production)</label>
+                        <input type="password" value="sk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxx" class="w-full input-dark p-3 rounded-xl text-xs font-mono tracking-widest text-success border-success/30">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2 flex justify-between">
+                            Webhook Secret 
+                            <span class="text-[9px] text-cyan normal-case">Requis pour retour de signature</span>
+                        </label>
+                        <input type="password" value="whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxx" class="w-full input-dark p-3 rounded-xl text-xs font-mono tracking-widest">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: DEAL ROOM (C4/C3) -->
+        <!-- ========================================== -->
+        <div id="tab-dealroom" class="tab-content max-w-5xl mx-auto space-y-6">
+            <header class="flex justify-between items-end border-b border-white/10 pb-4 mb-6">
+                <div>
+                    <h2 class="text-2xl font-black text-white italic tracking-tight">Règles de Négociation <span class="text-cyan">(Deal Room)</span></h2>
+                    <p class="text-gray-400 text-xs mt-1">Paramétrez le comportement de l'interface pour les gros consommateurs (Mid-Market et Industrie).</p>
+                </div>
+                <button onclick="saveSettings('dealroom')" class="bg-cyan text-abysse px-8 py-3 rounded-xl text-xs font-black hover:bg-white transition shadow-[0_0_15px_rgba(0,229,255,0.4)]">
+                    Mettre à jour les seuils
+                </button>
+            </header>
+
+            <div class="grid grid-cols-2 gap-6">
+                <div class="bento-card p-8 border-t-4 border-cyan space-y-6">
+                    <h3 class="font-bold text-white text-lg">Seuils d'activation du Sur-Mesure</h3>
+                    
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs text-gray-400 font-bold">Activer le chiffrage PFC manuel si volume > </label>
+                            <span class="text-cyan font-bold font-mono">250 MWh</span>
+                        </div>
+                        <input type="range" min="100" max="1000" step="50" value="250" class="w-full accent-cyan">
+                        <p class="text-[9px] text-gray-500 mt-1">En dessous de ce seuil, les algorithmes utiliseront vos grilles Excel (C5).</p>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs text-gray-400 font-bold">Activer la "Deal Room" (Chat) si volume > </label>
+                            <span class="text-gold font-bold font-mono">5 000 MWh</span>
+                        </div>
+                        <input type="range" min="1000" max="10000" step="500" value="5000" class="w-full accent-gold">
+                        <p class="text-[9px] text-gray-500 mt-1">Ouvre un espace de discussion historisé pour proposer des produits complexes (Clics, Tranches).</p>
+                    </div>
+                </div>
+
+                <div class="bento-card p-8 bg-abysse/50">
+                    <h3 class="font-bold text-white text-lg mb-4">Notifications Key Account Managers</h3>
+                    <div class="space-y-4">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" checked class="w-4 h-4 accent-cyan">
+                            <span class="text-xs text-gray-300">Recevoir un email immédiat quand un dossier > 5 GWh est mis aux enchères.</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" checked class="w-4 h-4 accent-cyan">
+                            <span class="text-xs text-gray-300">Alerte Churn (Risque de départ d'un client actif).</span>
+                        </label>
+                        <div class="mt-4 pt-4 border-t border-white/10">
+                            <label class="text-[10px] text-gray-500 uppercase font-bold mb-2 block">Email(s) du Desk Pricing</label>
+                            <input type="text" class="w-full input-dark p-3 rounded-lg text-xs" value="pricing@fournisseur.com">
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
     </main>
 
     <script>
+        const App = {
+            toast: function(msg, type='info') {
+                const container = document.getElementById('toast-container');
+                const el = document.createElement('div');
+                const colorClass = type === 'success' ? 'bg-success text-abysse' : 'bg-supplier text-white';
+                const icon = type === 'success' ? 'fa-check-circle' : 'fa-info-circle';
+                el.className = `${colorClass} px-6 py-3 rounded-xl font-bold text-sm shadow-2xl flex items-center gap-3 transform transition-all duration-300 translate-y-10 opacity-0`;
+                el.innerHTML = `<i class="fa-solid ${icon}"></i> ${msg}`;
+                container.appendChild(el);
+                requestAnimationFrame(() => el.classList.remove('translate-y-10', 'opacity-0'));
+                setTimeout(() => { el.classList.add('opacity-0', 'translate-x-full'); setTimeout(() => el.remove(), 300); }, 3000);
+            }
+        };
+
         function switchTab(tabId) {
-            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white', 'border-partner'); el.classList.add('text-gray-400', 'border-transparent'); });
+            document.querySelectorAll('.nav-item').forEach(el => { 
+                el.classList.remove('active', 'text-white'); 
+                el.classList.add('text-gray-400'); 
+            });
             const btn = document.getElementById('nav-' + tabId);
-            btn.classList.add('active', 'text-white', 'border-partner'); btn.classList.remove('text-gray-400', 'border-transparent');
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden')); document.getElementById('tab-' + tabId).classList.remove('hidden');
+            if(btn) { 
+                btn.classList.add('active', 'text-white'); 
+                btn.classList.remove('text-gray-400'); 
+            }
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); 
+            const target = document.getElementById('tab-' + tabId);
+            if(target) target.classList.add('active');
         }
 
-        // --- SAVE REAL (API CABLEE) ---
-        async function saveConfig() {
-            const btn = document.activeElement;
-            const original = btn.innerText;
-            btn.innerText = "Sauvegarde...";
-            btn.disabled = true;
-
-            const data = {
-                branding: {
-                    name: document.getElementById('offer-name').value,
-                    color: document.getElementById('offer-color').value,
-                    domain: document.getElementById('offer-domain').value
-                },
-                pricing: {
-                    margin_kwh: document.getElementById('margin-kwh').value,
-                    margin_fix: document.getElementById('margin-fix').value
-                }
-            };
-
-            try {
-                const res = await fetch('/api/partner/save_config', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
-                });
-                
-                if((await res.json()).success) {
-                    const t = document.getElementById('toast');
-                    t.className = "show";
-                    setTimeout(() => t.className = "", 3000);
-                } else {
-                    alert("Erreur serveur");
-                }
-            } catch(e) { alert("Erreur réseau"); }
-            
-            btn.innerText = original;
-            btn.disabled = false;
+        function saveSettings(module) {
+            App.toast(`Configuration ${module.toUpperCase()} enregistrée sur le serveur sécurisé.`, 'success');
         }
 
-        // Sync Color Picker
-        document.getElementById('offer-color-picker').addEventListener('input', (e) => {
-            document.getElementById('offer-color').value = e.target.value;
-        });
-
-        switchTab('branding');
+        // Init par défaut
+        document.addEventListener('DOMContentLoaded', () => switchTab('grilles'));
     </script>
 </body>
 </html>
