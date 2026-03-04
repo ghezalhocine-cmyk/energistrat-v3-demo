@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | PPA Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = { theme: { extend: { colors: { abysse: '#001529', card: '#0F172A', ppa: '#F97316', success: '#10B981' }, fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] } } } }
+    </script>
+    <style>
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="flex h-screen w-screen text-sm">
+
+    <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50">
+        <button onclick="window.location.href='/ops_nexus'" class="w-12 h-12 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="w-12 h-12 rounded-xl bg-ppa/20 text-ppa flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(249,115,22,0.4)] mb-2"><i class="fa-solid fa-handshake-simple"></i></div>
+        <div class="text-[8px] font-bold text-ppa uppercase tracking-widest text-center">PPA<br>BUILDER</div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
+        <header class="h-20 border-b border-white/5 flex items-center px-8 bg-abysse/95 backdrop-blur z-20 justify-between">
+            <div>
+                <h2 class="text-2xl font-black text-white italic tracking-tight">CORTEX <span class="text-ppa">PPA</span></h2>
+                <p class="text-xs text-gray-400 font-mono mt-1">Corporate Power Purchase Agreement - Achat Direct EnR</p>
+            </div>
+            <div class="bg-card border border-white/10 px-6 py-2 rounded-xl text-right">
+                <span class="text-[10px] text-gray-500 uppercase font-bold block">Couverture Verte</span>
+                <span class="text-xl font-bold text-success font-mono" id="val-couverture">-- %</span>
+            </div>
+        </header>
+
+        <div class="p-8 overflow-y-auto h-full pb-20">
+            <div class="grid grid-cols-12 gap-6 h-full">
+                
+                <div class="col-span-8 flex flex-col gap-6">
+                    <div class="bento-card p-6 h-[450px] flex flex-col border-t-4 border-ppa">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-sm font-bold text-white uppercase tracking-wider">Superposition : Conso Globale vs Parc Solaire/Éolien</h3>
+                        </div>
+                        <div class="flex-1 relative w-full"><canvas id="ppaChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="col-span-4 flex flex-col gap-6">
+                    <div class="bento-card p-8 bg-gradient-to-b from-card to-ppa/10 border border-ppa/30 flex-1 flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-xl font-black text-white mb-4">Analyse de Couverture PPA</h3>
+                            <p class="text-sm text-gray-300 leading-relaxed mb-6">
+                                En achetant directement la production d'une ferme solaire locale sur 10 ans à prix fixe, vous vous protégez de la volatilité du marché.
+                            </p>
+                            <div class="bg-abysse/50 p-4 rounded-xl border border-white/10 space-y-4">
+                                <div class="flex justify-between text-xs"><span class="text-gray-400">Prix PPA Négocié</span><span class="font-mono text-success font-bold">55 €/MWh</span></div>
+                                <div class="flex justify-between text-xs"><span class="text-gray-400">Prix Marché (Reste)</span><span class="font-mono text-alert font-bold">90 €/MWh</span></div>
+                                <div class="flex justify-between text-sm border-t border-white/10 pt-3"><span class="text-gray-200 font-bold">Prix Moyen Lissé</span><span class="font-mono text-ppa font-black">69 €/MWh</span></div>
+                            </div>
+                        </div>
+                        <button onclick="alert('Demande de sourcing PPA envoyée aux producteurs locaux.')" class="w-full bg-ppa text-abysse font-black py-4 rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.4)] hover:bg-white transition mt-6">
+                            SOURCER UN PRODUCTEUR
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let chartInstance = null;
+
+        async function initPPA() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                let totalVol = 0;
+                if(data.fleet) data.fleet.forEach(s => { if(s.energy === 'elec') totalVol += s.volume; });
+                
+                if(totalVol === 0) totalVol = 15000; // Fallback Demo
+
+                document.getElementById('val-couverture').innerText = "40 %";
+                
+                const ctx = document.getElementById('ppaChart').getContext('2d');
+                const labels = Array.from({length: 24}, (_, i) => i + 'h');
+                
+                const consoCurve = labels.map(h => (totalVol/365/24) * (parseInt(h)>7 && parseInt(h)<19 ? 1.2 : 0.8));
+                const ppaCurve = labels.map(h => { let hour = parseInt(h); return (hour > 9 && hour < 17) ? (totalVol/365/24)*1.5 : 0; });
+
+                chartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets:[
+                            { label: 'Production Ferme PPA', data: ppaCurve, backgroundColor: 'rgba(249, 115, 22, 0.4)', borderColor: '#F97316', fill: true, tension: 0.4 },
+                            { label: 'Consommation Réelle', data: consoCurve, borderColor: '#00E5FF', borderWidth: 2, borderDash: [5,5], pointRadius: 0 }
+                        ]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid:{display:false} }, y: { grid:{color:'rgba(255,255,255,0.05)'} } } }
+                });
+            } catch(e) {}
+        }
+        document.addEventListener('DOMContentLoaded', initPPA);
+    </script>
+</body>
+</html>
