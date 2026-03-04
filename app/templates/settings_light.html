@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mon Profil | ENERGISTRAT V3</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { abysse: '#050505', card: '#0F172A', cyan: '#00E5FF', success: '#10B981' },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #050505; color: white; -webkit-tap-highlight-color: transparent; }
+        .input-cyber { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: white; transition: all 0.3s ease; border-radius: 1rem; padding: 1rem 1.2rem; width: 100%; font-size: 0.875rem; outline: none; }
+        .input-cyber:focus { border-color: #00E5FF; box-shadow: 0 0 15px rgba(0, 229, 255, 0.1); background: rgba(0, 229, 255, 0.05); }
+        .input-cyber::placeholder { color: #64748B; }
+        select.input-cyber { appearance: none; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748B' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; }
+        select.input-cyber option { background-color: #0F172A; color: white; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- HEADER MOBILE-FIRST -->
+    <header class="h-16 flex items-center px-6 border-b border-white/5 bg-abysse/90 backdrop-blur sticky top-0 z-50">
+        <button onclick="history.back()" class="text-gray-400 hover:text-white transition p-2 -ml-2">
+            <i class="fa-solid fa-arrow-left text-lg"></i>
+        </button>
+        <div class="flex-1 text-center font-black text-lg tracking-tight">MON <span class="text-cyan">PROFIL</span></div>
+        <div class="w-8"></div> <!-- Spacer for center alignment -->
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-6 pb-24">
+        <div class="max-w-xl mx-auto space-y-8">
+
+            <div class="text-center mb-8">
+                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-cyan to-blue-600 mx-auto flex items-center justify-center text-abysse font-black text-3xl mb-4 shadow-[0_0_20px_rgba(0,229,255,0.3)]">
+                    <i class="fa-solid fa-user-astronaut"></i>
+                </div>
+                <h2 class="text-xl font-bold">Bienvenue sur CORTEX</h2>
+                <p class="text-sm text-gray-400 mt-1">Configurez votre logement ou votre local en 1 minute.</p>
+            </div>
+
+            <form id="light-settings-form" onsubmit="saveProfile(event)" class="space-y-6">
+                
+                <!-- BLOC 1 : IDENTITÉ -->
+                <div class="bg-card p-6 rounded-3xl border border-white/5 space-y-4">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-id-card text-cyan"></i> Identité & Localisation
+                    </h3>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-300 mb-2 pl-1">Nom du Site (ex: Mon Appart, Ma Boulangerie)</label>
+                        <input type="text" id="site_name" class="input-cyber" placeholder="Mon Domicile" required>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-300 mb-2 pl-1">Ville</label>
+                            <input type="text" id="city" class="input-cyber" placeholder="Paris" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-300 mb-2 pl-1">Surface (m²)</label>
+                            <input type="number" id="surface" class="input-cyber font-mono" placeholder="70" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BLOC 2 : TECHNIQUE & LINKY -->
+                <div class="bg-card p-6 rounded-3xl border border-white/5 space-y-4">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-bolt text-yellow-400"></i> Données Compteur (Linky)
+                    </h3>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-300 mb-2 pl-1 flex justify-between">
+                            <span>Numéro PDL / PRM</span>
+                            <span class="text-gray-500 font-normal">14 chiffres</span>
+                        </label>
+                        <input type="text" id="pdl" class="input-cyber font-mono tracking-widest" placeholder="12345678901234" maxlength="14" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-300 mb-2 pl-1">Puissance Souscrite (Abonnement)</label>
+                        <select id="power" class="input-cyber font-mono">
+                            <option value="3">3 kVA (Petit studio)</option>
+                            <option value="6" selected>6 kVA (Standard)</option>
+                            <option value="9">9 kVA (Tout électrique)</option>
+                            <option value="12">12 kVA (Grande maison)</option>
+                            <option value="18">18 kVA (Pro / Petite PME)</option>
+                            <option value="36">36 kVA (Pro / PME max)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- BLOC 3 : FACTURATION -->
+                <div class="bg-card p-6 rounded-3xl border border-white/5 space-y-4">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice-dollar text-green-400"></i> Contrat & Facturation
+                    </h3>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-300 mb-2 pl-1">Fournisseur actuel</label>
+                        <select id="provider" class="input-cyber">
+                            <option value="EDF">EDF (Tarif Bleu)</option>
+                            <option value="ENGIE">ENGIE</option>
+                            <option value="TOTAL">TotalEnergies</option>
+                            <option value="ENI">Eni</option>
+                            <option value="AUTRE">Autre fournisseur alternatif</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-300 mb-2 pl-1 flex justify-between">
+                            <span>Prix du kWh (TTC)</span>
+                            <span class="text-gray-500 font-normal">Optionnel</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="price" step="0.001" class="input-cyber font-mono" placeholder="0.251">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">€</span>
+                        </div>
+                        <p class="text-[10px] text-gray-500 mt-2 pl-1">Laissez vide si vous ne savez pas. L'IA utilisera le tarif réglementé (TRVE) par défaut.</p>
+                    </div>
+                </div>
+
+                <!-- SUBMIT -->
+                <div class="pt-4">
+                    <button type="submit" id="submit-btn" class="w-full bg-cyan text-abysse font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(0,229,255,0.3)] hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 text-lg">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> ENREGISTRER MON PROFIL
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </main>
+
+    <!-- TOAST -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none"></div>
+
+    <script>
+        const App = {
+            toast: function(msg) {
+                const container = document.getElementById('toast-container');
+                const el = document.createElement('div');
+                el.className = `bg-success text-black px-6 py-3 rounded-full font-bold text-sm shadow-2xl flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0`;
+                el.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${msg}`;
+                container.appendChild(el);
+                requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
+                setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 3000);
+            }
+        };
+
+        async function saveProfile(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submit-btn');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> SAUVEGARDE...';
+            
+            const pdl = document.getElementById('pdl').value;
+            
+            // Construction du JSON respectant la "Data Unity" du main.py
+            const payload = {
+                identity: {
+                    id: pdl, // L'ID devient le PDL pour le citoyen/PME
+                    site_name: document.getElementById('site_name').value
+                },
+                location: {
+                    city: document.getElementById('city').value,
+                    surface: parseFloat(document.getElementById('surface').value)
+                },
+                contract: {
+                    pdl: pdl,
+                    power: parseFloat(document.getElementById('power').value),
+                    provider: document.getElementById('provider').value
+                },
+                pricing: {
+                    price_kwh: parseFloat(document.getElementById('price').value) || 0.251
+                }
+            };
+
+            try {
+                const res = await fetch('/api/settings/save_client', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    App.toast('Profil mis à jour avec succès !');
+                    setTimeout(() => {
+                        // Redirection intelligente en fonction de l'origine
+                        if(document.referrer.includes('pme')) {
+                            window.location.href = '/pme';
+                        } else {
+                            window.location.href = '/citoyen';
+                        }
+                    }, 1500);
+                } else {
+                    alert("Erreur de sauvegarde : " + data.error);
+                    btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> RÉESSAYER';
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Erreur réseau");
+                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> RÉESSAYER';
+            }
+        }
+    </script>
+</body>
+</html>
