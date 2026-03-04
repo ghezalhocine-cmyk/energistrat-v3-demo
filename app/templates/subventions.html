@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | Subvention Finder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = { theme: { extend: { colors: { abysse: '#001529', card: '#0F172A', sub: '#00E5FF', success: '#10B981' }, fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] } } } }
+    </script>
+    <style>
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    </style>
+</head>
+<body class="flex h-screen w-screen text-sm">
+
+    <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50">
+        <button onclick="window.location.href='/ops_nexus'" class="w-12 h-12 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="w-12 h-12 rounded-xl bg-sub/20 text-sub flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(0,229,255,0.4)] mb-2"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+        <div class="text-[8px] font-bold text-sub uppercase tracking-widest text-center">AIDES<br>ÉTAT</div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
+        <header class="h-20 border-b border-white/5 flex items-center px-8 bg-abysse/95 backdrop-blur z-20 justify-between">
+            <div>
+                <h2 class="text-2xl font-black text-white italic tracking-tight">CORTEX <span class="text-sub">SUBVENTIONS</span></h2>
+                <p class="text-xs text-gray-400 font-mono mt-1">Détection automatique des aides (CEE, Ademe, Région) éligibles pour votre parc.</p>
+            </div>
+            <div class="bg-card border border-white/10 px-6 py-2 rounded-xl text-right">
+                <span class="text-[10px] text-gray-500 uppercase font-bold block">Enveloppe Sécurisable</span>
+                <span class="text-xl font-bold text-success font-mono" id="val-total-aides">-- €</span>
+            </div>
+        </header>
+
+        <div class="p-8 overflow-y-auto h-full pb-20">
+            <div class="bento-card p-0 overflow-hidden flex flex-col h-[700px] border-t-4 border-sub">
+                <div class="flex-1 overflow-y-auto">
+                    <table class="w-full text-left text-xs text-gray-300">
+                        <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold sticky top-0">
+                            <tr>
+                                <th class="px-6 py-4">Bâtiment / Site</th>
+                                <th class="px-6 py-4">Dispositif Détecté par l'IA</th>
+                                <th class="px-6 py-4 text-right">Prime Estimée</th>
+                                <th class="px-6 py-4 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5" id="aides-list">
+                            <!-- Injecté par JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function initAides() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                const list = document.getElementById('aides-list');
+                let totalAides = 0;
+
+                data.fleet.sort((a,b) => b.volume - a.volume).forEach(s => {
+                    const surface = s.surface > 0 ? s.surface : 1500;
+                    const intensity = (s.volume * 1000) / surface;
+                    
+                    let aide = ""; let montant = 0; let badge = "";
+
+                    if (intensity > 250) { 
+                        montant = surface * 35; // Aide ITE
+                        aide = "Rénovation Globale (CEE + Ademe)";
+                        badge = "text-blue-400";
+                    } else if (s.ghost_savings > 500) { 
+                        montant = surface * 15; // Aide GTB
+                        aide = "Coup de Pouce GTB (Fiche TH-116)";
+                        badge = "text-cyan";
+                    } else if (s.energy === 'gaz' && s.volume > 150) {
+                        montant = 45000; // Fonds Chaleur
+                        aide = "Fonds Chaleur (Conversion PAC/Réseau)";
+                        badge = "text-alert";
+                    }
+
+                    if (montant > 0) {
+                        totalAides += montant;
+                        list.innerHTML += `
+                            <tr class="hover:bg-white/5 transition border-b border-white/5">
+                                <td class="px-6 py-4 font-bold text-white">${s.name} <br><span class="text-[9px] font-mono text-gray-500">${s.pdl || s.id}</span></td>
+                                <td class="px-6 py-4 font-bold ${badge}">${aide}</td>
+                                <td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(montant).toLocaleString()} €</td>
+                                <td class="px-6 py-4 text-center"><button class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded text-xs transition">Monter le dossier</button></td>
+                            </tr>
+                        `;
+                    }
+                });
+
+                document.getElementById('val-total-aides').innerText = "+ " + Math.round(totalAides).toLocaleString() + " €";
+
+                if (list.innerHTML === "") {
+                    list.innerHTML = "<tr><td colspan='4' class='text-center p-8 text-gray-500'>Aucune aide détectée pour le moment.</td></tr>";
+                }
+
+            } catch(e) { console.error(e); }
+        }
+        document.addEventListener('DOMContentLoaded', initAides);
+    </script>
+</body>
+</html>
