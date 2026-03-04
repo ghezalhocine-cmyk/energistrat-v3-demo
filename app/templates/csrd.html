@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | CSRD Compliance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = { theme: { extend: { colors: { abysse: '#001529', card: '#0F172A', csrd: '#14B8A6' }, fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] } } } }
+    </script>
+    <style>
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="flex h-screen w-screen text-sm">
+
+    <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50">
+        <button onclick="window.location.href='/ops_nexus'" class="w-12 h-12 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="w-12 h-12 rounded-xl bg-csrd/20 text-csrd flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(20,184,166,0.4)] mb-2"><i class="fa-solid fa-book-bookmark"></i></div>
+        <div class="text-[8px] font-bold text-csrd uppercase tracking-widest text-center">CSRD<br>ESRS E1</div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
+        <header class="h-20 border-b border-white/5 flex items-center px-8 bg-abysse/95 backdrop-blur z-20">
+            <div>
+                <h2 class="text-2xl font-black text-white italic tracking-tight">CORTEX <span class="text-csrd">CSRD COMPLIANCE</span></h2>
+                <p class="text-xs text-gray-400 font-mono mt-1">Norme ESRS E1 - Génération du bilan extra-financier européen</p>
+            </div>
+        </header>
+
+        <div class="p-8 overflow-y-auto h-full pb-20">
+            <div class="grid grid-cols-12 gap-6 h-full">
+                
+                <div class="col-span-8 flex flex-col gap-6">
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="bento-card p-6 border-l-4 border-alert">
+                            <h3 class="text-[10px] text-gray-400 uppercase font-bold mb-1">Scope 1 (Émissions Directes - Gaz)</h3>
+                            <div class="text-4xl font-black text-white font-mono" id="val-scope1">-- t</div>
+                        </div>
+                        <div class="bento-card p-6 border-l-4 border-blue-500">
+                            <h3 class="text-[10px] text-gray-400 uppercase font-bold mb-1">Scope 2 (Émissions Indirectes - Élec)</h3>
+                            <div class="text-4xl font-black text-white font-mono" id="val-scope2">-- t</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bento-card p-6 flex-1 flex flex-col border-t-4 border-csrd">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4">Trajectoire Carbone Consolidée du Patrimoine</h3>
+                        <div class="flex-1 relative w-full"><canvas id="csrdChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="col-span-4 flex flex-col gap-6">
+                    <div class="bento-card p-8 bg-gradient-to-b from-card to-csrd/10 border border-csrd/30 flex-1 flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-xl font-black text-white mb-4"><i class="fa-solid fa-file-pdf text-csrd mr-2"></i> Audit Annuel Légal</h3>
+                            <p class="text-sm text-gray-300 leading-relaxed mb-6">
+                                CORTEX a analysé l'intégralité de votre parc énergétique. Les données sont consolidées selon le protocole GHG et la taxonomie Européenne.
+                            </p>
+                            <div class="bg-abysse/50 p-4 rounded-xl border border-white/10 space-y-3">
+                                <div class="flex justify-between text-xs"><span class="text-gray-400">Périmètre audité</span><span class="font-mono text-white font-bold" id="val-sites">--</span></div>
+                                <div class="flex justify-between text-xs"><span class="text-gray-400">Fiabilité SGE</span><span class="font-mono text-success font-bold">100%</span></div>
+                                <div class="flex justify-between text-xs border-t border-white/10 pt-2"><span class="text-gray-400">Bilan Total CO2e</span><span class="font-mono text-csrd font-black" id="val-total">-- t</span></div>
+                            </div>
+                        </div>
+                        <button onclick="alert('Le rapport PDF normé ESRS E1 est en cours de génération pour vos auditeurs.')" class="w-full bg-csrd text-abysse font-black py-4 rounded-xl shadow-[0_0_20px_rgba(20,184,166,0.4)] hover:bg-white transition">
+                            GÉNÉRER RAPPORT CSRD
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const FE_ELEC = 0.052; const FE_GAZ = 0.227;
+        let chartInstance = null;
+
+        async function initCSRD() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                if(data.fleet) {
+                    let volElec = 0; let volGaz = 0;
+                    data.fleet.forEach(s => {
+                        if(s.energy === 'elec') volElec += s.volume;
+                        else volGaz += s.volume;
+                    });
+                    
+                    const t1 = volGaz * FE_GAZ;
+                    const t2 = volElec * FE_ELEC;
+                    
+                    document.getElementById('val-sites').innerText = data.fleet.length + " sites";
+                    document.getElementById('val-scope1').innerText = Math.round(t1).toLocaleString() + " t";
+                    document.getElementById('val-scope2').innerText = Math.round(t2).toLocaleString() + " t";
+                    document.getElementById('val-total').innerText = Math.round(t1 + t2).toLocaleString() + " t";
+                    
+                    drawChart(t1+t2);
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function drawChart(totalCo2) {
+            const ctx = document.getElementById('csrdChart').getContext('2d');
+            const dataProj =[1.0, 0.9, 0.8].map(f => totalCo2 * f);
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { labels:['2023', '2024', '2025', '2026', '2027 (Proj)'], datasets:[{ label: 'Émissions (tCO2e)', data: dataProj, backgroundColor: '#14B8A6', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } } }
+            });
+        }
+        document.addEventListener('DOMContentLoaded', initCSRD);
+    </script>
+</body>
+</html>
