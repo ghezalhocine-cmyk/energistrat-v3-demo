@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | NEXUS OPS</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        abysse: '#001529',
+                        card: '#0F172A',
+                        cyan: '#00E5FF',
+                        ind: '#3B82F6',   // Bleu Industrie
+                        pub: '#10B981',   // Vert SDE/Mairie
+                        oph: '#F97316',   // Orange OPH
+                        syn: '#6366F1',   // Indigo Syndic
+                        ops: '#EF4444',   // Rouge Danger/Admin
+                        sat: '#8B5CF6',   // Violet Satellites
+                        gold: '#F59E0B'
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                    borderRadius: { '3xl': '2rem', '4xl': '3rem' }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #001529; color: white; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
+        .bento-card:hover { transform: translateY(-4px); border-color: rgba(0, 229, 255, 0.4); box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5); }
+        .bg-grid-pattern { background-image: linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 40px 40px; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        .search-bar { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.2s; }
+        .search-bar:focus { border-color: #00E5FF; background: rgba(0,229,255,0.05); outline: none; }
+    </style>
+</head>
+<body class="bg-abysse min-h-screen flex flex-col relative bg-grid-pattern">
+
+    <!-- TOP NAVIGATION BAR -->
+    <header class="h-20 border-b border-white/5 flex items-center justify-between px-10 bg-abysse/90 backdrop-blur z-50 sticky top-0">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan to-blue-900 flex items-center justify-center text-white font-black shadow-[0_0_15px_rgba(0,229,255,0.4)]">
+                <i class="fa-solid fa-layer-group text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-black tracking-tight italic">CORTEX <span class="text-cyan">NEXUS</span></h1>
+                <p class="text-[10px] text-gray-400 font-mono tracking-widest uppercase">Admin Operations Center</p>
+            </div>
+        </div>
+        
+        <div class="flex-1 max-w-xl mx-8 relative">
+            <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+            <input type="text" id="nexus-search" onkeyup="filterCards()" placeholder="Rechercher un module (ex: Syndic, Carbone, Ingest)..." class="search-bar w-full rounded-full py-2.5 pl-12 pr-4 text-sm font-medium placeholder-gray-500">
+        </div>
+
+        <div class="flex items-center gap-6">
+            <div class="text-right">
+                <div class="text-[10px] text-gray-500 uppercase font-bold">Base de Données</div>
+                <div class="text-lg font-bold text-white font-mono flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-success animate-pulse"></div>
+                    <span id="kpi-count">--</span> <span class="text-xs text-gray-400">PDL actifs</span>
+                </div>
+            </div>
+            <div class="w-px h-8 bg-white/10"></div>
+            <a href="/logout" class="text-gray-400 hover:text-alert transition" title="Déconnexion"><i class="fa-solid fa-power-off text-xl"></i></a>
+        </div>
+    </header>
+
+    <!-- MAIN DASHBOARD -->
+    <main class="flex-1 p-10 overflow-y-auto">
+        <div class="max-w-7xl mx-auto space-y-12 pb-20">
+
+            <!-- SECTION 1 : PROFILS CLIENTS (La Flotte) -->
+            <section>
+                <div class="flex items-center gap-3 mb-6">
+                    <i class="fa-solid fa-users-rectangle text-xl text-gray-400"></i>
+                    <h2 class="text-lg font-bold text-white uppercase tracking-widest">Profils Métiers (Front-Office)</h2>
+                </div>
+                <div class="grid grid-cols-4 gap-6" id="grid-profils">
+                    
+                    <!-- SDE -->
+                    <a href="/sde" class="bento-card p-6 block hover:border-pub group module-card" data-tags="sde syndicat energie territoire communes">
+                        <div class="w-12 h-12 rounded-full bg-pub/10 text-pub flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-bolt"></i></div>
+                        <h3 class="text-base font-bold text-white mb-1">SDE.OS</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Gouvernance territoriale, ligue citoyenne, et génération DQE massifs.</p>
+                        <div class="text-[10px] font-bold text-pub uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
+                    </a>
+
+                    <!-- Mairie -->
+                    <a href="/mairie" class="bento-card p-6 block hover:border-pub group module-card" data-tags="mairie commune public m57">
+                        <div class="w-12 h-12 rounded-full bg-pub/10 text-pub flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-landmark"></i></div>
+                        <h3 class="text-base font-bold text-white mb-1">Mairie.OS</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Pilotage du parc public, comptabilité M57, et suivi de sobriété.</p>
+                        <div class="text-[10px] font-bold text-pub uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
+                    </a>
+
+                    <!-- OPH -->
+                    <a href="/oph" class="bento-card p-6 block hover:border-oph group module-card" data-tags="oph hlm bailleur social charges">
+                        <div class="w-12 h-12 rounded-full bg-oph/10 text-oph flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-city"></i></div>
+                        <h3 class="text-base font-bold text-white mb-1">OPH.OS</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Gestion bailleur social, concertation SRU, charges P1/P2/P3 et CEE.</p>
+                        <div class="text-[10px] font-bold text-oph uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
+                    </a>
+
+                    <!-- Syndic -->
+                    <a href="/syndic" class="bento-card p-6 block hover:border-syn group module-card" data-tags="syndic copropriete ag tantiemes">
+                        <div class="w-12 h-12 rounded-full bg-syn/10 text-syn flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-building"></i></div>
+                        <h3 class="text-base font-bold text-white mb-1">Syndic.OS</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Copropriétés privées, archives AG, tantièmes et bouclier TRVE.</p>
+                        <div class="text-[10px] font-bold text-syn uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
+                    </a>
+
+                    <!-- Industrie -->
+                    <a href="/industry" class="bento-card p-6 block hover:border-ind group module-card" data-tags="industrie usine iso 50001">
+                        <div class="w-12 h-12 rounded-full bg-ind/10 text-ind flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-industry"></i></div>
+                        <h3 class="text-base font-bold text-white mb-1">Industrie 4.0</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Monitoring intensif, Cos Phi, et indicateurs de performance purs.</p>
+                        <div class="text-[10px] font-bold text-ind uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
+                    </a>
+
+                    <!-- Retail / GSA -->
+                    <a href="/retail" class="bento-card p-6 block hover:border-ind group module-card" data-tags="retail gsa supermarche magasins">
+                        <div class="w-12 h-12 rounded-full bg-ind/10 text-ind flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-store"></i></div>
+                        <h3 class="text-base font-bold text-white mb-1">Retail & Franchises</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Pilotage multi-sites, froid commercial et optimisation réseau.</p>
+                        <div class="text-[10px] font-bold text-ind uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
+                    </a>
+
+                    <!-- PME -->
+                    <a href="/pme" class="bento-card p-6 block hover:border-ind group module-card" data-tags="pme pro artisan tertiaire">
+                        <div class="w-12 h-12 rounded-full bg-ind/10 text-ind flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-briefcase"></i></div>
+                        <h3 class="text-base font-bold text-white mb-1">PME & Tertiaire</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Optimisation factures, accompagnement PME et petits professionnels.</p>
+                        <div class="text-[10px] font-bold text-ind uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
+                    </a>
+
+                    <!-- Citoyen -->
+                    <a href="/citoyen" class="bento-card p-6 block hover:border-cyan group module-card" data-tags="citoyen particulier gamification">
+                        <div class="w-12 h-12 rounded-full bg-cyan/10 text-cyan flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-house-user"></i></div>
+                        <h3 class="text-base font-bold text-white mb-1">App Citoyen</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Application grand public, gamification et suivi Linky personnel.</p>
+                        <div class="text-[10px] font-bold text-cyan uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
+                    </a>
+
+                </div>
+            </section>
+
+            <!-- SECTION 2 : SATELLITES IA (Outils Experts) -->
+            <section>
+                <div class="flex items-center gap-3 mb-6">
+                    <i class="fa-solid fa-satellite text-xl text-sat"></i>
+                    <h2 class="text-lg font-bold text-white uppercase tracking-widest">Modules & Satellites IA</h2>
+                </div>
+                <div class="grid grid-cols-3 gap-6" id="grid-satellites">
+                    
+                    <a href="/finance" class="bento-card p-6 flex items-center gap-4 hover:border-gold group module-card" data-tags="finance factures audit pdf facturex ocr">
+                        <div class="w-14 h-14 rounded-xl bg-gold/10 text-gold flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                        <div>
+                            <h3 class="text-sm font-bold text-white mb-1">Financial Twin</h3>
+                            <p class="text-xs text-gray-400">Audit de factures (PDF/XML) & Projection.</p>
+                        </div>
+                    </a>
+
+                    <a href="/carbon" class="bento-card p-6 flex items-center gap-4 hover:border-pub group module-card" data-tags="carbone rse decret tertiaire elan">
+                        <div class="w-14 h-14 rounded-xl bg-pub/10 text-pub flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-leaf"></i></div>
+                        <div>
+                            <h3 class="text-sm font-bold text-white mb-1">Bilan Carbone</h3>
+                            <p class="text-xs text-gray-400">Scopes 1/2/3 et Audit Décret Tertiaire.</p>
+                        </div>
+                    </a>
+
+                    <a href="/cortex_grid" class="bento-card p-6 flex items-center gap-4 hover:border-sat group module-card" data-tags="grid irve bornes production autoconsommation solaire">
+                        <div class="w-14 h-14 rounded-xl bg-sat/10 text-sat flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-network-wired"></i></div>
+                        <div>
+                            <h3 class="text-sm font-bold text-white mb-1">Cortex GRID</h3>
+                            <p class="text-xs text-gray-400">Pilotage IRVE et Autoconsommation.</p>
+                        </div>
+                    </a>
+
+                    <a href="/pulse" class="bento-card p-6 flex items-center gap-4 hover:border-sat group module-card" data-tags="pulse rte ecowatt pp1 capacite">
+                        <div class="w-14 h-14 rounded-xl bg-sat/10 text-sat flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-satellite-dish"></i></div>
+                        <div>
+                            <h3 class="text-sm font-bold text-white mb-1">Cortex PULSE</h3>
+                            <p class="text-xs text-gray-400">API RTE, Alertes PP1 et Météo Réseau.</p>
+                        </div>
+                    </a>
+
+                    <a href="/reverse" class="bento-card p-6 flex items-center gap-4 hover:border-yellow-400 group module-card" data-tags="reverse simu inverse budget">
+                        <div class="w-14 h-14 rounded-xl bg-yellow-400/10 text-yellow-400 flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-bullseye"></i></div>
+                        <div>
+                            <h3 class="text-sm font-bold text-white mb-1">Cortex REVERSE</h3>
+                            <p class="text-xs text-gray-400">Simulateur budget ➔ Objectif conso.</p>
+                        </div>
+                    </a>
+
+                    <a href="/solar" class="bento-card p-6 flex items-center gap-4 hover:border-yellow-500 group module-card" data-tags="solar pvgis solaire panneaux roi">
+                        <div class="w-14 h-14 rounded-xl bg-yellow-500/10 text-yellow-500 flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-solar-panel"></i></div>
+                        <div>
+                            <h3 class="text-sm font-bold text-white mb-1">Solar Studio</h3>
+                            <p class="text-xs text-gray-400">Calculateur de ROI PVGIS (Solaire).</p>
+                        </div>
+                    </a>
+
+                    <a href="/optimization" class="bento-card p-6 flex items-center gap-4 hover:border-cyan group module-card" data-tags="optimization turpe cee travaux roi">
+                        <div class="w-14 h-14 rounded-xl bg-cyan/10 text-cyan flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-sliders"></i></div>
+                        <div>
+                            <h3 class="text-sm font-bold text-white mb-1">Optimisation TURPE</h3>
+                            <p class="text-xs text-gray-400">Optimisation tarifaire et Primes CEE.</p>
+                        </div>
+                    </a>
+
+                    <a href="/trading" class="bento-card p-6 flex items-center gap-4 hover:border-cyan group module-card" data-tags="trading spot marche epex bloc">
+                        <div class="w-14 h-14 rounded-xl bg-cyan/10 text-cyan flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-chart-line"></i></div>
+                        <div>
+                            <h3 class="text-sm font-bold text-white mb-1">Trading Room</h3>
+                            <p class="text-xs text-gray-400">Achat sur marché de gros (Bloc/Spot).</p>
+                        </div>
+                    </a>
+
+                    <a href="/forecast" class="bento-card p-6 flex items-center gap-4 hover:border-cyan group module-card" data-tags="forecast trajectoire previsions">
+                        <div class="w-14 h-14 rounded-xl bg-cyan/10 text-cyan flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-crystal-ball"></i></div>
+                        <div>
+                            <h3 class="text-sm font-bold text-white mb-1">Smart Twin Forecast</h3>
+                            <p class="text-xs text-gray-400">Projections et atterrissages à 3 ans.</p>
+                        </div>
+                    </a>
+
+                </div>
+            </section>
+
+            <!-- SECTION 3 : SALLE DES MACHINES (ADMIN) -->
+            <section>
+                <div class="flex items-center gap-3 mb-6">
+                    <i class="fa-solid fa-server text-xl text-ops"></i>
+                    <h2 class="text-lg font-bold text-white uppercase tracking-widest">Salle des Machines (Back-Office)</h2>
+                </div>
+                <div class="grid grid-cols-4 gap-6" id="grid-admin">
+                    
+                    <a href="/settings" class="bento-card p-6 border-t-4 border-cyan hover:bg-white/5 transition module-card" data-tags="settings data unity compteurs pdl normalisation client">
+                        <i class="fa-solid fa-database text-cyan text-3xl mb-4 block"></i>
+                        <h3 class="text-sm font-bold text-white mb-1">Data Unity (Client)</h3>
+                        <p class="text-[10px] text-gray-400">Gestionnaire des données (Import CSV, PDL, Puissances).</p>
+                    </a>
+
+                    <a href="/ops/ingest" class="bento-card p-6 border-t-4 border-ops hover:bg-white/5 transition module-card" data-tags="ops ingest sge grdf zip importation">
+                        <i class="fa-solid fa-file-zipper text-ops text-3xl mb-4 block"></i>
+                        <h3 class="text-sm font-bold text-white mb-1">Ingestion SGE/GRDF</h3>
+                        <p class="text-[10px] text-gray-400">Upload de masse des fichiers bruts Enedis/GRDF (.zip).</p>
+                    </a>
+
+                    <a href="/ops/market" class="bento-card p-6 border-t-4 border-ops hover:bg-white/5 transition module-card" data-tags="ops market prix trve marche configuration">
+                        <i class="fa-solid fa-money-bill-trend-up text-ops text-3xl mb-4 block"></i>
+                        <h3 class="text-sm font-bold text-white mb-1">Market Ops</h3>
+                        <p class="text-[10px] text-gray-400">Mise à jour des prix de référence (TRVE, PEG, CAL).</p>
+                    </a>
+
+                    <a href="/ops/aggregator" class="bento-card p-6 border-t-4 border-ops hover:bg-white/5 transition module-card" data-tags="ops aggregator fusion sge">
+                        <i class="fa-solid fa-object-group text-ops text-3xl mb-4 block"></i>
+                        <h3 class="text-sm font-bold text-white mb-1">Aggregator Tool</h3>
+                        <p class="text-[10px] text-gray-400">Générateur SGE virtuel (fusion de compteurs multi-sites).</p>
+                    </a>
+
+                    <a href="/partner/settings" class="bento-card p-6 border-t-4 border-gray-500 hover:bg-white/5 transition module-card" data-tags="partner settings admin partenaire marque blanche">
+                        <i class="fa-solid fa-building-user text-gray-400 text-3xl mb-4 block"></i>
+                        <h3 class="text-sm font-bold text-white mb-1">Settings Partner</h3>
+                        <p class="text-[10px] text-gray-400">Configuration Marque Blanche et droits (Fournisseurs/AMO).</p>
+                    </a>
+
+                </div>
+            </section>
+
+            <!-- SECTION 4 : VITRINE & DOCS -->
+            <section class="opacity-70 hover:opacity-100 transition duration-300">
+                <div class="flex items-center gap-3 mb-6">
+                    <i class="fa-solid fa-globe text-xl text-gray-500"></i>
+                    <h2 class="text-sm font-bold text-gray-500 uppercase tracking-widest">Espace Public & Vitrine</h2>
+                </div>
+                <div class="flex flex-wrap gap-4" id="grid-public">
+                    <a href="/" class="px-4 py-2 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/10 transition module-card" data-tags="index accueil landing"><i class="fa-solid fa-home mr-2"></i>Landing Page</a>
+                    <a href="/solutions" class="px-4 py-2 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/10 transition module-card" data-tags="solutions vitrine"><i class="fa-solid fa-shapes mr-2"></i>Nos Solutions</a>
+                    <a href="/cortex" class="px-4 py-2 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/10 transition module-card" data-tags="cortex ia vitrine"><i class="fa-solid fa-brain mr-2"></i>Technologie Cortex</a>
+                    <a href="/store" class="px-4 py-2 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/10 transition module-card" data-tags="store boutique equipements"><i class="fa-solid fa-shop mr-2"></i>Store Matériel</a>
+                    <a href="/audit_premium" class="px-4 py-2 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/10 transition module-card" data-tags="audit premium vitrine"><i class="fa-solid fa-star mr-2"></i>Audit Premium</a>
+                    <a href="/ethique" class="px-4 py-2 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/10 transition module-card" data-tags="ethique tiers de confiance"><i class="fa-solid fa-scale-balanced mr-2"></i>Éthique</a>
+                    <a href="/fournisseurs" class="px-4 py-2 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/10 transition module-card" data-tags="fournisseurs partenaires"><i class="fa-solid fa-handshake mr-2"></i>Fournisseurs</a>
+                    <a href="/etudes-de-cas" class="px-4 py-2 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/10 transition module-card" data-tags="etudes de cas references"><i class="fa-solid fa-book-open mr-2"></i>Études de cas</a>
+                    <a href="/modele_economique" class="px-4 py-2 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/10 transition module-card" data-tags="modele economique pricing"><i class="fa-solid fa-tags mr-2"></i>Modèle Économique</a>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <script>
+        // Moteur de recherche local (Command Palette)
+        function filterCards() {
+            const term = document.getElementById('nexus-search').value.toLowerCase();
+            const cards = document.querySelectorAll('.module-card');
+            
+            cards.forEach(card => {
+                const tags = card.getAttribute('data-tags') || "";
+                const text = card.innerText.toLowerCase();
+                
+                if (tags.includes(term) || text.includes(term)) {
+                    card.style.display = ""; // Rétablit l'affichage par défaut
+                } else {
+                    card.style.display = "none";
+                }
+            });
+        }
+
+        // Fetch Data Unity pour faire vivre le Header
+        async function fetchSystemHealth() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                if(data.fleet) {
+                    // Animation counter
+                    const el = document.getElementById('kpi-count');
+                    let start = 0;
+                    const end = data.fleet.length;
+                    const duration = 1000;
+                    const increment = end / (duration / 16);
+                    
+                    const timer = setInterval(() => {
+                        start += increment;
+                        if(start >= end) {
+                            clearInterval(timer);
+                            el.innerText = end.toLocaleString();
+                        } else {
+                            el.innerText = Math.floor(start).toLocaleString();
+                        }
+                    }, 16);
+                }
+            } catch(e) {
+                document.getElementById('kpi-count').innerText = "OFFLINE";
+                document.getElementById('kpi-count').classList.add('text-alert');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', fetchSystemHealth);
+    </script>
+</body>
+</html>
