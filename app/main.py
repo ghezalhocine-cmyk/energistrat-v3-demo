@@ -219,9 +219,9 @@ async def get_current_user(request: Request):
 
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request):
-    # SMART LOGIN : Si déjà connecté, on va au dashboard
+    # SMART LOGIN : Si déjà connecté, on va au NEXUS OPS par défaut
     token = request.cookies.get("access_token")
-    if token: return RedirectResponse(url="/dashboard/industry")
+    if token: return RedirectResponse(url="/ops_nexus")
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/api/auth/login")
@@ -709,9 +709,6 @@ async def api_forecast_simulate(client_id: str):
     res['volume_actuel'] = vol 
     return JSONResponse(json_compliant(res))
 
-# ==========================================
-# CORTEX LIVE (RTE)
-# ==========================================
 def get_rte_token(client_id, client_secret):
     url = "https://digital.iservices.rte-france.com/token/oauth/"
     auth_str = f"{client_id}:{client_secret}"
@@ -1104,7 +1101,6 @@ async def serve_dynamic(request: Request, page_name: str, user = Depends(get_cur
     target_file = page_name if page_name.endswith(".html") else f"{page_name}.html"
     if target_file not in PUBLIC_PAGES and not user: return RedirectResponse(url="/login")
     
-    # ROUTAGE INTELLIGENT (Prise en compte du dossier /cor/ pour les satellites)
     if os.path.exists(os.path.join(TEMPLATE_DIR, target_file)): 
         return templates.TemplateResponse(target_file, {"request": request})
     if os.path.exists(os.path.join(TEMPLATE_DIR, "cor", target_file)): 
