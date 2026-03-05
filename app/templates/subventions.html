@@ -9,104 +9,163 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script>
-        tailwind.config = { theme: { extend: { colors: { abysse: '#001529', card: '#0F172A', sub: '#00E5FF', success: '#10B981' }, fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] } } } }
+        tailwind.config = { 
+            theme: { 
+                extend: { 
+                    colors: { abysse: '#001529', card: '#0F172A', sub: '#00E5FF', success: '#10B981', alert: '#EF4444', gold: '#F59E0B' }, 
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] } 
+                } 
+            } 
+        }
     </script>
     <style>
         body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
         .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        .aide-card { animation: slideUp 0.4s ease-out forwards; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="flex h-screen w-screen text-sm">
 
-    <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50">
-        <button onclick="window.location.href='/ops_nexus'" class="w-12 h-12 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8"><i class="fa-solid fa-arrow-left"></i></button>
-        <div class="w-12 h-12 rounded-xl bg-sub/20 text-sub flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(0,229,255,0.4)] mb-2"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+    <!-- SIDEBAR -->
+    <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
+        <button onclick="window.location.href='/ops_nexus'" class="w-12 h-12 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8 border border-white/10">
+            <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-sub to-blue-600 text-white flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(0,229,255,0.4)] mb-2">
+            <i class="fa-solid fa-hand-holding-dollar"></i>
+        </div>
         <div class="text-[8px] font-bold text-sub uppercase tracking-widest text-center">AIDES<br>ÉTAT</div>
     </aside>
 
+    <!-- MAIN CONTENT -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
-        <header class="h-20 border-b border-white/5 flex items-center px-8 bg-abysse/95 backdrop-blur z-20 justify-between">
+        <header class="h-20 border-b border-white/5 flex items-center px-10 bg-abysse/95 backdrop-blur z-20 justify-between">
             <div>
                 <h2 class="text-2xl font-black text-white italic tracking-tight">CORTEX <span class="text-sub">SUBVENTIONS</span></h2>
-                <p class="text-xs text-gray-400 font-mono mt-1">Détection automatique des aides (CEE, Ademe, Région) éligibles pour votre parc.</p>
+                <p class="text-xs text-gray-400 font-mono mt-1">Application stricte des fiches CEE et algorithmes ADEME sur la Data Unity.</p>
             </div>
-            <div class="bg-card border border-white/10 px-6 py-2 rounded-xl text-right">
+            <div class="bg-card border border-white/10 px-6 py-2 rounded-xl text-right shadow-lg">
                 <span class="text-[10px] text-gray-500 uppercase font-bold block">Enveloppe Sécurisable</span>
-                <span class="text-xl font-bold text-success font-mono" id="val-total-aides">-- €</span>
+                <span class="text-2xl font-black text-success font-mono" id="val-total-aides">-- €</span>
             </div>
         </header>
 
-        <div class="p-8 overflow-y-auto h-full pb-20">
-            <div class="bento-card p-0 overflow-hidden flex flex-col h-[700px] border-t-4 border-sub">
-                <div class="flex-1 overflow-y-auto">
-                    <table class="w-full text-left text-xs text-gray-300">
-                        <thead class="bg-card text-[10px] uppercase text-gray-500 font-bold sticky top-0">
-                            <tr>
-                                <th class="px-6 py-4">Bâtiment / Site</th>
-                                <th class="px-6 py-4">Dispositif Détecté par l'IA</th>
-                                <th class="px-6 py-4 text-right">Prime Estimée</th>
-                                <th class="px-6 py-4 text-center">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5" id="aides-list">
-                            <!-- Injecté par JS -->
-                        </tbody>
-                    </table>
-                </div>
+        <div class="p-10 overflow-y-auto h-full pb-32">
+            
+            <div id="loader" class="flex flex-col items-center justify-center py-20 text-sub">
+                <i class="fa-solid fa-satellite-dish text-5xl mb-4 animate-pulse"></i>
+                <p class="font-bold tracking-widest uppercase text-sm">CORTEX scanne les fiches CEE...</p>
             </div>
+
+            <div class="grid grid-cols-1 gap-6 max-w-5xl mx-auto" id="results-container">
+                <!-- Les cartes Bento seront injectées ici -->
+            </div>
+
         </div>
     </main>
 
     <script>
         async function initAides() {
             try {
-                const res = await fetch('/api/dashboard/fleet');
+                // APPEL AU VRAI BACKEND (ZÉRO MOCK)
+                const res = await fetch('/api/tools/subventions');
                 const data = await res.json();
-                const list = document.getElementById('aides-list');
-                let totalAides = 0;
+                
+                document.getElementById('loader').style.display = 'none';
+                const container = document.getElementById('results-container');
+                
+                if (!data.success || data.results.length === 0) {
+                    container.innerHTML = `<div class="bento-card p-12 text-center text-gray-500 border-dashed border-2 border-white/10"><i class="fa-solid fa-folder-open text-4xl mb-4 block"></i> Aucun site n'est enregistré dans la base Data Unity.</div>`;
+                    return;
+                }
 
-                data.fleet.sort((a,b) => b.volume - a.volume).forEach(s => {
-                    const surface = s.surface > 0 ? s.surface : 1500;
-                    const intensity = (s.volume * 1000) / surface;
+                document.getElementById('val-total-aides').innerText = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(data.total_enveloppe);
+
+                data.results.forEach((site, index) => {
+                    // Délai pour l'animation d'apparition
+                    const delay = index * 0.1;
                     
-                    let aide = ""; let montant = 0; let badge = "";
-
-                    if (intensity > 250) { 
-                        montant = surface * 35; // Aide ITE
-                        aide = "Rénovation Globale (CEE + Ademe)";
-                        badge = "text-blue-400";
-                    } else if (s.ghost_savings > 500) { 
-                        montant = surface * 15; // Aide GTB
-                        aide = "Coup de Pouce GTB (Fiche TH-116)";
-                        badge = "text-cyan";
-                    } else if (s.energy === 'gaz' && s.volume > 150) {
-                        montant = 45000; // Fonds Chaleur
-                        aide = "Fonds Chaleur (Conversion PAC/Réseau)";
-                        badge = "text-alert";
+                    if (site.status === "MISSING_DATA") {
+                        // CARTE : DONNÉES MANQUANTES (Le Tiers de Confiance ne triche pas)
+                        container.innerHTML += `
+                            <div class="bento-card p-6 border-l-4 border-alert aide-card" style="animation-delay: ${delay}s">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h3 class="text-lg font-black text-white">${site.name}</h3>
+                                        <p class="text-[10px] text-gray-400 font-mono mt-1">PDL: ${site.id} | ${site.city}</p>
+                                    </div>
+                                    <span class="bg-alert/10 text-alert px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Audit Impossible</span>
+                                </div>
+                                <div class="mt-4 p-4 bg-alert/5 rounded-lg border border-alert/20 flex items-center justify-between">
+                                    <p class="text-xs text-gray-300">${site.reason}</p>
+                                    <a href="/settings" class="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded transition">Compléter le dossier</a>
+                                </div>
+                            </div>
+                        `;
+                    } 
+                    else if (site.status === "NON_ELIGIBLE") {
+                        // CARTE : NON ELIGIBLE (Site optimisé)
+                        container.innerHTML += `
+                            <div class="bento-card p-6 border-l-4 border-gray-600 aide-card" style="animation-delay: ${delay}s">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h3 class="text-lg font-black text-gray-300">${site.name}</h3>
+                                        <p class="text-[10px] text-gray-500 font-mono mt-1">PDL: ${site.id} | ${site.city}</p>
+                                    </div>
+                                    <span class="bg-gray-800 text-gray-400 px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest"><i class="fa-solid fa-check-circle mr-1"></i> Site Optimisé</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-4 italic">${site.reason}</p>
+                            </div>
+                        `;
                     }
+                    else if (site.status === "ELIGIBLE") {
+                        // CARTE : ELIGIBLE (Avec le détail des calculs)
+                        let aidesHtml = "";
+                        site.aides.forEach(aide => {
+                            aidesHtml += `
+                                <div class="bg-abysse p-4 rounded-xl border border-white/5 flex justify-between items-center group hover:border-sub/30 transition">
+                                    <div>
+                                        <div class="text-[10px] font-bold text-sub uppercase tracking-widest mb-1"><i class="fa-solid fa-file-contract mr-1"></i> Fiche ${aide.code}</div>
+                                        <div class="text-sm font-bold text-white">${aide.nom}</div>
+                                        <div class="text-[10px] text-gray-500 mt-1 font-mono">${aide.details}</div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-2xl font-black font-mono text-success">+ ${new Intl.NumberFormat('fr-FR').format(aide.montant)} €</div>
+                                        <button class="text-[10px] text-gray-400 hover:text-white underline mt-1">Télécharger le Cerfa</button>
+                                    </div>
+                                </div>
+                            `;
+                        });
 
-                    if (montant > 0) {
-                        totalAides += montant;
-                        list.innerHTML += `
-                            <tr class="hover:bg-white/5 transition border-b border-white/5">
-                                <td class="px-6 py-4 font-bold text-white">${s.name} <br><span class="text-[9px] font-mono text-gray-500">${s.pdl || s.id}</span></td>
-                                <td class="px-6 py-4 font-bold ${badge}">${aide}</td>
-                                <td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(montant).toLocaleString()} €</td>
-                                <td class="px-6 py-4 text-center"><button class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded text-xs transition">Monter le dossier</button></td>
-                            </tr>
+                        container.innerHTML += `
+                            <div class="bento-card p-0 overflow-hidden border-t-4 border-sub aide-card shadow-[0_10px_30px_rgba(0,229,255,0.1)]" style="animation-delay: ${delay}s">
+                                <div class="bg-sub/5 p-6 border-b border-sub/10 flex justify-between items-center">
+                                    <div>
+                                        <h3 class="text-xl font-black text-white">${site.name}</h3>
+                                        <p class="text-[10px] text-gray-400 font-mono mt-1">PDL: ${site.id} | Ville: ${site.city}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-[10px] text-gray-400 uppercase font-bold mb-1">Total Site</div>
+                                        <div class="text-lg font-black text-success font-mono">+ ${new Intl.NumberFormat('fr-FR').format(site.total_site)} €</div>
+                                    </div>
+                                </div>
+                                <div class="p-6 space-y-3">
+                                    ${aidesHtml}
+                                </div>
+                            </div>
                         `;
                     }
                 });
 
-                document.getElementById('val-total-aides').innerText = "+ " + Math.round(totalAides).toLocaleString() + " €";
-
-                if (list.innerHTML === "") {
-                    list.innerHTML = "<tr><td colspan='4' class='text-center p-8 text-gray-500'>Aucune aide détectée pour le moment.</td></tr>";
-                }
-
-            } catch(e) { console.error(e); }
+            } catch(e) { 
+                console.error(e);
+                document.getElementById('results-container').innerHTML = `<div class="bento-card p-6 text-alert font-bold border-alert/30"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Erreur de connexion au moteur CORTEX.</div>`;
+                document.getElementById('loader').style.display = 'none';
+            }
         }
+
         document.addEventListener('DOMContentLoaded', initAides);
     </script>
 </body>
