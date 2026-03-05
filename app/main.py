@@ -248,7 +248,7 @@ async def sentinel_daemon_loop():
 @app.on_event("startup")
 async def startup_event():
     """Démarre les routines asynchrones en tâche de fond au boot."""
-    print("🚀 [ENERGISTRAT V3] Lancement des daemons CORTEX...")
+    print("🚀[ENERGISTRAT V3] Lancement des daemons CORTEX...")
     asyncio.create_task(sentinel_daemon_loop())
 
 # --- FONCTIONS UTILITAIRES ---
@@ -370,6 +370,98 @@ async def trigger_sentinel_scan(background_tasks: BackgroundTasks):
     """Force un recalcul immédiat du parc (On-Demand)."""
     background_tasks.add_task(run_sentinel_scan)
     return JSONResponse({"success": True, "message": "Scan Sentinel déclenché en arrière-plan."})
+
+# ==========================================
+# NOUVEAU : API LÉGALE DEAL DESK (GOUV & DATA UNITY)
+# ==========================================
+@app.post("/api/dealdesk/analyze")
+async def api_dealdesk_analyze(request: Request):
+    """
+    Croise la Data Unity avec l'API Gouvernementale pour qualifier juridiquement le lead.
+    """
+    body = await request.json()
+    query = str(body.get('query', '')).strip().lower()
+    
+    if not query:
+        return JSONResponse({"success": False, "error": "Requête vide."})
+        
+    # 1. Recherche dans la Data Unity Locale (Zéro Mock)
+    site_data = None
+    files = glob.glob(os.path.join(DATA_DIR, "*.json"))
+    for p in files:
+        if any(x in p for x in["master_", "market_", "m57_", "carbon_", "rte_", "sentinel_"]): continue
+        try:
+            with open(p, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                pdl = str(data.get('contract', {}).get('pdl', '')).strip()
+                pce = str(data.get('contract', {}).get('pce', '')).strip()
+                name = str(data.get('identity', {}).get('site_name', '')).strip().lower()
+                
+                if query == pdl or query == pce or query in name:
+                    site_data = data
+                    break
+        except: continue
+        
+    if not site_data:
+        return JSONResponse({"success": False, "error": "Ce PDL/Nom est introuvable dans votre base (Data Unity). Veuillez importer le client en amont."})
+        
+    # 2. Enrichissement Cortex pour récupérer les vraies métriques (Volume/Puissance)
+    try:
+        fin = cortex.enrich_site_financials(site_data)
+        vol = fin.get('volume_mwh', 0)
+        # Fallback router
+        if vol == 0 and 'kpis' in site_data and 'volume_mwh' in site_data['kpis']:
+            vol = float(site_data['kpis']['volume_mwh'])
+    except: vol = 0
+    
+    power = float(site_data.get('contract', {}).get('power', 0))
+    pdl_val = site_data.get('contract', {}).get('pdl') or site_data.get('contract', {}).get('pce', 'N/A')
+    siret = site_data.get('identity', {}).get('siret', '')
+    original_name = site_data.get('identity', {}).get('site_name', 'Client Inconnu')
+
+    # 3. Interrogation API Gouvernementale (recherche-entreprises.api.gouv.fr)
+    legal_info = {"is_micro": False, "regime": "CODE_COMMERCE", "nom": original_name, "siret": siret}
+    search_term = siret if siret else original_name
+    
+    if search_term and search_term != "Client Inconnu":
+        try:
+            url = f"https://recherche-entreprises.api.gouv.fr/search?q={urllib.parse.quote(search_term)}&page=1&per_page=1"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Energistrat-Cortex/1.0'})
+            with urllib.request.urlopen(req, timeout=3) as response:
+                gov_data = json.loads(response.read().decode('utf-8'))
+                if gov_data.get('results') and len(gov_data['results']) > 0:
+                    comp = gov_data['results'][0]
+                    # Code Tranche Effectif INSEE : 00, 01, 02, 03 = Moins de 10 salariés
+                    effectif = comp.get('tranche_effectif_salarie', '00')
+                    
+                    if effectif in['00', '01', '02', '03'] or effectif is None:
+                        legal_info['is_micro'] = True
+                        legal_info['regime'] = "CODE_CONSOMMATION"
+                    
+                    legal_info['nom'] = comp.get('nom_complet', original_name)
+                    legal_info['siret'] = comp.get('siege', {}).get('siret', siret)
+        except Exception as e:
+            print(f"[API GOUV] Echec pour {search_term}: {e}")
+
+    # 4. Routage Segment selon la puissance et le volume réels
+    if vol > 5000:
+        segment = "B2B_HEAVY"
+    elif power > 36 or vol > 250:
+        segment = "C4_MID"
+    else:
+        segment = "C5_MASS"
+
+    return JSONResponse({
+        "success": True,
+        "site": {
+            "name": legal_info['nom'],
+            "pdl": pdl_val,
+            "volume": round(vol, 2),
+            "power": power
+        },
+        "legal": legal_info,
+        "segment": segment
+    })
 
 # --- API PRINCIPALES (SETTINGS & DATA) ---
 
@@ -1205,11 +1297,15 @@ async def view_settings(request: Request, user = Depends(get_current_user)):
 @app.get("/partner/settings")
 async def view_partner_settings(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
-    if "supplier" in request.headers.get("referer", ""): return templates.TemplateResponse("settings_partner.html", {"request": request})
-    return templates.TemplateResponse("settings.html", {"request": request})
+    return templates.TemplateResponse("settings_partner.html", {"request": request})
 
 @app.get("/ops/market")
 async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
+
+@app.get("/deal_desk", response_class=HTMLResponse)
+async def view_deal_desk(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
+    return templates.TemplateResponse("deal_desk.html", {"request": request})
 
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
