@@ -371,7 +371,7 @@ async def trigger_sentinel_scan(background_tasks: BackgroundTasks):
     return JSONResponse({"success": True, "message": "Scan Sentinel déclenché en arrière-plan."})
 
 # ==========================================
-# INJECTION CORTEX 1 : API DEAL DESK (LEGAL)
+# INJECTION CORTEX 1 : API DEAL DESK (LEGAL & INSEE)
 # ==========================================
 @app.post("/api/dealdesk/analyze")
 async def api_dealdesk_analyze(request: Request):
@@ -399,7 +399,7 @@ async def api_dealdesk_analyze(request: Request):
         except: continue
         
     if not site_data:
-        return JSONResponse({"success": False, "error": "Ce PDL/Nom est introuvable dans votre base (Data Unity). Veuillez l'importer en amont."})
+        return JSONResponse({"success": False, "error": "Ce PDL/Nom est introuvable dans la Data Unity. Veuillez l'importer en amont."})
         
     try:
         fin = cortex.enrich_site_financials(site_data)
@@ -444,7 +444,7 @@ async def api_dealdesk_analyze(request: Request):
     })
 
 # ==========================================
-# INJECTION CORTEX 2 : API SUBVENTIONS
+# INJECTION CORTEX 2 : API SUBVENTIONS (ZÉRO MOCK)
 # ==========================================
 @app.get("/api/tools/subventions")
 async def api_subventions_analyze(user = Depends(get_current_user)):
@@ -461,7 +461,7 @@ async def api_subventions_analyze(user = Depends(get_current_user)):
                 raw_sites.append(data)
         except: continue
 
-    cee_price_mwh = 6.50 # Euro / MWh cumac (Prix de marché CEE)
+    cee_price_mwh = 6.50 # Euro / MWh cumac
     results =[]
     total_enveloppe = 0
 
@@ -520,7 +520,6 @@ async def api_subventions_analyze(user = Depends(get_current_user)):
     return JSONResponse({"success": True, "results": results, "total_enveloppe": round(total_enveloppe)})
 
 # --- API PRINCIPALES (SETTINGS & DATA) ---
-
 def normalize_full_data(data):
     if 'contract' not in data: data['contract'] = {}
     if 'pricing' not in data: data['pricing'] = {}
@@ -703,35 +702,38 @@ async def get_fleet_data(response: Response):
         if "master" in p or "market" in p or "m57" in p or "carbon" in p or "rte" in p or "sentinel" in p: continue
         try:
             with open(p, 'r', encoding='utf-8') as f: data = json.load(f)
-            fin = cortex.enrich_site_financials(data)
-            data['computed_financials'] = fin
+            if cortex:
+                fin = cortex.enrich_site_financials(data)
+                data['computed_financials'] = fin
             raw_sites.append(data)
         except: continue
-    analysis = cortex.analyze_portfolio(raw_sites)
+    
+    if cortex: analysis = cortex.analyze_portfolio(raw_sites)
+    else: analysis = {"global": {}, "green_league": {}}
+
     fleet_list =[]
     all_cities, all_providers = set(), set()
     for s in raw_sites:
         if "CLI_" in str(s.get('identity',{}).get('id')): continue
-        fin = s['computed_financials']
+        fin = s.get('computed_financials', {})
         contract = s.get('contract', {})
-        city = fin['meta']['city']
+        city = fin.get('meta', {}).get('city', 'Inconnue')
         prov = contract.get('provider', 'Inconnu')
-        if city: all_cities.add(city)
+        if city and city != 'Inconnue': all_cities.add(city)
         if prov: all_providers.add(prov)
         
         raw_id = s.get('identity',{}).get('id')
         safe_id = get_safe_id(raw_id)
-        
         pdl_display = contract.get('pdl')
         if not pdl_display or len(str(pdl_display)) < 5: pdl_display = contract.get('pce', '-')
         
-        vol_engine = fin['volume_mwh']
+        vol_engine = fin.get('volume_mwh', 0)
         vol_router = 0
         if 'kpis' in s and 'volume_mwh' in s['kpis']: vol_router = float(s['kpis']['volume_mwh'])
         final_vol = vol_engine
         if vol_engine == 0 and vol_router > 0: final_vol = vol_router
 
-        final_budget = fin['budget_annual']
+        final_budget = fin.get('budget_annual', 0)
         if vol_engine == 0 and vol_router > 0:
             pricing = s.get('pricing', {})
             avg_price = 0.20
@@ -744,11 +746,10 @@ async def get_fleet_data(response: Response):
             final_budget = sub_cost + energy_cost
 
         fleet_list.append({
-            "id": safe_id, "name": fin['meta']['site_label'], "city": city, "zip": s.get('location', {}).get('zip_code', ''),
-            "volume": final_vol, "energy": "gaz" if fin['meta']['is_gas'] else "elec", "segment": contract.get('segment', '-'),
-            "provider": prov, "budget": final_budget, "landing": fin['landing_forecast'], "alert": fin['kpis']['pmc_eur_mwh'] > 300,
-            "ghost_savings": fin['kpis']['ghost_savings'], "power": contract.get('power', 0), "pdl": pdl_display,
-            "surface": s.get('location', {}).get('surface', 0)
+            "id": safe_id, "name": fin.get('meta', {}).get('site_label', 'Inconnu'), "city": city, "zip": s.get('location', {}).get('zip_code', ''),
+            "volume": final_vol, "energy": "gaz" if fin.get('meta', {}).get('is_gas') else "elec", "segment": contract.get('segment', '-'),
+            "provider": prov, "budget": final_budget, "landing": fin.get('landing_forecast', 0), "alert": fin.get('kpis', {}).get('pmc_eur_mwh', 0) > 300,
+            "ghost_savings": fin.get('kpis', {}).get('ghost_savings', 0), "power": contract.get('power', 0), "pdl": pdl_display, "surface": s.get('location', {}).get('surface', 0)
         })
     return JSONResponse(json_compliant({
         "fleet": fleet_list, "count": len(fleet_list), "green_league": analysis.get('green_league'), "global_kpis": analysis.get('global'),
@@ -782,10 +783,8 @@ async def get_dashboard_data(client_id: str, response: Response):
 
     budget_display = financials['budget_annual']
     volume_multiplier = 1000 if vol_display <= 100000 else 1
-    
     if financials['volume_mwh'] == 0 and vol_display > 0:
-        p_data = data.get('pricing', {})
-        u_price = 0.20
+        p_data = data.get('pricing', {}); u_price = 0.20
         for k in['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
             if k in p_data and p_data[k]: 
                 try: u_price = float(p_data[k]); break
@@ -1022,6 +1021,12 @@ async def view_ops_nexus(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("ops_nexus.html", {"request": request})
 
+# FIX ZÉRO RÉGRESSION : LA ROUTE PARTNER SETTINGS CORRIGÉE
+@app.get("/partner/settings")
+async def view_partner_settings(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
+    return templates.TemplateResponse("settings_partner.html", {"request": request})
+
 @app.get("/industrie", response_class=HTMLResponse)
 @app.get("/industry", response_class=HTMLResponse)
 async def view_industrie(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
@@ -1143,14 +1148,12 @@ async def view_settings(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("settings.html", {"request": request})
 
-@app.get("/partner/settings")
-async def view_partner_settings(request: Request, user = Depends(get_current_user)):
-    if not user: return RedirectResponse(url="/login")
-    return templates.TemplateResponse("settings_partner.html", {"request": request})
-
 @app.get("/ops/market")
 async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
 
+# ==========================================
+# ROUTES FRONT CORTEX (INJECTION REUSSIE)
+# ==========================================
 @app.get("/deal_desk", response_class=HTMLResponse)
 async def view_deal_desk(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
