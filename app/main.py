@@ -39,6 +39,7 @@ try:
     from app.core.cortex_aggregator import aggregator
     from app.core.cortex_finance import finance
     from app.core.cortex_auth import auth
+    from app.core.cortex_pdf import pdf_builder
 
 except Exception as e_prod:
     print(f"⚠️ PROD IMPORT ERROR: {str(e_prod)}")
