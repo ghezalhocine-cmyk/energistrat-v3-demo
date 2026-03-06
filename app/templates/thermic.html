@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | Cortex Thermic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { abysse: '#001529', card: '#0F172A', orange: '#F97316', success: '#10B981', alert: '#EF4444', gold: '#F59E0B' },
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    </style>
+</head>
+<body class="flex h-screen w-screen text-sm">
+
+    <aside class="w-20 bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
+        <button onclick="window.history.back()" title="Retour" class="w-12 h-12 rounded-xl bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white flex items-center justify-center transition mb-8 border border-white/10">
+            <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange to-red-600 flex items-center justify-center text-white font-bold shadow-[0_0_15px_rgba(249,115,22,0.4)] mb-2">
+            <i class="fa-solid fa-temperature-arrow-up text-xl"></i>
+        </div>
+        <div class="text-[8px] font-bold text-orange uppercase tracking-widest text-center mt-1">CORTEX<br>THERMIC</div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange/5 via-abysse to-abysse">
+        
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
+            <div>
+                <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight">Audit de Chaufferie (Signature Énergétique)</h2>
+                <p class="text-xs text-gray-400 font-mono mt-1">Algorithme de Droite de Chauffe : Croisement Data Unity vs Open-Meteo (DJU).</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <select id="site-selector" onchange="loadThermicData(this.value)" class="bg-card border border-white/10 px-6 py-3 rounded-xl text-xs font-bold text-white outline-none focus:border-orange shadow-lg cursor-pointer">
+                    <option value="">Chargement du parc immobilier...</option>
+                </select>
+            </div>
+        </header>
+
+        <div class="p-8 overflow-y-auto h-full pb-20">
+            <div class="grid grid-cols-12 gap-6 max-w-7xl mx-auto">
+                
+                <div class="col-span-4 space-y-6">
+                    <div class="bento-card p-6 border-t-4 border-orange">
+                        <h3 class="text-[10px] uppercase font-bold text-gray-400 mb-4">Qualité de Régulation (R²)</h3>
+                        <div class="text-5xl font-black text-white font-mono" id="score-r2">-- %</div>
+                        <p class="text-xs mt-2 font-bold text-gray-500" id="desc-r2">Sélectionnez un site...</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bento-card p-6 bg-white/5 border border-white/5 text-center">
+                            <i class="fa-solid fa-fire-burner text-orange text-2xl mb-2"></i>
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Sensibilité (Pente)</div>
+                            <div class="text-lg font-bold text-white mt-1 font-mono" id="score-pente">--</div>
+                            <div class="text-[9px] text-gray-400">kWh / DJU</div>
+                        </div>
+                        <div class="bento-card p-6 bg-white/5 border border-white/5 text-center">
+                            <i class="fa-solid fa-faucet-drip text-cyan text-2xl mb-2"></i>
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Talon Fixe (ECS)</div>
+                            <div class="text-lg font-bold text-white mt-1 font-mono" id="score-talon">--</div>
+                            <div class="text-[9px] text-gray-400">MWh / Mois</div>
+                        </div>
+                    </div>
+
+                    <div class="bento-card p-6 bg-orange/5 border border-orange/20">
+                        <h3 class="text-xs font-bold text-orange mb-2 uppercase tracking-widest"><i class="fa-solid fa-robot mr-2"></i>Avis de l'Expert IA</h3>
+                        <p class="text-sm text-white leading-relaxed" id="cortex-advice">L'algorithme de régression linéaire est en attente d'une cible. Choisissez un bâtiment équipé d'une chaufferie dans le menu déroulant.</p>
+                    </div>
+                </div>
+
+                <!-- NUAGE DE POINTS -->
+                <div class="col-span-8 bento-card p-6 h-[600px] flex flex-col relative overflow-hidden shadow-2xl border-l-4 border-orange">
+                    <div class="absolute top-0 right-0 bg-orange/20 text-orange px-4 py-2 rounded-bl-2xl font-bold text-[10px] border-b border-l border-orange/30">
+                        SYNCHRO API OPEN-METEO
+                    </div>
+                    <h3 class="text-sm font-bold text-gray-300 uppercase tracking-widest mb-4">Nuage de points & Droite de Chauffe</h3>
+                    <div class="flex-1 relative w-full">
+                        <canvas id="thermicChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let scatterChart = null;
+
+        async function loadSites() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                const sel = document.getElementById('site-selector');
+                sel.innerHTML = '<option value="">-- Choisir un site à auditer --</option>';
+                
+                data.fleet.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.innerText = s.name + " (" + s.city + ")";
+                    sel.appendChild(opt);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadThermicData(clientId) {
+            if(!clientId) return;
+            
+            document.getElementById('cortex-advice').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-orange"></i> Analyse mathématique en cours (Extraction DJU)...';
+            document.getElementById('desc-r2').innerText = "Calcul en cours...";
+            
+            try {
+                const res = await fetch(`/api/physics/thermic_signature/${clientId}`);
+                const data = await res.json();
+                
+                if(data.error) {
+                    document.getElementById('cortex-advice').innerText = "Erreur : " + data.error;
+                    return;
+                }
+
+                const r2_pct = Math.round(data.regression.r2 * 100);
+                document.getElementById('score-r2').innerText = r2_pct + " %";
+                
+                const r2Desc = document.getElementById('desc-r2');
+                if (r2_pct > 85) { r2Desc.innerText = "Excellente Régulation Thermique"; r2Desc.className = "text-xs mt-2 font-bold text-success"; }
+                else if (r2_pct > 70) { r2Desc.innerText = "Régulation Moyenne (Loi d'eau à revoir)"; r2Desc.className = "text-xs mt-2 font-bold text-gold"; }
+                else { r2Desc.innerText = "Régulation Défaillante (Anomalie technique)"; r2Desc.className = "text-xs mt-2 font-bold text-alert"; }
+
+                document.getElementById('score-pente').innerText = data.diagnostics.sensibilite;
+                document.getElementById('score-talon').innerText = data.diagnostics.talon_mensuel;
+
+                if (data.diagnostics.is_optimized) {
+                    document.getElementById('cortex-advice').innerHTML = `Le bâtiment réagit parfaitement au climat. La consigne de chauffe est respectée (corrélation très forte de ${r2_pct}%). Aucune dérive majeure n'est constatée sur l'installation.`;
+                } else {
+                    document.getElementById('cortex-advice').innerHTML = `Attention, le nuage de points est erratique. Le bâtiment consomme de l'énergie de manière décorrélée de la météo extérieure. <b>Intervention d'un exploitant chauffagiste fortement recommandée pour recadrer la loi d'eau.</b>`;
+                }
+
+                renderScatterChart(data);
+
+            } catch(e) {
+                console.error(e);
+                document.getElementById('cortex-advice').innerText = "Erreur de communication API.";
+            }
+        }
+
+        function renderScatterChart(data) {
+            const ctx = document.getElementById('thermicChart').getContext('2d');
+            if (scatterChart) scatterChart.destroy();
+
+            const scatterPoints = data.points.map(p => ({ x: p.x, y: p.y }));
+            const maxX = Math.max(...data.points.map(p => p.x));
+            const linePoints =[{ x: 0, y: data.regression.b }, { x: maxX, y: (data.regression.a * maxX) + data.regression.b }];
+
+            scatterChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets:[
+                        {
+                            label: 'Consommation Réelle Mensuelle',
+                            data: scatterPoints,
+                            backgroundColor: '#F97316',
+                            pointRadius: 8, pointHoverRadius: 11,
+                            borderColor: 'white', borderWidth: 1
+                        },
+                        {
+                            type: 'line',
+                            label: `Modélisation de la Chaufferie (R²=${data.regression.r2})`,
+                            data: linePoints,
+                            borderColor: '#10B981', borderWidth: 3, borderDash: [5, 5], fill: false, pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: 'white', font: { family: 'Inter' } } },
+                        tooltip: { callbacks: { label: function(context) { if(context.datasetIndex === 0) return `Climat (DJU): ${context.parsed.x} | Conso: ${context.parsed.y} MWh`; return ''; } } }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Rigueur Climatique Mensuelle (DJU Météo)', color: '#94A3B8', font: { weight: 'bold' } }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94A3B8' } },
+                        y: { title: { display: true, text: 'Consommation Énergétique (MWh)', color: '#94A3B8', font: { weight: 'bold' } }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94A3B8' }, beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', loadSites);
+    </script>
+</body>
+</html>
