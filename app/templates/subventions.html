@@ -24,14 +24,18 @@
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
         .aide-card { animation: slideUp 0.4s ease-out forwards; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Styles des filtres */
+        .filter-btn { transition: all 0.2s; }
+        .filter-btn.active { background-color: #00E5FF; color: #001529; box-shadow: 0 0 15px rgba(0,229,255,0.4); }
     </style>
 </head>
 <body class="flex h-screen w-screen text-sm">
 
     <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
-        <button onclick="window.location.href='/ops_nexus'" class="w-12 h-12 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8 border border-white/10">
+        <a href="/ops_nexus" title="Retour au Nexus" class="w-12 h-12 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8 border border-white/10">
             <i class="fa-solid fa-arrow-left"></i>
-        </button>
+        </a>
         <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-sub to-blue-600 text-white flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(0,229,255,0.4)] mb-2">
             <i class="fa-solid fa-hand-holding-dollar"></i>
         </div>
@@ -50,6 +54,14 @@
             </div>
         </header>
 
+        <!-- FILTRES RAPIDES -->
+        <div class="px-10 py-4 border-b border-white/5 bg-abysse/50 flex gap-3 justify-center z-10">
+            <button onclick="applyFilter('ALL')" id="btn-filt-ALL" class="filter-btn active px-6 py-2 rounded-lg text-xs font-bold text-white border border-white/10">Tout le Parc</button>
+            <button onclick="applyFilter('ELIGIBLE')" id="btn-filt-ELIGIBLE" class="filter-btn px-6 py-2 rounded-lg text-xs font-bold text-gray-400 bg-white/5 hover:text-white border border-white/5">Sites Éligibles (CEE/ADEME)</button>
+            <button onclick="applyFilter('NON_ELIGIBLE')" id="btn-filt-NON_ELIGIBLE" class="filter-btn px-6 py-2 rounded-lg text-xs font-bold text-gray-400 bg-white/5 hover:text-white border border-white/5">Déjà Optimisés</button>
+            <button onclick="applyFilter('MISSING_DATA')" id="btn-filt-MISSING_DATA" class="filter-btn px-6 py-2 rounded-lg text-xs font-bold text-gray-400 bg-white/5 hover:text-white border border-white/5">Données Manquantes (Audit Bloqué)</button>
+        </div>
+
         <div class="p-10 overflow-y-auto h-full pb-32">
             
             <div id="loader" class="flex flex-col items-center justify-center py-20 text-sub">
@@ -64,101 +76,131 @@
     </main>
 
     <script>
+        let GLOBAL_DATA =[];
+
         async function initAides() {
             try {
                 const res = await fetch('/api/tools/subventions');
                 const data = await res.json();
                 
                 document.getElementById('loader').style.display = 'none';
-                const container = document.getElementById('results-container');
                 
                 if (!data.success || data.results.length === 0) {
-                    container.innerHTML = `<div class="bento-card p-12 text-center text-gray-500 border-dashed border-2 border-white/10"><i class="fa-solid fa-folder-open text-4xl mb-4 block"></i> Aucun site n'est enregistré dans la base Data Unity.</div>`;
+                    document.getElementById('results-container').innerHTML = `<div class="bento-card p-12 text-center text-gray-500 border-dashed border-2 border-white/10"><i class="fa-solid fa-folder-open text-4xl mb-4 block"></i> Aucun site n'est enregistré dans la base Data Unity.</div>`;
                     return;
                 }
 
                 document.getElementById('val-total-aides').innerText = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(data.total_enveloppe);
-
-                data.results.forEach((site, index) => {
-                    const delay = index * 0.1;
-                    
-                    if (site.status === "MISSING_DATA") {
-                        container.innerHTML += `
-                            <div class="bento-card p-6 border-l-4 border-alert aide-card" style="animation-delay: ${delay}s">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <h3 class="text-lg font-black text-white">${site.name}</h3>
-                                        <p class="text-[10px] text-gray-400 font-mono mt-1">PDL: ${site.pdl} | ${site.city}</p>
-                                    </div>
-                                    <span class="bg-alert/10 text-alert px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Audit Impossible</span>
-                                </div>
-                                <div class="mt-4 p-4 bg-alert/5 rounded-lg border border-alert/20 flex items-center justify-between">
-                                    <p class="text-xs text-gray-300">${site.reason}</p>
-                                    <a href="/settings" class="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded transition">Compléter le dossier</a>
-                                </div>
-                            </div>
-                        `;
-                    } 
-                    else if (site.status === "NON_ELIGIBLE") {
-                        container.innerHTML += `
-                            <div class="bento-card p-6 border-l-4 border-gray-600 aide-card" style="animation-delay: ${delay}s">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <h3 class="text-lg font-black text-gray-300">${site.name}</h3>
-                                        <p class="text-[10px] text-gray-500 font-mono mt-1">PDL: ${site.pdl} | ${site.city}</p>
-                                    </div>
-                                    <span class="bg-gray-800 text-gray-400 px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest"><i class="fa-solid fa-check-circle mr-1"></i> Site Optimisé</span>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-4 italic">${site.reason}</p>
-                            </div>
-                        `;
-                    }
-                    else if (site.status === "ELIGIBLE") {
-                        let aidesHtml = "";
-                        site.aides.forEach(aide => {
-                            // C'est ICI que l'on utilise site.id (le safe_id) pour le lien
-                            aidesHtml += `
-                                <div class="bg-abysse p-4 rounded-xl border border-white/5 flex justify-between items-center group hover:border-sub/30 transition">
-                                    <div>
-                                        <div class="text-[10px] font-bold text-sub uppercase tracking-widest mb-1"><i class="fa-solid fa-file-contract mr-1"></i> Fiche ${aide.code}</div>
-                                        <div class="text-sm font-bold text-white">${aide.nom}</div>
-                                        <div class="text-[10px] text-gray-500 mt-1 font-mono">${aide.details}</div>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-2xl font-black font-mono text-success mb-2">+ ${new Intl.NumberFormat('fr-FR').format(aide.montant)} €</div>
-                                        <button onclick="window.open('/api/tools/cerfa/${site.id}/${aide.code}', '_blank')" class="bg-sub/10 text-sub hover:bg-sub hover:text-abysse px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ml-auto">
-                                            <i class="fa-solid fa-file-pdf"></i> Générer le CERFA
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                        });
-
-                        container.innerHTML += `
-                            <div class="bento-card p-0 overflow-hidden border-t-4 border-sub aide-card shadow-[0_10px_30px_rgba(0,229,255,0.1)]" style="animation-delay: ${delay}s">
-                                <div class="bg-sub/5 p-6 border-b border-sub/10 flex justify-between items-center">
-                                    <div>
-                                        <h3 class="text-xl font-black text-white">${site.name}</h3>
-                                        <p class="text-[10px] text-gray-400 font-mono mt-1">PDL: ${site.pdl} | Ville: ${site.city}</p>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-[10px] text-gray-400 uppercase font-bold mb-1">Total Site</div>
-                                        <div class="text-lg font-black text-success font-mono">+ ${new Intl.NumberFormat('fr-FR').format(site.total_site)} €</div>
-                                    </div>
-                                </div>
-                                <div class="p-6 space-y-3">
-                                    ${aidesHtml}
-                                </div>
-                            </div>
-                        `;
-                    }
-                });
+                
+                GLOBAL_DATA = data.results;
+                renderAides('ALL');
 
             } catch(e) { 
                 console.error(e);
                 document.getElementById('results-container').innerHTML = `<div class="bento-card p-6 text-alert font-bold border-alert/30"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Erreur de connexion au moteur CORTEX.</div>`;
                 document.getElementById('loader').style.display = 'none';
             }
+        }
+
+        window.applyFilter = function(filterType) {
+            // Gestion UI des boutons
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.classList.remove('active', 'text-white');
+                b.classList.add('text-gray-400', 'bg-white/5');
+            });
+            const activeBtn = document.getElementById('btn-filt-' + filterType);
+            if(activeBtn) {
+                activeBtn.classList.add('active', 'text-abysse'); // Car la classe .active de Tailwind config mettra bg-cyan
+                activeBtn.classList.remove('text-gray-400', 'bg-white/5');
+            }
+            
+            renderAides(filterType);
+        }
+
+        function renderAides(filterType) {
+            const container = document.getElementById('results-container');
+            container.innerHTML = '';
+
+            const filteredData = filterType === 'ALL' ? GLOBAL_DATA : GLOBAL_DATA.filter(s => s.status === filterType);
+
+            if(filteredData.length === 0) {
+                container.innerHTML = `<div class="p-8 text-center text-gray-500 italic">Aucun résultat pour ce filtre.</div>`;
+                return;
+            }
+
+            filteredData.forEach((site, index) => {
+                const delay = index * 0.05; // Animation rapide
+                
+                if (site.status === "MISSING_DATA") {
+                    container.innerHTML += `
+                        <div class="bento-card p-6 border-l-4 border-alert aide-card" style="animation-delay: ${delay}s">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 class="text-lg font-black text-white">${site.name}</h3>
+                                    <p class="text-[10px] text-gray-400 font-mono mt-1">PDL: ${site.pdl} | ${site.city}</p>
+                                </div>
+                                <span class="bg-alert/10 text-alert px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Audit Impossible</span>
+                            </div>
+                            <div class="mt-4 p-4 bg-alert/5 rounded-lg border border-alert/20 flex items-center justify-between">
+                                <p class="text-xs text-gray-300">${site.reason}</p>
+                                <a href="/settings" class="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded transition">Compléter la Data Unity</a>
+                            </div>
+                        </div>
+                    `;
+                } 
+                else if (site.status === "NON_ELIGIBLE") {
+                    container.innerHTML += `
+                        <div class="bento-card p-6 border-l-4 border-gray-600 aide-card" style="animation-delay: ${delay}s">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 class="text-lg font-black text-gray-300">${site.name}</h3>
+                                    <p class="text-[10px] text-gray-500 font-mono mt-1">PDL: ${site.pdl} | ${site.city}</p>
+                                </div>
+                                <span class="bg-gray-800 text-gray-400 px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest"><i class="fa-solid fa-check-circle mr-1"></i> Site Optimisé</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-4 italic">${site.reason}</p>
+                        </div>
+                    `;
+                }
+                else if (site.status === "ELIGIBLE") {
+                    let aidesHtml = "";
+                    site.aides.forEach(aide => {
+                        aidesHtml += `
+                            <div class="bg-abysse p-4 rounded-xl border border-white/5 flex justify-between items-center group hover:border-sub/30 transition">
+                                <div>
+                                    <div class="text-[10px] font-bold text-sub uppercase tracking-widest mb-1"><i class="fa-solid fa-file-contract mr-1"></i> Fiche ${aide.code}</div>
+                                    <div class="text-sm font-bold text-white">${aide.nom}</div>
+                                    <div class="text-[10px] text-gray-500 mt-1 font-mono">${aide.details}</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-xl font-black font-mono text-success mb-2">+ ${new Intl.NumberFormat('fr-FR').format(aide.montant)} €</div>
+                                    <button onclick="window.open('/api/tools/cerfa/${site.id}/${aide.code}', '_blank')" class="bg-sub/10 text-sub hover:bg-sub hover:text-abysse px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ml-auto">
+                                        <i class="fa-solid fa-file-pdf"></i> Pré-remplir le CERFA
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    container.innerHTML += `
+                        <div class="bento-card p-0 overflow-hidden border-t-4 border-sub aide-card shadow-[0_10px_30px_rgba(0,229,255,0.1)]" style="animation-delay: ${delay}s">
+                            <div class="bg-sub/5 p-6 border-b border-sub/10 flex justify-between items-center">
+                                <div>
+                                    <h3 class="text-xl font-black text-white">${site.name}</h3>
+                                    <p class="text-[10px] text-gray-400 font-mono mt-1">PDL: ${site.pdl} | Ville: ${site.city}</p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-[10px] text-gray-400 uppercase font-bold mb-1">Total Sécurisable Site</div>
+                                    <div class="text-lg font-black text-success font-mono">+ ${new Intl.NumberFormat('fr-FR').format(site.total_site)} €</div>
+                                </div>
+                            </div>
+                            <div class="p-6 space-y-3 bg-card">
+                                ${aidesHtml}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
         }
 
         document.addEventListener('DOMContentLoaded', initAides);
