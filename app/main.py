@@ -8,10 +8,11 @@ import traceback
 import urllib.request
 import urllib.parse
 import base64
-import asyncio 
+import asyncio # AJOUT CORTEX : Pour le Daemon Sentinel
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta # AJOUT CORTEX : Pour le calcul des dates RTE
 
+# AJOUTS SÉCURITÉ : Depends, status, RedirectResponse, BackgroundTasks
 from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException, Response, Depends, status, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +20,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+# --- GESTION DES DEPENDANCES ---
 try:
     import pandas as pd
     PANDAS_READY = True
@@ -26,7 +28,7 @@ except ImportError:
     PANDAS_READY = False
 
 # ==============================================================================
-# BLOC IMPORT CORTEX ROBUSTE
+# BLOC IMPORT CORTEX ROBUSTE (EVOLUTION ANTI-CRASH)
 # ==============================================================================
 try:
     from app.core.cortex_ingest import ingest
@@ -38,8 +40,10 @@ try:
     from app.core.cortex_aggregator import aggregator
     from app.core.cortex_finance import finance
     from app.core.cortex_auth import auth
+
 except Exception as e_prod:
     print(f"⚠️ PROD IMPORT ERROR: {str(e_prod)}")
+    
     try:
         import cortex_ingest as ingest
         import cortex_engine as cortex
@@ -50,6 +54,7 @@ except Exception as e_prod:
         from core.cortex_aggregator import aggregator
         from core.cortex_finance import finance
         from core.cortex_auth import auth
+
     except Exception as e_local:
         print(f"⚠️ LOCAL IMPORT ERROR: {str(e_local)}")
         print("🔴 CRITICAL: ACTIVATION DU MODE DEGRADE (MOCKS)")
@@ -89,7 +94,7 @@ except Exception as e_prod:
         
         ingest = None; physics = None; forecast = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V5.0-RESCUE")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V4.6-RTE-OPEN-DATA")
 
 app.add_middleware(
     CORSMiddleware,
@@ -153,6 +158,7 @@ class RTESettingsModel(BaseModel):
 # DAEMON CORTEX SENTINEL 
 # ==============================================================================
 async def run_sentinel_scan():
+    print("[CORTEX SENTINEL] Démarrage du scan de mouvements et dérives...")
     alerts =[]
     try:
         files = glob.glob(os.path.join(DATA_DIR, "*.json"))
@@ -162,13 +168,14 @@ async def run_sentinel_scan():
                 with open(p, 'r', encoding='utf-8') as f: data = json.load(f)
                 if cortex is None: continue
                 fin = cortex.enrich_site_financials(data)
-                identity = data.get('identity', {}); contract = data.get('contract', {})
-                vol = fin.get('volume_mwh', 0); budget = fin.get('budget_annual', 0)
+                identity = data.get('identity', {})
+                contract = data.get('contract', {})
+                vol = fin.get('volume_mwh', 0)
+                budget = fin.get('budget_annual', 0)
                 ghost = fin.get('kpis', {}).get('ghost_savings', 0)
                 city = data.get('location', {}).get('city', 'Inconnue')
                 name = identity.get('site_name') or identity.get('name', 'Site Inconnu')
                 pdl = contract.get('pdl') or contract.get('pce') or identity.get('id', 'N/A')
-                
                 action = ""; motif = ""; color = ""
                 if vol > 0 and budget == 0:
                     action = "🟢 Entrée Orpheline"; motif = "Raccordement détecté (volume actif) mais hors marché public."; color = "text-success bg-success/10 border-success/30"
@@ -176,16 +183,17 @@ async def run_sentinel_scan():
                     action = "🔴 Sortie de Parc"; motif = "Facturation active (Abonnement) mais conso nulle."; color = "text-alert bg-alert/10 border-alert/30"
                 elif budget > 0 and ghost > (budget * 0.4):
                     action = "🟡 Dérive Majeure"; motif = f"Surconsommation (Talon). Gaspillage estimé à {int(ghost)} €/an."; color = "text-gold bg-gold/10 border-gold/30"
-                
-                if action: alerts.append({"id": identity.get("id", ""), "city": city, "name": name, "pdl": pdl, "action": action, "motif": motif, "color": color, "timestamp": datetime.now().isoformat()})
-            except: continue
+                if action:
+                    alerts.append({"id": identity.get("id", ""), "city": city, "name": name, "pdl": pdl, "action": action, "motif": motif, "color": color, "timestamp": datetime.now().isoformat()})
+            except Exception: continue
 
         system_dir = os.path.join(DATA_DIR, "system")
         os.makedirs(system_dir, exist_ok=True)
         with open(os.path.join(system_dir, "sentinel_alerts.json"), 'w', encoding='utf-8') as f:
             json.dump({"last_scan": datetime.now().isoformat(), "alert_count": len(alerts), "alerts": alerts}, f, indent=4, ensure_ascii=False)
+        print(f"[CORTEX SENTINEL] Scan terminé. {len(alerts)} anomalies.")
         return len(alerts)
-    except: return 0
+    except Exception as e: return 0
 
 async def sentinel_daemon_loop():
     await asyncio.sleep(10)
@@ -195,6 +203,7 @@ async def sentinel_daemon_loop():
 
 @app.on_event("startup")
 async def startup_event():
+    print("🚀 [ENERGISTRAT V3] Lancement des daemons CORTEX...")
     asyncio.create_task(sentinel_daemon_loop())
 
 # --- FONCTIONS UTILITAIRES ---
@@ -237,6 +246,19 @@ async def get_current_user(request: Request):
     if not payload: return None
     return payload
 
+def get_rte_token(client_id, client_secret):
+    url = "https://digital.iservices.rte-france.com/token/oauth/"
+    auth_str = f"{client_id}:{client_secret}"
+    b64_auth = base64.b64encode(auth_str.encode('utf-8')).decode('utf-8')
+    headers = { "Authorization": f"Basic {b64_auth}", "Content-Type": "application/x-www-form-urlencoded" }
+    data = urllib.parse.urlencode({}).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            return res_data.get("access_token")
+    except Exception: return None
+
 # ==========================================
 # AUTHENTIFICATION
 # ==========================================
@@ -260,7 +282,7 @@ async def logout(response: Response):
     return RedirectResponse(url="/login")
 
 # ==========================================
-# SATELLITES CORTEX : APIS B2B & GOUV
+# API CORTEX SENTINEL
 # ==========================================
 @app.get("/api/ops/sentinel/alerts")
 async def get_sentinel_alerts():
@@ -268,7 +290,7 @@ async def get_sentinel_alerts():
     if os.path.exists(path):
         try:
             with open(path, 'r', encoding='utf-8') as f: return json.load(f)
-        except: pass
+        except Exception: pass
     return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
 
 @app.post("/api/ops/sentinel/run")
@@ -276,11 +298,15 @@ async def trigger_sentinel_scan(background_tasks: BackgroundTasks):
     background_tasks.add_task(run_sentinel_scan)
     return JSONResponse({"success": True, "message": "Scan Sentinel déclenché."})
 
+# ==========================================
+# API DEAL DESK 
+# ==========================================
 @app.post("/api/dealdesk/analyze")
 async def api_dealdesk_analyze(request: Request):
     body = await request.json()
     query = str(body.get('query', '')).strip().lower()
     if not query: return JSONResponse({"success": False, "error": "Requête vide."})
+        
     site_data = None
     for p in glob.glob(os.path.join(DATA_DIR, "*.json")):
         if any(x in p for x in["master_", "market_", "m57_", "carbon_", "rte_", "sentinel_"]): continue
@@ -290,16 +316,20 @@ async def api_dealdesk_analyze(request: Request):
                 if query == str(data.get('contract', {}).get('pdl', '')).strip() or query == str(data.get('contract', {}).get('pce', '')).strip() or query in str(data.get('identity', {}).get('site_name', '')).strip().lower():
                     site_data = data; break
         except: continue
-    if not site_data: return JSONResponse({"success": False, "error": "Introuvable dans la Data Unity."})
+        
+    if not site_data: return JSONResponse({"success": False, "error": "PDL/Nom introuvable dans la Data Unity."})
+        
     try:
         fin = cortex.enrich_site_financials(site_data)
         vol = fin.get('volume_mwh', 0)
         if vol == 0 and 'kpis' in site_data and 'volume_mwh' in site_data['kpis']: vol = float(site_data['kpis']['volume_mwh'])
     except: vol = 0
+    
     power = float(site_data.get('contract', {}).get('power', 0))
     pdl_val = site_data.get('contract', {}).get('pdl') or site_data.get('contract', {}).get('pce', 'N/A')
     siret = site_data.get('identity', {}).get('siret', '')
     original_name = site_data.get('identity', {}).get('site_name', 'Client Inconnu')
+
     legal_info = {"is_micro": False, "regime": "CODE_COMMERCE", "nom": original_name, "siret": siret}
     if siret or original_name != "Client Inconnu":
         try:
@@ -314,9 +344,13 @@ async def api_dealdesk_analyze(request: Request):
                     legal_info['nom'] = comp.get('nom_complet', original_name)
                     legal_info['siret'] = comp.get('siege', {}).get('siret', siret)
         except: pass
+
     segment = "B2B_HEAVY" if vol > 5000 else ("C4_MID" if power > 36 or vol > 250 else "C5_MASS")
     return JSONResponse({"success": True, "site": { "name": legal_info['nom'], "pdl": pdl_val, "volume": round(vol, 2), "power": power }, "legal": legal_info, "segment": segment})
 
+# ==========================================
+# API SUBVENTIONS & CERFA
+# ==========================================
 @app.get("/api/tools/subventions")
 async def api_subventions_analyze(user = Depends(get_current_user)):
     raw_sites =[]
@@ -328,8 +362,10 @@ async def api_subventions_analyze(user = Depends(get_current_user)):
                 if cortex: data['computed_financials'] = cortex.enrich_site_financials(data)
                 raw_sites.append(data)
         except: continue
+
     cee_price_mwh = 6.50
     results =[]; total_enveloppe = 0
+
     for s in raw_sites:
         if "CLI_" in str(s.get('identity',{}).get('id')): continue
         fin = s.get('computed_financials', {}); loc = s.get('location', {}); contract = s.get('contract', {}); kpis = s.get('kpis', {})
@@ -340,6 +376,7 @@ async def api_subventions_analyze(user = Depends(get_current_user)):
         name = fin.get('meta', {}).get('site_label', 'Site Inconnu')
         is_gas = fin.get('meta', {}).get('is_gas', False)
         raw_id = s.get('identity', {}).get('id', ''); safe_id = get_safe_id(raw_id)
+        
         if surface == 0:
             results.append({"id": safe_id, "pdl": pdl, "name": name, "city": city, "status": "MISSING_DATA", "reason": "Surface manquante."})
             continue
@@ -353,7 +390,7 @@ async def api_subventions_analyze(user = Depends(get_current_user)):
             total_enveloppe += prime_coup_de_pouce
         if (vol * 1000) / surface > 300 if surface > 0 else False:
             prime = (((surface * 0.3) * 1400 * zone_factor) / 1000) * cee_price_mwh
-            aides.append({"code": "BAT-EN-101", "nom": "Isolation Thermique Toiture", "details": f"Surface toit ({round(surface * 0.3)}m²) × 1400 kWhc × Zone {zone_name}", "montant": round(prime)})
+            aides.append({"code": "BAT-EN-101", "nom": "Isolation Thermique Toiture", "details": f"Surface estimée ({round(surface * 0.3)}m²) × 1400 kWhc × Zone {zone_name}", "montant": round(prime)})
             total_enveloppe += prime
         if is_gas and vol > 500:
             prime = vol * 25
@@ -455,16 +492,80 @@ async def api_immo_analyze(client_id: str, user = Depends(get_current_user)):
     impact_euros = valeur_theorique * decote_pct
     return JSONResponse({"success": True, "site": {"name": data.get('identity', {}).get('site_name', 'Site'), "city": city, "surface": surface, "naf": naf, "sector": sector_name}, "energy": {"volume_mwh": vol, "intensity_kwh_m2": round(intensity), "baseline_kwh_m2": baseline_kwh_m2}, "dpe": {"note": dpe, "is_passoire": dpe in['F', 'G']}, "finance": {"valeur_theorique": valeur_theorique, "impact_foncier": round(impact_euros), "decote_pct": round(decote_pct * 100)}})
 
+# ==============================================================================
+# INJECTION CORTEX 3 : LE SNIPER BRANCHÉ SUR L'OPEN DATA RTE (ZERO MOCK)
+# ==============================================================================
 @app.get("/api/tools/sniper/market")
 async def api_sniper_market(user = Depends(get_current_user)):
-    points_elec =[]; points_gaz =[]; base_elec = 65.0; base_gaz = 35.0
-    import random
-    for i in range(30):
-        date_str = (datetime.now() - pd.Timedelta(days=30-i)).strftime("%Y-%m-%d") if PANDAS_READY else f"Jour -{30-i}"
-        base_elec += random.uniform(-2, 2); base_gaz += random.uniform(-1, 1)
-        points_elec.append({"date": date_str, "price": round(base_elec, 2)})
-        points_gaz.append({"date": date_str, "price": round(base_gaz, 2)})
-    return JSONResponse({"success": True, "market_elec_cal": points_elec, "market_gaz_peg": points_gaz, "current_prices": {"elec": points_elec[-1]['price'], "gaz": points_gaz[-1]['price']}, "status": "BEAR" if points_elec[-1]['price'] < 70 else "BULL", "alert_triggered": points_elec[-1]['price'] < 60 })
+    """Cortex Sniper : Interrogation en temps réel de l'API Open Data RTE."""
+    path = os.path.join(DATA_DIR, "rte_settings.json")
+    rte_token = None
+    
+    # 1. Vérification des Clés API RTE
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f: keys = json.load(f)
+            client_id = keys.get("client_id")
+            client_secret = keys.get("client_secret")
+            if client_id and client_secret and client_secret != "******":
+                rte_token = get_rte_token(client_id, client_secret)
+        except: pass
+        
+    # 2. Sécurité Tiers de Confiance : Pas de fausses data si pas d'API
+    if not rte_token:
+        return JSONResponse({
+            "success": False, 
+            "error": "Clés API RTE manquantes. Allez dans 'Settings > Satellites' pour configurer l'accès Open Data."
+        })
+        
+    try:
+        # 3. Interrogation réelle API RTE Wholesale Market v2 (Day-Ahead Prices France)
+        end_date = datetime.utcnow() + timedelta(days=2)
+        start_date = datetime.utcnow() - timedelta(days=15)
+        
+        start_str = start_date.strftime("%Y-%m-%dT00:00:00Z")
+        end_str = end_date.strftime("%Y-%m-%dT00:00:00Z")
+        
+        url = f"https://digital.iservices.rte-france.com/open_api/wholesale_market/v2/france_day_ahead_prices?start_date={start_str}&end_date={end_str}"
+        
+        req = urllib.request.Request(url, headers={'Authorization': f'Bearer {rte_token}'})
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            
+        points_elec =[]
+        if 'france_day_ahead_prices' in data and len(data['france_day_ahead_prices']) > 0:
+            values = data['france_day_ahead_prices'][0].get('values',[])
+            
+            # Agrégation journalière (Prix moyen Base Load CAL)
+            daily_prices = {}
+            for v in values:
+                day = v['start_date'][:10]
+                daily_prices.setdefault(day, []).append(v['price'])
+                
+            for day, prices in daily_prices.items():
+                points_elec.append({"date": day, "price": round(sum(prices)/len(prices), 2)})
+        
+        # Tri chronologique sécurisé
+        points_elec = sorted(points_elec, key=lambda x: x['date'])
+        current_elec = points_elec[-1]['price'] if points_elec else 0
+        
+        # 4. Fallback PEG Gaz (RTE ne fait que l'Elec)
+        points_gaz = [{"date": p['date'], "price": 35.0} for p in points_elec]
+        
+        return JSONResponse({
+            "success": True,
+            "market_elec_cal": points_elec,
+            "market_gaz_peg": points_gaz,
+            "current_prices": {"elec": current_elec, "gaz": 35.0},
+            "status": "BEAR" if current_elec < 70 else "BULL",
+            "alert_triggered": current_elec < 60
+        })
+        
+    except Exception as e:
+        return JSONResponse({
+            "success": False, 
+            "error": f"Erreur de connexion aux serveurs RTE: {str(e)}"
+        })
 
 @app.get("/api/tools/gridmap/capacity")
 async def api_gridmap_capacity(user = Depends(get_current_user)):
@@ -499,6 +600,7 @@ def normalize_full_data(data):
                     c['power_details'][target] = s[v]
                     c[f"ps_{target}"] = s[v] 
                     break
+
     price_map = { 'hph':['price_hph', 'prix_hph', 'P_HPH', 'tarif_hph'], 'hch':['price_hch', 'prix_hch', 'P_HCH', 'tarif_hch'], 'hpe':['price_hpe', 'prix_hpe', 'P_HPE', 'tarif_hpe'], 'hce':['price_hce', 'prix_hce', 'P_HCE', 'tarif_hce'] }
     for target, variants in price_map.items():
         for s in sources:
@@ -507,11 +609,13 @@ def normalize_full_data(data):
                 if v in s and s[v]:
                     p[target] = s[v] 
                     break
+
     if 'identity' in data:
         i = data['identity']
         if 'siret' in data and data['siret']: i['siret'] = data['siret']
         if not i.get('id') and i.get('siret'): i['id'] = i['siret']
-    data['contract'] = c; data['pricing'] = p
+    data['contract'] = c
+    data['pricing'] = p
     return data
 
 @app.post("/api/settings/save_client")
@@ -530,7 +634,8 @@ async def api_save_client(request: Request):
                     if section not in existing_data: existing_data[section] = {}
                     existing_data[section].update(data[section])
             final_data = existing_data
-        else: final_data = data
+        else:
+            final_data = data
         with open(file_path, 'w', encoding='utf-8') as f: json.dump(final_data, f, indent=4, ensure_ascii=False)
         return JSONResponse({"success": True, "id": raw_id})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
@@ -633,11 +738,13 @@ async def api_import_csv(file: UploadFile = File(...)):
                     if 'contract' in s: existing['contract'].update(s['contract'])
                     if 'pricing' in s: existing['pricing'] = s['pricing']
                     if 'identity' in s: existing['identity'].update(s['identity'])
-                    new_tech = s.get('technical', {}); old_tech = existing.get('technical', {})
+                    new_tech = s.get('technical', {})
+                    old_tech = existing.get('technical', {})
                     for k, v in new_tech.items():
                         if v: old_tech[k] = v
                     existing['technical'] = old_tech
-                    new_loc = s.get('location', {}); old_loc = existing.get('location', {})
+                    new_loc = s.get('location', {})
+                    old_loc = existing.get('location', {})
                     for k, v in new_loc.items():
                         if v: old_loc[k] = v
                     existing['location'] = old_loc
@@ -645,7 +752,7 @@ async def api_import_csv(file: UploadFile = File(...)):
                 else: final_s = s
                 with open(file_path, 'w', encoding='utf-8') as f: json.dump(final_s, f, indent=4, ensure_ascii=False)
                 saved += 1
-            except Exception: pass
+            except Exception as e: pass
         return JSONResponse({"success": True, "imported": len(sites), "saved": saved})
     except ValueError as ve: return JSONResponse({"success": False, "error": str(ve)})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
@@ -798,33 +905,6 @@ async def api_forecast_simulate(client_id: str):
     res = forecast.generate_3_year_projection(vol, typology, energy)
     res['volume_mwh'] = vol; res['volume_actuel'] = vol 
     return JSONResponse(json_compliant(res))
-
-def get_rte_token(client_id, client_secret):
-    url = "https://digital.iservices.rte-france.com/token/oauth/"
-    auth_str = f"{client_id}:{client_secret}"
-    b64_auth = base64.b64encode(auth_str.encode('utf-8')).decode('utf-8')
-    headers = { "Authorization": f"Basic {b64_auth}", "Content-Type": "application/x-www-form-urlencoded" }
-    data = urllib.parse.urlencode({}).encode('utf-8')
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
-            return res_data.get("access_token")
-    except Exception: return None
-
-@app.get("/api/rte/live")
-async def get_rte_live_data():
-    mock_response = { "status": "MOCKED", "ecowatt": { "today": "NORMAL", "tomorrow": "NORMAL", "d2": "VIGILANCE" }, "mix": { "nuclear": 68, "wind": 14, "hydro": 12, "gas": 6, "co2_g_kwh": 42 }, "pp1": { "remaining": 12, "next_day_alert": True } }
-    path = os.path.join(DATA_DIR, "rte_settings.json")
-    if not os.path.exists(path): return JSONResponse(mock_response)
-    try:
-        with open(path, 'r', encoding='utf-8') as f: keys = json.load(f)
-        client_id = keys.get("client_id"); client_secret = keys.get("client_secret")
-        if not client_id or not client_secret: return JSONResponse(mock_response)
-        token = get_rte_token(client_id, client_secret)
-        if not token: return JSONResponse(mock_response)
-        return JSONResponse({ "status": "LIVE", "ecowatt": { "today": "NORMAL", "tomorrow": "NORMAL", "d2": "NORMAL" }, "mix": { "nuclear": 72, "wind": 10, "hydro": 15, "gas": 3, "co2_g_kwh": 38 }, "pp1": { "remaining": 10, "next_day_alert": False } })
-    except Exception: return JSONResponse(mock_response)
 
 @app.post("/api/ops/market/update")
 async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header(None)):
@@ -1106,9 +1186,6 @@ async def view_partner_settings(request: Request, user = Depends(get_current_use
 @app.get("/ops/market")
 async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
 
-# ==========================================
-# ROUTES FRONT CORTEX (SATELLITES)
-# ==========================================
 @app.get("/deal_desk", response_class=HTMLResponse)
 async def view_deal_desk(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
@@ -1133,11 +1210,6 @@ async def view_sniper(request: Request, user = Depends(get_current_user)):
 async def view_gridmap(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("gridmap.html", {"request": request})
-
-@app.get("/thermic", response_class=HTMLResponse)
-async def view_thermic(request: Request, user = Depends(get_current_user)):
-    if not user: return RedirectResponse(url="/login")
-    return templates.TemplateResponse("thermic.html", {"request": request})
 
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
