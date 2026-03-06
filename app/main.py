@@ -12,7 +12,7 @@ import asyncio # AJOUT CORTEX : Pour le Daemon Sentinel
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-# AJOUTS SÉCURITÉ : Depends, status, RedirectResponse, BackgroundTasks (Pour Sentinel)
+# AJOUTS SÉCURITÉ : Depends, status, RedirectResponse, BackgroundTasks
 from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException, Response, Depends, status, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,7 +31,6 @@ except ImportError:
 # BLOC IMPORT CORTEX ROBUSTE (EVOLUTION ANTI-CRASH)
 # ==============================================================================
 try:
-    # 1. Tentative Import Structure Prod (app.core)
     from app.core.cortex_ingest import ingest
     from app.core.cortex_engine import cortex
     from app.core.cortex_physics import physics
@@ -44,9 +43,7 @@ try:
 
 except Exception as e_prod:
     print(f"⚠️ PROD IMPORT ERROR: {str(e_prod)}")
-    
     try:
-        # 2. Tentative Import Structure Dev (Local)
         import cortex_ingest as ingest
         import cortex_engine as cortex
         import cortex_physics as physics
@@ -61,7 +58,6 @@ except Exception as e_prod:
         print(f"⚠️ LOCAL IMPORT ERROR: {str(e_local)}")
         print("🔴 CRITICAL: ACTIVATION DU MODE DEGRADE (MOCKS)")
 
-        # 3. MOCKS DE SECOURS (POUR EVITER LE CRASH CONTAINER)
         class MockAuth:
             def authenticate_user(self, e, p, m=None): return {"id": "mock", "role": "ADMIN"}
             def create_access_token(self, d): return "mock_token"
@@ -87,10 +83,17 @@ except Exception as e_prod:
             def aggregate_sites(self, s, y): return None
         aggregator = MockAggregator()
         
-        # Objets vides pour éviter NameError
-        ingest = None; cortex = None; physics = None; forecast = None
+        class MockCortex:
+            def enrich_site_financials(self, data): return {"volume_mwh": 0, "budget_annual": 0, "meta": {"is_gas": False, "site_label": "Mock", "city": "Mock"}, "kpis": {"pmc_eur_mwh": 0, "ghost_savings": 0}}
+            def analyze_portfolio(self, sites): return {"global": {}, "green_league": {}}
+            def simulate_budget_from_bpu(self, b, s): return {}
+            def analyze_load_curve(self, c, n): return {}
+            def generate_dqe_structure(self, s): return pd.DataFrame() if PANDAS_READY else None
+        cortex = MockCortex()
+        
+        ingest = None; physics = None; forecast = None
 
-app = FastAPI(title="ENERGISTRAT V3", version="DIAMOND-V3031-SDE-MASTER")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V4.3-REPORT-BUILDER")
 
 app.add_middleware(
     CORSMiddleware,
@@ -125,134 +128,85 @@ class MarketUpdateModel(BaseModel):
     trve: Optional[Dict[str, Any]] = None
     targets: Optional[Dict[str, Any]] = None
 
-# Modèle pour la stratégie de trading
 class StrategyRequest(BaseModel):
     site_id: str
     bloc_kw: float
 
-# Modèle pour l'agrégation
 class AggregationRequest(BaseModel):
     site_ids: List[str]
     years: int = 3
 
-# NOUVEAU MODÈLE M57 (CHANTIER A.2 & SDE.OS)
 class M57SettingsModel(BaseModel):
     bp_elec: float = 0.0
     bp_gaz: float = 0.0
     consumed_elec: float = 0.0
     consumed_gaz: float = 0.0
-    # EVOLUTION SDE : Budgets Annexes
     bp_irve: float = 0.0
     consumed_irve: float = 0.0
     bp_enr: float = 0.0
     consumed_enr: float = 0.0
 
-# NOUVEAU MODÈLE CARBONE (CHANTIER B.2)
 class CarbonSettingsModel(BaseModel):
     baseline_year: int = 2010
     baseline_kwh_sqm: float = 0.0
 
-# NOUVEAU MODÈLE RTE (CHANTIER SATELLITE GRID/PULSE)
 class RTESettingsModel(BaseModel):
     client_id: str = ""
     client_secret: str = ""
 
 # ==============================================================================
-# DAEMON CORTEX SENTINEL (CHANTIER 2 - TÂCHE DE FOND ASYNCHRONE)
+# DAEMON CORTEX SENTINEL 
 # ==============================================================================
 async def run_sentinel_scan():
-    """Moteur IA Asynchrone : Analyse de vacance SGE et mouvements de parc."""
     print("[CORTEX SENTINEL] Démarrage du scan de mouvements et dérives...")
     alerts =[]
     try:
         files = glob.glob(os.path.join(DATA_DIR, "*.json"))
         for p in files:
-            # Ignorer les fichiers de configuration système
-            if any(x in p for x in["master_", "market_", "m57_", "carbon_", "rte_", "sentinel_"]):
-                continue
+            if any(x in p for x in["master_", "market_", "m57_", "carbon_", "rte_", "sentinel_"]): continue
             try:
-                with open(p, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                
-                # Nécessite l'enrichissement de Cortex pour les données calculées
+                with open(p, 'r', encoding='utf-8') as f: data = json.load(f)
                 if cortex is None: continue
                 fin = cortex.enrich_site_financials(data)
-                
                 identity = data.get('identity', {})
                 contract = data.get('contract', {})
                 vol = fin.get('volume_mwh', 0)
                 budget = fin.get('budget_annual', 0)
                 ghost = fin.get('kpis', {}).get('ghost_savings', 0)
-                
                 city = data.get('location', {}).get('city', 'Inconnue')
                 name = identity.get('site_name') or identity.get('name', 'Site Inconnu')
                 pdl = contract.get('pdl') or contract.get('pce') or identity.get('id', 'N/A')
-                
-                action = ""
-                motif = ""
-                color = ""
-
-                # ALGORITHME DE DÉTECTION "ZÉRO MOCK"
+                action = ""; motif = ""; color = ""
                 if vol > 0 and budget == 0:
-                    action = "🟢 Entrée Orpheline"
-                    motif = "Raccordement détecté (volume actif) mais hors marché public (aucun contrat)."
-                    color = "text-success bg-success/10 border-success/30"
+                    action = "🟢 Entrée Orpheline"; motif = "Raccordement détecté (volume actif) mais hors marché public."; color = "text-success bg-success/10 border-success/30"
                 elif vol == 0 and budget > 0:
-                    action = "🔴 Sortie de Parc"
-                    motif = "Facturation active (Abonnement) mais conso nulle. Bâtiment potentiellement vacant."
-                    color = "text-alert bg-alert/10 border-alert/30"
+                    action = "🔴 Sortie de Parc"; motif = "Facturation active (Abonnement) mais conso nulle."; color = "text-alert bg-alert/10 border-alert/30"
                 elif budget > 0 and ghost > (budget * 0.4):
-                    action = "🟡 Dérive Majeure"
-                    motif = f"Surconsommation (Talon). Gaspillage estimé à {int(ghost)} €/an. Audit requis."
-                    color = "text-gold bg-gold/10 border-gold/30"
-                
+                    action = "🟡 Dérive Majeure"; motif = f"Surconsommation (Talon). Gaspillage estimé à {int(ghost)} €/an."; color = "text-gold bg-gold/10 border-gold/30"
                 if action:
-                    alerts.append({
-                        "id": identity.get("id", ""),
-                        "city": city,
-                        "name": name,
-                        "pdl": pdl,
-                        "action": action,
-                        "motif": motif,
-                        "color": color,
-                        "timestamp": datetime.now().isoformat()
-                    })
-            except Exception:
-                continue
+                    alerts.append({"id": identity.get("id", ""), "city": city, "name": name, "pdl": pdl, "action": action, "motif": motif, "color": color, "timestamp": datetime.now().isoformat()})
+            except Exception: continue
 
-        # Sauvegarde sécurisée des alertes pour l'API
         system_dir = os.path.join(DATA_DIR, "system")
         os.makedirs(system_dir, exist_ok=True)
-        out_path = os.path.join(system_dir, "sentinel_alerts.json")
-        
-        with open(out_path, 'w', encoding='utf-8') as f:
-            json.dump({
-                "last_scan": datetime.now().isoformat(),
-                "alert_count": len(alerts),
-                "alerts": alerts
-            }, f, indent=4, ensure_ascii=False)
-            
-        print(f"[CORTEX SENTINEL] Scan terminé. {len(alerts)} anomalies détectées et stockées.")
+        with open(os.path.join(system_dir, "sentinel_alerts.json"), 'w', encoding='utf-8') as f:
+            json.dump({"last_scan": datetime.now().isoformat(), "alert_count": len(alerts), "alerts": alerts}, f, indent=4, ensure_ascii=False)
+        print(f"[CORTEX SENTINEL] Scan terminé. {len(alerts)} anomalies.")
         return len(alerts)
-    except Exception as e:
-        print(f"[CORTEX SENTINEL] ERREUR CRITIQUE: {str(e)}")
-        return 0
+    except Exception as e: return 0
 
 async def sentinel_daemon_loop():
-    """Boucle infinie du Cron (Compatible Cloud Run)."""
-    await asyncio.sleep(10) # Attente initiale pour boot FastAPI
+    await asyncio.sleep(10)
     while True:
         await run_sentinel_scan()
-        await asyncio.sleep(43200) # Rotation toutes les 12 heures
+        await asyncio.sleep(43200)
 
 @app.on_event("startup")
 async def startup_event():
-    """Démarre les routines asynchrones en tâche de fond au boot."""
     print("🚀 [ENERGISTRAT V3] Lancement des daemons CORTEX...")
     asyncio.create_task(sentinel_daemon_loop())
 
 # --- FONCTIONS UTILITAIRES ---
-
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
     elif isinstance(data, list): return[json_compliant(v) for v in data]
@@ -272,9 +226,7 @@ def find_site_file(target_id):
         try:
             with open(p, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                stored_id = str(data.get('identity', {}).get('id', ''))
-                if get_safe_id(stored_id) == safe_target:
-                    return p
+                if get_safe_id(str(data.get('identity', {}).get('id', ''))) == safe_target: return p
         except: continue
     return None
 
@@ -284,64 +236,31 @@ def get_market_ref():
         try:
             with open(path, 'r') as f: return json.load(f)
         except: pass
-    return {
-        "updated_at": datetime.now().isoformat(),
-        "elec": { "cal_n1": 85.0 }, "gaz": { "peg_n1": 35.0 },
-        "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 }
-    }
+    return {"updated_at": datetime.now().isoformat(), "elec": { "cal_n1": 85.0 }, "gaz": { "peg_n1": 35.0 }, "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 }}
 
-# --- AJOUT : MIDDLEWARE DE SÉCURITÉ (DEPENDENCY) ---
 async def get_current_user(request: Request):
-    """
-    Vérifie le Cookie de Session.
-    Si valide : Retourne l'utilisateur.
-    Si invalide : Retourne None.
-    """
     token = request.cookies.get("access_token")
-    if not token:
-        return None
-    
-    # Nettoyage du Bearer si présent
+    if not token: return None
     if token.startswith("Bearer "): token = token.split(" ")[1]
-    
     payload = auth.decode_token(token)
     if not payload: return None
     return payload
 
 # ==========================================
-# AJOUT : ROUTES D'AUTHENTIFICATION
+# AUTHENTIFICATION
 # ==========================================
-
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request):
-    # SMART LOGIN : Si déjà connecté, on va au NEXUS OPS par défaut
-    token = request.cookies.get("access_token")
-    if token: return RedirectResponse(url="/ops_nexus")
+    if request.cookies.get("access_token"): return RedirectResponse(url="/ops_nexus")
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/api/auth/login")
 async def api_login(credentials: LoginRequest, response: Response):
-    """Endpoint de connexion (Email/Pass + MFA)."""
     result = auth.authenticate_user(credentials.email, credentials.password, credentials.mfa_code)
-    
-    if result == "MFA_REQUIRED":
-        return JSONResponse({"detail": "MFA_REQUIRED"}, status_code=403)
-    
-    if not result:
-        return JSONResponse({"detail": "Identifiants invalides"}, status_code=401)
-    
-    # Création du Token
+    if result == "MFA_REQUIRED": return JSONResponse({"detail": "MFA_REQUIRED"}, status_code=403)
+    if not result: return JSONResponse({"detail": "Identifiants invalides"}, status_code=401)
     access_token = auth.create_access_token(data={"sub": result["email"], "role": result["role"]})
-    
-    # Stockage dans un Cookie HTTPOnly (Sécurisé)
-    response.set_cookie(
-        key="access_token", 
-        value=f"Bearer {access_token}", 
-        httponly=True, # Inaccessible au JS (Anti-XSS)
-        max_age=3600, # 1h
-        samesite="lax"
-    )
-    
+    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True, max_age=3600, samesite="lax")
     return {"access_token": access_token, "token_type": "bearer", "role": result["role"]}
 
 @app.get("/logout")
@@ -350,62 +269,47 @@ async def logout(response: Response):
     return RedirectResponse(url="/login")
 
 # ==========================================
-# ROUTES CORTEX SENTINEL
+# API CORTEX SENTINEL
 # ==========================================
 @app.get("/api/ops/sentinel/alerts")
 async def get_sentinel_alerts():
-    """Retourne la dernière cartographie de vacance calculée par le Daemon."""
     path = os.path.join(DATA_DIR, "system", "sentinel_alerts.json")
     if os.path.exists(path):
         try:
-            with open(path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
-            pass
+            with open(path, 'r', encoding='utf-8') as f: return json.load(f)
+        except Exception: pass
     return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
 
 @app.post("/api/ops/sentinel/run")
 async def trigger_sentinel_scan(background_tasks: BackgroundTasks):
-    """Force un recalcul immédiat du parc (On-Demand)."""
     background_tasks.add_task(run_sentinel_scan)
-    return JSONResponse({"success": True, "message": "Scan Sentinel déclenché en arrière-plan."})
+    return JSONResponse({"success": True, "message": "Scan Sentinel déclenché."})
 
 # ==========================================
-# INJECTION CORTEX 1 : API DEAL DESK (LEGAL & INSEE)
+# API DEAL DESK 
 # ==========================================
 @app.post("/api/dealdesk/analyze")
 async def api_dealdesk_analyze(request: Request):
-    """Croise la Data Unity avec l'API Gouvernementale pour qualifier juridiquement le lead."""
     body = await request.json()
     query = str(body.get('query', '')).strip().lower()
-    
-    if not query:
-        return JSONResponse({"success": False, "error": "Requête vide."})
+    if not query: return JSONResponse({"success": False, "error": "Requête vide."})
         
     site_data = None
-    files = glob.glob(os.path.join(DATA_DIR, "*.json"))
-    for p in files:
+    for p in glob.glob(os.path.join(DATA_DIR, "*.json")):
         if any(x in p for x in["master_", "market_", "m57_", "carbon_", "rte_", "sentinel_"]): continue
         try:
             with open(p, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                pdl = str(data.get('contract', {}).get('pdl', '')).strip()
-                pce = str(data.get('contract', {}).get('pce', '')).strip()
-                name = str(data.get('identity', {}).get('site_name', '')).strip().lower()
-                
-                if query == pdl or query == pce or query in name:
-                    site_data = data
-                    break
+                if query == str(data.get('contract', {}).get('pdl', '')).strip() or query == str(data.get('contract', {}).get('pce', '')).strip() or query in str(data.get('identity', {}).get('site_name', '')).strip().lower():
+                    site_data = data; break
         except: continue
         
-    if not site_data:
-        return JSONResponse({"success": False, "error": "Ce PDL/Nom est introuvable dans la Data Unity. Veuillez l'importer en amont."})
+    if not site_data: return JSONResponse({"success": False, "error": "PDL/Nom introuvable dans la Data Unity."})
         
     try:
         fin = cortex.enrich_site_financials(site_data)
         vol = fin.get('volume_mwh', 0)
-        if vol == 0 and 'kpis' in site_data and 'volume_mwh' in site_data['kpis']:
-            vol = float(site_data['kpis']['volume_mwh'])
+        if vol == 0 and 'kpis' in site_data and 'volume_mwh' in site_data['kpis']: vol = float(site_data['kpis']['volume_mwh'])
     except: vol = 0
     
     power = float(site_data.get('contract', {}).get('power', 0))
@@ -414,66 +318,45 @@ async def api_dealdesk_analyze(request: Request):
     original_name = site_data.get('identity', {}).get('site_name', 'Client Inconnu')
 
     legal_info = {"is_micro": False, "regime": "CODE_COMMERCE", "nom": original_name, "siret": siret}
-    search_term = siret if siret else original_name
-    
-    if search_term and search_term != "Client Inconnu":
+    if siret or original_name != "Client Inconnu":
         try:
-            url = f"https://recherche-entreprises.api.gouv.fr/search?q={urllib.parse.quote(search_term)}&page=1&per_page=1"
-            req = urllib.request.Request(url, headers={'User-Agent': 'Energistrat-Cortex/1.0'})
+            url = f"https://recherche-entreprises.api.gouv.fr/search?q={urllib.parse.quote(siret if siret else original_name)}&page=1&per_page=1"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Energistrat/1.0'})
             with urllib.request.urlopen(req, timeout=3) as response:
                 gov_data = json.loads(response.read().decode('utf-8'))
                 if gov_data.get('results') and len(gov_data['results']) > 0:
                     comp = gov_data['results'][0]
-                    effectif = comp.get('tranche_effectif_salarie', '00')
-                    if effectif in['00', '01', '02', '03'] or effectif is None:
-                        legal_info['is_micro'] = True
-                        legal_info['regime'] = "CODE_CONSOMMATION"
+                    if comp.get('tranche_effectif_salarie', '00') in['00', '01', '02', '03'] or comp.get('tranche_effectif_salarie') is None:
+                        legal_info['is_micro'] = True; legal_info['regime'] = "CODE_CONSOMMATION"
                     legal_info['nom'] = comp.get('nom_complet', original_name)
                     legal_info['siret'] = comp.get('siege', {}).get('siret', siret)
-        except Exception as e:
-            print(f"[API GOUV] Echec pour {search_term}: {e}")
+        except: pass
 
-    if vol > 5000: segment = "B2B_HEAVY"
-    elif power > 36 or vol > 250: segment = "C4_MID"
-    else: segment = "C5_MASS"
-
-    return JSONResponse({
-        "success": True,
-        "site": { "name": legal_info['nom'], "pdl": pdl_val, "volume": round(vol, 2), "power": power },
-        "legal": legal_info, "segment": segment
-    })
+    segment = "B2B_HEAVY" if vol > 5000 else ("C4_MID" if power > 36 or vol > 250 else "C5_MASS")
+    return JSONResponse({"success": True, "site": { "name": legal_info['nom'], "pdl": pdl_val, "volume": round(vol, 2), "power": power }, "legal": legal_info, "segment": segment})
 
 # ==========================================
-# INJECTION CORTEX 2 : API SUBVENTIONS (ZÉRO MOCK)
+# API SUBVENTIONS (ZÉRO MOCK)
 # ==========================================
 @app.get("/api/tools/subventions")
 async def api_subventions_analyze(user = Depends(get_current_user)):
-    """Moteur algorithmique appliquant les fiches standardisées CEE et ADEME réelles."""
     raw_sites =[]
     for p in glob.glob(os.path.join(DATA_DIR, "*.json")):
         if any(x in p for x in["master", "market", "m57", "carbon", "rte", "sentinel"]): continue
         try:
             with open(p, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                if cortex:
-                    fin = cortex.enrich_site_financials(data)
-                    data['computed_financials'] = fin
+                if cortex: data['computed_financials'] = cortex.enrich_site_financials(data)
                 raw_sites.append(data)
         except: continue
 
-    cee_price_mwh = 6.50 # Euro / MWh cumac
-    results =[]
-    total_enveloppe = 0
+    cee_price_mwh = 6.50
+    results =[]; total_enveloppe = 0
 
     for s in raw_sites:
         if "CLI_" in str(s.get('identity',{}).get('id')): continue
-        fin = s.get('computed_financials', {})
-        loc = s.get('location', {})
-        contract = s.get('contract', {})
-        kpis = s.get('kpis', {})
-        
-        surface = float(loc.get('surface', 0))
-        city = str(loc.get('city', '')).upper()
+        fin = s.get('computed_financials', {}); loc = s.get('location', {}); contract = s.get('contract', {}); kpis = s.get('kpis', {})
+        surface = float(loc.get('surface', 0)); city = str(loc.get('city', '')).upper()
         vol = float(fin.get('volume_mwh', 0))
         if vol == 0: vol = float(kpis.get('volume_mwh', 0))
         
@@ -482,49 +365,176 @@ async def api_subventions_analyze(user = Depends(get_current_user)):
         is_gas = fin.get('meta', {}).get('is_gas', False)
         
         if surface == 0:
-            results.append({"id": pdl, "name": name, "city": city, "status": "MISSING_DATA", "reason": "La surface (m²) n'est pas renseignée dans la Data Unity. L'audit CEE/ADEME est impossible sans cette valeur."})
+            results.append({"id": pdl, "name": name, "city": city, "status": "MISSING_DATA", "reason": "Surface (m²) manquante. Audit impossible."})
             continue
             
-        zone_factor = 1.0
-        if any(x in city for x in['LILLE', 'PARIS', 'STRASBOURG', 'LYON', 'NANCY', 'REIMS', 'METZ']): zone_factor = 1.3
-        elif any(x in city for x in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON', 'PERPIGNAN', 'NIMES']): zone_factor = 0.8
+        zone_factor = 1.3 if any(x in city for x in['LILLE', 'PARIS', 'STRASBOURG', 'LYON', 'NANCY', 'REIMS', 'METZ']) else (0.8 if any(x in city for x in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON', 'PERPIGNAN', 'NIMES']) else 1.0)
         zone_name = "H1" if zone_factor == 1.3 else ("H3" if zone_factor == 0.8 else "H2")
 
         aides =[]
         ghost = float(fin.get('kpis', {}).get('ghost_savings', 0))
         if surface >= 500 and ghost > (vol * 0.1):
-            kwh_cumac = surface * 250 * zone_factor
-            prime = (kwh_cumac / 1000) * cee_price_mwh
-            prime_coup_de_pouce = prime * 1.5 
-            aides.append({"code": "BAT-TH-116", "nom": "Coup de Pouce GTB (Régulation thermique)", "details": f"Formule: Surface ({surface}m²) × Forfait CEE × Zone {zone_name} × {cee_price_mwh}€/MWhc (x1.5)", "montant": round(prime_coup_de_pouce)})
+            prime_coup_de_pouce = ((surface * 250 * zone_factor) / 1000) * cee_price_mwh * 1.5 
+            aides.append({"code": "BAT-TH-116", "nom": "Coup de Pouce GTB (Régulation)", "details": f"Surface ({surface}m²) × Forfait CEE × Zone {zone_name}", "montant": round(prime_coup_de_pouce)})
             total_enveloppe += prime_coup_de_pouce
 
-        intensity = (vol * 1000) / surface if surface > 0 else 0
-        if intensity > 300:
-            surface_toit = surface * 0.3
-            kwh_cumac = surface_toit * 1400 * zone_factor
-            prime = (kwh_cumac / 1000) * cee_price_mwh
-            aides.append({"code": "BAT-EN-101", "nom": "Isolation Thermique Toiture", "details": f"Formule: Surface toit estimée ({round(surface_toit)}m²) × 1400 kWhc × Zone {zone_name} × {cee_price_mwh}€/MWhc", "montant": round(prime)})
+        if (vol * 1000) / surface > 300:
+            prime = (((surface * 0.3) * 1400 * zone_factor) / 1000) * cee_price_mwh
+            aides.append({"code": "BAT-EN-101", "nom": "Isolation Thermique Toiture", "details": f"Surface toit estimée ({round(surface * 0.3)}m²) × 1400 kWhc × Zone {zone_name}", "montant": round(prime)})
             total_enveloppe += prime
 
         if is_gas and vol > 500:
             prime = vol * 25
-            aides.append({"code": "ADEME-CHALEUR", "nom": "Fonds Chaleur (Conversion EnR/Réseau)", "details": f"Formule: Substitution {round(vol)} MWh fossile × 25€ (Aide moyenne ADEME)", "montant": round(prime)})
+            aides.append({"code": "ADEME-CHALEUR", "nom": "Fonds Chaleur (Conversion)", "details": f"Substitution {round(vol)} MWh fossile × 25€", "montant": round(prime)})
             total_enveloppe += prime
             
-        if len(aides) > 0:
-            results.append({ "id": pdl, "name": name, "city": city, "status": "ELIGIBLE", "aides": aides, "total_site": sum(a['montant'] for a in aides) })
-        else:
-            results.append({ "id": pdl, "name": name, "city": city, "status": "NON_ELIGIBLE", "reason": "Profil énergétique optimisé. Les seuils de la réglementation CEE ne déclenchent pas d'aide significative." })
+        if len(aides) > 0: results.append({ "id": pdl, "name": name, "city": city, "status": "ELIGIBLE", "aides": aides, "total_site": sum(a['montant'] for a in aides) })
+        else: results.append({ "id": pdl, "name": name, "city": city, "status": "NON_ELIGIBLE", "reason": "Profil énergétique optimisé." })
 
     return JSONResponse({"success": True, "results": results, "total_enveloppe": round(total_enveloppe)})
 
+# ==========================================
+# INJECTION CORTEX 3 : LE GÉNÉRATEUR DE CERFA (CHANTIER 1)
+# ==========================================
+@app.get("/api/tools/cerfa/{pdl}/{aide_code}", response_class=HTMLResponse)
+async def generate_cerfa_pdf(pdl: str, aide_code: str, user = Depends(get_current_user)):
+    """Génère un CERFA HTML formatté A4 pour impression PDF via le navigateur (Zéro Dépendance)."""
+    if not user: return HTMLResponse("Non autorisé", status_code=401)
+    
+    file_path = find_site_file(pdl)
+    if not file_path: return HTMLResponse(f"<h1>Erreur</h1><p>Le site PDL {pdl} est introuvable.</p>", status_code=404)
+    
+    with open(file_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        
+    identity = data.get('identity', {})
+    loc = data.get('location', {})
+    
+    company_name = identity.get('site_name') or identity.get('name', 'NON RENSEIGNÉ')
+    siret = identity.get('siret', 'NON RENSEIGNÉ')
+    address = loc.get('address', 'NON RENSEIGNÉ')
+    city = loc.get('city', 'NON RENSEIGNÉ')
+    surface = loc.get('surface', 'NON RENSEIGNÉ')
+    naf = identity.get('naf', 'NON RENSEIGNÉ')
+
+    # Mapping des aides
+    cerfa_num = "15404*01"
+    if "116" in aide_code:
+        titre_travaux = "MISE EN PLACE D'UN SYSTÈME DE GESTION TECHNIQUE DU BÂTIMENT (GTB)"
+        fiche_name = "BAT-TH-116"
+    elif "101" in aide_code:
+        titre_travaux = "ISOLATION DE COMBLES OU DE TOITURES"
+        fiche_name = "BAT-EN-101"
+    else:
+        titre_travaux = "AIDE À LA DÉCARBONATION (ADEME)"
+        fiche_name = aide_code
+        cerfa_num = "ADEME-2026"
+
+    date_jour = datetime.now().strftime("%d/%m/%Y")
+
+    # Template HTML structuré en A4 pour l'impression PDF native
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <title>CERFA_{fiche_name}_{pdl}</title>
+        <style>
+            @page {{ size: A4; margin: 15mm; }}
+            body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: black; background: white; margin: 0; padding: 0; font-size: 12px; }}
+            .header {{ display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px; }}
+            .marianne {{ text-align: center; font-weight: bold; font-size: 10px; border: 1px solid black; padding: 10px; width: 100px; }}
+            .title-box {{ text-align: center; flex-1; padding: 0 20px; }}
+            .cerfa-box {{ border: 1px solid black; padding: 10px; font-weight: bold; text-align: center; }}
+            h1 {{ font-size: 16px; margin: 0 0 5px 0; }}
+            h2 {{ font-size: 14px; margin: 0; background: #e0e0e0; padding: 5px; border: 1px solid black; margin-top: 20px; }}
+            .form-row {{ display: flex; border: 1px solid black; border-top: none; }}
+            .form-label {{ width: 40%; padding: 8px; border-right: 1px solid black; background: #f9f9f9; font-weight: bold; }}
+            .form-value {{ width: 60%; padding: 8px; font-family: monospace; font-size: 13px; }}
+            .attestation {{ margin-top: 30px; border: 1px solid black; padding: 15px; text-align: justify; line-height: 1.5; }}
+            .signature-box {{ margin-top: 20px; display: flex; justify-content: space-between; }}
+            .sign-area {{ border: 1px dashed gray; height: 100px; width: 45%; padding: 10px; color: gray; }}
+            @media print {{
+                .no-print {{ display: none; }}
+                body {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+            }}
+        </style>
+    </head>
+    <body onload="setTimeout(function(){{ window.print(); }}, 500);">
+        <button class="no-print" onclick="window.print()" style="margin-bottom:20px; padding:10px; background:blue; color:white; border:none; cursor:pointer;">Lancer l'impression PDF</button>
+        
+        <div class="header">
+            <div class="marianne">Liberté<br>Égalité<br>Fraternité<br><br>RÉPUBLIQUE FRANÇAISE</div>
+            <div class="title-box">
+                <h1>ATTESTATION SUR L'HONNEUR</h1>
+                <p>Opérations standardisées d'économies d'énergie (CEE)</p>
+            </div>
+            <div class="cerfa-box">CERFA<br>N° {cerfa_num}</div>
+        </div>
+
+        <h2>A - BÉNÉFICIAIRE DE L'OPÉRATION</h2>
+        <div class="form-row" style="border-top: 1px solid black;">
+            <div class="form-label">Raison Sociale</div><div class="form-value">{company_name.upper()}</div>
+        </div>
+        <div class="form-row">
+            <div class="form-label">N° SIRET</div><div class="form-value">{siret}</div>
+        </div>
+        <div class="form-row">
+            <div class="form-label">Code NAF / APE</div><div class="form-value">{naf}</div>
+        </div>
+
+        <h2>B - LIEU DE RÉALISATION DES TRAVAUX</h2>
+        <div class="form-row" style="border-top: 1px solid black;">
+            <div class="form-label">Adresse du site</div><div class="form-value">{address}</div>
+        </div>
+        <div class="form-row">
+            <div class="form-label">Ville</div><div class="form-value">{city.upper()}</div>
+        </div>
+        <div class="form-row">
+            <div class="form-label">Référence Compteur (PDL)</div><div class="form-value">{pdl}</div>
+        </div>
+        <div class="form-row">
+            <div class="form-label">Surface totale chauffée/climatisée</div><div class="form-value">{surface} m²</div>
+        </div>
+
+        <h2>C - CARACTÉRISTIQUES DE L'OPÉRATION</h2>
+        <div class="form-row" style="border-top: 1px solid black;">
+            <div class="form-label">Référence de la fiche CEE</div><div class="form-value font-bold">{fiche_name}</div>
+        </div>
+        <div class="form-row">
+            <div class="form-label">Nature des travaux</div><div class="form-value">{titre_travaux}</div>
+        </div>
+
+        <div class="attestation">
+            <b>Je soussigné(e), agissant en qualité de représentant légal du bénéficiaire, certifie sur l'honneur que :</b><br><br>
+            1. L'entreprise mentionnée ci-dessus est bien le bénéficiaire de l'opération d'économies d'énergie.<br>
+            2. Les informations déclarées relatives à la nature et aux caractéristiques de l'opération sont exactes.<br>
+            3. L'opération n'a pas déjà fait l'objet d'une demande de certificats d'économies d'énergie.<br>
+            4. La contribution financière a été directement déduite du devis des travaux selon le cadre du Tiers de Confiance ENERGISTRAT.<br><br>
+            <i>Fait pour valoir ce que de droit. Toute fausse déclaration est passible de sanctions pénales.</i>
+        </div>
+
+        <div class="signature-box">
+            <div class="sign-area">
+                Fait à : {city.upper()}<br>
+                Le : {date_jour}<br><br>
+                <b>Signature du bénéficiaire :</b>
+            </div>
+            <div class="sign-area">
+                <b>Cachet de l'entreprise (Obligatoire) :</b>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
 # --- API PRINCIPALES (SETTINGS & DATA) ---
+
 def normalize_full_data(data):
     if 'contract' not in data: data['contract'] = {}
     if 'pricing' not in data: data['pricing'] = {}
-    c = data['contract']
-    p = data['pricing']
+    c = data['contract']; p = data['pricing']
     if 'power_details' not in c: c['power_details'] = {}
     sources =[data, c, data.get('technical', {}), p]
     power_map = { 'hph':['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph'], 'hch':['ps_hch', 'p_hch', 'PS_HCH', 'puissance_hch'], 'hpe':['ps_hpe', 'p_hpe', 'PS_HPE', 'puissance_hpe'], 'hce':['ps_hce', 'p_hce', 'PS_HCE', 'puissance_hce'] }
@@ -550,8 +560,7 @@ def normalize_full_data(data):
         i = data['identity']
         if 'siret' in data and data['siret']: i['siret'] = data['siret']
         if not i.get('id') and i.get('siret'): i['id'] = i['siret']
-    data['contract'] = c
-    data['pricing'] = p
+    data['contract'] = c; data['pricing'] = p
     return data
 
 @app.post("/api/settings/save_client")
@@ -702,24 +711,20 @@ async def get_fleet_data(response: Response):
         if "master" in p or "market" in p or "m57" in p or "carbon" in p or "rte" in p or "sentinel" in p: continue
         try:
             with open(p, 'r', encoding='utf-8') as f: data = json.load(f)
-            if cortex:
-                fin = cortex.enrich_site_financials(data)
-                data['computed_financials'] = fin
+            fin = cortex.enrich_site_financials(data)
+            data['computed_financials'] = fin
             raw_sites.append(data)
         except: continue
-    
-    if cortex: analysis = cortex.analyze_portfolio(raw_sites)
-    else: analysis = {"global": {}, "green_league": {}}
-
+    analysis = cortex.analyze_portfolio(raw_sites)
     fleet_list =[]
     all_cities, all_providers = set(), set()
     for s in raw_sites:
         if "CLI_" in str(s.get('identity',{}).get('id')): continue
-        fin = s.get('computed_financials', {})
+        fin = s['computed_financials']
         contract = s.get('contract', {})
-        city = fin.get('meta', {}).get('city', 'Inconnue')
+        city = fin['meta']['city']
         prov = contract.get('provider', 'Inconnu')
-        if city and city != 'Inconnue': all_cities.add(city)
+        if city: all_cities.add(city)
         if prov: all_providers.add(prov)
         
         raw_id = s.get('identity',{}).get('id')
@@ -727,13 +732,13 @@ async def get_fleet_data(response: Response):
         pdl_display = contract.get('pdl')
         if not pdl_display or len(str(pdl_display)) < 5: pdl_display = contract.get('pce', '-')
         
-        vol_engine = fin.get('volume_mwh', 0)
+        vol_engine = fin['volume_mwh']
         vol_router = 0
         if 'kpis' in s and 'volume_mwh' in s['kpis']: vol_router = float(s['kpis']['volume_mwh'])
         final_vol = vol_engine
         if vol_engine == 0 and vol_router > 0: final_vol = vol_router
 
-        final_budget = fin.get('budget_annual', 0)
+        final_budget = fin['budget_annual']
         if vol_engine == 0 and vol_router > 0:
             pricing = s.get('pricing', {})
             avg_price = 0.20
@@ -746,10 +751,11 @@ async def get_fleet_data(response: Response):
             final_budget = sub_cost + energy_cost
 
         fleet_list.append({
-            "id": safe_id, "name": fin.get('meta', {}).get('site_label', 'Inconnu'), "city": city, "zip": s.get('location', {}).get('zip_code', ''),
-            "volume": final_vol, "energy": "gaz" if fin.get('meta', {}).get('is_gas') else "elec", "segment": contract.get('segment', '-'),
-            "provider": prov, "budget": final_budget, "landing": fin.get('landing_forecast', 0), "alert": fin.get('kpis', {}).get('pmc_eur_mwh', 0) > 300,
-            "ghost_savings": fin.get('kpis', {}).get('ghost_savings', 0), "power": contract.get('power', 0), "pdl": pdl_display, "surface": s.get('location', {}).get('surface', 0)
+            "id": safe_id, "name": fin['meta']['site_label'], "city": city, "zip": s.get('location', {}).get('zip_code', ''),
+            "volume": final_vol, "energy": "gaz" if fin['meta']['is_gas'] else "elec", "segment": contract.get('segment', '-'),
+            "provider": prov, "budget": final_budget, "landing": fin['landing_forecast'], "alert": fin['kpis']['pmc_eur_mwh'] > 300,
+            "ghost_savings": fin['kpis']['ghost_savings'], "power": contract.get('power', 0), "pdl": pdl_display,
+            "surface": s.get('location', {}).get('surface', 0)
         })
     return JSONResponse(json_compliant({
         "fleet": fleet_list, "count": len(fleet_list), "green_league": analysis.get('green_league'), "global_kpis": analysis.get('global'),
@@ -853,8 +859,7 @@ def get_rte_token(client_id, client_secret):
         with urllib.request.urlopen(req) as response:
             res_data = json.loads(response.read().decode('utf-8'))
             return res_data.get("access_token")
-    except Exception as e:
-        return None
+    except Exception: return None
 
 @app.get("/api/rte/live")
 async def get_rte_live_data():
@@ -1021,12 +1026,6 @@ async def view_ops_nexus(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("ops_nexus.html", {"request": request})
 
-# FIX ZÉRO RÉGRESSION : LA ROUTE PARTNER SETTINGS CORRIGÉE
-@app.get("/partner/settings")
-async def view_partner_settings(request: Request, user = Depends(get_current_user)):
-    if not user: return RedirectResponse(url="/login")
-    return templates.TemplateResponse("settings_partner.html", {"request": request})
-
 @app.get("/industrie", response_class=HTMLResponse)
 @app.get("/industry", response_class=HTMLResponse)
 async def view_industrie(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
@@ -1148,12 +1147,14 @@ async def view_settings(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
     return templates.TemplateResponse("settings.html", {"request": request})
 
+@app.get("/partner/settings")
+async def view_partner_settings(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
+    return templates.TemplateResponse("settings_partner.html", {"request": request})
+
 @app.get("/ops/market")
 async def view_ops_market(request: Request): return templates.TemplateResponse("ops_market.html", {"request": request})
 
-# ==========================================
-# ROUTES FRONT CORTEX (INJECTION REUSSIE)
-# ==========================================
 @app.get("/deal_desk", response_class=HTMLResponse)
 async def view_deal_desk(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
