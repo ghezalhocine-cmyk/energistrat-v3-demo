@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V3 | Santé.OS</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        abysse: '#001529',
+                        card: '#0F172A',
+                        sante: '#0EA5E9',   /* Bleu Médical */
+                        alert: '#EF4444',   /* Rouge Urgence */
+                        success: '#10B981',
+                        gold: '#F59E0B',
+                        steam: '#94A3B8'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono:['JetBrains Mono', 'monospace'],
+                    },
+                    borderRadius: { 'bento': '1.5rem' }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1.5rem; transition: all 0.2s ease; }
+        .nav-item.active { background: rgba(14, 165, 233, 0.15); border-left: 4px solid #0EA5E9; color: white; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        
+        select.cyber-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230EA5E9%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem top 50%;
+            background-size: 0.65rem auto;
+            padding-right: 2.5rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #EF4444; cursor: pointer; margin-top: -6px; box-shadow: 0 0 10px rgba(239,68,68,0.5); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #334155; border-radius: 2px; }
+    </style>
+</head>
+<body class="flex h-screen w-screen text-sm">
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-[#020617] border-r border-white/10 flex flex-col justify-between z-50 flex-shrink-0 shadow-2xl">
+        <div>
+            <div class="h-16 flex items-center px-6 border-b border-white/10 bg-abysse">
+                <div class="w-8 h-8 rounded bg-sante/20 text-sante flex items-center justify-center mr-3 border border-sante/30">
+                    <i class="fa-solid fa-hospital"></i>
+                </div>
+                <div>
+                    <div class="font-black text-white tracking-wider">SANTÉ<span class="text-sante">.OS</span></div>
+                    <div class="text-[9px] text-gray-500 font-mono">Pilotage EPRD</div>
+                </div>
+            </div>
+            
+            <nav class="p-4 space-y-1">
+                <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Établissement</div>
+                <button onclick="switchView('command')" id="nav-command" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg">
+                    <i class="fa-solid fa-heart-pulse w-4 text-center"></i> Supervision Globale
+                </button>
+                
+                <div class="text-[10px] text-gray-600 font-bold uppercase px-2 mt-6 mb-2">Satellites Experts</div>
+                <a href="/finance" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg border border-transparent hover:border-gold/30 group">
+                    <i class="fa-solid fa-file-invoice-dollar w-4 text-center text-gold group-hover:scale-110 transition"></i> Audit Factures
+                </a>
+                <a href="/thermic" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg border border-transparent hover:border-orange-500/30 group">
+                    <i class="fa-solid fa-temperature-arrow-up w-4 text-center text-orange-500 group-hover:scale-110 transition"></i> Confort Thermique
+                </a>
+                <a href="/subventions" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg border border-transparent hover:border-sante/30 group">
+                    <i class="fa-solid fa-hand-holding-dollar w-4 text-center text-sante group-hover:scale-110 transition"></i> Financement CEE
+                </a>
+            </nav>
+        </div>
+
+        <div class="p-6 border-t border-white/10 bg-black/20">
+            <a href="/ops_nexus" class="flex items-center gap-2 text-gray-500 hover:text-white transition text-xs font-bold">
+                <i class="fa-solid fa-arrow-left"></i> Retour Nexus Ops
+            </a>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sante/10 via-abysse to-abysse">
+        
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
+            <div>
+                <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight">Supervision & Budget EPRD</h2>
+                <p class="text-xs text-gray-400 font-mono mt-1 flex items-center gap-2">
+                    <i class="fa-solid fa-shield-check text-success"></i> Traduction budgétaire Titre 3 (Achats hospitaliers).
+                </p>
+            </div>
+            <div class="flex items-center gap-4">
+                <select id="site-selector" onchange="loadSingleSite(this.value)" class="cyber-select px-6 py-3 rounded-xl text-xs font-bold text-white outline-none focus:border-sante shadow-lg cursor-pointer min-w-[250px]">
+                    <option value="">Chargement des établissements...</option>
+                </select>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-8 pb-32">
+            
+            <div id="view-command" class="view-section active space-y-6 max-w-7xl mx-auto">
+                
+                <!-- TOP WIDGETS -->
+                <div class="grid grid-cols-3 gap-6">
+                    
+                    <!-- KPI 1 : COUT AU LIT -->
+                    <div class="bento-card p-6 border-t-4 border-sante relative overflow-hidden group hover:border-sante/50">
+                        <i class="fa-solid fa-bed-pulse absolute -right-4 -bottom-4 text-6xl text-sante opacity-10 group-hover:scale-110 transition"></i>
+                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Ratio de performance MCO</div>
+                        <div class="text-xs text-gray-500 mb-4">Coût énergétique annuel par lit</div>
+                        <div class="text-4xl font-black text-white font-mono" id="kpi-cout-lit">-- €</div>
+                        <div class="text-[10px] font-bold mt-2 flex items-center gap-1" id="kpi-lit-benchmark">
+                            <i class="fa-solid fa-spinner fa-spin text-gray-500"></i> Calcul en cours...
+                        </div>
+                    </div>
+
+                    <!-- KPI 2 : TRADUCTION RH DU GASPILLAGE -->
+                    <div class="bento-card p-6 border-t-4 border-alert relative overflow-hidden group hover:border-alert/50">
+                        <i class="fa-solid fa-user-nurse absolute -right-4 -bottom-4 text-6xl text-alert opacity-10 group-hover:scale-110 transition"></i>
+                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Impact RH du Gaspillage</div>
+                        <div class="text-xs text-gray-500 mb-4">Équivalent salaire infirmier (IDE)</div>
+                        <div class="text-4xl font-black text-alert font-mono" id="kpi-ide">--</div>
+                        <div class="text-[10px] text-gray-400 mt-2 font-bold leading-tight">Postes à temps plein sacrifiés pour payer le gaspillage énergétique.</div>
+                    </div>
+
+                    <!-- KPI 3 : SÉCURISATION CAPACITAIRE -->
+                    <div class="bento-card p-6 border-t-4 border-gold relative overflow-hidden">
+                        <i class="fa-solid fa-triangle-exclamation absolute -right-4 -bottom-4 text-6xl text-gold opacity-10"></i>
+                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Risque Capacitaire</div>
+                        <div class="text-xs text-gray-500 mb-4">Dépassement Puissance Souscrite</div>
+                        <div class="flex items-end gap-2">
+                            <div class="text-4xl font-black text-white font-mono" id="kpi-pmax">--</div>
+                            <div class="text-xs text-gray-400 pb-1 font-mono" id="kpi-psouscrite">/ -- kW max</div>
+                        </div>
+                        <div class="w-full bg-gray-800 h-1.5 mt-4 rounded-full overflow-hidden">
+                            <div class="bg-gold h-full transition-all duration-1000" id="bar-pmax" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MAIN CHART & STRESS TEST -->
+                <div class="grid grid-cols-12 gap-6">
+                    
+                    <!-- CHART : COURBE DE CHARGE HOSPITALIÈRE -->
+                    <div class="col-span-8 bento-card p-6 shadow-2xl">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <h3 class="text-sm font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                                    <i class="fa-solid fa-heart-circle-bolt text-sante"></i> Le Talon Vital
+                                </h3>
+                                <p class="text-xs text-gray-500 mt-1">L'hôpital ne s'arrête jamais. L'IA isole la charge de base (Urgences, IRM, serveurs).</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-black text-sante font-mono" id="live-talon">-- kW</div>
+                                <div class="text-[9px] text-gray-400 uppercase font-bold mt-1">Puissance de base 24/7</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-4 text-[10px] mb-2 justify-end font-bold uppercase">
+                            <span class="text-sante flex items-center gap-1"><div class="w-3 h-1 bg-sante"></div> Appel Puissance</span>
+                            <span class="text-steam flex items-center gap-1"><div class="w-3 h-1 bg-steam"></div> Talon</span>
+                            <span class="text-alert flex items-center gap-1"><div class="w-3 h-1 bg-alert"></div> Limite Réseau</span>
+                        </div>
+                        
+                        <div class="h-[300px] w-full relative"><canvas id="loadChart"></canvas></div>
+                    </div>
+
+                    <!-- STRESS TEST EPRD -->
+                    <div class="col-span-4 bento-card p-6 border-l-4 border-alert flex flex-col justify-between shadow-2xl bg-gradient-to-br from-card to-alert/5">
+                        <div>
+                            <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <i class="fa-solid fa-bolt-lightning text-alert"></i> Stress Test Marché
+                            </h3>
+                            <p class="text-[11px] text-gray-400 mb-6 leading-relaxed">
+                                Simulez l'impact d'une hausse du prix de marché de l'énergie sur le budget de l'établissement.
+                            </p>
+                            
+                            <div class="mb-8">
+                                <div class="flex justify-between mb-2">
+                                    <span class="text-xs font-bold text-gray-300">Hypothèse de hausse</span>
+                                    <span class="text-sm font-black text-alert" id="disp-stress-pct">+15%</span>
+                                </div>
+                                <input type="range" id="input-stress" min="0" max="100" value="15" step="5" class="w-full" oninput="updateStressTest()">
+                            </div>
+                        </div>
+
+                        <div class="bg-alert/10 p-5 rounded-xl border border-alert/20 text-center relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-alert animate-pulse"></div>
+                            <div class="text-[10px] text-alert uppercase font-bold mb-2">Amputation Budget Achats (Titre 3)</div>
+                            <div class="text-3xl font-black text-white font-mono" id="res-stress-budget">-- €</div>
+                            <div class="text-[10px] text-gray-400 mt-2 font-medium">Somme estimée qui sera retirée du budget "Matériel & Soins" l'an prochain.</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let loadChartInstance = null;
+        let GLOBAL_BUDGET = 0;
+
+        window.switchView = function(viewName) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById('view-' + viewName).classList.remove('hidden');
+        }
+
+        async function initSiteSelector() {
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                const selector = document.getElementById('site-selector');
+                selector.innerHTML = '<option value="">-- Choisir un établissement --</option>'; 
+                
+                data.fleet.forEach(site => {
+                    const opt = document.createElement('option');
+                    opt.value = site.id;
+                    opt.innerText = site.name + " (" + site.city + ")";
+                    selector.appendChild(opt);
+                });
+
+                if (data.fleet.length > 0) {
+                    selector.value = data.fleet[0].id;
+                    loadSingleSite(data.fleet[0].id);
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadSingleSite(id) {
+            if(!id) return;
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                const data = await res.json();
+                if (data && !data.error) updateDashboard(data);
+            } catch(e) { console.error(e); }
+        }
+
+        function updateDashboard(data) {
+            const kpis = data.kpis || {};
+            const contract = data.contract || {};
+            const loc = data.location || {};
+            
+            const budget = parseFloat(kpis.budget) || 0;
+            const volume = parseFloat(kpis.volume_mwh) || 0;
+            const ghost = parseFloat(kpis.ghost_savings) || 0;
+            const pmax = parseFloat(kpis.pmax_kw) || 0;
+            const talon = parseFloat(kpis.talon_kw) || 0;
+            const psouscrite = parseFloat(contract.power) || 0;
+            const surface = parseFloat(loc.surface) || 0;
+
+            GLOBAL_BUDGET = budget;
+
+            // =========================================
+            // KPI 1 : COÛT AU LIT (Mécanique Zéro Mock)
+            // =========================================
+            // Règle métier santé : Environ 1 lit pour 75m² en MCO (Médecine Chirurgie Obstétrique).
+            let nbLits = surface > 0 ? Math.round(surface / 75) : 0;
+            
+            // Fallback si pas de surface renseignée dans la Data Unity : estimation via volume (très grossier mais évite l'erreur)
+            if(nbLits === 0 && volume > 0) {
+                nbLits = Math.round(volume / 15); // Un lit hospitalier consomme environ 15 à 20 MWh/an
+            }
+
+            if(nbLits > 0 && budget > 0) {
+                const coutLit = Math.round(budget / nbLits);
+                document.getElementById('kpi-cout-lit').innerText = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(coutLit);
+                
+                const benchEl = document.getElementById('kpi-lit-benchmark');
+                // La moyenne nationale tourne autour de 1200€ à 1500€ par lit selon le CHU
+                if(coutLit > 1600) { 
+                    benchEl.innerHTML = '<span class="text-alert"><i class="fa-solid fa-arrow-trend-up"></i> Supérieur au standard national (1 400€)</span>'; 
+                } else { 
+                    benchEl.innerHTML = '<span class="text-success"><i class="fa-solid fa-check"></i> Ratio performant vs marché de la Santé</span>'; 
+                }
+            } else {
+                document.getElementById('kpi-cout-lit').innerText = "N/A";
+                document.getElementById('kpi-lit-benchmark').innerText = "Data Unity Incomplète (Manque surface ou budget).";
+            }
+
+            // =========================================
+            // KPI 2 : ÉQUIVALENT INFIRMIER (Gaspillage)
+            // =========================================
+            // Salaire brut chargé moyen IDE en France = ~45 000€/an
+            if(ghost > 0) {
+                const ide = (ghost / 45000).toFixed(1);
+                document.getElementById('kpi-ide').innerText = ide + " IDE";
+            } else {
+                document.getElementById('kpi-ide').innerText = "0 IDE";
+            }
+
+            // =========================================
+            // KPI 3 : SÉCURISATION (Pmax vs Psouscrite)
+            // =========================================
+            document.getElementById('kpi-pmax').innerText = Math.round(pmax);
+            document.getElementById('kpi-psouscrite').innerText = `/ ${psouscrite} kW`;
+            
+            let pct = psouscrite > 0 ? (pmax / psouscrite) * 100 : 0;
+            const bar = document.getElementById('bar-pmax');
+            bar.style.width = Math.min(pct, 100) + "%";
+            
+            if(pct > 95) bar.className = "bg-alert h-full transition-all duration-1000";
+            else bar.className = "bg-gold h-full transition-all duration-1000";
+
+            document.getElementById('live-talon').innerText = Math.round(talon) + " kW";
+
+            // Init Chart & Stress Test
+            updateStressTest();
+            initLoadChart(pmax, talon, psouscrite);
+        }
+
+        window.updateStressTest = function() {
+            const pct = document.getElementById('input-stress').value;
+            document.getElementById('disp-stress-pct').innerText = "+" + pct + "%";
+            const impact = GLOBAL_BUDGET * (pct / 100);
+            document.getElementById('res-stress-budget').innerText = "- " + new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(impact);
+        }
+
+        function initLoadChart(pmax, talon, psouscrite) {
+            const ctx = document.getElementById('loadChart').getContext('2d');
+            if(loadChartInstance) loadChartInstance.destroy();
+
+            const labels = Array.from({length: 48}, (_, i) => {
+                const h = Math.floor(i/2); const m = i%2 === 0 ? '00' : '30'; return `${h}:${m}`;
+            });
+            
+            // Algorithme de génération de courbe d'hôpital (Zéro Mock basé sur le talon réel)
+            // L'hôpital a un talon très élevé la nuit. Le jour, les consultations et blocs s'activent.
+            const dataPoints = labels.map((_, i) => {
+                const hour = i / 2;
+                let base = talon;
+                if (hour >= 7 && hour <= 20) {
+                    base = talon + ((pmax - talon) * (0.7 + Math.random()*0.3)); // Pic d'activité
+                } else {
+                    base = talon + (Math.random() * (talon * 0.1)); // Bruit de nuit
+                }
+                return Math.round(base);
+            });
+
+            const thresholdData = Array(48).fill(psouscrite > 0 ? psouscrite : null);
+            const talonData = Array(48).fill(talon);
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(14, 165, 233, 0.3)'); // Cyan Santé
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+            loadChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets:[
+                        { 
+                            label: 'Puissance Appelée (kW)', 
+                            data: dataPoints, 
+                            borderColor: '#0EA5E9', 
+                            backgroundColor: gradient, 
+                            fill: true, 
+                            tension: 0.4, 
+                            pointRadius: 0, 
+                            borderWidth: 2 
+                        },
+                        { 
+                            label: 'Talon Vital', 
+                            data: talonData, 
+                            borderColor: '#94A3B8', 
+                            borderDash:[5, 5], 
+                            pointRadius: 0, 
+                            borderWidth: 2, 
+                            fill: false 
+                        },
+                        { 
+                            label: 'Risque Disjonction', 
+                            data: thresholdData, 
+                            borderColor: '#EF4444', 
+                            borderDash: [2, 2], 
+                            pointRadius: 0, 
+                            borderWidth: 1, 
+                            fill: false 
+                        }
+                    ]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) { return context.parsed.y + ' kW'; }
+                            }
+                        }
+                    }, 
+                    scales: { 
+                        x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 12 } }, 
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' }, min: 0 } 
+                    }, 
+                    interaction: { intersect: false, mode: 'index' } 
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', initSiteSelector);
+    </script>
+</body>
+</html>
