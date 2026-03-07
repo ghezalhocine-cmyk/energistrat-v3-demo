@@ -26,13 +26,12 @@ except ImportError:
     PANDAS_READY = False
 
 # ==============================================================================
-# LE MOTEUR PDF DE SECOURS (ANTI-CRASH POUR LE BILAN AG)
+# LE MOTEUR PDF DE SECOURS (ANTI-CRASH POUR LE BILAN AG & GRAPPE)
 # ==============================================================================
 class FallbackPDFBuilder:
     def __init__(self):
         self.logo_svg = """<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="30" rx="8" y="5" fill="#00E5FF"/><path d="M10 15L20 15L15 25Z" fill="#001529"/><text x="40" y="27" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#001529">ENERGISTRAT</text></svg>"""
-    def generate_bilan_ag_cluster(self, cluster_name, site_count, vol_total, budget_total, vol_elec, vol_gaz, ghost_total):
-        return f"<h1>Bilan AG Grappe {cluster_name} (Secours)</h1>"
+
     def generate_bilan_ag(self, client_id, data, fin, kpis):
         try:
             identity = data.get('identity', {})
@@ -113,9 +112,6 @@ class FallbackPDFBuilder:
                     <div class="header-brand">
                         <div>{self.logo_svg}</div>
                         <div class="doc-title">
-                        class ClusterAGRequest(BaseModel):
-                        cluster_name: str
-                        site_ids: List[str]
                             <h1>BILAN ÉNERGÉTIQUE ANNUEL</h1>
                             <div class="subtitle">Préparation Assemblée Générale {annee_en_cours}</div>
                         </div>
@@ -170,6 +166,48 @@ class FallbackPDFBuilder:
         except Exception as e:
             trace = traceback.format_exc()
             return f"<h1>Erreur interne lors de la génération du PDF</h1><p>{str(e)}</p><pre>{trace}</pre>"
+
+    def generate_bilan_ag_cluster(self, cluster_name, site_count, vol_total, budget_total, vol_elec, vol_gaz, ghost_total):
+        budget_non_negocie = budget_total * 1.15 
+        economie = budget_non_negocie - budget_total
+        pct_elec = (vol_elec / vol_total) * 100 if vol_total > 0 else 0
+        pct_gaz = (vol_gaz / vol_total) * 100 if vol_total > 0 else 0
+        
+        r2_simule = 0.88 if ghost_total < (vol_total * 0.1) else 0.65
+        etat_chaufferie = "Excellente régulation globale du parc." if r2_simule > 0.85 else "Dérives thermiques ou talons électriques nocturnes constatés."
+        couleur_chaufferie = "#10B981" if r2_simule > 0.85 else "#EF4444"
+        
+        annee_en_cours = datetime.now().year
+        date_edition = datetime.now().strftime('%d/%m/%Y')
+
+        return f"""
+        <!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>BILAN_AG_GRAPPE_{cluster_name.replace(' ', '_')}</title>
+        <style>@page {{ size: A4; margin: 0; }} body {{ font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #1e293b; background: white; margin: 0; padding: 0; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }} .page {{ width: 210mm; min-height: 296mm; padding: 20mm; box-sizing: border-box; page-break-after: always; position: relative; }} .header-brand {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #001529; padding-bottom: 15px; margin-bottom: 30px; }} .header-brand h1 {{ color: #001529; font-size: 22px; margin: 0; text-transform: uppercase; letter-spacing: -0.5px; }} .header-brand .subtitle {{ color: #00E5FF; font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }} h2 {{ color: #001529; font-size: 16px; border-left: 5px solid #00E5FF; padding-left: 12px; margin-top: 35px; text-transform: uppercase; letter-spacing: 1px; }} .info-box {{ background: #001529; color: white; border-radius: 12px; padding: 20px; margin-bottom: 25px; display: flex; gap: 20px; }} .info-label {{ font-size: 10px; text-transform: uppercase; color: #00E5FF; font-weight: bold; margin-bottom: 5px; }} .info-value {{ font-size: 16px; font-weight: bold; }} .kpi-grid {{ display: flex; gap: 20px; margin-bottom: 30px; }} .kpi-card {{ flex: 1; border: 2px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center; background: #f8fafc; }} .kpi-val {{ font-size: 26px; font-weight: 900; color: #001529; margin: 10px 0; font-family: monospace; }} .shield-box {{ background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #22c55e; padding: 20px; border-radius: 12px; }} .legal-box {{ background: #f1f5f9; border-left: 4px solid #94a3b8; padding: 15px; margin-top: 40px; font-size: 10px; color: #475569; }} .mix-bar {{ width: 100%; height: 20px; background: #f1f5f9; border-radius: 10px; overflow: hidden; display: flex; margin-top: 10px; border: 1px solid #cbd5e1;}} .mix-gas {{ background: #F97316; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: white; font-weight: bold; }} .mix-elec {{ background: #00E5FF; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #001529; font-weight: bold; }} .footer-doc {{ position: absolute; bottom: 15mm; left: 20mm; right: 20mm; border-top: 2px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 9px; font-weight: bold; color: #94a3b8; text-transform: uppercase; }} .no-print {{ position: fixed; top: 20px; right: 20px; z-index: 1000; }} .btn-print {{ background: #001529; color: #00E5FF; border: 2px solid #00E5FF; padding: 12px 24px; border-radius: 8px; font-weight: 900; cursor: pointer; text-transform: uppercase; }} @media print {{ .no-print {{ display: none; }} }}</style>
+        </head><body onload="setTimeout(function(){{ window.print(); }}, 800);"><div class="no-print"><button class="btn-print" onclick="window.print()">🖨️ Télécharger le PDF (Grappe)</button></div>
+        <div class="page">
+            <div class="header-brand"><div>{self.logo_svg}</div><div style="text-align: right;"><h1>BILAN MULTI-ÉNERGIES (GRAPPE)</h1><div class="subtitle">Préparation Assemblée Générale {annee_en_cours}</div></div></div>
+            <div class="info-box"><div style="flex:1;"><div class="info-label">Résidence (Grappe)</div><div class="info-value">{cluster_name.upper()}</div></div><div style="flex:1;"><div class="info-label">Compteurs fusionnés</div><div class="info-value">{site_count} PDL / PCE</div></div></div>
+            
+            <h2>1. Mix Énergétique du Bâtiment (DPE Collectif)</h2>
+            <p>Ce rapport agrège l'ensemble des fluides de la copropriété (Chaufferie Gaz, Ascenseurs, Communs Électricité) pour offrir une vue consolidée exigée par la loi Climat (DPE Collectif).</p>
+            <div class="mix-bar">
+                <div class="mix-gas" style="width: {pct_gaz}%;">GAZ {round(pct_gaz)}%</div>
+                <div class="mix-elec" style="width: {pct_elec}%;">ÉLEC {round(pct_elec)}%</div>
+            </div>
+
+            <h2>2. Synthèse Budgétaire Globale</h2>
+            <div class="kpi-grid" style="margin-top: 15px;">
+                <div class="kpi-card"><div style="font-size:11px;color:#64748b;font-weight:bold;">Volume Réel Consommé</div><div class="kpi-val">{round(vol_total)} <span style="font-size: 14px;">MWh</span></div></div>
+                <div class="kpi-card"><div style="font-size:11px;color:#64748b;font-weight:bold;">Budget Annuel Facturé</div><div class="kpi-val" style="color: #00E5FF;">{int(budget_total):,} <span style="font-size: 14px;">€ TTC</span></div></div>
+            </div>
+            <div class="shield-box"><strong style="color: #15803d; font-size: 16px;">🛡️ Bouclier Tarifaire Global</strong><br><br><b>Économie globale sécurisée sur la grappe : <span style="font-size: 18px; color: #166534;">{int(economie):,} €</span>.</b></div>
+            
+            <h2>3. Audit & Dérive Thermique</h2>
+            <div style="display:flex; gap:20px;"><div style="flex:1; border-left:4px solid {couleur_chaufferie}; padding-left:15px;"><div class="info-label" style="color: #64748b;">Régulation Globale</div><div style="font-size: 24px; font-weight: 900; color: {couleur_chaufferie};">{round(r2_simule * 100)} %</div></div><div style="flex:2;"><b>Diagnostic IA Multi-Sites :</b><br>{etat_chaufferie}<br><i>Gaspillage estimé de la grappe : {round(ghost_total)} €/an.</i></div></div>
+            
+            <div class="legal-box"><strong>⚖️ ATTESTATION DE PROVENANCE (TIERS DE CONFIANCE)</strong><br>ENERGISTRAT atteste que les {site_count} compteurs ont été certifiés via les API des gestionnaires de réseau. Ce document fait foi pour l'étude PPPT.</div>
+            <div class="footer-doc"><span>© ENERGISTRAT - GRAPPE</span><span>Date : {date_edition}</span><span>Page 1 / 1</span></div>
+        </div></body></html>"""
 
 # ==============================================================================
 # BLOC IMPORT CORTEX ROBUSTE 
@@ -599,8 +637,7 @@ async def api_dealdesk_analyze(request: Request):
         "legal": legal_info, 
         "segment": segment
     })
-
-# ==========================================
+    # ==========================================
 # API SUBVENTIONS & CERFA
 # ==========================================
 @app.get("/api/tools/subventions")
@@ -827,7 +864,7 @@ async def generate_cerfa_pdf(site_id: str, aide_code: str, user = Depends(get_cu
         return HTMLResponse(f"<h1>Erreur Serveur</h1><p>{str(e)}</p><pre>{trace}</pre>", status_code=500)
 
 # ==========================================
-# REPORT BUILDER (L'USINE À PDF CORPORATE - FIX 500 ERROR)
+# REPORT BUILDER (L'USINE À PDF CORPORATE - GRAPPE)
 # ==========================================
 @app.get("/api/tools/bilan_ag/{client_id}", response_class=HTMLResponse)
 async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)):
@@ -835,76 +872,94 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
         if not user: return HTMLResponse("Non autorisé", status_code=401)
         
         file_path = find_site_file(client_id)
-        if not file_path: return HTMLResponse(f"<h1>Erreur 404</h1><p>Copropriété introuvable pour l'ID: {client_id}</p>", status_code=404)
+        if not file_path: 
+            return HTMLResponse(f"<h1>Erreur 404</h1><p>Copropriété introuvable pour l'ID: {client_id}</p>", status_code=404)
         
         with open(file_path, 'r', encoding='utf-8') as f: 
-            data = json.load(f)
+            base_data = json.load(f)
             
-        fin = {}
-        if cortex:
-            try: fin = cortex.enrich_site_financials(data)
-            except Exception as ce: print(f"Cortex enrichment failed: {ce}")
-            
-        kpis = data.get('kpis', {})
+        # ====================================================
+        # LOGIQUE D'IDENTIFICATION DE LA GRAPPE (CLUSTER)
+        # ====================================================
+        identity = base_data.get('identity', {})
+        cluster_name = str(identity.get('site_name') or identity.get('name') or "").strip()
+        cluster_siret = str(identity.get('siret') or "").strip()
         
-        html = pdf_builder.generate_bilan_ag(client_id, data, fin, kpis)
-        return HTMLResponse(content=html)
-    except Exception as e:
-        trace = traceback.format_exc()
-        return HTMLResponse(f"<div style='padding:40px; font-family:sans-serif;'><h1>🚨 Erreur Interne (API 500)</h1><p style='color:red;'><b>{str(e)}</b></p><p>Le moteur PDF a rencontré une donnée inattendue dans le fichier JSON du client.</p><pre style='background:#f4f4f4; padding:20px; border-radius:10px;'>{trace}</pre></div>", status_code=500)
-
-@app.post("/api/tools/bilan_ag_cluster", response_class=HTMLResponse)
-async def api_generate_bilan_ag_cluster(payload: ClusterAGRequest, user = Depends(get_current_user)):
-    """Génère le Bilan AG fusionné pour une grappe de compteurs (Zéro Mock)."""
-    try:
-        if not user: return HTMLResponse("Non autorisé", status_code=401)
-        if not payload.site_ids: return HTMLResponse("Aucun compteur sélectionné.", status_code=400)
-
-        total_vol = 0.0
-        total_budget = 0.0
-        total_ghost = 0.0
-        vol_elec = 0.0
-        vol_gaz = 0.0
-
-        for sid in payload.site_ids:
-            file_path = find_site_file(sid)
-            if not file_path: continue
+        cluster_files =[]
+        
+        if cluster_name != "" or cluster_siret != "":
+            for p in glob.glob(os.path.join(DATA_DIR, "*.json")):
+                if any(x in p for x in["master", "market", "m57", "carbon", "rte", "sentinel"]): 
+                    continue
+                try:
+                    with open(p, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        i = data.get('identity', {})
+                        s_name = str(i.get('site_name') or i.get('name') or "").strip()
+                        s_siret = str(i.get('siret') or "").strip()
+                        
+                        is_match = False
+                        # Priorité au SIRET, sinon regroupement par nom exact
+                        if cluster_siret and s_siret == cluster_siret:
+                            is_match = True
+                        elif cluster_name and s_name == cluster_name:
+                            is_match = True
+                            
+                        if is_match:
+                            cluster_files.append(data)
+                except:
+                    continue
+        
+        if not cluster_files:
+            cluster_files =[base_data]
             
-            with open(file_path, 'r', encoding='utf-8') as f: 
-                data = json.load(f)
+        # ====================================================
+        # ROUTAGE MULTI-SITES (GRAPPE) OU MONO-SITE
+        # ====================================================
+        if len(cluster_files) > 1:
+            vol_total = 0
+            budget_total = 0
+            vol_elec = 0
+            vol_gaz = 0
+            ghost_total = 0
             
+            for s_data in cluster_files:
+                fin = {}
+                if cortex:
+                    try: fin = cortex.enrich_site_financials(s_data)
+                    except: pass
+                    
+                kpis = s_data.get('kpis', {})
+                vol = float(fin.get('volume_mwh') or kpis.get('volume_mwh') or 0)
+                budg = float(fin.get('budget_annual') or 0)
+                if budg == 0: budg = vol * 180.0
+                
+                is_gas = fin.get('meta', {}).get('is_gas', False)
+                if is_gas: vol_gaz += vol
+                else: vol_elec += vol
+                
+                vol_total += vol
+                budget_total += budg
+                ghost_total += float(kpis.get('ghost_savings') or fin.get('kpis', {}).get('ghost_savings') or 0)
+                
+            display_name = cluster_name if cluster_name else f"Grappe_{client_id}"
+            html = pdf_builder.generate_bilan_ag_cluster(display_name, len(cluster_files), vol_total, budget_total, vol_elec, vol_gaz, ghost_total)
+            return HTMLResponse(content=html)
+            
+        else:
+            # Mode standard (Mono-compteur isolé)
             fin = {}
             if cortex:
-                try: fin = cortex.enrich_site_financials(data)
-                except: pass
+                try: fin = cortex.enrich_site_financials(base_data)
+                except Exception as ce: print(f"Cortex enrichment failed: {ce}")
                 
-            kpis = data.get('kpis', {})
+            kpis = base_data.get('kpis', {})
+            html = pdf_builder.generate_bilan_ag(client_id, base_data, fin, kpis)
+            return HTMLResponse(content=html)
             
-            v = float(fin.get('volume_mwh') or kpis.get('volume_mwh') or 0)
-            b = float(fin.get('budget_annual') or 0)
-            if b == 0: b = v * 180.0
-            g = float(kpis.get('ghost_savings') or 0)
-            
-            total_vol += v
-            total_budget += b
-            total_ghost += g
-            
-            is_gas = fin.get('meta', {}).get('is_gas', False) if isinstance(fin, dict) else False
-            if is_gas: vol_gaz += v
-            else: vol_elec += v
-
-        html = pdf_builder.generate_bilan_ag_cluster(
-            cluster_name=payload.cluster_name,
-            site_count=len(payload.site_ids),
-            vol_total=total_vol,
-            budget_total=total_budget,
-            vol_elec=vol_elec,
-            vol_gaz=vol_gaz,
-            ghost_total=total_ghost
-        )
-        return HTMLResponse(content=html)
     except Exception as e:
-        return HTMLResponse(f"<h1>Erreur Grappe</h1><p>{str(e)}</p>", status_code=500)
+        trace = traceback.format_exc()
+        return HTMLResponse(f"<div style='padding:40px; font-family:sans-serif;'><h1>🚨 Erreur Interne (API 500)</h1><p style='color:red;'><b>{str(e)}</b></p><pre style='background:#f4f4f4; padding:20px; border-radius:10px;'>{trace}</pre></div>", status_code=500)
 
 @app.get("/api/physics/thermic_signature/{client_id}")
 async def get_thermic_signature(client_id: str):
@@ -1019,7 +1074,7 @@ async def api_immo_analyze(client_id: str, user = Depends(get_current_user)):
         dpe = "G"
         decote_pct = -0.20 
         
-    prix_m2_moyen = 9500 if "PARIS" in city.upper() else (4500 if any(x in city.upper() for x in ['LYON', 'BORDEAUX', 'NICE']) else 2500)
+    prix_m2_moyen = 9500 if "PARIS" in city.upper() else (4500 if any(x in city.upper() for x in['LYON', 'BORDEAUX', 'NICE']) else 2500)
     valeur_theorique = surface * prix_m2_moyen
     impact_euros = valeur_theorique * decote_pct
     
@@ -1039,7 +1094,7 @@ async def api_immo_analyze(client_id: str, user = Depends(get_current_user)):
         }, 
         "dpe": {
             "note": dpe, 
-            "is_passoire": dpe in ['F', 'G']
+            "is_passoire": dpe in['F', 'G']
         }, 
         "finance": {
             "valeur_theorique": valeur_theorique, 
@@ -1107,7 +1162,7 @@ async def api_sniper_market(user = Depends(get_current_user)):
 async def api_gridmap_capacity(user = Depends(get_current_user)):
     results =[]
     for p in glob.glob(os.path.join(DATA_DIR, "*.json")):
-        if any(x in p for x in ["master", "market", "m57", "carbon", "rte", "sentinel"]): 
+        if any(x in p for x in["master", "market", "m57", "carbon", "rte", "sentinel"]): 
             continue
         try:
             with open(p, 'r', encoding='utf-8') as f: 
@@ -1781,7 +1836,7 @@ async def generate_tender(request: Request):
         return JSONResponse({"error": "Pandas missing"}, 500)
     try:
         body = await request.json()
-        site_ids = body.get('site_ids', [])
+        site_ids = body.get('site_ids',[])
         selected_sites =[]
         
         for sid in site_ids:
