@@ -71,11 +71,15 @@
                 <button onclick="switchView('cee')" id="btn-cee" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase text-[10px] transition flex items-center gap-3">
                     <i class="fa-solid fa-piggy-bank w-4 text-center text-success"></i> Chasseur de CEE
                 </button>
+                <!-- INJECTION CORTEX: Le lien vers le satellite Thermic (Tueur de BE) -->
+                <a href="/thermic" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase text-[10px] transition flex items-center gap-3 border-transparent hover:border-orange-500/30 group">
+                    <i class="fa-solid fa-temperature-arrow-up w-4 text-center text-orange-500 group-hover:scale-110 transition"></i> Cortex Thermic (DJU)
+                </a>
                 <button onclick="switchView('contrats')" id="btn-contrats" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase text-[10px] transition flex items-center gap-3">
                     <i class="fa-solid fa-calendar-check w-4 text-center text-cyan"></i> Échéancier Contrats
                 </button>
                 <button onclick="switchView('ag')" id="btn-ag" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase text-[10px] transition flex items-center gap-3">
-                    <i class="fa-solid fa-vault w-4 text-center text-gold"></i> Archives AG
+                    <i class="fa-solid fa-vault w-4 text-center text-gold"></i> Bilan & Archives AG
                 </button>
             </nav>
         </div>
@@ -280,7 +284,7 @@
             </div>
 
             <!-- ========================================== -->
-            <!-- VUE 7 : ASSEMBLÉE GÉNÉRALE & VOTE -->
+            <!-- VUE 7 : ASSEMBLÉE GÉNÉRALE & VOTE (INJECTION SMART PDF) -->
             <!-- ========================================== -->
             <div id="view-ag" class="view-section">
                  <div class="bento-card p-6 bg-gradient-to-r from-card to-syndic/20 border border-syndic/30 flex justify-between items-center mb-2">
@@ -293,13 +297,19 @@
                     </button>
                  </div>
 
-                 <div class="bento-card p-8 border-t-4 border-gold">
-                    <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-                        <h3 class="text-xl font-black text-white"><i class="fa-solid fa-vault text-gold mr-2"></i> Archives & Bilan Réglementaire AG</h3>
-                        <button onclick="window.print()" class="text-xs bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded transition"><i class="fa-solid fa-print mr-2"></i>Imprimer Bilan Actuel</button>
-                    </div>
-                    <div class="space-y-4" id="vault-list"></div>
-                 </div>
+                 <!-- LE FIX CORTEX : GÉNÉRATEUR BILAN AG -->
+                 <div class="bento-card p-12 text-center border-t-4 border-cyan relative overflow-hidden shadow-2xl mt-4">
+                    <div class="absolute -right-10 -top-10 text-[150px] text-cyan opacity-5"><i class="fa-solid fa-file-pdf"></i></div>
+                    <i class="fa-solid fa-gavel text-5xl text-cyan mb-6"></i>
+                    <h2 class="text-2xl font-black text-white mb-2">Préparation Conseil Syndical & AG</h2>
+                    <p class="text-sm text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
+                        Générez le <b>Bilan Énergétique Officiel</b> de la copropriété. Ce rapport PDF intègre la synthèse financière (PMP), l'audit thermique IA, et le rappel de la Loi Climat (DPE Collectif). Il est prêt à être joint aux convocations d'Assemblée Générale.
+                    </p>
+                    <button onclick="genererBilanAG()" class="bg-cyan text-abysse font-black px-8 py-4 rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.4)] hover:bg-white transition inline-flex items-center gap-3">
+                        <i class="fa-solid fa-print text-xl"></i> GÉNÉRER LE BILAN AG (PDF)
+                    </button>
+                    <p class="text-[10px] text-gray-500 mt-4"><i class="fa-solid fa-shield-check text-success"></i> Tiers de Confiance : Document généré à partir de la Data Unity.</p>
+                </div>
             </div>
 
         </div>
@@ -344,7 +354,7 @@
                 'nilm': 'Intelligence Patrimoine (NILM)',
                 'cee': 'Chasseur de CEE', 
                 'contrats': 'Échéanciers des Contrats', 
-                'ag': 'Archives AG'
+                'ag': 'Préparation Assemblée Générale'
             };
             document.getElementById('page-title').innerText = titles[viewId] || 'SYNDIC.OS';
         }
@@ -417,8 +427,10 @@
                 document.getElementById('current-site-label').innerText = "🏢 Vision Globale Parc";
                 document.getElementById('header-vol-label').innerText = "Volume Total Géré";
                 document.getElementById('header-budget-label').innerText = "Budget Total (P1)";
+                window.CURRENT_ID = null;
             } else {
                 const basicSite = FLEET_DATA.find(s => s.id === id);
+                window.CURRENT_ID = id; // Stockage pour le générateur PDF
                 document.getElementById('current-site-label').innerText = basicSite ? basicSite.name : "Site en cours...";
                 document.getElementById('header-vol-label').innerText = "Volume Site";
                 document.getElementById('header-budget-label').innerText = "Budget Site";
@@ -475,7 +487,6 @@
                     pmpColor = "text-alert font-bold";
                 }
 
-                // Pour la démo, on affiche toutes les alertes, mais on limite les conformes si c'est la vue globale
                 if (pmp_kwh > 0.25 || s.budget === 0 || data.length === 1 || Math.random() > 0.6) {
                     auditList.innerHTML += `
                         <tr class="hover:bg-white/5 border-b border-white/5">
@@ -495,10 +506,10 @@
 
                 if (intensity > 250) { 
                     ceeAmount = surface * 30; totalCee += ceeAmount;
-                    ceeHtml = `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white">${s.name}</td><td class="px-6 py-4 text-alert text-xs">Intensité extrême (${Math.round(intensity)} kWh/m²)</td><td class="px-6 py-4 font-mono text-xs text-blue-400">BAT-EN-101 (Isolation)</td><td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(ceeAmount).toLocaleString()} €</td><td class="px-6 py-4 text-center"><button onclick="window.location.href='/optimization'" class="bg-success/20 text-success hover:bg-success hover:text-white px-3 py-1 rounded transition">Monter Dossier</button></td></tr>`;
+                    ceeHtml = `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white">${s.name}</td><td class="px-6 py-4 text-alert text-xs">Intensité extrême (${Math.round(intensity)} kWh/m²)</td><td class="px-6 py-4 font-mono text-xs text-blue-400">BAT-EN-101 (Isolation)</td><td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(ceeAmount).toLocaleString()} €</td><td class="px-6 py-4 text-center"><button onclick="window.location.href='/subventions'" class="bg-success/20 text-success hover:bg-success hover:text-white px-3 py-1 rounded transition">Monter Dossier</button></td></tr>`;
                 } else if (s.ghost_savings > 500) { 
                     ceeAmount = surface * 15; totalCee += ceeAmount;
-                    ceeHtml = `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white">${s.name}</td><td class="px-6 py-4 text-gold text-xs">Talon SGE élevé (${Math.round(s.ghost_savings)} €/an)</td><td class="px-6 py-4 font-mono text-xs text-cyan">BAT-TH-116 (GTB/GTC)</td><td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(ceeAmount).toLocaleString()} €</td><td class="px-6 py-4 text-center"><button onclick="window.location.href='/optimization'" class="bg-success/20 text-success hover:bg-success hover:text-white px-3 py-1 rounded transition">Monter Dossier</button></td></tr>`;
+                    ceeHtml = `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white">${s.name}</td><td class="px-6 py-4 text-gold text-xs">Talon SGE élevé (${Math.round(s.ghost_savings)} €/an)</td><td class="px-6 py-4 font-mono text-xs text-cyan">BAT-TH-116 (GTB/GTC)</td><td class="px-6 py-4 text-right font-black text-success font-mono">+ ${Math.round(ceeAmount).toLocaleString()} €</td><td class="px-6 py-4 text-center"><button onclick="window.location.href='/subventions'" class="bg-success/20 text-success hover:bg-success hover:text-white px-3 py-1 rounded transition">Monter Dossier</button></td></tr>`;
                 }
                 if(ceeAmount > 0) ceeList.innerHTML += ceeHtml;
 
@@ -535,7 +546,6 @@
             document.getElementById('trve-savings').className = savings>0 ? "text-5xl font-mono font-black text-success" : "text-5xl font-mono font-black text-alert";
 
             runChartP1(totalBudget);
-            generateVault(totalBudget, totalVol);
         }
 
         // --- CHARTS & TANTIÈMES ---
@@ -553,20 +563,20 @@
         }
 
         window.updateTantieme = function() {
-            const surfApt = parseFloat(document.getElementById('apt-surface')?.value || document.getElementById('ag-surface')?.value) || 0;
+            const surfApt = parseFloat(document.getElementById('apt-surface').value) || 0;
             const surfTotale = IS_GLOBAL ? 50000 : (CURRENT_SITE?.location?.surface || 1500);
             const quotePart = (window.CURRENT_BUDGET / surfTotale) * surfApt;
-            document.querySelectorAll('#apt-cost, #ag-quote-part').forEach(el => el.innerHTML = Math.round(quotePart).toLocaleString() + " € <span class='text-xs text-gray-500 font-normal'>/ an</span>");
+            document.getElementById('apt-cost').innerHTML = Math.round(quotePart).toLocaleString() + " € <span class='text-xs text-gray-500 font-normal'>/ an</span>";
         }
 
-        // --- VAULT AG ---
-        function generateVault(budget, vol) {
-            const vault = document.getElementById('vault-list'); vault.innerHTML = '';
-            const cy = new Date().getFullYear();
-            const hist =[{ y: cy, l: "Exercice N (En cours)", p: 1.0, c: 1.0, col: "text-syndic" }, { y: cy-1, l: "Bilan N-1 (Clôturé)", p: 0.85, c: 0.92, col: "text-white" }, { y: cy-2, l: "Archive N-2", p: 0.60, c: 1.05, col: "text-gray-400" }, { y: cy-3, l: "Archive N-3", p: 0.45, c: 0.98, col: "text-gray-500" }];
-            hist.forEach(h => {
-                vault.innerHTML += `<div class="bg-white/5 border border-white/10 rounded-xl p-4 flex justify-between items-center hover:bg-white/10 transition"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded bg-black/50 flex items-center justify-center border border-white/10 ${h.col} font-bold"><i class="fa-solid fa-file-pdf"></i></div><div><h4 class="font-bold ${h.col}">${h.l}</h4><div class="text-[10px] text-gray-400 font-mono mt-1">Conso: ${Math.round(vol*h.c)} MWh | Coût: ${Math.round((budget*h.p)*h.c).toLocaleString()} €</div></div></div><button onclick="window.print()" class="text-xs font-bold text-gray-400 hover:text-white transition bg-black/30 px-3 py-2 rounded-lg border border-white/10 hover:border-white/30"><i class="fa-solid fa-download mr-1"></i> PDF</button></div>`;
-            });
+        // --- GÉNÉRATEUR DE SMART PDF (BILAN AG) ---
+        window.genererBilanAG = function() {
+            if(window.CURRENT_ID) {
+                window.open(`/api/tools/bilan_ag/${window.CURRENT_ID}`, '_blank');
+            } else {
+                alert("Veuillez sélectionner UNE copropriété précise (pas la vision globale) dans la barre de recherche en haut à droite pour générer son Bilan AG.");
+                openSearchModal();
+            }
         }
 
         // --- GADGET E-VOTE ---
