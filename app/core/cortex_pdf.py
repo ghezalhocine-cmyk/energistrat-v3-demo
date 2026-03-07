@@ -4,31 +4,50 @@ class CortexReportBuilder:
     """Moteur de génération Smart PDF Corporate - ENERGISTRAT V3"""
     
     def __init__(self):
-        self.version = "3.0 (Corporate Edition)"
+        self.version = "3.1 (Corporate Edition - Stabilized)"
         # Logo ENERGISTRAT vectoriel (Base64/SVG) pour impression parfaite
         self.logo_svg = """<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="30" rx="8" y="5" fill="#00E5FF"/><path d="M10 15L20 15L15 25Z" fill="#001529"/><text x="40" y="27" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#001529">ENERGISTRAT</text></svg>"""
 
     def generate_bilan_ag(self, client_id, data, fin, kpis):
         """Rapport Bilan AG (Syndic.OS) avec App Citoyen et Mentions Légales"""
+        
+        # 1. Extraction Sécurisée des données (Anti-Crash)
         identity = data.get('identity', {})
         loc = data.get('location', {})
-        site_name = identity.get('site_name') or identity.get('name') or "Copropriété"
+        site_name = str(identity.get('site_name') or identity.get('name') or "Copropriété")
         address = f"{loc.get('address', '')} - {loc.get('city', '')}".strip(" -")
         
-        vol_mwh = fin.get('volume_mwh', 0)
-        if vol_mwh == 0 and 'volume_mwh' in kpis: vol_mwh = float(kpis['volume_mwh'])
-        budget = fin.get('budget_annual', 0)
-        if budget == 0: budget = vol_mwh * 180 
+        # 2. Casting des métriques (Zéro Mock, mais sécurisé)
+        try: vol_mwh = float(fin.get('volume_mwh') or 0)
+        except: vol_mwh = 0.0
+        
+        if vol_mwh == 0: 
+            try: vol_mwh = float(kpis.get('volume_mwh') or 0)
+            except: vol_mwh = 0.0
+            
+        try: budget = float(fin.get('budget_annual') or 0)
+        except: budget = 0.0
+        
+        if budget == 0: budget = vol_mwh * 180.0
         
         budget_non_negocie = budget * 1.15 
         economie = budget_non_negocie - budget
         
-        talon_pct = 0.15 if fin.get('meta', {}).get('is_gas', False) else 0.30
-        talon_monthly = (vol_mwh * talon_pct) / 12
-        r2_simule = 0.88 if kpis.get('ghost_savings', 0) < (vol_mwh * 0.1) else 0.65
+        # 3. Cortex Thermique
+        is_gas = fin.get('meta', {}).get('is_gas', False) if isinstance(fin, dict) else False
+        talon_pct = 0.15 if is_gas else 0.30
+        talon_monthly = (vol_mwh * talon_pct) / 12.0
         
+        try: ghost = float(kpis.get('ghost_savings') or 0)
+        except: ghost = 0.0
+        
+        r2_simule = 0.88 if ghost < (vol_mwh * 0.1) else 0.65
         etat_chaufferie = "Excellente régulation climatique. La courbe de chauffe suit les variations météorologiques." if r2_simule > 0.85 else "Dérive thermique constatée. Un réglage de la courbe de chauffe est recommandé pour éviter le gaspillage."
         couleur_chaufferie = "#10B981" if r2_simule > 0.85 else "#EF4444"
+
+        # 4. FIX DU BUG : Déclaration explicite des variables de dates
+        annee_en_cours = datetime.now().year
+        date_edition = datetime.now().strftime('%d/%m/%Y')
 
         return f"""
         <!DOCTYPE html>
@@ -90,7 +109,7 @@ class CortexReportBuilder:
                     <div>{self.logo_svg}</div>
                     <div class="doc-title">
                         <h1>BILAN ÉNERGÉTIQUE ANNUEL</h1>
-                        <div class="subtitle">Préparation Assemblée Générale {datetime.now().year}</div>
+                        <div class="subtitle">Préparation Assemblée Générale {annee_en_cours}</div>
                     </div>
                 </div>
 
