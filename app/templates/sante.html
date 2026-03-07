@@ -17,14 +17,14 @@
                     colors: {
                         abysse: '#001529',
                         card: '#0F172A',
-                        sante: '#0EA5E9',   /* Bleu Médical */
-                        alert: '#EF4444',   /* Rouge Urgence */
+                        sante: '#0EA5E9',   
+                        alert: '#EF4444',   
                         success: '#10B981',
                         gold: '#F59E0B',
                         steam: '#94A3B8'
                     },
                     fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
+                        sans:['Inter', 'sans-serif'],
                         mono:['JetBrains Mono', 'monospace'],
                     },
                     borderRadius: { 'bento': '1.5rem' }
@@ -91,10 +91,16 @@
             </nav>
         </div>
 
-        <div class="p-6 border-t border-white/10 bg-black/20">
-            <a href="/ops_nexus" class="flex items-center gap-2 text-gray-500 hover:text-white transition text-xs font-bold">
-                <i class="fa-solid fa-arrow-left"></i> Retour Nexus Ops
+        <!-- LE FIX DU SETTINGS ET RETOUR NEXUS -->
+        <div class="mt-auto p-4 border-t border-white/10 bg-black/20">
+            <a href="/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group mb-2">
+                <div class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs text-white font-bold group-hover:bg-sante group-hover:text-abysse transition border border-white/10"><i class="fa-solid fa-database"></i></div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-xs font-bold text-white">Data Unity</div>
+                    <div class="text-[10px] text-gray-500">Paramétrage PDL</div>
+                </div>
             </a>
+            <a href="/ops_nexus" class="flex items-center gap-2 text-gray-500 hover:text-white transition text-xs pl-2 font-bold"><i class="fa-solid fa-arrow-left"></i> Retour Nexus Ops</a>
         </div>
     </aside>
 
@@ -104,10 +110,14 @@
             <div>
                 <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight">Supervision & Budget EPRD</h2>
                 <p class="text-xs text-gray-400 font-mono mt-1 flex items-center gap-2">
-                    <i class="fa-solid fa-shield-check text-success"></i> Traduction budgétaire Titre 3 (Achats hospitaliers).
+                    <i class="fa-solid fa-shield-check text-success"></i> Traduction budgétaire Titre 3 (Achats).
                 </p>
             </div>
             <div class="flex items-center gap-4">
+                <!-- LE FIX DES BADGES D'ÉNERGIE ET USAGE -->
+                <div id="badge-energy" class="hidden items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] font-bold"></div>
+                <div id="badge-usage" class="hidden items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-300 text-[10px] font-bold"></div>
+                
                 <select id="site-selector" onchange="loadSingleSite(this.value)" class="cyber-select px-6 py-3 rounded-xl text-xs font-bold text-white outline-none focus:border-sante shadow-lg cursor-pointer min-w-[250px]">
                     <option value="">Chargement des établissements...</option>
                 </select>
@@ -120,7 +130,6 @@
                 
                 <!-- TOP WIDGETS -->
                 <div class="grid grid-cols-3 gap-6">
-                    
                     <!-- KPI 1 : COUT AU LIT -->
                     <div class="bento-card p-6 border-t-4 border-sante relative overflow-hidden group hover:border-sante/50">
                         <i class="fa-solid fa-bed-pulse absolute -right-4 -bottom-4 text-6xl text-sante opacity-10 group-hover:scale-110 transition"></i>
@@ -156,9 +165,7 @@
                     </div>
                 </div>
 
-                <!-- MAIN CHART & STRESS TEST -->
                 <div class="grid grid-cols-12 gap-6">
-                    
                     <!-- CHART : COURBE DE CHARGE HOSPITALIÈRE -->
                     <div class="col-span-8 bento-card p-6 shadow-2xl">
                         <div class="flex justify-between items-start mb-6">
@@ -198,7 +205,7 @@
                                     <span class="text-xs font-bold text-gray-300">Hypothèse de hausse</span>
                                     <span class="text-sm font-black text-alert" id="disp-stress-pct">+15%</span>
                                 </div>
-                                <input type="range" id="input-stress" min="0" max="100" value="15" step="5" class="w-full" oninput="updateStressTest()">
+                                <input type="range" id="input-stress" min="0" max="100" value="15" step="5" class="w-full accent-alert" oninput="updateStressTest()">
                             </div>
                         </div>
 
@@ -270,22 +277,35 @@
             GLOBAL_BUDGET = budget;
 
             // =========================================
-            // KPI 1 : COÛT AU LIT (Mécanique Zéro Mock)
+            // GESTION DES BADGES ÉNERGIE ET USAGE (FIX)
             // =========================================
-            // Règle métier santé : Environ 1 lit pour 75m² en MCO (Médecine Chirurgie Obstétrique).
-            let nbLits = surface > 0 ? Math.round(surface / 75) : 0;
-            
-            // Fallback si pas de surface renseignée dans la Data Unity : estimation via volume (très grossier mais évite l'erreur)
-            if(nbLits === 0 && volume > 0) {
-                nbLits = Math.round(volume / 15); // Un lit hospitalier consomme environ 15 à 20 MWh/an
+            const isGas = data.energy_type === 'gaz';
+            const energyBadge = document.getElementById('badge-energy');
+            energyBadge.classList.remove('hidden');
+            if (isGas) {
+                energyBadge.innerHTML = '<i class="fa-solid fa-fire"></i> GAZ NATUREL';
+                energyBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] font-bold border-orange-500/50 bg-orange-500/10 text-orange-500 shadow-md';
+            } else {
+                energyBadge.innerHTML = '<i class="fa-solid fa-bolt"></i> ÉLECTRICITÉ';
+                energyBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] font-bold border-cyan/50 bg-cyan/10 text-cyan shadow-md';
             }
+            
+            const usage = loc.typologie || contract.segment || 'MCO / CHU';
+            const usageBadge = document.getElementById('badge-usage');
+            usageBadge.classList.remove('hidden');
+            usageBadge.innerHTML = '<i class="fa-solid fa-tag text-sante"></i> ' + usage.toUpperCase();
+
+            // =========================================
+            // KPI 1 : COÛT AU LIT
+            // =========================================
+            let nbLits = surface > 0 ? Math.round(surface / 75) : 0;
+            if(nbLits === 0 && volume > 0) nbLits = Math.round(volume / 15); 
 
             if(nbLits > 0 && budget > 0) {
                 const coutLit = Math.round(budget / nbLits);
                 document.getElementById('kpi-cout-lit').innerText = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(coutLit);
                 
                 const benchEl = document.getElementById('kpi-lit-benchmark');
-                // La moyenne nationale tourne autour de 1200€ à 1500€ par lit selon le CHU
                 if(coutLit > 1600) { 
                     benchEl.innerHTML = '<span class="text-alert"><i class="fa-solid fa-arrow-trend-up"></i> Supérieur au standard national (1 400€)</span>'; 
                 } else { 
@@ -293,13 +313,12 @@
                 }
             } else {
                 document.getElementById('kpi-cout-lit').innerText = "N/A";
-                document.getElementById('kpi-lit-benchmark').innerText = "Data Unity Incomplète (Manque surface ou budget).";
+                document.getElementById('kpi-lit-benchmark').innerText = "Data Unity Incomplète.";
             }
 
             // =========================================
-            // KPI 2 : ÉQUIVALENT INFIRMIER (Gaspillage)
+            // KPI 2 : ÉQUIVALENT INFIRMIER
             // =========================================
-            // Salaire brut chargé moyen IDE en France = ~45 000€/an
             if(ghost > 0) {
                 const ide = (ghost / 45000).toFixed(1);
                 document.getElementById('kpi-ide').innerText = ide + " IDE";
@@ -308,7 +327,7 @@
             }
 
             // =========================================
-            // KPI 3 : SÉCURISATION (Pmax vs Psouscrite)
+            // KPI 3 : SÉCURISATION (Pmax)
             // =========================================
             document.getElementById('kpi-pmax').innerText = Math.round(pmax);
             document.getElementById('kpi-psouscrite').innerText = `/ ${psouscrite} kW`;
@@ -316,13 +335,11 @@
             let pct = psouscrite > 0 ? (pmax / psouscrite) * 100 : 0;
             const bar = document.getElementById('bar-pmax');
             bar.style.width = Math.min(pct, 100) + "%";
-            
             if(pct > 95) bar.className = "bg-alert h-full transition-all duration-1000";
             else bar.className = "bg-gold h-full transition-all duration-1000";
 
             document.getElementById('live-talon').innerText = Math.round(talon) + " kW";
 
-            // Init Chart & Stress Test
             updateStressTest();
             initLoadChart(pmax, talon, psouscrite);
         }
@@ -342,16 +359,11 @@
                 const h = Math.floor(i/2); const m = i%2 === 0 ? '00' : '30'; return `${h}:${m}`;
             });
             
-            // Algorithme de génération de courbe d'hôpital (Zéro Mock basé sur le talon réel)
-            // L'hôpital a un talon très élevé la nuit. Le jour, les consultations et blocs s'activent.
             const dataPoints = labels.map((_, i) => {
                 const hour = i / 2;
                 let base = talon;
-                if (hour >= 7 && hour <= 20) {
-                    base = talon + ((pmax - talon) * (0.7 + Math.random()*0.3)); // Pic d'activité
-                } else {
-                    base = talon + (Math.random() * (talon * 0.1)); // Bruit de nuit
-                }
+                if (hour >= 7 && hour <= 20) base = talon + ((pmax - talon) * (0.7 + Math.random()*0.3));
+                else base = talon + (Math.random() * (talon * 0.1)); 
                 return Math.round(base);
             });
 
@@ -359,7 +371,7 @@
             const talonData = Array(48).fill(talon);
 
             const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(0, 'rgba(14, 165, 233, 0.3)'); // Cyan Santé
+            gradient.addColorStop(0, 'rgba(14, 165, 233, 0.3)'); 
             gradient.addColorStop(1, 'rgba(0,0,0,0)');
 
             loadChartInstance = new Chart(ctx, {
@@ -367,51 +379,15 @@
                 data: {
                     labels: labels,
                     datasets:[
-                        { 
-                            label: 'Puissance Appelée (kW)', 
-                            data: dataPoints, 
-                            borderColor: '#0EA5E9', 
-                            backgroundColor: gradient, 
-                            fill: true, 
-                            tension: 0.4, 
-                            pointRadius: 0, 
-                            borderWidth: 2 
-                        },
-                        { 
-                            label: 'Talon Vital', 
-                            data: talonData, 
-                            borderColor: '#94A3B8', 
-                            borderDash:[5, 5], 
-                            pointRadius: 0, 
-                            borderWidth: 2, 
-                            fill: false 
-                        },
-                        { 
-                            label: 'Risque Disjonction', 
-                            data: thresholdData, 
-                            borderColor: '#EF4444', 
-                            borderDash: [2, 2], 
-                            pointRadius: 0, 
-                            borderWidth: 1, 
-                            fill: false 
-                        }
+                        { label: 'Puissance Appelée (kW)', data: dataPoints, borderColor: '#0EA5E9', backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 },
+                        { label: 'Talon Vital', data: talonData, borderColor: '#94A3B8', borderDash:[5, 5], pointRadius: 0, borderWidth: 2, fill: false },
+                        { label: 'Risque Disjonction', data: thresholdData, borderColor: '#EF4444', borderDash: [2, 2], pointRadius: 0, borderWidth: 1, fill: false }
                     ]
                 },
                 options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) { return context.parsed.y + ' kW'; }
-                            }
-                        }
-                    }, 
-                    scales: { 
-                        x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 12 } }, 
-                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' }, min: 0 } 
-                    }, 
+                    responsive: true, maintainAspectRatio: false, 
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { return context.parsed.y + ' kW'; } } } }, 
+                    scales: { x: { grid: { display: false }, ticks: { color: '#64748B', maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' }, min: 0 } }, 
                     interaction: { intersect: false, mode: 'index' } 
                 }
             });
