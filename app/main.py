@@ -31,7 +31,8 @@ except ImportError:
 class FallbackPDFBuilder:
     def __init__(self):
         self.logo_svg = """<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="30" rx="8" y="5" fill="#00E5FF"/><path d="M10 15L20 15L15 25Z" fill="#001529"/><text x="40" y="27" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#001529">ENERGISTRAT</text></svg>"""
-
+    def generate_bilan_ag_cluster(self, cluster_name, site_count, vol_total, budget_total, vol_elec, vol_gaz, ghost_total):
+        return f"<h1>Bilan AG Grappe {cluster_name} (Secours)</h1>"
     def generate_bilan_ag(self, client_id, data, fin, kpis):
         try:
             identity = data.get('identity', {})
@@ -112,6 +113,9 @@ class FallbackPDFBuilder:
                     <div class="header-brand">
                         <div>{self.logo_svg}</div>
                         <div class="doc-title">
+                        class ClusterAGRequest(BaseModel):
+                        cluster_name: str
+                        site_ids: List[str]
                             <h1>BILAN ÉNERGÉTIQUE ANNUEL</h1>
                             <div class="subtitle">Préparation Assemblée Générale {annee_en_cours}</div>
                         </div>
@@ -848,6 +852,59 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
     except Exception as e:
         trace = traceback.format_exc()
         return HTMLResponse(f"<div style='padding:40px; font-family:sans-serif;'><h1>🚨 Erreur Interne (API 500)</h1><p style='color:red;'><b>{str(e)}</b></p><p>Le moteur PDF a rencontré une donnée inattendue dans le fichier JSON du client.</p><pre style='background:#f4f4f4; padding:20px; border-radius:10px;'>{trace}</pre></div>", status_code=500)
+
+@app.post("/api/tools/bilan_ag_cluster", response_class=HTMLResponse)
+async def api_generate_bilan_ag_cluster(payload: ClusterAGRequest, user = Depends(get_current_user)):
+    """Génère le Bilan AG fusionné pour une grappe de compteurs (Zéro Mock)."""
+    try:
+        if not user: return HTMLResponse("Non autorisé", status_code=401)
+        if not payload.site_ids: return HTMLResponse("Aucun compteur sélectionné.", status_code=400)
+
+        total_vol = 0.0
+        total_budget = 0.0
+        total_ghost = 0.0
+        vol_elec = 0.0
+        vol_gaz = 0.0
+
+        for sid in payload.site_ids:
+            file_path = find_site_file(sid)
+            if not file_path: continue
+            
+            with open(file_path, 'r', encoding='utf-8') as f: 
+                data = json.load(f)
+            
+            fin = {}
+            if cortex:
+                try: fin = cortex.enrich_site_financials(data)
+                except: pass
+                
+            kpis = data.get('kpis', {})
+            
+            v = float(fin.get('volume_mwh') or kpis.get('volume_mwh') or 0)
+            b = float(fin.get('budget_annual') or 0)
+            if b == 0: b = v * 180.0
+            g = float(kpis.get('ghost_savings') or 0)
+            
+            total_vol += v
+            total_budget += b
+            total_ghost += g
+            
+            is_gas = fin.get('meta', {}).get('is_gas', False) if isinstance(fin, dict) else False
+            if is_gas: vol_gaz += v
+            else: vol_elec += v
+
+        html = pdf_builder.generate_bilan_ag_cluster(
+            cluster_name=payload.cluster_name,
+            site_count=len(payload.site_ids),
+            vol_total=total_vol,
+            budget_total=total_budget,
+            vol_elec=vol_elec,
+            vol_gaz=vol_gaz,
+            ghost_total=total_ghost
+        )
+        return HTMLResponse(content=html)
+    except Exception as e:
+        return HTMLResponse(f"<h1>Erreur Grappe</h1><p>{str(e)}</p>", status_code=500)
 
 @app.get("/api/physics/thermic_signature/{client_id}")
 async def get_thermic_signature(client_id: str):
