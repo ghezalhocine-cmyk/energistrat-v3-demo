@@ -54,6 +54,7 @@ except Exception as e_prod:
         from core.cortex_aggregator import aggregator
         from core.cortex_finance import finance
         from core.cortex_auth import auth
+        from core.cortex_pdf import pdf_builder
 
     except Exception as e_local:
         print(f"⚠️ LOCAL IMPORT ERROR: {str(e_local)}")
