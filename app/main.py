@@ -693,6 +693,25 @@ async def generate_cerfa_pdf(site_id: str, aide_code: str, user = Depends(get_cu
     </html>
     """
     return HTMLResponse(content=html_content)
+# ==========================================
+# GÉNÉRATEUR BILAN AG (SMART PDF)
+# ==========================================
+@app.get("/api/tools/bilan_ag/{client_id}", response_class=HTMLResponse)
+async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)):
+    """Génère le Bilan AG en appelant le module externe Cortex PDF"""
+    if not user: return HTMLResponse("Non autorisé", status_code=401)
+    
+    file_path = find_site_file(client_id)
+    if not file_path: return HTMLResponse("Copropriété introuvable.", status_code=404)
+    
+    with open(file_path, 'r', encoding='utf-8') as f: 
+        data = json.load(f)
+        
+    fin = cortex.enrich_site_financials(data)
+    kpis = data.get('kpis', {})
+    
+    html = pdf_builder.generate_bilan_ag(client_id, data, fin, kpis)
+    return HTMLResponse(content=html)
 
 @app.get("/api/physics/thermic_signature/{client_id}")
 async def get_thermic_signature(client_id: str):
