@@ -4,9 +4,9 @@ class CortexReportBuilder:
     """Moteur de génération Smart PDF Corporate - ENERGISTRAT V3"""
     
     def __init__(self):
-        self.version = "3.1 (Corporate Edition - Stabilized)"
-        # Logo ENERGISTRAT vectoriel (Base64/SVG) pour impression parfaite
-        self.logo_svg = """<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="30" rx="8" y="5" fill="#00E5FF"/><path d="M10 15L20 15L15 25Z" fill="#001529"/><text x="40" y="27" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#001529">ENERGISTRAT</text></svg>"""
+        self.version = "3.2 (Corporate Edition - Logo Fixed)"
+        # FIX SVG : viewbox élargie à 220px pour laisser passer "ENERGISTRAT" en entier
+        self.logo_svg = """<svg width="220" height="40" viewBox="0 0 220 40" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="30" rx="8" y="5" fill="#00E5FF"/><path d="M10 15L20 15L15 25Z" fill="#001529"/><text x="40" y="27" font-family="Arial, sans-serif" font-size="22" font-weight="900" fill="#001529" letter-spacing="-0.5">ENERGISTRAT</text></svg>"""
 
     def generate_bilan_ag(self, client_id, data, fin, kpis):
         """Rapport Bilan AG (Syndic.OS) avec App Citoyen et Mentions Légales"""
@@ -45,7 +45,6 @@ class CortexReportBuilder:
         etat_chaufferie = "Excellente régulation climatique. La courbe de chauffe suit les variations météorologiques." if r2_simule > 0.85 else "Dérive thermique constatée. Un réglage de la courbe de chauffe est recommandé pour éviter le gaspillage."
         couleur_chaufferie = "#10B981" if r2_simule > 0.85 else "#EF4444"
 
-        # 4. FIX DU BUG : Déclaration explicite des variables de dates
         annee_en_cours = datetime.now().year
         date_edition = datetime.now().strftime('%d/%m/%Y')
 
@@ -213,7 +212,7 @@ class CortexReportBuilder:
             <h2 style="color:#00E5FF;">{site_name}</h2>
             <hr>
             <p>Suite à l'analyse de l'intensité énergétique (<b>{data.get('energy',{}).get('intensity_kwh_m2')} kWh/m²/an</b>) par l'IA ENERGISTRAT par rapport au standard du secteur (Code NAF), la classe énergétique estimée est :</p>
-            <div style="font-size: 80px; font-weight: bold; color: {'red' if dpe_note in ['F','G'] else 'green'}; text-align: center; margin: 40px 0;">{dpe_note}</div>
+            <div style="font-size: 80px; font-weight: bold; color: {'red' if dpe_note in['F','G'] else 'green'}; text-align: center; margin: 40px 0;">{dpe_note}</div>
             <p><b>Impact sur la valeur foncière (Loi Climat) :</b> {'DÉCOTE' if decote < 0 else 'SURCOTE'} estimée de {decote}%.</p>
             <p><i>Document généré à titre indicatif par le module Cortex IMMO. Ne remplace pas un audit réglementaire.</i></p>
         </body>
