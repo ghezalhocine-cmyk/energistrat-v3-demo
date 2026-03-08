@@ -1,7 +1,4 @@
 import os
-import json
-import glob
-import uuid
 import math
 import io
 import traceback
@@ -210,7 +207,7 @@ class FallbackPDFBuilder:
         </div></body></html>"""
 
 # ==============================================================================
-# BLOC IMPORT CORTEX ROBUSTE 
+# BLOC IMPORT CORTEX ROBUSTE (AVEC FIRESTORE V6)
 # ==============================================================================
 try:
     from app.core.cortex_ingest import ingest
@@ -222,6 +219,7 @@ try:
     from app.core.cortex_aggregator import aggregator
     from app.core.cortex_finance import finance
     from app.core.cortex_auth import auth
+    from app.core.cortex_db import db
     try:
         from app.core.cortex_pdf import pdf_builder
     except ImportError:
@@ -240,6 +238,7 @@ except Exception as e_prod:
         from core.cortex_aggregator import aggregator
         from core.cortex_finance import finance
         from core.cortex_auth import auth
+        from core.cortex_db import db
         try:
             from core.cortex_pdf import pdf_builder
         except ImportError:
@@ -255,6 +254,17 @@ except Exception as e_prod:
                     return {"uid": "mock", "email": "admin@energistrat.com", "role": "ADMIN", "sub": "admin"}
                 return None
         auth = MockAuth()
+
+        class MockDB:
+            def get_all_sites(self): return[]
+            def get_site(self, sid): return {}
+            def save_site(self, sid, d): return True
+            def delete_site(self, sid): return True
+            def get_setting(self, n): return {}
+            def save_setting(self, n, d): return True
+            def get_sentinel_alerts(self): return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
+            def save_sentinel_alerts(self, d): return True
+        db = MockDB()
 
         class MockFinance:
             def parse_invoice(self, c, f): return {"status": "ERROR", "message": "Module Finance HS"}
@@ -288,7 +298,7 @@ except Exception as e_prod:
         forecast = None
         pdf_builder = FallbackPDFBuilder()
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V5.2-FIREBASE")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V6.0-FIRESTORE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -351,74 +361,61 @@ class RTESettingsModel(BaseModel):
     client_secret: str = ""
 
 # ==============================================================================
-# DAEMON CORTEX SENTINEL 
+# DAEMON CORTEX SENTINEL (BRANCHÉ SUR FIRESTORE)
 # ==============================================================================
 async def run_sentinel_scan():
     alerts =[]
     try:
-        files = glob.glob(os.path.join(DATA_DIR, "*.json"))
-        for p in files:
-            if any(x in p for x in["master_", "market_", "m57_", "carbon_", "rte_", "sentinel_"]): 
+        sites = db.get_all_sites()
+        for data in sites:
+            if not data or cortex is None: 
                 continue
-            try:
-                with open(p, 'r', encoding='utf-8') as f: 
-                    data = json.load(f)
                 
-                if cortex is None: 
-                    continue
-                    
-                fin = cortex.enrich_site_financials(data)
-                identity = data.get('identity', {})
-                contract = data.get('contract', {})
-                
-                vol = fin.get('volume_mwh', 0)
-                budget = fin.get('budget_annual', 0)
-                ghost = fin.get('kpis', {}).get('ghost_savings', 0)
-                city = data.get('location', {}).get('city', 'Inconnue')
-                name = identity.get('site_name') or identity.get('name', 'Site Inconnu')
-                pdl = contract.get('pdl') or contract.get('pce') or identity.get('id', 'N/A')
-                
-                action = ""
-                motif = ""
-                color = ""
-                
-                if vol > 0 and budget == 0:
-                    action = "🟢 Entrée Orpheline"
-                    motif = "Raccordement détecté (volume actif) mais hors marché public."
-                    color = "text-success bg-success/10 border-success/30"
-                elif vol == 0 and budget > 0:
-                    action = "🔴 Sortie de Parc"
-                    motif = "Facturation active (Abonnement) mais conso nulle."
-                    color = "text-alert bg-alert/10 border-alert/30"
-                elif budget > 0 and ghost > (budget * 0.4):
-                    action = "🟡 Dérive Majeure"
-                    motif = f"Surconsommation (Talon). Gaspillage estimé à {int(ghost)} €/an."
-                    color = "text-gold bg-gold/10 border-gold/30"
-                
-                if action:
-                    alerts.append({
-                        "id": identity.get("id", ""), 
-                        "city": city, 
-                        "name": name, 
-                        "pdl": pdl, 
-                        "action": action, 
-                        "motif": motif, 
-                        "color": color, 
-                        "timestamp": datetime.now().isoformat()
-                    })
-            except Exception: 
-                continue
-
-        system_dir = os.path.join(DATA_DIR, "system")
-        os.makedirs(system_dir, exist_ok=True)
-        
-        with open(os.path.join(system_dir, "sentinel_alerts.json"), 'w', encoding='utf-8') as f:
-            json.dump({
-                "last_scan": datetime.now().isoformat(), 
-                "alert_count": len(alerts), 
-                "alerts": alerts
-            }, f, indent=4, ensure_ascii=False)
+            fin = cortex.enrich_site_financials(data)
+            identity = data.get('identity', {})
+            contract = data.get('contract', {})
             
+            vol = fin.get('volume_mwh', 0)
+            budget = fin.get('budget_annual', 0)
+            ghost = fin.get('kpis', {}).get('ghost_savings', 0)
+            city = data.get('location', {}).get('city', 'Inconnue')
+            name = identity.get('site_name') or identity.get('name', 'Site Inconnu')
+            pdl = contract.get('pdl') or contract.get('pce') or identity.get('id', 'N/A')
+            
+            action = ""
+            motif = ""
+            color = ""
+            
+            if vol > 0 and budget == 0:
+                action = "🟢 Entrée Orpheline"
+                motif = "Raccordement détecté (volume actif) mais hors marché public."
+                color = "text-success bg-success/10 border-success/30"
+            elif vol == 0 and budget > 0:
+                action = "🔴 Sortie de Parc"
+                motif = "Facturation active (Abonnement) mais conso nulle."
+                color = "text-alert bg-alert/10 border-alert/30"
+            elif budget > 0 and ghost > (budget * 0.4):
+                action = "🟡 Dérive Majeure"
+                motif = f"Surconsommation (Talon). Gaspillage estimé à {int(ghost)} €/an."
+                color = "text-gold bg-gold/10 border-gold/30"
+            
+            if action:
+                alerts.append({
+                    "id": identity.get("id", ""), 
+                    "city": city, 
+                    "name": name, 
+                    "pdl": pdl, 
+                    "action": action, 
+                    "motif": motif, 
+                    "color": color, 
+                    "timestamp": datetime.now().isoformat()
+                })
+
+        db.save_sentinel_alerts({
+            "last_scan": datetime.now().isoformat(), 
+            "alert_count": len(alerts), 
+            "alerts": alerts
+        })
         return len(alerts)
     except Exception as e: 
         return 0
@@ -438,7 +435,7 @@ def json_compliant(data):
     if isinstance(data, dict): 
         return {k: json_compliant(v) for k, v in data.items()}
     elif isinstance(data, list): 
-        return[json_compliant(v) for v in data]
+        return [json_compliant(v) for v in data]
     elif isinstance(data, float):
         if math.isnan(data) or math.isinf(data): 
             return 0.0
@@ -447,33 +444,10 @@ def json_compliant(data):
 def get_safe_id(raw_id):
     return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
 
-def find_site_file(target_id):
-    safe_target = get_safe_id(target_id)
-    direct_path = os.path.join(DATA_DIR, f"{safe_target}.json")
-    
-    if os.path.exists(direct_path): 
-        return direct_path
-        
-    files = glob.glob(os.path.join(DATA_DIR, "*.json"))
-    for p in files:
-        try:
-            with open(p, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if get_safe_id(str(data.get('identity', {}).get('id', ''))) == safe_target: 
-                    return p
-        except: 
-            continue
-    return None
-
 def get_market_ref():
-    path = os.path.join(DATA_DIR, "market_ref.json")
-    if os.path.exists(path):
-        try:
-            with open(path, 'r') as f: 
-                return json.load(f)
-        except: 
-            pass
-            
+    market_data = db.get_setting("Market")
+    if market_data:
+        return market_data
     return {
         "updated_at": datetime.now().isoformat(), 
         "elec": { "cal_n1": 85.0 }, 
@@ -489,7 +463,6 @@ async def get_current_user(request: Request):
     if token.startswith("Bearer "): 
         token = token.split(" ")[1]
         
-    # Le Backend vérifie cryptographiquement le jeton Firebase
     payload = auth.verify_token(token)
     if not payload: 
         return None
@@ -509,7 +482,8 @@ def get_rte_token(client_id, client_secret):
             return res_data.get("access_token")
     except Exception: 
         return None
-    # ==========================================
+
+# ==========================================
 # AUTHENTIFICATION (MODE FIREBASE)
 # ==========================================
 @app.get("/login", response_class=HTMLResponse)
@@ -520,22 +494,18 @@ async def view_login(request: Request):
 
 @app.post("/api/auth/session")
 async def api_session(payload: SessionRequest, response: Response):
-    # 1. Vérification cryptographique absolue via Firebase
     user_data = auth.verify_token(payload.id_token)
-    
     if not user_data: 
         return JSONResponse({"detail": "Token Firebase invalide ou session expirée"}, status_code=401)
         
-    # 2. Création du cookie de session (HttpOnly pour bloquer le vol par XSS)
     response.set_cookie(
         key="access_token", 
         value=f"Bearer {payload.id_token}", 
         httponly=True, 
-        max_age=3600 * 24, # Session de 24h
+        max_age=3600 * 24, 
         samesite="lax",
         secure=True if "https" in str(response.headers) else False
     )
-    
     return {"success": True, "role": user_data.get("role", "USER")}
 
 @app.get("/logout")
@@ -547,15 +517,8 @@ async def logout(response: Response):
 # API CORTEX SENTINEL
 # ==========================================
 @app.get("/api/ops/sentinel/alerts")
-async def get_sentinel_alerts():
-    path = os.path.join(DATA_DIR, "system", "sentinel_alerts.json")
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f: 
-                return json.load(f)
-        except Exception: 
-            pass
-    return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
+async def api_get_sentinel_alerts():
+    return db.get_sentinel_alerts()
 
 @app.post("/api/ops/sentinel/run")
 async def trigger_sentinel_scan(background_tasks: BackgroundTasks):
@@ -574,22 +537,16 @@ async def api_dealdesk_analyze(request: Request):
         return JSONResponse({"success": False, "error": "Requête vide."})
         
     site_data = None
-    for p in glob.glob(os.path.join(DATA_DIR, "*.json")):
-        if any(x in p for x in["master_", "market_", "m57_", "carbon_", "rte_", "sentinel_"]): 
-            continue
-        try:
-            with open(p, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                
-                pdl_match = str(data.get('contract', {}).get('pdl', '')).strip()
-                pce_match = str(data.get('contract', {}).get('pce', '')).strip()
-                name_match = str(data.get('identity', {}).get('site_name', '')).strip().lower()
-                
-                if query == pdl_match or query == pce_match or query in name_match:
-                    site_data = data
-                    break
-        except: 
-            continue
+    sites = db.get_all_sites()
+    
+    for data in sites:
+        pdl_match = str(data.get('contract', {}).get('pdl', '')).strip()
+        pce_match = str(data.get('contract', {}).get('pce', '')).strip()
+        name_match = str(data.get('identity', {}).get('site_name', '')).strip().lower()
+        
+        if query == pdl_match or query == pce_match or query in name_match:
+            site_data = data
+            break
             
     if not site_data: 
         return JSONResponse({"success": False, "error": "Introuvable dans la Data Unity."})
@@ -646,21 +603,11 @@ async def api_dealdesk_analyze(request: Request):
 # ==========================================
 # API SUBVENTIONS & CERFA
 # ==========================================
+
 @app.get("/api/tools/subventions")
 async def api_subventions_analyze(user = Depends(get_current_user)):
-    raw_sites =[]
-    for p in glob.glob(os.path.join(DATA_DIR, "*.json")):
-        if any(x in p for x in["master", "market", "m57", "carbon", "rte", "sentinel"]): 
-            continue
-        try:
-            with open(p, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if cortex: 
-                    data['computed_financials'] = cortex.enrich_site_financials(data)
-                raw_sites.append(data)
-        except: 
-            continue
-            
+    raw_sites = db.get_all_sites()
+    
     cee_price_mwh = 6.50
     results =[]
     total_enveloppe = 0
@@ -668,6 +615,9 @@ async def api_subventions_analyze(user = Depends(get_current_user)):
     for s in raw_sites:
         if "CLI_" in str(s.get('identity', {}).get('id')): 
             continue
+            
+        if cortex: 
+            s['computed_financials'] = cortex.enrich_site_financials(s)
             
         fin = s.get('computed_financials', {})
         loc = s.get('location', {})
@@ -768,12 +718,9 @@ async def generate_cerfa_pdf(site_id: str, aide_code: str, user = Depends(get_cu
         if not user: 
             return HTMLResponse("Non autorisé", status_code=401)
             
-        file_path = find_site_file(site_id)
-        if not file_path: 
-            return HTMLResponse(f"<h1>Erreur</h1><p>Site introuvable.</p>", status_code=404)
-            
-        with open(file_path, 'r', encoding='utf-8') as f: 
-            data = json.load(f)
+        data = db.get_site(site_id)
+        if not data: 
+            return HTMLResponse(f"<h1>Erreur</h1><p>Site introuvable dans Firestore.</p>", status_code=404)
             
         identity = data.get('identity', {})
         loc = data.get('location', {})
@@ -870,23 +817,17 @@ async def generate_cerfa_pdf(site_id: str, aide_code: str, user = Depends(get_cu
         return HTMLResponse(f"<h1>Erreur Serveur</h1><p>{str(e)}</p><pre>{trace}</pre>", status_code=500)
 
 # ==========================================
-# REPORT BUILDER (L'USINE À PDF CORPORATE - GRAPPE)
+# REPORT BUILDER (L'USINE À PDF CORPORATE - GRAPPE FIRESTORE)
 # ==========================================
 @app.get("/api/tools/bilan_ag/{client_id}", response_class=HTMLResponse)
 async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)):
     try:
         if not user: return HTMLResponse("Non autorisé", status_code=401)
         
-        file_path = find_site_file(client_id)
-        if not file_path: 
+        base_data = db.get_site(client_id)
+        if not base_data: 
             return HTMLResponse(f"<h1>Erreur 404</h1><p>Copropriété introuvable pour l'ID: {client_id}</p>", status_code=404)
-        
-        with open(file_path, 'r', encoding='utf-8') as f: 
-            base_data = json.load(f)
             
-        # ====================================================
-        # LOGIQUE D'IDENTIFICATION DE LA GRAPPE (CLUSTER)
-        # ====================================================
         identity = base_data.get('identity', {})
         cluster_name = str(identity.get('site_name') or identity.get('name') or "").strip()
         cluster_siret = str(identity.get('siret') or "").strip()
@@ -894,34 +835,24 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
         cluster_files =[]
         
         if cluster_name != "" or cluster_siret != "":
-            for p in glob.glob(os.path.join(DATA_DIR, "*.json")):
-                if any(x in p for x in["master", "market", "m57", "carbon", "rte", "sentinel"]): 
-                    continue
-                try:
-                    with open(p, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        i = data.get('identity', {})
-                        s_name = str(i.get('site_name') or i.get('name') or "").strip()
-                        s_siret = str(i.get('siret') or "").strip()
-                        
-                        is_match = False
-                        # Priorité au SIRET, sinon regroupement par nom exact
-                        if cluster_siret and s_siret == cluster_siret:
-                            is_match = True
-                        elif cluster_name and s_name == cluster_name:
-                            is_match = True
-                            
-                        if is_match:
-                            cluster_files.append(data)
-                except:
-                    continue
+            all_sites = db.get_all_sites()
+            for data in all_sites:
+                i = data.get('identity', {})
+                s_name = str(i.get('site_name') or i.get('name') or "").strip()
+                s_siret = str(i.get('siret') or "").strip()
+                
+                is_match = False
+                if cluster_siret and s_siret == cluster_siret:
+                    is_match = True
+                elif cluster_name and s_name == cluster_name:
+                    is_match = True
+                    
+                if is_match:
+                    cluster_files.append(data)
         
         if not cluster_files:
             cluster_files = [base_data]
             
-        # ====================================================
-        # ROUTAGE MULTI-SITES (GRAPPE) OU MONO-SITE
-        # ====================================================
         if len(cluster_files) > 1:
             vol_total = 0
             budget_total = 0
@@ -953,7 +884,6 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
             return HTMLResponse(content=html)
             
         else:
-            # Mode standard (Mono-compteur isolé)
             fin = {}
             if cortex:
                 try: fin = cortex.enrich_site_financials(base_data)
@@ -969,12 +899,9 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
 
 @app.get("/api/physics/thermic_signature/{client_id}")
 async def get_thermic_signature(client_id: str):
-    file_path = find_site_file(client_id)
-    if not file_path: 
-        return JSONResponse({"error": "Introuvable"}, 404)
-        
-    with open(file_path, 'r', encoding='utf-8') as f: 
-        data = json.load(f)
+    data = db.get_site(client_id)
+    if not data: 
+        return JSONResponse({"error": "Site introuvable dans Firestore"}, 404)
         
     fin = cortex.enrich_site_financials(data)
     vol = fin.get('volume_mwh', 0)
@@ -984,10 +911,10 @@ async def get_thermic_signature(client_id: str):
     city = str(data.get('location', {}).get('city', 'Paris')).upper()
     dju_profile =[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]
     
-    if any(x in city for x in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']): 
-        dju_profile =[x * 1.2 for x in dju_profile]
+    if any(x in city for x in ['LILLE', 'STRASBOURG', 'NANCY', 'METZ']): 
+        dju_profile = [x * 1.2 for x in dju_profile]
     elif any(x in city for x in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']): 
-        dju_profile =[x * 0.7 for x in dju_profile]
+        dju_profile = [x * 0.7 for x in dju_profile]
         
     total_dju = sum(dju_profile)
     if total_dju == 0: 
@@ -1024,12 +951,9 @@ async def get_thermic_signature(client_id: str):
 
 @app.get("/api/tools/immo/{client_id}")
 async def api_immo_analyze(client_id: str, user = Depends(get_current_user)):
-    file_path = find_site_file(client_id)
-    if not file_path: 
-        return JSONResponse({"error": "Site introuvable"}, 404)
-        
-    with open(file_path, 'r', encoding='utf-8') as f: 
-        data = json.load(f)
+    data = db.get_site(client_id)
+    if not data: 
+        return JSONResponse({"error": "Site introuvable dans Firestore"}, 404)
         
     fin = cortex.enrich_site_financials(data)
     vol = fin.get('volume_mwh', 0)
@@ -1080,7 +1004,7 @@ async def api_immo_analyze(client_id: str, user = Depends(get_current_user)):
         dpe = "G"
         decote_pct = -0.20 
         
-    prix_m2_moyen = 9500 if "PARIS" in city.upper() else (4500 if any(x in city.upper() for x in['LYON', 'BORDEAUX', 'NICE']) else 2500)
+    prix_m2_moyen = 9500 if "PARIS" in city.upper() else (4500 if any(x in city.upper() for x in ['LYON', 'BORDEAUX', 'NICE']) else 2500)
     valeur_theorique = surface * prix_m2_moyen
     impact_euros = valeur_theorique * decote_pct
     
@@ -1100,7 +1024,7 @@ async def api_immo_analyze(client_id: str, user = Depends(get_current_user)):
         }, 
         "dpe": {
             "note": dpe, 
-            "is_passoire": dpe in['F', 'G']
+            "is_passoire": dpe in ['F', 'G']
         }, 
         "finance": {
             "valeur_theorique": valeur_theorique, 
@@ -1111,22 +1035,17 @@ async def api_immo_analyze(client_id: str, user = Depends(get_current_user)):
 
 @app.get("/api/tools/sniper/market")
 async def api_sniper_market(user = Depends(get_current_user)):
-    path = os.path.join(DATA_DIR, "rte_settings.json")
+    keys = db.get_setting("RTE")
     rte_token = None
     
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f: 
-                keys = json.load(f)
-            client_id = keys.get("client_id")
-            client_secret = keys.get("client_secret")
-            if client_id and client_secret and client_secret != "******":
-                rte_token = get_rte_token(client_id, client_secret)
-        except: 
-            pass
+    if keys:
+        client_id = keys.get("client_id")
+        client_secret = keys.get("client_secret")
+        if client_id and client_secret and client_secret != "******":
+            rte_token = get_rte_token(client_id, client_secret)
         
     if not rte_token: 
-        return JSONResponse({"success": False, "error": "Clés API RTE manquantes."})
+        return JSONResponse({"success": False, "error": "Clés API RTE manquantes dans Firestore."})
         
     try:
         end_date = datetime.utcnow() + timedelta(days=2)
@@ -1145,13 +1064,13 @@ async def api_sniper_market(user = Depends(get_current_user)):
             daily_prices = {}
             for v in values:
                 day = v['start_date'][:10]
-                daily_prices.setdefault(day,[]).append(v['price'])
+                daily_prices.setdefault(day, []).append(v['price'])
             for day, prices in daily_prices.items():
                 points_elec.append({"date": day, "price": round(sum(prices)/len(prices), 2)})
         
         points_elec = sorted(points_elec, key=lambda x: x['date'])
         current_elec = points_elec[-1]['price'] if points_elec else 0
-        points_gaz =[{"date": p['date'], "price": 35.0} for p in points_elec]
+        points_gaz = [{"date": p['date'], "price": 35.0} for p in points_elec]
         
         return JSONResponse({
             "success": True, 
@@ -1167,51 +1086,42 @@ async def api_sniper_market(user = Depends(get_current_user)):
 @app.get("/api/tools/gridmap/capacity")
 async def api_gridmap_capacity(user = Depends(get_current_user)):
     results =[]
-    for p in glob.glob(os.path.join(DATA_DIR, "*.json")):
-        if any(x in p for x in["master", "market", "m57", "carbon", "rte", "sentinel"]): 
+    sites = db.get_all_sites()
+    
+    for s in sites:
+        if "CLI_" in str(s.get('identity', {}).get('id')): 
             continue
-        try:
-            with open(p, 'r', encoding='utf-8') as f: 
-                s = json.load(f)
-            if "CLI_" in str(s.get('identity', {}).get('id')): 
-                continue
-                
-            pdl = s.get('contract', {}).get('pdl')
-            if not pdl: 
-                continue
-                
-            power = float(s.get('contract', {}).get('power', 0))
-            city = s.get('location', {}).get('city', 'Inconnue')
-            capacity = 150 if power > 250 else (50 if power > 100 else 15)
             
-            results.append({
-                "pdl": pdl, 
-                "name": s.get('identity', {}).get('site_name', 'Site'), 
-                "city": city, 
-                "power_kva": power, 
-                "residual_capacity_kva": capacity, 
-                "can_host_fast_charge": capacity >= 50
-            })
-        except: 
+        pdl = s.get('contract', {}).get('pdl')
+        if not pdl: 
             continue
+            
+        power = float(s.get('contract', {}).get('power', 0))
+        city = s.get('location', {}).get('city', 'Inconnue')
+        capacity = 150 if power > 250 else (50 if power > 100 else 15)
+        
+        results.append({
+            "pdl": pdl, 
+            "name": s.get('identity', {}).get('site_name', 'Site'), 
+            "city": city, 
+            "power_kva": power, 
+            "residual_capacity_kva": capacity, 
+            "can_host_fast_charge": capacity >= 50
+        })
     return JSONResponse({"success": True, "nodes": results})
 
-# --- API PRINCIPALES (SETTINGS & DATA) ---
+# --- API PRINCIPALES (SETTINGS & DATA FIRESTORE) ---
 def normalize_full_data(data):
-    if 'contract' not in data: 
-        data['contract'] = {}
-    if 'pricing' not in data: 
-        data['pricing'] = {}
-        
+    if 'contract' not in data: data['contract'] = {}
+    if 'pricing' not in data: data['pricing'] = {}
     c = data['contract']
     p = data['pricing']
     
-    if 'power_details' not in c: 
-        c['power_details'] = {}
+    if 'power_details' not in c: c['power_details'] = {}
         
     sources =[data, c, data.get('technical', {}), p]
     power_map = { 
-        'hph':['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph'], 
+        'hph': ['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph'], 
         'hch':['ps_hch', 'p_hch', 'PS_HCH', 'puissance_hch'], 
         'hpe':['ps_hpe', 'p_hpe', 'PS_HPE', 'puissance_hpe'], 
         'hce':['ps_hce', 'p_hce', 'PS_HCE', 'puissance_hce'] 
@@ -1243,10 +1153,8 @@ def normalize_full_data(data):
 
     if 'identity' in data:
         i = data['identity']
-        if 'siret' in data and data['siret']: 
-            i['siret'] = data['siret']
-        if not i.get('id') and i.get('siret'): 
-            i['id'] = i['siret']
+        if 'siret' in data and data['siret']: i['siret'] = data['siret']
+        if not i.get('id') and i.get('siret'): i['id'] = i['siret']
             
     data['contract'] = c
     data['pricing'] = p
@@ -1260,11 +1168,9 @@ async def api_save_client(request: Request):
         raw_id = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
         data["identity"]["id"] = raw_id
         safe_id = get_safe_id(raw_id)
-        file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
         
-        if os.path.exists(file_path):
-            with open(file_path, 'r', encoding='utf-8') as f: 
-                existing_data = json.load(f)
+        existing_data = db.get_site(safe_id)
+        if existing_data:
             for section in['technical', 'location', 'identity', 'contract', 'pricing', 'kpis', 'financials', 'rgpd']:
                 if section in data:
                     if section not in existing_data: 
@@ -1274,88 +1180,56 @@ async def api_save_client(request: Request):
         else:
             final_data = data
             
-        with open(file_path, 'w', encoding='utf-8') as f: 
-            json.dump(final_data, f, indent=4, ensure_ascii=False)
-            
+        db.save_site(safe_id, final_data)
         return JSONResponse({"success": True, "id": raw_id})
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
 
 @app.get("/api/settings/m57")
 async def get_m57_settings():
-    path = os.path.join(DATA_DIR, "m57_settings.json")
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f: 
-                return json.load(f)
-        except: 
-            pass
-    return {"bp_elec": 0.0, "bp_gaz": 0.0, "consumed_elec": 0.0, "consumed_gaz": 0.0, "bp_irve": 0.0, "consumed_irve": 0.0, "bp_enr": 0.0, "consumed_enr": 0.0}
+    res = db.get_setting("M57")
+    return res if res else {"bp_elec": 0.0, "bp_gaz": 0.0, "consumed_elec": 0.0, "consumed_gaz": 0.0, "bp_irve": 0.0, "consumed_irve": 0.0, "bp_enr": 0.0, "consumed_enr": 0.0}
 
 @app.post("/api/settings/m57")
 async def save_m57_settings(data: M57SettingsModel, user = Depends(get_current_user)):
-    if not user: 
-        return JSONResponse({"error": "Non autorisé"}, 401)
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
     try:
-        path = os.path.join(DATA_DIR, "m57_settings.json")
-        with open(path, 'w', encoding='utf-8') as f: 
-            json.dump(data.dict(), f, indent=4)
+        db.save_setting("M57", data.dict())
         return JSONResponse({"success": True})
     except Exception as e: 
         return JSONResponse({"error": str(e)}, 500)
 
 @app.get("/api/settings/carbon")
 async def get_carbon_settings():
-    path = os.path.join(DATA_DIR, "carbon_settings.json")
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f: 
-                return json.load(f)
-        except: 
-            pass
-    return {"baseline_year": 2010, "baseline_kwh_sqm": 0.0}
+    res = db.get_setting("Carbon")
+    return res if res else {"baseline_year": 2010, "baseline_kwh_sqm": 0.0}
 
 @app.post("/api/settings/carbon")
 async def save_carbon_settings(data: CarbonSettingsModel, user = Depends(get_current_user)):
-    if not user: 
-        return JSONResponse({"error": "Non autorisé"}, 401)
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
     try:
-        path = os.path.join(DATA_DIR, "carbon_settings.json")
-        with open(path, 'w', encoding='utf-8') as f: 
-            json.dump(data.dict(), f, indent=4)
+        db.save_setting("Carbon", data.dict())
         return JSONResponse({"success": True})
     except Exception as e: 
         return JSONResponse({"error": str(e)}, 500)
 
 @app.get("/api/settings/rte")
 async def get_rte_settings():
-    path = os.path.join(DATA_DIR, "rte_settings.json")
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f: 
-                data = json.load(f)
-                return {"client_id": data.get("client_id", ""), "client_secret": "******" if data.get("client_secret") else ""}
-        except: 
-            pass
+    res = db.get_setting("RTE")
+    if res:
+        return {"client_id": res.get("client_id", ""), "client_secret": "******" if res.get("client_secret") else ""}
     return {"client_id": "", "client_secret": ""}
 
 @app.post("/api/settings/rte")
 async def save_rte_settings(data: RTESettingsModel, user = Depends(get_current_user)):
-    if not user: 
-        return JSONResponse({"error": "Non autorisé"}, 401)
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
     try:
-        path = os.path.join(DATA_DIR, "rte_settings.json")
-        existing = {}
-        if os.path.exists(path):
-            with open(path, 'r') as f: 
-                existing = json.load(f)
-                
+        existing = db.get_setting("RTE")
         new_data = data.dict()
         if new_data["client_secret"] == "******": 
             new_data["client_secret"] = existing.get("client_secret", "")
             
-        with open(path, 'w', encoding='utf-8') as f: 
-            json.dump(new_data, f, indent=4)
+        db.save_setting("RTE", new_data)
         return JSONResponse({"success": True})
     except Exception as e: 
         return JSONResponse({"error": str(e)}, 500)
@@ -1370,12 +1244,9 @@ async def api_update_site(request: Request):
         if not site_id: 
             return JSONResponse({"error": "ID manquant"}, 400)
             
-        file_path = find_site_file(site_id)
-        if not file_path: 
-            return JSONResponse({"error": "Site introuvable"}, 404)
-            
-        with open(file_path, 'r', encoding='utf-8') as f: 
-            data = json.load(f)
+        data = db.get_site(site_id)
+        if not data: 
+            return JSONResponse({"error": "Site introuvable dans Firestore"}, 404)
             
         sections_to_update =['location', 'technical', 'identity', 'contract', 'pricing', 'financials', 'rgpd']
         for section in sections_to_update:
@@ -1384,10 +1255,8 @@ async def api_update_site(request: Request):
                     data[section] = {}
                 data[section].update(payload[section])
                 
-        with open(file_path, 'w', encoding='utf-8') as f: 
-            json.dump(data, f, indent=4, ensure_ascii=False)
-            
-        return JSONResponse({"success": True, "message": "Sauvegarde Complète OK"})
+        db.save_site(site_id, data)
+        return JSONResponse({"success": True, "message": "Sauvegarde Firestore OK"})
     except Exception as e: 
         return JSONResponse({"error": str(e)}, 500)
 
@@ -1406,18 +1275,12 @@ async def api_import_csv(file: UploadFile = File(...)):
                 raw_id = s.get('identity', {}).get('id') or f"GEN_{uuid.uuid4().hex[:8]}"
                 s['identity']['id'] = raw_id
                 safe_id = get_safe_id(raw_id)
-                file_path = os.path.join(DATA_DIR, f"{safe_id}.json")
                 
-                if os.path.exists(file_path):
-                    with open(file_path, 'r', encoding='utf-8') as f: 
-                        existing = json.load(f)
-                        
-                    if 'contract' in s: 
-                        existing['contract'].update(s['contract'])
-                    if 'pricing' in s: 
-                        existing['pricing'] = s['pricing']
-                    if 'identity' in s: 
-                        existing['identity'].update(s['identity'])
+                existing = db.get_site(safe_id)
+                if existing:
+                    if 'contract' in s: existing['contract'].update(s['contract'])
+                    if 'pricing' in s: existing['pricing'] = s['pricing']
+                    if 'identity' in s: existing['identity'].update(s['identity'])
                         
                     new_tech = s.get('technical', {})
                     old_tech = existing.get('technical', {})
@@ -1435,8 +1298,7 @@ async def api_import_csv(file: UploadFile = File(...)):
                 else: 
                     final_s = s
                     
-                with open(file_path, 'w', encoding='utf-8') as f: 
-                    json.dump(final_s, f, indent=4, ensure_ascii=False)
+                db.save_site(safe_id, final_s)
                 saved += 1
             except Exception as e: 
                 pass
@@ -1450,21 +1312,12 @@ async def api_import_csv(file: UploadFile = File(...)):
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data(response: Response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    raw_sites =[]
-    files = glob.glob(os.path.join(DATA_DIR, "*.json"))
+    raw_sites = db.get_all_sites()
     
-    for p in files:
-        if any(x in p for x in["master", "market", "m57", "carbon", "rte", "sentinel"]): 
-            continue
-        try:
-            with open(p, 'r', encoding='utf-8') as f: 
-                data = json.load(f)
-            if cortex:
-                fin = cortex.enrich_site_financials(data)
-                data['computed_financials'] = fin
-            raw_sites.append(data)
-        except: 
-            continue
+    for s in raw_sites:
+        if cortex:
+            fin = cortex.enrich_site_financials(s)
+            s['computed_financials'] = fin
     
     if cortex: 
         analysis = cortex.analyze_portfolio(raw_sites)
@@ -1484,10 +1337,8 @@ async def get_fleet_data(response: Response):
         city = fin.get('meta', {}).get('city', 'Inconnue')
         prov = contract.get('provider', 'Inconnu')
         
-        if city and city != 'Inconnue': 
-            all_cities.add(city)
-        if prov: 
-            all_providers.add(prov)
+        if city and city != 'Inconnue': all_cities.add(city)
+        if prov: all_providers.add(prov)
         
         raw_id = s.get('identity', {}).get('id')
         safe_id = get_safe_id(raw_id)
@@ -1555,13 +1406,10 @@ async def get_fleet_data(response: Response):
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str, response: Response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    file_path = find_site_file(client_id)
-    if not file_path: 
-        return JSONResponse({"error": "Site introuvable"}, 404)
+    data = db.get_site(client_id)
+    if not data: 
+        return JSONResponse({"error": "Site introuvable dans Firestore"}, 404)
         
-    with open(file_path, 'r', encoding='utf-8') as f: 
-        data = json.load(f)
-    
     financials = cortex.enrich_site_financials(data)
     market_ref = get_market_ref()
     market_analysis = cortex.analyze_market_position(
@@ -1605,19 +1453,13 @@ async def get_dashboard_data(client_id: str, response: Response):
         budget_display = financials.get('budget_subscription', 0) + (vol_display * volume_multiplier * u_price)
 
     power_details = contract.get('power_details', {})
-    if not contract.get('ps_hph'): 
-        contract['ps_hph'] = power_details.get('hph') or contract.get('p_hph') or contract.get('P_HPH') or "-"
-    if not contract.get('ps_hch'): 
-        contract['ps_hch'] = power_details.get('hch') or contract.get('p_hch') or contract.get('P_HCH') or "-"
-    if not contract.get('ps_hpe'): 
-        contract['ps_hpe'] = power_details.get('hpe') or contract.get('p_hpe') or contract.get('P_HPE') or "-"
-    if not contract.get('ps_hce'): 
-        contract['ps_hce'] = power_details.get('hce') or contract.get('p_hce') or contract.get('P_HCE') or "-"
+    if not contract.get('ps_hph'): contract['ps_hph'] = power_details.get('hph') or contract.get('p_hph') or contract.get('P_HPH') or "-"
+    if not contract.get('ps_hch'): contract['ps_hch'] = power_details.get('hch') or contract.get('p_hch') or contract.get('P_HCH') or "-"
+    if not contract.get('ps_hpe'): contract['ps_hpe'] = power_details.get('hpe') or contract.get('p_hpe') or contract.get('P_HPE') or "-"
+    if not contract.get('ps_hce'): contract['ps_hce'] = power_details.get('hce') or contract.get('p_hce') or contract.get('P_HCE') or "-"
 
-    if not financials['meta'].get('provider'): 
-        financials['meta']['provider'] = contract.get('provider') or "Inconnu"
-    if not display_segment: 
-        display_segment = contract.get('segment') or "-"
+    if not financials['meta'].get('provider'): financials['meta']['provider'] = contract.get('provider') or "Inconnu"
+    if not display_segment: display_segment = contract.get('segment') or "-"
 
     response_data = {
         "energy_type": "gaz" if financials['meta']['is_gas'] else "elec", 
@@ -1668,12 +1510,9 @@ async def get_dashboard_data(client_id: str, response: Response):
 
 @app.get("/api/forecast/simulate/{client_id}")
 async def api_forecast_simulate(client_id: str):
-    file_path = find_site_file(client_id)
-    if not file_path: 
+    data = db.get_site(client_id)
+    if not data: 
         return JSONResponse({"error": "Site introuvable"}, 404)
-        
-    with open(file_path, 'r', encoding='utf-8') as f: 
-        data = json.load(f)
         
     vol = 0
     if 'kpis' in data and 'volume_mwh' in data['kpis']: 
@@ -1712,14 +1551,11 @@ async def get_rte_live_data():
         "pp1": { "remaining": 12, "next_day_alert": True } 
     }
     
-    path = os.path.join(DATA_DIR, "rte_settings.json")
-    if not os.path.exists(path): 
+    keys = db.get_setting("RTE")
+    if not keys: 
         return JSONResponse(mock_response)
         
     try:
-        with open(path, 'r', encoding='utf-8') as f: 
-            keys = json.load(f)
-            
         client_id = keys.get("client_id")
         client_secret = keys.get("client_secret")
         
@@ -1744,8 +1580,7 @@ async def api_update_market(data: MarketUpdateModel, x_admin_token: str = Header
     try:
         new_payload = data.dict()
         new_payload["updated_at"] = datetime.now().isoformat()
-        with open(os.path.join(DATA_DIR, "market_ref.json"), "w") as f: 
-            json.dump(new_payload, f, indent=4)
+        db.save_setting("Market", new_payload)
         return JSONResponse({"success": True})
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
@@ -1818,16 +1653,7 @@ async def get_static_asset(filename: str):
 async def api_simulate_offer(file: UploadFile = File(...)):
     try:
         content = await file.read()
-        current_sites =[]
-        for p in glob.glob(os.path.join(DATA_DIR, "*.json")):
-            if any(x in p for x in["master", "m57", "carbon", "rte", "sentinel"]): 
-                continue
-            try:
-                with open(p, 'r', encoding='utf-8') as f: 
-                    current_sites.append(json.load(f))
-            except: 
-                continue
-                
+        current_sites = db.get_all_sites()
         return JSONResponse(json_compliant(cortex.simulate_budget_from_bpu(content, current_sites)))
     except Exception as e: 
         return JSONResponse({"success": False, "error": str(e)})
@@ -1846,10 +1672,9 @@ async def generate_tender(request: Request):
         selected_sites =[]
         
         for sid in site_ids:
-            fp = find_site_file(sid)
-            if fp:
-                with open(fp, 'r', encoding='utf-8') as f: 
-                    selected_sites.append(json.load(f))
+            data = db.get_site(sid)
+            if data:
+                selected_sites.append(data)
         
         df_dqe = cortex.generate_dqe_structure(selected_sites)
         df_elec = df_dqe[df_dqe['Type'] == 'ELEC']
@@ -1900,12 +1725,9 @@ async def ingest_files_mass(files: List[UploadFile] = File(...)):
 
 @app.post("/api/ops/market/simulate_strategy")
 async def api_simulate_strategy(payload: StrategyRequest):
-    file_path = find_site_file(payload.site_id)
-    if not file_path: 
+    data = db.get_site(payload.site_id)
+    if not data: 
         return JSONResponse({"error": "Site introuvable"}, 404)
-        
-    with open(file_path, 'r', encoding='utf-8') as f: 
-        data = json.load(f)
         
     kpis = data.get('kpis', {})
     pmax = float(kpis.get('pmax_kw', 100))
@@ -1936,11 +1758,7 @@ async def api_finance_upload(file: UploadFile = File(...), site_id: str = Form(.
         if parsed.get("status") == "ERROR": 
             return JSONResponse(parsed, status_code=400)
             
-        file_path = find_site_file(site_id)
-        site_data = {}
-        if file_path:
-            with open(file_path, 'r', encoding='utf-8') as f: 
-                site_data = json.load(f)
+        site_data = db.get_site(site_id) or {}
                 
         return JSONResponse(json_compliant(finance.audit_invoice(parsed, site_data)))
     except Exception as e: 
@@ -1959,24 +1777,20 @@ async def view_ops_nexus(request: Request, user = Depends(get_current_user)):
 async def view_industrie(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
     if id:
-        file_path = find_site_file(id)
-        if file_path:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                fin = cortex.enrich_site_financials(data)
-                return templates.TemplateResponse("industry.html", {"request": request, "data": { "client_name": data.get('identity', {}).get('site_name', 'Client'), "site_type": "Industrie - Réel", "puissance_souscrite": data.get('contract', {}).get('power', 0), "talon_moyen": 0, "cos_phi": 0.95, "depassements": 0, "kpis": fin.get('kpis', {}) }})
+        data = db.get_site(id)
+        if data:
+            fin = cortex.enrich_site_financials(data)
+            return templates.TemplateResponse("industry.html", {"request": request, "data": { "client_name": data.get('identity', {}).get('site_name', 'Client'), "site_type": "Industrie - Réel", "puissance_souscrite": data.get('contract', {}).get('power', 0), "talon_moyen": 0, "cos_phi": 0.95, "depassements": 0, "kpis": fin.get('kpis', {}) }})
     return templates.TemplateResponse("industry.html", {"request": request, "data": {"client_name": "USINE DÉMO", "site_type": "DÉMO", "puissance_souscrite": 0, "kpis": {}}})
 
 @app.get("/syndic", response_class=HTMLResponse)
 async def view_syndic(request: Request, id: Optional[str] = None, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
     if id:
-        file_path = find_site_file(id)
-        if file_path:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                fin = cortex.enrich_site_financials(data)
-                return templates.TemplateResponse("syndic.html", {"request": request, "data": { "client_name": data.get('identity', {}).get('site_name', 'Résidence'), "lots": 0, "chaufferie": "Chauffage Collectif", "dju_n": 2100, "dju_n_1": 2400, "conso_n": fin.get('volume_mwh', 0) * 1000, "conso_n_1": (fin.get('volume_mwh', 0) * 1000) * 1.1 }})
+        data = db.get_site(id)
+        if data:
+            fin = cortex.enrich_site_financials(data)
+            return templates.TemplateResponse("syndic.html", {"request": request, "data": { "client_name": data.get('identity', {}).get('site_name', 'Résidence'), "lots": 0, "chaufferie": "Chauffage Collectif", "dju_n": 2100, "dju_n_1": 2400, "conso_n": fin.get('volume_mwh', 0) * 1000, "conso_n_1": (fin.get('volume_mwh', 0) * 1000) * 1.1 }})
     return templates.TemplateResponse("syndic.html", {"request": request, "data": {"client_name": "RÉSIDENCE DÉMO", "dju_n": 2100, "dju_n_1": 2400, "conso_n": 450000}})
 
 @app.get("/mairie", response_class=HTMLResponse)
@@ -2041,10 +1855,9 @@ async def view_finance(request: Request, user = Depends(get_current_user)):
 
 @app.get("/api/finance/landing/{site_id}")
 async def api_finance_landing(site_id: str):
-    file_path = find_site_file(site_id)
-    if not file_path: return JSONResponse({"error": "Site introuvable"}, 404)
+    site_data = db.get_site(site_id)
+    if not site_data: return JSONResponse({"error": "Site introuvable dans Firestore"}, 404)
     try:
-        with open(file_path, 'r', encoding='utf-8') as f: site_data = json.load(f)
         return JSONResponse(json_compliant(finance.simulate_landing(site_data)))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
@@ -2058,7 +1871,7 @@ async def view_processing(request: Request): return templates.TemplateResponse("
 
 @app.get("/dashboard/{profile}")
 async def view_dashboard(request: Request, profile: str, user = Depends(get_current_user)):
-    if not user and profile not in["demo"]: return RedirectResponse(url="/login")
+    if not user and profile not in ["demo"]: return RedirectResponse(url="/login")
     if profile == "retail": return templates.TemplateResponse("retail.html", {"request": request})
     if profile == "mairie": return templates.TemplateResponse("mairie.html", {"request": request})
     if profile == "sde": return templates.TemplateResponse("sde.html", {"request": request})
@@ -2121,7 +1934,7 @@ async def view_sante(request: Request, user = Depends(get_current_user)):
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
     PUBLIC_PAGES =["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html"]
-    if any(x in page_name for x in[".js", ".css", ".png", ".jpg"]): 
+    if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): 
         return JSONResponse({}, 404)
         
     target_file = page_name if page_name.endswith(".html") else f"{page_name}.html"
@@ -2139,53 +1952,10 @@ async def serve_dynamic(request: Request, page_name: str, user = Depends(get_cur
 
 @app.get("/{full_path:path}")
 async def catch_all_deep(request: Request, full_path: str):
-    if any(x in full_path for x in["static", "assets", "favicon"]): 
+    if any(x in full_path for x in ["static", "assets", "favicon"]): 
         return JSONResponse({}, 404)
     return templates.TemplateResponse("index.html", {"request": request})
 
-# ==========================================
-# CHANTIER B : OUTIL DE MIGRATION FIRESTORE (SECRET)
-# ==========================================
-@app.get("/api/ops/force_migration")
-async def force_migration_to_firestore(user = Depends(get_current_user)):
-    # Sécurité absolue : Seul ton compte Admin peut lancer ça
-    if not user or user.get("role") != "ADMIN":
-        return JSONResponse({"error": "Accès refusé. Réservé au Tiers de Confiance."}, 401)
-
-    try:
-        # Importation dynamique du nouveau connecteur
-        from app.core.cortex_db import db_service
-        if not db_service or not db_service.db:
-            return JSONResponse({"error": "La connexion à Firestore a échoué."}, 500)
-
-        migrated_count = 0
-        files = glob.glob(os.path.join(DATA_DIR, "*.json"))
-
-        for p in files:
-            # On ignore les fichiers systèmes locaux
-            if any(x in p for x in ["master", "market", "m57", "carbon", "rte", "sentinel"]):
-                continue
-            try:
-                with open(p, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    site_id = data.get("identity", {}).get("id")
-                    
-                    if site_id:
-                        safe_id = str(site_id).replace('/', '_').replace(' ', '_').replace('+', '').strip()
-                        # L'arme lourde : On pousse le JSON dans le Cloud Google
-                        db_service.save_site(safe_id, data)
-                        migrated_count += 1
-            except Exception as e:
-                print(f"Erreur sur la migration de {p} : {e}")
-
-        return JSONResponse({
-            "success": True,
-            "message": "MIGRATION DATA UNITY TERMINÉE AVEC SUCCÈS",
-            "sites_transferes_vers_cloud": migrated_count
-        })
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, 500)
-
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)    
+    uvicorn.run(app, host="0.0.0.0", port=8080)
