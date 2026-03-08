@@ -298,7 +298,7 @@ except Exception as e_prod:
         forecast = None
         pdf_builder = FallbackPDFBuilder()
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V6.0-FIRESTORE")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V6.1-FIRESTORE-SAFE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -435,7 +435,7 @@ def json_compliant(data):
     if isinstance(data, dict): 
         return {k: json_compliant(v) for k, v in data.items()}
     elif isinstance(data, list): 
-        return [json_compliant(v) for v in data]
+        return[json_compliant(v) for v in data]
     elif isinstance(data, float):
         if math.isnan(data) or math.isinf(data): 
             return 0.0
@@ -484,13 +484,18 @@ def get_rte_token(client_id, client_secret):
         return None
 
 # ==========================================
-# AUTHENTIFICATION (MODE FIREBASE)
+# AUTHENTIFICATION (MODE FIREBASE + FIX REDIRECT LOOP)
 # ==========================================
 @app.get("/login", response_class=HTMLResponse)
-async def view_login(request: Request):
-    if request.cookies.get("access_token"): 
+async def view_login(request: Request, user = Depends(get_current_user)):
+    # FIX: Si l'utilisateur est déjà validé par Firebase, on le laisse passer
+    if user: 
         return RedirectResponse(url="/ops_nexus")
-    return templates.TemplateResponse("login.html", {"request": request})
+        
+    # FIX: S'il n'est pas validé (faux cookie), on force la page de login et on détruit le cookie toxique
+    response = templates.TemplateResponse("login.html", {"request": request})
+    response.delete_cookie("access_token")
+    return response
 
 @app.post("/api/auth/session")
 async def api_session(payload: SessionRequest, response: Response):
@@ -914,7 +919,7 @@ async def get_thermic_signature(client_id: str):
     if any(x in city for x in ['LILLE', 'STRASBOURG', 'NANCY', 'METZ']): 
         dju_profile = [x * 1.2 for x in dju_profile]
     elif any(x in city for x in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']): 
-        dju_profile = [x * 0.7 for x in dju_profile]
+        dju_profile =[x * 0.7 for x in dju_profile]
         
     total_dju = sum(dju_profile)
     if total_dju == 0: 
@@ -1934,7 +1939,7 @@ async def view_sante(request: Request, user = Depends(get_current_user)):
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
     PUBLIC_PAGES =["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html"]
-    if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): 
+    if any(x in page_name for x in[".js", ".css", ".png", ".jpg"]): 
         return JSONResponse({}, 404)
         
     target_file = page_name if page_name.endswith(".html") else f"{page_name}.html"
