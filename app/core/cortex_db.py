@@ -10,9 +10,9 @@ class CortexDB:
     
     def __init__(self):
         try:
-            # Récupère la connexion Firebase déjà authentifiée par cortex_auth
-            self.db = firestore.client()
-            print("🟢 CORTEX DB : Connexion Firestore établie avec succès.")
+            # FIX MAJEUR : Ciblage GPS absolu du projet Firestore (Évite d'écrire dans le vide)
+            self.db = firestore.Client(project="energistrat-saas")
+            print("🟢 CORTEX DB : Connexion Firestore FORCÉE sur energistrat-saas.")
         except Exception as e:
             print(f"🔴 ERREUR CRITIQUE CORTEX DB (FIRESTORE) : {e}")
             self.db = None
@@ -34,10 +34,8 @@ class CortexDB:
         """Récupère un site spécifique par son ID"""
         if not self.db: return None
         try:
-            doc_ref = self.db.collection("Sites").document(site_id)
-            doc = doc_ref.get()
-            if doc.exists:
-                return doc.to_dict()
+            doc = self.db.collection("Sites").document(str(site_id)).get()
+            if doc.exists: return doc.to_dict()
             return None
         except Exception as e:
             print(f"⚠️ Erreur get_site ({site_id}) : {e}")
@@ -47,24 +45,19 @@ class CortexDB:
         """Sauvegarde ou met à jour un site (Merge)"""
         if not self.db: return False
         try:
-            # L'option merge=True permet de ne mettre à jour que les champs modifiés
-            # sans écraser le reste du document s'il existe déjà.
-            self.db.collection("Sites").document(site_id).set(data, merge=True)
+            self.db.collection("Sites").document(str(site_id)).set(data, merge=True)
             return True
         except Exception as e:
-            print(f"⚠️ Erreur save_site ({site_id}) : {e}")
-            traceback.print_exc()
+            print(f"🔴 ERREUR D'ÉCRITURE FIRESTORE ({site_id}) : {e}")
             return False
 
     def delete_site(self, site_id: str) -> bool:
         """Supprime un site de la Data Unity"""
         if not self.db: return False
         try:
-            self.db.collection("Sites").document(site_id).delete()
+            self.db.collection("Sites").document(str(site_id)).delete()
             return True
-        except Exception as e:
-            print(f"⚠️ Erreur delete_site ({site_id}) : {e}")
-            return False
+        except Exception: return False
 
     # ==========================================
     # GESTION DES PARAMÈTRES SYSTÈME (SETTINGS)
@@ -74,12 +67,9 @@ class CortexDB:
         if not self.db: return dict()
         try:
             doc = self.db.collection("Settings").document(doc_name).get()
-            if doc.exists:
-                return doc.to_dict()
+            if doc.exists: return doc.to_dict()
             return dict()
-        except Exception as e:
-            print(f"⚠️ Erreur get_setting ({doc_name}) : {e}")
-            return dict()
+        except Exception: return dict()
 
     def save_setting(self, doc_name: str, data: dict) -> bool:
         """Sauvegarde un paramètre système"""
@@ -87,9 +77,7 @@ class CortexDB:
         try:
             self.db.collection("Settings").document(doc_name).set(data, merge=True)
             return True
-        except Exception as e:
-            print(f"⚠️ Erreur save_setting ({doc_name}) : {e}")
-            return False
+        except Exception: return False
 
     # ==========================================
     # GESTION DE CORTEX SENTINEL (ALERTES)
@@ -100,12 +88,9 @@ class CortexDB:
         if not self.db: return default_resp
         try:
             doc = self.db.collection("System").document("Sentinel").get()
-            if doc.exists:
-                return doc.to_dict()
+            if doc.exists: return doc.to_dict()
             return default_resp
-        except Exception as e:
-            print(f"⚠️ Erreur get_sentinel_alerts : {e}")
-            return default_resp
+        except Exception: return default_resp
 
     def save_sentinel_alerts(self, data: dict) -> bool:
         """Sauvegarde le rapport du daemon Sentinel"""
@@ -113,9 +98,7 @@ class CortexDB:
         try:
             self.db.collection("System").document("Sentinel").set(data)
             return True
-        except Exception as e:
-            print(f"⚠️ Erreur save_sentinel_alerts : {e}")
-            return False
+        except Exception: return False
 
 # Instanciation du Singleton de base de données
 db_service = CortexDB()
