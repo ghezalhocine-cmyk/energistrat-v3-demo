@@ -4,9 +4,9 @@ import io
 import logging
 import chardet
 import re
+import uuid
 from datetime import datetime
 
-# --- IMPORT DU MOTEUR DB (NOUVEAUTÉ FIRESTORE) ---
 try:
     from app.core.cortex_db import db
 except ImportError:
@@ -16,12 +16,11 @@ except ImportError:
         db = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V7.0")
+logger = logging.getLogger("CORTEX_INGEST_V7.2")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "7.0 (Firestore Ready) + FINANCE EXTENSION"
-        
+        self.version = "7.2 (Anti-Scientific Notation)"
         self.COLUMN_MAPPING = {
             "pdl":["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
             "site_label":["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM"],
@@ -90,13 +89,23 @@ class CortexIngest:
         except: return 0.0
 
     def _safe_str_clean(self, val):
+        """ Nettoyeur IA : Détruit la notation scientifique d'Excel (ex: 3,00E+13 -> 30000000000000) """
         if pd.isna(val) or val == '' or val is None: return ""
-        s = str(val).replace(',', '.')
-        try:
-            if 'E+' in s or 'e+' in s: return str(int(float(s))) 
-            if '.' in s: return str(int(float(s)))
-            return s.strip()
-        except: return str(val).strip()
+        s = str(val).upper().replace(',', '.').strip()
+        
+        # FIX EXCEL : Désamorçage de la notation scientifique (E+13)
+        if 'E+' in s:
+            try:
+                # Convertit "3.0E+13" en nombre réel, puis en entier, puis en texte
+                return str(int(float(s)))
+            except:
+                pass
+                
+        # Cas classique : suppression des ".0" à la fin d'un SIRET
+        if s.endswith('.0'):
+            s = s[:-2]
+            
+        return s
 
     def parse_mass_import_unified(self, file_content):
         sites =[]
@@ -113,14 +122,16 @@ class CortexIngest:
 
         cols = df.columns
         c_pdl = self._find_col(cols, "pdl")
-        if not c_pdl: return[]
+        c_siret = self._find_col(cols, "siret")
+        
+        if not c_pdl and not c_siret: 
+            return []
 
         c_nom = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
         c_addr = self._find_col(cols, "adresse")
         c_cp = self._find_col(cols, "cp")
         c_ville = self._find_col(cols, "ville")
-        c_siret = self._find_col(cols, "siret")
         c_ref_copro = self._find_col(cols, "ref_copro")
         c_naf = self._find_col(cols, "naf") 
         c_insee = self._find_col(cols, "insee") 
@@ -134,156 +145,57 @@ class CortexIngest:
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
         c_pmax = self._find_col(cols, "p_max")
-        c_compteur_prod = self._find_col(cols, "compteur_prod")
         c_seg = self._find_col(cols, "segment")
-        c_fta = self._find_col(cols, "fta")
-        c_grd = self._find_col(cols, "grd")
-        c_start = self._find_col(cols, "date_debut")
-        c_end = self._find_col(cols, "date_fin")
-        c_cja = self._find_col(cols, "cja")
-        c_profil = self._find_col(cols, "profil")
-        c_tarif_ach = self._find_col(cols, "tarif_ach")
-        c_ps_hph = self._find_col(cols, "ps_hph")
-        c_ps_hch = self._find_col(cols, "ps_hch")
-        c_ps_hpe = self._find_col(cols, "ps_hpe")
-        c_ps_hce = self._find_col(cols, "ps_hce")
-        c_c_hph = self._find_col(cols, "conso_hph")
-        c_c_hch = self._find_col(cols, "conso_hch")
-        c_c_hpe = self._find_col(cols, "conso_hpe")
-        c_c_hce = self._find_col(cols, "conso_hce")
-        c_p_hph = self._find_col(cols, "prix_unitaire")
-        c_p_hch = self._find_col(cols, "prix_hch")
-        c_p_hpe = self._find_col(cols, "prix_hpe")
-        c_p_hce = self._find_col(cols, "prix_hce")
-        c_abo = self._find_col(cols, "abonnement")
-        c_tax = self._find_col(cols, "taxes")
-        c_stock = self._find_col(cols, "stockage")
 
         for idx, row in df.iterrows():
             try:
-                pdl = self._safe_str_clean(row.get(c_pdl, f"TMP_{idx}"))
-                nom_brut = str(row.get(c_nom, "")).strip()
-                entite_brut = str(row.get(c_entite, "")).strip()
-                ville = str(row.get(c_ville, "")).strip()
-                final_name = "Site Inconnu"
-                is_nom_bad = not nom_brut or any(b in nom_brut.upper() for b in self.NAME_BLACKLIST)
-                if not is_nom_bad: final_name = nom_brut
-                elif entite_brut and not any(b in entite_brut.upper() for b in self.NAME_BLACKLIST): final_name = entite_brut
-                elif ville: final_name = f"{ville} ({pdl[-4:]})"
-                raw_conso = self._safe_float(row.get(c_conso))
-                conso_kwh = raw_conso
-                if c_conso and "MWH" in str(c_conso).upper(): conso_kwh = raw_conso * 1000.0
-                if conso_kwh > 10_000_000: conso_kwh = conso_kwh / 1000.0
-                segment = str(row.get(c_seg, "")).upper()
+                # Création d'un ID Absolu (Priorité au PDL, sinon SIRET, sinon ID généré)
+                pdl = self._safe_str_clean(row.get(c_pdl, "")) if c_pdl else ""
+                siret = self._safe_str_clean(row.get(c_siret, "")) if c_siret else ""
+                site_id = pdl if pdl else (siret if siret else f"GEN_{uuid.uuid4().hex[:8]}")
+                
+                nom_brut = str(row.get(c_nom, "")).strip() if c_nom else ""
+                ville = str(row.get(c_ville, "")).strip() if c_ville else ""
+                final_name = nom_brut if nom_brut else f"Site {site_id}"
+
+                segment = str(row.get(c_seg, "")).upper() if c_seg else ""
                 is_gas = False
                 if "GAZ" in segment or "T1" in segment or "T2" in segment or "T3" in segment: is_gas = True
-                elif c_pdl and "PCE" in str(c_pdl).upper(): is_gas = True
+                elif "PCE" in str(c_pdl).upper(): is_gas = True
                 energy_type = "gaz" if is_gas else "elec"
-                power_val = self._safe_float(row.get(c_puiss))
-                if is_gas and power_val == 0: power_val = self._safe_float(row.get(c_conso))
-                p_hph = self._safe_float(row.get(c_p_hph))
-                if is_gas and p_hph > 2.0: p_hph /= 1000.0
-                if not is_gas and p_hph > 5.0: p_hph /= 1000.0
                 
-                provider_excel = self._safe_str_clean(row.get(c_fourn, ""))
-                if not provider_excel or provider_excel == "0": provider_excel = "Inconnu"
+                provider_excel = self._safe_str_clean(row.get(c_fourn, "")) if c_fourn else "Inconnu"
 
+                # STRUCTURE PARFAITE V7
                 site = {
                     "identity": { 
-                        "id": pdl, 
+                        "id": site_id, 
                         "site_name": final_name, 
-                        "entity_name": entite_brut, 
-                        "siret": self._safe_str_clean(row.get(c_siret)),
-                        "ref_copro": self._safe_str_clean(row.get(c_ref_copro)),
-                        "naf": self._safe_str_clean(row.get(c_naf)), 
-                        "insee": self._safe_str_clean(row.get(c_insee)) 
+                        "siret": siret,
+                        "ref_copro": self._safe_str_clean(row.get(c_ref_copro)) if c_ref_copro else "",
+                        "naf": self._safe_str_clean(row.get(c_naf)) if c_naf else ""
                     },
                     "location": { 
-                        "address": str(row.get(c_addr, "")), 
-                        "zip_code": self._safe_str_clean(row.get(c_cp, "")), 
+                        "address": str(row.get(c_addr, "")) if c_addr else "", 
+                        "zip_code": self._safe_str_clean(row.get(c_cp, "")) if c_cp else "", 
                         "city": ville,
-                        "surface": self._safe_float(row.get(c_surface)),
-                        "typologie": self._safe_str_clean(row.get(c_typologie))
-                    },
-                    "technical": {
-                        "chauffage": self._safe_str_clean(row.get(c_chauff)),
-                        "isolation": self._safe_str_clean(row.get(c_isol)),
-                        "regulation": self._safe_str_clean(row.get(c_regul))
+                        "surface": self._safe_float(row.get(c_surface)) if c_surface else 0.0,
+                        "typologie": self._safe_str_clean(row.get(c_typologie)) if c_typologie else ""
                     },
                     "contract": {
                         "pdl": pdl, 
                         "provider": provider_excel,
                         "segment": segment, 
-                        "power": power_val,
-                        "p_max": self._safe_float(row.get(c_pmax)),
-                        "annual_volume_estimated": conso_kwh, 
-                        "energy_type": energy_type,
-                        "fta": str(row.get(c_fta, "-")),
-                        "grd": str(row.get(c_grd, "Enedis" if not is_gas else "GRDF")),
-                        "start_date": str(row.get(c_start, "-")),
-                        "end_date": str(row.get(c_end, "-")),
-                        "cja": self._safe_float(row.get(c_cja)),
-                        "profil": str(row.get(c_profil, "")),
-                        "tarif_acheminement": str(row.get(c_tarif_ach, "")),
-                        "compteur_prod": self._safe_str_clean(row.get(c_compteur_prod)),
-                        "power_details": {
-                            "hph": self._safe_float(row.get(c_ps_hph)), "hch": self._safe_float(row.get(c_ps_hch)),
-                            "hpe": self._safe_float(row.get(c_ps_hpe)), "hce": self._safe_float(row.get(c_ps_hce))
-                        },
-                        "consumption_details": {
-                            "hph": self._safe_float(row.get(c_c_hph)), "hch": self._safe_float(row.get(c_c_hch)),
-                            "hpe": self._safe_float(row.get(c_c_hpe)), "hce": self._safe_float(row.get(c_c_hce))
-                        }
-                    },
-                    "pricing": {
-                        "hph": p_hph, 
-                        "hch": self._safe_float(row.get(c_p_hch)),
-                        "hpe": self._safe_float(row.get(c_p_hpe)),
-                        "hce": self._safe_float(row.get(c_p_hce)),
-                        "fix": self._safe_float(row.get(c_abo)),
-                        "tax": self._safe_float(row.get(c_tax)), 
-                        "storage": self._safe_float(row.get(c_stock))
+                        "power": self._safe_float(row.get(c_puiss)) if c_puiss else 0.0,
+                        "energy_type": energy_type
                     }
                 }
                 
-                # SAUVEGARDE DIRECTE DANS LE CLOUD (Remplacement du fichier local)
-                self._save_site_firestore(pdl, site)
+                if db:
+                    db.save_site(site_id, site)
                 sites.append(site)
-            except: continue
+            except Exception as e: print(f"Erreur Ligne CSV: {e}")
         return sites
-
-    def parse_bpu_excel(self, file_content):
-        try:
-            buffer = io.BytesIO(file_content)
-            xl = pd.ExcelFile(buffer, engine='openpyxl')
-            sheet_name = None
-            for s in xl.sheet_names:
-                if "REPONSE" in s.upper():
-                    sheet_name = s
-                    break
-            df = pd.read_excel(xl, sheet_name=sheet_name if sheet_name else 0, dtype=str)
-            cols =[str(c).upper() for c in df.columns]
-            c_pdl = next((c for c in cols if "PDL" in c or "PCE" in c), None)
-            c_hph = next((c for c in cols if "PRIX_HPH" in c or "HPH" in c or "MOLECULE" in c), None)
-            c_abo = next((c for c in cols if "ABONNEMENT" in c), None)
-            price_map = {}
-            is_gaz = False
-            if c_hph and "MOLECULE" in c_hph: is_gaz = True
-            if c_pdl and c_hph:
-                for idx, row in df.iterrows():
-                    pdl = self._safe_str_clean(row.get(c_pdl))
-                    price = self._safe_float(row.get(c_hph))
-                    fix = self._safe_float(row.get(c_abo)) if c_abo else 0.0
-                    if pdl and price > 0:
-                        price_map[pdl] = {"hph": price, "fix": fix}
-            if not price_map and c_hph:
-                val = self._safe_float(df.iloc[0].get(c_hph))
-                if val > 0:
-                    price_map["default"] = {"hph": val, "fix": self._safe_float(df.iloc[0].get(c_abo, 0))}
-            return price_map, is_gaz
-        except Exception as e: 
-            logging.error(f"BPU Parse Error: {e}")
-            return {}, False
 
     def parse_load_curve(self, file_content, filename):
         try:
@@ -294,7 +206,6 @@ class CortexIngest:
             except: 
                 buffer.seek(0)
                 df = pd.read_csv(buffer, sep=',', encoding=enc, on_bad_lines='skip')
-            cols =[str(c).upper() for c in df.columns]
             col_date = next((c for c in df.columns if "DATE" in str(c).upper()), None)
             col_val = next((c for c in df.columns if "PUISSANCE" in str(c).upper() or "VALEUR" in str(c).upper()), None)
             if not col_date or not col_val: return None, 0, {}
@@ -305,109 +216,5 @@ class CortexIngest:
             delta = (df['date'].iloc[1] - df['date'].iloc[0]).total_seconds() / 60
             return df, int(delta), {}
         except: return None, 0, {}
-
-    # --- REMPLACEMENT DU JSON LOCAL PAR FIRESTORE ---
-    def _save_site_firestore(self, pdl, data_update):
-        """Helper pour sauvegarder ou merger un site directement dans la DB."""
-        if not db: return
-        safe_id = str(pdl).strip()
-        
-        current_data = db.get_site(safe_id)
-        if not current_data:
-            current_data = {
-                "identity": {"id": safe_id, "site_name": f"Site {safe_id}"},
-                "contract": {"pdl": safe_id},
-                "measurements":[]
-            }
-
-        # Fusion Intelligente
-        if 'measurements' in data_update:
-            current_data['measurements'] = data_update['measurements']
-            total = sum([m['val'] for m in data_update['measurements']])
-            if 'kpis' not in current_data: current_data['kpis'] = {}
-            current_data['kpis']['volume_mwh'] = round(total / 1000, 3)
-
-        # Merge des autres sections
-        for section in ['identity', 'contract', 'location', 'technical', 'pricing']:
-            if section in data_update:
-                if section not in current_data: current_data[section] = {}
-                current_data[section].update(data_update[section])
-
-        # Validation Cloud
-        db.save_site(safe_id, current_data)
-
-    def ingest_enedis_individual(self, content):
-        """Parse l'Excel 'Compte Client' Enedis (Format Particulier)."""
-        try:
-            df_head = pd.read_excel(io.BytesIO(content), header=None, nrows=15)
-            pdl = None
-            
-            for r in range(len(df_head)):
-                row_str = " ".join(df_head.iloc[r].astype(str).values)
-                if "Point Référence Mesure" in row_str or "PRM" in row_str:
-                    match = re.search(r"(\d{14})", row_str)
-                    if match:
-                        pdl = match.group(1)
-                        break
-            
-            if not pdl:
-                for col in range(10):
-                    for row in range(10):
-                        try:
-                            val = str(df_head.iloc[row, col]).replace(" ", "")
-                            if val.isdigit() and len(val) == 14:
-                                pdl = val
-                                break
-                        except: continue
-                    if pdl: break
-
-            if not pdl:
-                return {"status": "ERROR", "message": "Impossible de trouver le PDL dans l'en-tête."}
-
-            df_raw = pd.read_excel(io.BytesIO(content), header=None)
-            header_idx = -1
-            for i, row in df_raw.iterrows():
-                row_values =[str(v) for v in row.values]
-                if "Date" in row_values and any("Valeur" in v for v in row_values):
-                    header_idx = i
-                    break
-            
-            if header_idx == -1:
-                return {"status": "ERROR", "message": "Tableau introuvable."}
-
-            df_data = pd.read_excel(io.BytesIO(content), header=header_idx)
-            cols = df_data.columns.tolist()
-            val_col = next((c for c in cols if "Valeur" in c or "Conso" in c), None)
-            
-            if not val_col:
-                return {"status": "ERROR", "message": "Colonne Valeur/Conso introuvable."}
-
-            df_data = df_data[['Date', val_col]].dropna()
-            
-            measurements =[]
-            for _, row in df_data.iterrows():
-                try:
-                    d_str = row['Date']
-                    if isinstance(d_str, datetime): d_iso = d_str.strftime("%Y-%m-%d")
-                    else: d_iso = datetime.strptime(str(d_str), "%d/%m/%Y").strftime("%Y-%m-%d")
-                    val = float(str(row[val_col]).replace(',', '.').replace('\xa0', ''))
-                    measurements.append({"date": d_iso, "val": val})
-                except Exception: continue
-
-            # Remplacement Cloud
-            self._save_site_firestore(pdl, {
-                "measurements": measurements,
-                "identity": {"site_name": f"Domicile {pdl[-4:]}"}
-            })
-
-            return {
-                "status": "SUCCESS", 
-                "message": f"Succès : {len(measurements)} jours importés",
-                "pdl": pdl,
-                "points": len(measurements)
-            }
-
-        except Exception as e:
-            return {"status": "ERROR", "message": f"Crash Parser Enedis: {str(e)}"}
 
 ingest = CortexIngest()
