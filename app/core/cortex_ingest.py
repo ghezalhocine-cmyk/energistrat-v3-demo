@@ -4,78 +4,80 @@ import io
 import logging
 import chardet
 import re
-import json
-import os
 from datetime import datetime
 
+# --- IMPORT DU MOTEUR DB (NOUVEAUTÉ FIRESTORE) ---
+try:
+    from app.core.cortex_db import db
+except ImportError:
+    try:
+        from core.cortex_db import db
+    except ImportError:
+        db = None
+
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V1116")
+logger = logging.getLogger("CORTEX_INGEST_V7.0")
 
 class CortexIngest:
     def __init__(self):
-        self.version = "1116.0 (Provider Fix) + FINANCE EXTENSION"
-        self.DATA_DIR = os.path.join(os.getcwd(), "data")
-        if not os.path.exists(self.DATA_DIR): os.makedirs(self.DATA_DIR, exist_ok=True)
+        self.version = "7.0 (Firestore Ready) + FINANCE EXTENSION"
         
         self.COLUMN_MAPPING = {
-            "pdl": ["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
-            "site_label": ["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM"],
-            "entity": ["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT", "SOCIETE"],
+            "pdl":["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
+            "site_label":["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM"],
+            "entity":["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT", "SOCIETE"],
             "siret": ["SIRET", "SIRET_SITE", "SIREN"],
-            "ref_copro": ["REF_COPRO", "IMMATRICULATION", "REGISTRE_COPRO", "MATRICULE"],
-            "naf": ["NAF", "CODE_NAF", "APE", "CODE_APE"], 
-            "insee": ["INSEE", "CODE_INSEE", "CODE_COMMUNE"], 
-            "adresse": ["ADRESSE_SITE", "ADRESSE", "RUE", "LIGNE_ADRESSE"],
-            "ville": ["VILLE", "COMMUNE", "CITY", "TOWN"],
-            "cp": ["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
-            "surface": ["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER"],
-            "typologie": ["TYPOLOGIE", "USAGE", "TYPE_BATIMENT", "ACTIVITE"],
-            
-            # FOURNISSEUR (PRIORITAIRE)
-            "fournisseur": ["FOURNISSEUR", "TITULAIRE", "PROVIDER", "MARCHE", "NOM_FOURNISSEUR"],
-            
-            "chauffage": ["CHAUFFAGE", "TYPE_CHAUFFAGE", "ENERGIE_CHAUFFAGE", "SYSTEME_CVC"],
-            "isolation": ["ISOLATION", "TYPE_ISOLATION", "VITRAGE", "PERFORMANCE_ENVELOPPE"],
-            "regulation": ["REGULATION", "GTB", "GTC", "PILOTAGE"],
-            "compteur_prod": ["COMPTEUR_PRODUCTION", "PRODUCTEUR", "INJECTION", "COMPTEUR_PROD"],
-            "puissance": ["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)", "PUISSANCE_SOUSCRITE"],
-            "p_max": ["POINTE_MAX", "P_MAX", "PUISSANCE_ATTEINTE", "MAX_ATTEINTE"],
+            "ref_copro":["REF_COPRO", "IMMATRICULATION", "REGISTRE_COPRO", "MATRICULE"],
+            "naf":["NAF", "CODE_NAF", "APE", "CODE_APE"], 
+            "insee":["INSEE", "CODE_INSEE", "CODE_COMMUNE"], 
+            "adresse":["ADRESSE_SITE", "ADRESSE", "RUE", "LIGNE_ADRESSE"],
+            "ville":["VILLE", "COMMUNE", "CITY", "TOWN"],
+            "cp":["CP", "CODE_POSTAL", "ZIP", "ZIP_CODE"],
+            "surface":["SURFACE", "M2", "SQM", "SURFACE_M2", "SURFACE_PLANCHER"],
+            "typologie":["TYPOLOGIE", "USAGE", "TYPE_BATIMENT", "ACTIVITE"],
+            "fournisseur":["FOURNISSEUR", "TITULAIRE", "PROVIDER", "MARCHE", "NOM_FOURNISSEUR"],
+            "chauffage":["CHAUFFAGE", "TYPE_CHAUFFAGE", "ENERGIE_CHAUFFAGE", "SYSTEME_CVC"],
+            "isolation":["ISOLATION", "TYPE_ISOLATION", "VITRAGE", "PERFORMANCE_ENVELOPPE"],
+            "regulation":["REGULATION", "GTB", "GTC", "PILOTAGE"],
+            "compteur_prod":["COMPTEUR_PRODUCTION", "PRODUCTEUR", "INJECTION", "COMPTEUR_PROD"],
+            "puissance":["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)", "PUISSANCE_SOUSCRITE"],
+            "p_max":["POINTE_MAX", "P_MAX", "PUISSANCE_ATTEINTE", "MAX_ATTEINTE"],
             "fta": ["FTA", "FORMULE_TARIFAIRE", "OPTION"],
-            "cja": ["CJA", "CJA_MWH_J", "CAPACITE_JOURNALIERE"],
+            "cja":["CJA", "CJA_MWH_J", "CAPACITE_JOURNALIERE"],
             "profil": ["PROFIL", "PROFIL_GAZ"],
-            "tarif_ach": ["TARIF_ACHEM", "TARIF_ACHEMINEMENT", "ATRT"],
-            "conso": ["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL", "CJA"],
-            "segment": ["SEGMENT", "SEGMENT_GAZ", "TARIF", "CATEGORIE"],
-            "grd": ["GRD", "GESTIONNAIRE", "DISTRIBUTEUR"],
-            "date_debut": ["DATE_DEBUT", "DEBUT_CONTRAT", "START_DATE"],
-            "date_fin": ["DATE_FIN", "ECHEANCE", "FIN_CONTRAT", "END_DATE"],
-            "ps_hph": ["PS HPH", "PUISSANCE HPH", "P_HPH", "PS_HPH", "PS_HPH"],
-            "ps_hch": ["PS HCH", "PUISSANCE HCH", "P_HCH", "PS_HCH", "PS_HCH"],
-            "ps_hpe": ["PS HPE", "PUISSANCE HPE", "P_HPE", "PS_HPE", "PS_HPE"],
-            "ps_hce": ["PS HCE", "PUISSANCE HCE", "P_HCE", "PS_HCE", "PS_HCE"],
-            "conso_hph": ["CONSO HPH", "C_HPH", "HP HAUTE", "CONSO_HPH"],
-            "conso_hch": ["CONSO HCH", "C_HCH", "HC HAUTE", "CONSO_HCH"],
-            "conso_hpe": ["CONSO HPE", "C_HPE", "HP BASSE", "CONSO_HPE"],
-            "conso_hce": ["CONSO HCE", "C_HCE", "HC BASSE", "CONSO_HCE"],
-            "prix_unitaire": ["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
-            "prix_hch": ["PRIX_HCH", "HCH"],
+            "tarif_ach":["TARIF_ACHEM", "TARIF_ACHEMINEMENT", "ATRT"],
+            "conso":["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL", "CJA"],
+            "segment":["SEGMENT", "SEGMENT_GAZ", "TARIF", "CATEGORIE"],
+            "grd":["GRD", "GESTIONNAIRE", "DISTRIBUTEUR"],
+            "date_debut":["DATE_DEBUT", "DEBUT_CONTRAT", "START_DATE"],
+            "date_fin":["DATE_FIN", "ECHEANCE", "FIN_CONTRAT", "END_DATE"],
+            "ps_hph":["PS HPH", "PUISSANCE HPH", "P_HPH", "PS_HPH", "PS_HPH"],
+            "ps_hch":["PS HCH", "PUISSANCE HCH", "P_HCH", "PS_HCH", "PS_HCH"],
+            "ps_hpe":["PS HPE", "PUISSANCE HPE", "P_HPE", "PS_HPE", "PS_HPE"],
+            "ps_hce":["PS HCE", "PUISSANCE HCE", "P_HCE", "PS_HCE", "PS_HCE"],
+            "conso_hph":["CONSO HPH", "C_HPH", "HP HAUTE", "CONSO_HPH"],
+            "conso_hch":["CONSO HCH", "C_HCH", "HC HAUTE", "CONSO_HCH"],
+            "conso_hpe":["CONSO HPE", "C_HPE", "HP BASSE", "CONSO_HPE"],
+            "conso_hce":["CONSO HCE", "C_HCE", "HC BASSE", "CONSO_HCE"],
+            "prix_unitaire":["PRIX_MOLECULE", "PRIX_HPH", "PRIX_UNITAIRE", "P1", "HPH", "PRIX"],
+            "prix_hch":["PRIX_HCH", "HCH"],
             "prix_hpe": ["PRIX_HPE", "HPE"],
             "prix_hce": ["PRIX_HCE", "HCE"],
             "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE", "PART_FIXE"],
             "taxes": ["TAXES", "CSPE", "TICGN", "CTA"],
-            "stockage": ["TERME_STOCK", "STOCKAGE", "TERME_STOCKAGE"]
+            "stockage":["TERME_STOCK", "STOCKAGE", "TERME_STOCKAGE"]
         }
-        self.NAME_BLACKLIST = ["CLIENT", "SITE", "INCONNU", "NAN", "NONE", "NOM_SITE", "0", ".", "COMMUNE", "MAIRIE", "SOCIETE"]
+        self.NAME_BLACKLIST =["CLIENT", "SITE", "INCONNU", "NAN", "NONE", "NOM_SITE", "0", ".", "COMMUNE", "MAIRIE", "SOCIETE"]
 
     def _clean_header(self, h):
         return str(h).upper().strip().replace('É', 'E').replace('È', 'E').replace(' ', '_').replace('.', '').replace('-', '_')
 
     def _find_col(self, df_cols, key):
-        candidates = self.COLUMN_MAPPING.get(key, [])
+        candidates = self.COLUMN_MAPPING.get(key,[])
         for col in df_cols:
             clean = self._clean_header(col)
             if clean in candidates: return col
-            if len(key) > 3 and key not in ["prix_hph", "prix_hch", "prix_hpe", "prix_hce"]: 
+            if len(key) > 3 and key not in["prix_hph", "prix_hch", "prix_hpe", "prix_hce"]: 
                 for cand in candidates:
                     if cand in clean: return col
         return None
@@ -97,7 +99,7 @@ class CortexIngest:
         except: return str(val).strip()
 
     def parse_mass_import_unified(self, file_content):
-        sites = []
+        sites =[]
         df = None
         buffer = io.BytesIO(file_content)
         try: df = pd.read_excel(buffer, dtype=str)
@@ -107,11 +109,11 @@ class CortexIngest:
                 try: buffer.seek(0); df = pd.read_csv(buffer, sep=',', encoding='utf-8', dtype=str, on_bad_lines='skip')
                 except: return []
 
-        if df is None or df.empty: return []
+        if df is None or df.empty: return[]
 
         cols = df.columns
         c_pdl = self._find_col(cols, "pdl")
-        if not c_pdl: return []
+        if not c_pdl: return[]
 
         c_nom = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
@@ -127,7 +129,7 @@ class CortexIngest:
         c_chauff = self._find_col(cols, "chauffage")
         c_isol = self._find_col(cols, "isolation")
         c_regul = self._find_col(cols, "regulation")
-        c_fourn = self._find_col(cols, "fournisseur") # IMPORTANT
+        c_fourn = self._find_col(cols, "fournisseur")
         
         c_conso = self._find_col(cols, "conso")
         c_puiss = self._find_col(cols, "puissance")
@@ -183,7 +185,6 @@ class CortexIngest:
                 if is_gas and p_hph > 2.0: p_hph /= 1000.0
                 if not is_gas and p_hph > 5.0: p_hph /= 1000.0
                 
-                # FOURNISSEUR FIX : RECUPERATION BRUTE
                 provider_excel = self._safe_str_clean(row.get(c_fourn, ""))
                 if not provider_excel or provider_excel == "0": provider_excel = "Inconnu"
 
@@ -211,7 +212,7 @@ class CortexIngest:
                     },
                     "contract": {
                         "pdl": pdl, 
-                        "provider": provider_excel, # MAITRE
+                        "provider": provider_excel,
                         "segment": segment, 
                         "power": power_val,
                         "p_max": self._safe_float(row.get(c_pmax)),
@@ -245,8 +246,8 @@ class CortexIngest:
                     }
                 }
                 
-                # SAUVEGARDE JSON (Appel interne)
-                self._save_site_json(pdl, site)
+                # SAUVEGARDE DIRECTE DANS LE CLOUD (Remplacement du fichier local)
+                self._save_site_firestore(pdl, site)
                 sites.append(site)
             except: continue
         return sites
@@ -261,7 +262,7 @@ class CortexIngest:
                     sheet_name = s
                     break
             df = pd.read_excel(xl, sheet_name=sheet_name if sheet_name else 0, dtype=str)
-            cols = [str(c).upper() for c in df.columns]
+            cols =[str(c).upper() for c in df.columns]
             c_pdl = next((c for c in cols if "PDL" in c or "PCE" in c), None)
             c_hph = next((c for c in cols if "PRIX_HPH" in c or "HPH" in c or "MOLECULE" in c), None)
             c_abo = next((c for c in cols if "ABONNEMENT" in c), None)
@@ -293,7 +294,7 @@ class CortexIngest:
             except: 
                 buffer.seek(0)
                 df = pd.read_csv(buffer, sep=',', encoding=enc, on_bad_lines='skip')
-            cols = [str(c).upper() for c in df.columns]
+            cols =[str(c).upper() for c in df.columns]
             col_date = next((c for c in df.columns if "DATE" in str(c).upper()), None)
             col_val = next((c for c in df.columns if "PUISSANCE" in str(c).upper() or "VALEUR" in str(c).upper()), None)
             if not col_date or not col_val: return None, 0, {}
@@ -305,27 +306,23 @@ class CortexIngest:
             return df, int(delta), {}
         except: return None, 0, {}
 
-    # --- MÉTHODES UTILITAIRES INTERNES (POUR LE NOUVEAU MODULE) ---
-    def _save_site_json(self, pdl, data_update):
-        """Helper pour sauvegarder ou merger un JSON existant."""
+    # --- REMPLACEMENT DU JSON LOCAL PAR FIRESTORE ---
+    def _save_site_firestore(self, pdl, data_update):
+        """Helper pour sauvegarder ou merger un site directement dans la DB."""
+        if not db: return
         safe_id = str(pdl).strip()
-        file_path = os.path.join(self.DATA_DIR, f"{safe_id}.json")
         
-        current_data = {}
-        if os.path.exists(file_path):
-            with open(file_path, 'r', encoding='utf-8') as f:
-                current_data = json.load(f)
-        else:
+        current_data = db.get_site(safe_id)
+        if not current_data:
             current_data = {
                 "identity": {"id": safe_id, "site_name": f"Site {safe_id}"},
                 "contract": {"pdl": safe_id},
-                "measurements": []
+                "measurements":[]
             }
 
         # Fusion Intelligente
         if 'measurements' in data_update:
             current_data['measurements'] = data_update['measurements']
-            # Recalcul Volume
             total = sum([m['val'] for m in data_update['measurements']])
             if 'kpis' not in current_data: current_data['kpis'] = {}
             current_data['kpis']['volume_mwh'] = round(total / 1000, 3)
@@ -336,21 +333,15 @@ class CortexIngest:
                 if section not in current_data: current_data[section] = {}
                 current_data[section].update(data_update[section])
 
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(current_data, f, indent=4, ensure_ascii=False)
+        # Validation Cloud
+        db.save_site(safe_id, current_data)
 
-    # --- NOUVELLE FONCTION : IMPORT INDIVIDUEL ENEDIS (GREFFÉE SANS IMPACT) ---
     def ingest_enedis_individual(self, content):
-        """
-        Parse l'Excel 'Compte Client' Enedis (Format Particulier).
-        Structure : Header (~Ligne 7) -> Tableau (~Ligne 14).
-        """
+        """Parse l'Excel 'Compte Client' Enedis (Format Particulier)."""
         try:
-            # A. Extraction du PDL (Header)
             df_head = pd.read_excel(io.BytesIO(content), header=None, nrows=15)
             pdl = None
             
-            # Recherche brute dans les cellules
             for r in range(len(df_head)):
                 row_str = " ".join(df_head.iloc[r].astype(str).values)
                 if "Point Référence Mesure" in row_str or "PRM" in row_str:
@@ -359,9 +350,8 @@ class CortexIngest:
                         pdl = match.group(1)
                         break
             
-            # Fallback : Recherche cellule spécifique (souvent C7 ou D7)
             if not pdl:
-                for col in range(10): # Scan large
+                for col in range(10):
                     for row in range(10):
                         try:
                             val = str(df_head.iloc[row, col]).replace(" ", "")
@@ -372,25 +362,20 @@ class CortexIngest:
                     if pdl: break
 
             if not pdl:
-                return {"status": "ERROR", "message": "Impossible de trouver le PDL (PRM) dans l'en-tête."}
+                return {"status": "ERROR", "message": "Impossible de trouver le PDL dans l'en-tête."}
 
-            # B. Extraction des Données (Tableau)
-            # On cherche la ligne d'en-tête "Date"
             df_raw = pd.read_excel(io.BytesIO(content), header=None)
             header_idx = -1
             for i, row in df_raw.iterrows():
-                row_values = [str(v) for v in row.values]
+                row_values =[str(v) for v in row.values]
                 if "Date" in row_values and any("Valeur" in v for v in row_values):
                     header_idx = i
                     break
             
             if header_idx == -1:
-                return {"status": "ERROR", "message": "Tableau de données introuvable (Colonne 'Date' manquante)."}
+                return {"status": "ERROR", "message": "Tableau introuvable."}
 
-            # On recharge proprement avec le bon header
             df_data = pd.read_excel(io.BytesIO(content), header=header_idx)
-            
-            # Normalisation des colonnes
             cols = df_data.columns.tolist()
             val_col = next((c for c in cols if "Valeur" in c or "Conso" in c), None)
             
@@ -399,33 +384,25 @@ class CortexIngest:
 
             df_data = df_data[['Date', val_col]].dropna()
             
-            measurements = []
+            measurements =[]
             for _, row in df_data.iterrows():
                 try:
-                    # Conversion Date (DD/MM/YYYY) -> ISO
                     d_str = row['Date']
-                    if isinstance(d_str, datetime):
-                        d_iso = d_str.strftime("%Y-%m-%d")
-                    else:
-                        d_iso = datetime.strptime(str(d_str), "%d/%m/%Y").strftime("%Y-%m-%d")
-                    
-                    # Conversion Valeur (32,86 -> 32.86)
-                    val_raw = str(row[val_col]).replace(',', '.').replace('\xa0', '')
-                    val = float(val_raw)
-                    
+                    if isinstance(d_str, datetime): d_iso = d_str.strftime("%Y-%m-%d")
+                    else: d_iso = datetime.strptime(str(d_str), "%d/%m/%Y").strftime("%Y-%m-%d")
+                    val = float(str(row[val_col]).replace(',', '.').replace('\xa0', ''))
                     measurements.append({"date": d_iso, "val": val})
-                except Exception as e:
-                    continue
+                except Exception: continue
 
-            # C. Sauvegarde
-            self._save_site_json(pdl, {
+            # Remplacement Cloud
+            self._save_site_firestore(pdl, {
                 "measurements": measurements,
                 "identity": {"site_name": f"Domicile {pdl[-4:]}"}
             })
 
             return {
                 "status": "SUCCESS", 
-                "message": f"Succès : {len(measurements)} jours importés pour le PDL {pdl}",
+                "message": f"Succès : {len(measurements)} jours importés",
                 "pdl": pdl,
                 "points": len(measurements)
             }
