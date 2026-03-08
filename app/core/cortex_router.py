@@ -1,13 +1,11 @@
 import re
 import io
 import os
-import json
 import glob
 import pandas as pd
 from datetime import datetime
 
-# --- IMPORT DU MOTEUR PHYSIQUE (NOUVEAUTÉ) ---
-# Le routeur délègue désormais les calculs mathématiques au physicien
+# --- IMPORT DU MOTEUR PHYSIQUE ---
 try:
     from app.core.cortex_physics import physics
 except ImportError:
@@ -16,6 +14,16 @@ except ImportError:
     except ImportError:
         physics = None
         print("⚠️ ALERTE : Cortex Physics introuvable. Le calcul intelligent sera désactivé.")
+
+# --- IMPORT DU MOTEUR DB (NOUVEAUTÉ FIRESTORE) ---
+try:
+    from app.core.cortex_db import db
+except ImportError:
+    try:
+        from core.cortex_db import db
+    except ImportError:
+        db = None
+        print("⚠️ ALERTE : Cortex DB introuvable. Impossible d'accéder à Firestore.")
 
 # Import conditionnel pour l'ingestion spécifique (Finance/Particulier)
 try:
@@ -28,57 +36,59 @@ except ImportError:
 
 class CortexRouter:
     """
-    CORTEX ROUTER V6.5 - PHYSICS INTEGRATION + FINANCE EXTENSION
+    CORTEX ROUTER V7.0 - FIRESTORE INTEGRATION
     Responsabilités : I/O Fichiers, Identification Client, Orchestration.
-    Délègue l'analyse de la courbe à CortexPhysics.
-    Gère désormais les exports Enedis Particulier (Excel).
+    Connecté directement à la base de données Cloud (Zero JSON local).
     """
 
     def __init__(self):
-        self.base_dir = os.getcwd()
-        self.data_dir = os.path.join(self.base_dir, "data")
         self.pdl_mapping = {}
         self.refresh_database()
 
     def refresh_database(self):
-        """Recharge la liste des clients et leurs chemins de fichier."""
+        """Recharge la liste des clients directement depuis Firestore."""
         self.pdl_mapping = {}
-        if not os.path.exists(self.data_dir): return
+        if not db:
+            print("🔴 CORTEX ROUTER: Base de données Firestore non connectée.")
+            return
 
-        json_files = glob.glob(os.path.join(self.data_dir, "*.json"))
+        sites = db.get_all_sites()
         
-        for file_path in json_files:
-            if "master" in file_path or "market" in file_path: continue
-                
+        for data in sites:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    client_name = data.get('identity', {}).get('site_name', 'Client Inconnu')
-                    contract = data.get('contract', {})
+                identity = data.get('identity', {})
+                contract = data.get('contract', {})
+                site_id = identity.get('id')
+                client_name = identity.get('site_name', 'Client Inconnu')
+                
+                if not site_id:
+                    continue
                     
-                    # Nettoyage
-                    pdl = str(contract.get('pdl', '')).replace(' ', '').strip()
-                    pce = str(contract.get('pce', '')).replace(' ', '').strip()
-                    
-                    # Détection Profil
-                    profile = "retail"
-                    typologie = data.get('location', {}).get('typologie', '').lower()
-                    if "mairie" in typologie or "admin" in typologie: profile = "mairie"
-                    if "usine" in typologie or "indus" in typologie: profile = "industrie"
-                    if "residence" in typologie or "syndic" in typologie: profile = "syndic"
+                # Nettoyage
+                pdl = str(contract.get('pdl', '')).replace(' ', '').strip()
+                pce = str(contract.get('pce', '')).replace(' ', '').strip()
+                
+                # Détection Profil
+                profile = "retail"
+                typologie = data.get('location', {}).get('typologie', '').lower()
+                if "mairie" in typologie or "admin" in typologie: profile = "mairie"
+                if "usine" in typologie or "indus" in typologie: profile = "industrie"
+                if "residence" in typologie or "syndic" in typologie: profile = "syndic"
 
-                    # Mapping
-                    info = {"client": client_name, "type": "ELEC", "profile": profile, "path": file_path}
+                # Mapping (On garde le site_id Firestore en mémoire)
+                info = {"client": client_name, "type": "ELEC", "profile": profile, "site_id": site_id}
+                
+                if pdl and len(pdl) > 5:
+                    self.pdl_mapping[pdl] = info
+                if pce and len(pce) > 5:
+                    info_gaz = info.copy()
+                    info_gaz["type"] = "GAZ"
+                    self.pdl_mapping[pce] = info_gaz
                     
-                    if pdl and len(pdl) > 5:
-                        self.pdl_mapping[pdl] = info
-                    if pce and len(pce) > 5:
-                        info["type"] = "GAZ"
-                        self.pdl_mapping[pce] = info
-                        
-            except Exception: pass
+            except Exception as e:
+                print(f"Erreur mappage Firestore: {e}")
         
-        print(f"✅ CORTEX ROUTER: {len(self.pdl_mapping)} PDL connectés.")
+        print(f"✅ CORTEX ROUTER: {len(self.pdl_mapping)} PDL/PCE connectés via Firestore.")
 
     def _extract_pdl_from_content(self, file_content: bytes, filename: str):
         """Scan intelligent (Deep Scan) + Détection du Header."""
@@ -89,18 +99,11 @@ class CortexRouter:
         try:
             # CAS 1 : EXCEL
             if filename.endswith('.xlsx') or filename.endswith('.xls'):
-                # Lecture légère pour détection
                 df = pd.read_excel(io.BytesIO(file_content), dtype=str, header=None)
                 
-                # --- AJOUT FINANCE : Détection Enedis Particulier ---
-                # On scanne les premières lignes pour trouver "Point Référence Mesure"
                 preview_str = df.head(20).to_string()
                 if "Point Référence Mesure" in preview_str and ingest:
-                    # C'est un fichier Enedis Particulier -> On laisse CortexIngest gérer
-                    # On retourne un marqueur spécial pour que analyze_file_stream le sache
                     return "ENEDIS_INDIVIDUAL", None, 0
-
-                # --- FIN AJOUT ---
 
                 for idx, row in df.head(20).iterrows():
                     row_str = " ".join([str(x) for x in row.values])
@@ -138,7 +141,7 @@ class CortexRouter:
             return None, None, 0
 
     def _process_and_save_volume(self, pdl, file_stream, header_row, filename):
-        """Orchestre le calcul physique et la sauvegarde."""
+        """Orchestre le calcul physique et la sauvegarde DANS FIRESTORE."""
         try:
             client_info = self.pdl_mapping.get(pdl)
             if not client_info: return "Client inconnu"
@@ -166,33 +169,34 @@ class CortexRouter:
             # 3. APPEL AU PHYSICIEN (Calculs Mathématiques)
             if not physics: return "Erreur: Moteur physique non chargé"
             
-            # C'est ici que la magie opère : on envoie les données brutes, on reçoit l'intelligence
             results = physics.analyze_load_curve(df, val_col)
             
             if "error" in results:
                 return f"Erreur Analyse: {results['error']}"
 
-            # 4. Sauvegarde des résultats (Persistance)
-            json_path = client_info['path']
-            with open(json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            # 4. SAUVEGARDE DES RÉSULTATS DANS FIRESTORE
+            site_id = client_info['site_id']
+            data = db.get_site(site_id)
+            
+            if not data:
+                return "Erreur: Document Cloud introuvable"
             
             if 'kpis' not in data: data['kpis'] = {}
             
-            # Injection des nouvelles métriques
+            # Injection des nouvelles métriques IA
             data['kpis']['volume_mwh'] = results['volume_mwh']
-            data['kpis']['talon_kw'] = results['talon_kw']       # Nouveau
-            data['kpis']['pmax_kw'] = results['pmax_kw']         # Nouveau
-            data['kpis']['cortex_advice'] = results['advice']    # Nouveau
-            data['kpis']['is_alert'] = results['is_alert']       # Nouveau
+            data['kpis']['talon_kw'] = results['talon_kw']
+            data['kpis']['pmax_kw'] = results['pmax_kw']
+            data['kpis']['cortex_advice'] = results['advice']
+            data['kpis']['is_alert'] = results['is_alert']
             
             if 'contract' not in data: data['contract'] = {}
             if 'consumption_details' not in data['contract']: data['contract']['consumption_details'] = {}
             data['contract']['consumption_details']['volume_annuel'] = results['volume_annuel_kwh']
             data['contract']['consumption_details']['last_upload'] = datetime.now().strftime("%d/%m/%Y")
 
-            with open(json_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
+            # La frappe finale vers Google Cloud
+            db.save_site(site_id, data)
 
             return f"Vol: {results['volume_mwh']} MWh | Talon: {results['talon_kw']} kW | {results['advice']}"
 
@@ -204,10 +208,8 @@ class CortexRouter:
         """Point d'entrée de l'API."""
         self.refresh_database()
 
-        # 1. Deep Scan
         pdl, stream, header_row = self._extract_pdl_from_content(file_content, filename)
 
-        # --- AJOUT FINANCE : Interception Enedis Particulier ---
         if pdl == "ENEDIS_INDIVIDUAL" and ingest:
             result = ingest.ingest_enedis_individual(file_content)
             return {
@@ -217,9 +219,7 @@ class CortexRouter:
                 "pdl": result.get("pdl", "N/A"),
                 "target_profile": "PARTICULIER"
             }
-        # --- FIN AJOUT ---
 
-        # 2. Fallback Nom
         if not pdl:
             match_filename = re.search(r'\d{14}', filename)
             if match_filename and not match_filename.group(0).startswith('202'):
@@ -234,14 +234,13 @@ class CortexRouter:
             if pdl in self.pdl_mapping:
                 client_info = self.pdl_mapping[pdl]
                 
-                # Lancement du traitement complet
                 vol_msg = self._process_and_save_volume(pdl, stream, header_row, filename)
                 
                 status = "INGESTED"
                 message = f"{client_info['client']} -> {vol_msg}"
             else:
                 status = "UNKNOWN_PDL"
-                message = f"PDL {pdl} détecté mais absent de la base."
+                message = f"PDL {pdl} détecté mais absent de la base Firestore."
         
         return {
             "filename": filename,
