@@ -250,9 +250,10 @@ except Exception as e_prod:
         print("🔴 CRITICAL: ACTIVATION DU MODE DEGRADE (MOCKS)")
 
         class MockAuth:
-            def authenticate_user(self, e, p, m=None): return {"id": "mock", "role": "ADMIN"}
-            def create_access_token(self, d): return "mock_token"
-            def decode_token(self, t): return {"sub": "admin@energistrat.com", "role": "ADMIN"}
+            def verify_token(self, t): 
+                if t == "mock_token":
+                    return {"uid": "mock", "email": "admin@energistrat.com", "role": "ADMIN", "sub": "admin"}
+                return None
         auth = MockAuth()
 
         class MockFinance:
@@ -287,7 +288,7 @@ except Exception as e_prod:
         forecast = None
         pdf_builder = FallbackPDFBuilder()
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V5.1-SAFE")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V5.2-FIREBASE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -314,10 +315,8 @@ if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # --- MODELES DE DONNEES ---
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-    mfa_code: Optional[str] = None
+class SessionRequest(BaseModel):
+    id_token: str
 
 class MarketUpdateModel(BaseModel):
     elec: Dict[str, Any]
@@ -490,7 +489,8 @@ async def get_current_user(request: Request):
     if token.startswith("Bearer "): 
         token = token.split(" ")[1]
         
-    payload = auth.decode_token(token)
+    # Le Backend vérifie cryptographiquement le jeton Firebase
+    payload = auth.verify_token(token)
     if not payload: 
         return None
     return payload
@@ -509,9 +509,8 @@ def get_rte_token(client_id, client_secret):
             return res_data.get("access_token")
     except Exception: 
         return None
-
-# ==========================================
-# AUTHENTIFICATION
+    # ==========================================
+# AUTHENTIFICATION (MODE FIREBASE)
 # ==========================================
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request):
@@ -519,19 +518,25 @@ async def view_login(request: Request):
         return RedirectResponse(url="/ops_nexus")
     return templates.TemplateResponse("login.html", {"request": request})
 
-@app.post("/api/auth/login")
-async def api_login(credentials: LoginRequest, response: Response):
-    result = auth.authenticate_user(credentials.email, credentials.password, credentials.mfa_code)
+@app.post("/api/auth/session")
+async def api_session(payload: SessionRequest, response: Response):
+    # 1. Vérification cryptographique absolue via Firebase
+    user_data = auth.verify_token(payload.id_token)
     
-    if result == "MFA_REQUIRED": 
-        return JSONResponse({"detail": "MFA_REQUIRED"}, status_code=403)
-    if not result: 
-        return JSONResponse({"detail": "Identifiants invalides"}, status_code=401)
+    if not user_data: 
+        return JSONResponse({"detail": "Token Firebase invalide ou session expirée"}, status_code=401)
         
-    access_token = auth.create_access_token(data={"sub": result["email"], "role": result["role"]})
-    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True, max_age=3600, samesite="lax")
+    # 2. Création du cookie de session (HttpOnly pour bloquer le vol par XSS)
+    response.set_cookie(
+        key="access_token", 
+        value=f"Bearer {payload.id_token}", 
+        httponly=True, 
+        max_age=3600 * 24, # Session de 24h
+        samesite="lax",
+        secure=True if "https" in str(response.headers) else False
+    )
     
-    return {"access_token": access_token, "token_type": "bearer", "role": result["role"]}
+    return {"success": True, "role": user_data.get("role", "USER")}
 
 @app.get("/logout")
 async def logout(response: Response):
@@ -637,7 +642,8 @@ async def api_dealdesk_analyze(request: Request):
         "legal": legal_info, 
         "segment": segment
     })
-    # ==========================================
+
+# ==========================================
 # API SUBVENTIONS & CERFA
 # ==========================================
 @app.get("/api/tools/subventions")
@@ -911,7 +917,7 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
                     continue
         
         if not cluster_files:
-            cluster_files =[base_data]
+            cluster_files = [base_data]
             
         # ====================================================
         # ROUTAGE MULTI-SITES (GRAPPE) OU MONO-SITE
@@ -1836,7 +1842,7 @@ async def generate_tender(request: Request):
         return JSONResponse({"error": "Pandas missing"}, 500)
     try:
         body = await request.json()
-        site_ids = body.get('site_ids',[])
+        site_ids = body.get('site_ids', [])
         selected_sites =[]
         
         for sid in site_ids:
@@ -1873,7 +1879,7 @@ async def generate_tender(request: Request):
 
 @app.get("/ops/ingest", response_class=HTMLResponse)
 async def ops_ingest_page(request: Request, user = Depends(get_current_user)):
-    if not user or user.get("role") not in ["ADMIN", "OPS_TECH"]: 
+    if not user or user.get("role") not in["ADMIN", "OPS_TECH"]: 
         return RedirectResponse(url="/login")
     try:
         if 'router' not in globals() and 'router' not in locals(): 
@@ -2139,4 +2145,4 @@ async def catch_all_deep(request: Request, full_path: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8080)    
