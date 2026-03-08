@@ -22,13 +22,13 @@ class CortexDB:
     # ==========================================
     def get_all_sites(self) -> list:
         """Récupère l'intégralité des sites (La Flotte)"""
-        if not self.db: return[]
+        if not self.db: return list()
         try:
             docs = self.db.collection("Sites").stream()
-            return[doc.to_dict() for doc in docs]
+            return [doc.to_dict() for doc in docs]
         except Exception as e:
             print(f"⚠️ Erreur get_all_sites : {e}")
-            return[]
+            return list()
 
     def get_site(self, site_id: str) -> dict:
         """Récupère un site spécifique par son ID"""
@@ -71,15 +71,15 @@ class CortexDB:
     # ==========================================
     def get_setting(self, doc_name: str) -> dict:
         """Récupère un paramètre système (M57, Carbon, RTE, Market)"""
-        if not self.db: return {}
+        if not self.db: return dict()
         try:
             doc = self.db.collection("Settings").document(doc_name).get()
             if doc.exists:
                 return doc.to_dict()
-            return {}
+            return dict()
         except Exception as e:
             print(f"⚠️ Erreur get_setting ({doc_name}) : {e}")
-            return {}
+            return dict()
 
     def save_setting(self, doc_name: str, data: dict) -> bool:
         """Sauvegarde un paramètre système"""
@@ -96,12 +96,27 @@ class CortexDB:
     # ==========================================
     def get_sentinel_alerts(self) -> dict:
         """Récupère les dernières alertes du daemon IA"""
-        if not self.db: return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
+        default_resp = {"last_scan": "Jamais", "alert_count": 0, "alerts": list()}
+        if not self.db: return default_resp
         try:
             doc = self.db.collection("System").document("Sentinel").get()
             if doc.exists:
                 return doc.to_dict()
-            return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
+            return default_resp
         except Exception as e:
             print(f"⚠️ Erreur get_sentinel_alerts : {e}")
-            return {"last_scan": "Jamais", "alert_count": 0, "alerts":
+            return default_resp
+
+    def save_sentinel_alerts(self, data: dict) -> bool:
+        """Sauvegarde le rapport du daemon Sentinel"""
+        if not self.db: return False
+        try:
+            self.db.collection("System").document("Sentinel").set(data)
+            return True
+        except Exception as e:
+            print(f"⚠️ Erreur save_sentinel_alerts : {e}")
+            return False
+
+# Instanciation du Singleton de base de données
+db_service = CortexDB()
+db = db_service
