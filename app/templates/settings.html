@@ -166,9 +166,7 @@
             <header class="flex justify-between items-end">
                 <div><h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2><p class="text-gray-400 text-xs">Gestion Multi-Sites, Gaz/Élec et Lots.</p></div>
                 <div class="flex gap-2">
-                    <!-- BOUTON AUTO-DISCOVERY (NOUVEAU) -->
                     <button onclick="toggleDiscoveryModal()" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow-lg shadow-purple-500/20"><i class="fa-solid fa-magic mr-2"></i>Auto-Découverte</button>
-                    
                     <button onclick="toggleImportModal()" class="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg text-xs font-bold border border-white/10 transition"><i class="fa-solid fa-file-csv mr-2"></i>Import Masse</button>
                     <button onclick="saveSite()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20"><i class="fa-solid fa-save mr-2"></i>Enregistrer le Site</button>
                 </div>
@@ -183,15 +181,19 @@
                             <i class="fa-solid fa-plus mr-1"></i> Nouveau
                         </button>
                     </div>
-                    <input type="text" id="search-site" placeholder="Filtrer..." class="input-dark mb-4" oninput="loadSites()">
+                    <input type="text" id="search-site" placeholder="Filtrer..." class="input-dark mb-4 w-full p-2 rounded text-xs" oninput="loadSites()">
                     <div id="site-list" class="flex-1 overflow-y-auto space-y-2 pr-2">
-                        <!-- JS Injection -->
                         <div class="text-center text-gray-500 text-xs mt-10">Chargement...</div>
                     </div>
                 </div>
 
                 <!-- FORMULAIRE COMPLET -->
-                <div class="col-span-9 bento-card p-6 overflow-y-auto">
+                <div class="col-span-9 bento-card p-6 overflow-y-auto relative">
+                    <!-- LOADER OVERLAY -->
+                    <div id="form-loader" class="absolute inset-0 bg-card/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+                        <i class="fa-solid fa-spinner fa-spin text-cyan text-4xl"></i>
+                    </div>
+
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="font-bold text-white flex items-center gap-3">
                             <i class="fa-solid fa-building-user text-gray-500"></i>
@@ -214,7 +216,7 @@
                             </div>
                             <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Raison Sociale</label><input type="text" id="company-name" placeholder="Juridique..." class="w-full input-dark p-2 rounded text-xs bg-white/5"></div>
                             <div class="col-span-4"><label class="text-[10px] text-cyan font-bold uppercase">NOM DU SITE (Dashboard)</label><input type="text" id="site-name-input" placeholder="Ex: École Jules Ferry..." class="w-full input-dark p-2 rounded text-xs border border-cyan/30 text-white font-bold"></div>
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Groupe / Réseau</label><select class="w-full input-dark p-2 rounded text-xs"><option value="none">Aucun</option><option value="sde">Syndicat Énergie</option><option value="retail">Réseau Retail</option></select></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Groupe / Réseau</label><select id="groupe-input" class="w-full input-dark p-2 rounded text-xs"><option value="none">Aucun</option><option value="sde">Syndicat Énergie</option><option value="retail">Réseau Retail</option></select></div>
                             <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Nom du Lot / Grappe</label><input type="text" id="lot-input" placeholder="Ex: Lot 1..." class="w-full input-dark p-2 rounded text-xs text-cyan border-cyan/20"></div>
                         </div>
                     </div>
@@ -223,7 +225,7 @@
                     <div class="bento-card rounded-bento p-6 border-l-4 border-purple-500 mb-6">
                         <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><span class="w-6 h-6 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px]">2</span> LOCALISATION & DONNÉES PHYSIQUES</h3>
                         <div class="grid grid-cols-12 gap-4">
-                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Usage</label><select id="inp-type" class="w-full input-dark p-2 rounded text-xs"><option value="Admin">Administratif / Mairie</option><option value="Ecole">École</option><option value="Sport">Sport</option><option value="Industrie">Industrie</option><option value="Habitat">Habitat</option></select></div>
+                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Usage</label><input type="text" id="inp-type" placeholder="Ex: Industrie, Administratif..." class="w-full input-dark p-2 rounded text-xs"></div>
                             
                             <div class="col-span-3 relative"><label class="text-[10px] text-gray-500 font-bold uppercase">Adresse (Voie)</label><input type="text" id="address-input" class="w-full input-dark p-2 rounded text-xs" oninput="searchAddress()"><div id="address-suggestions" class="suggestions-list hidden"></div></div>
                             
@@ -251,10 +253,10 @@
                             <div class="col-span-3"><label id="lbl-ref" class="text-[10px] text-gray-500 font-bold uppercase">PDL / PRM (14)</label><input type="text" id="ref-input" placeholder="000..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
                             <div class="col-span-2"><label id="lbl-puiss" class="text-[10px] text-gray-500 font-bold uppercase">P. Souscrite</label><input type="number" id="val-input" class="w-full input-dark p-2 rounded text-xs font-mono text-yellow-500 font-bold" oninput="inferContract()"></div>
                             
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">FTA (Achem.)</label><select id="fta-input" class="w-full input-dark p-2 rounded text-xs"><option value="-">-</option><option value="MTA4">MTA4</option><option value="MTA5">MTA5</option><option value="BT > 36">BT > 36</option></select></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">FTA (Achem.)</label><input type="text" id="fta-input" class="w-full input-dark p-2 rounded text-xs" placeholder="-"></div>
                             
-                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Fournisseur</label><select id="provider-input" class="w-full input-dark p-2 rounded text-xs"><option>EDF</option><option>Engie</option><option>TotalEnergies</option><option>Eni</option><option>Vattenfall</option></select></div>
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Segment</label><input type="text" id="segment-display" readonly class="w-full input-dark p-2 rounded text-xs font-bold text-gray-400 bg-white/5" value="--"></div>
+                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Fournisseur</label><input type="text" id="provider-input" class="w-full input-dark p-2 rounded text-xs" placeholder="Ex: EDF"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Segment</label><input type="text" id="segment-display" class="w-full input-dark p-2 rounded text-xs font-bold text-gray-400 bg-white/5" value="--"></div>
                         </div>
 
                         <div class="grid grid-cols-12 gap-4 mb-4">
@@ -278,7 +280,6 @@
                                 <div><label id="lbl-tax" class="text-[9px] text-gray-500 uppercase">CSPE / TICGN</label><input type="number" id="price-tax" placeholder="22.5" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
                             </div>
 
-                            <!-- PUISSANCES DETAILLEES (FIX V3020) -->
                             <div id="grid-ps" class="grid grid-cols-6 gap-2 mt-4 border-t border-white/5 pt-4">
                                  <div class="col-span-6 mb-2"><span class="text-[9px] font-bold text-gray-500 uppercase">Puissances Souscrites Détaillées (kW)</span></div>
                                  <div class="col-start-2"><input type="number" id="ps-hph" placeholder="P1 (HPH)" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
@@ -363,7 +364,7 @@
                 <h3 class="font-bold text-white">Changer de mot de passe</h3>
                 <div class="space-y-2"><label class="text-xs text-gray-400 font-bold uppercase">Actuel</label><input type="password" class="w-full input-dark px-4 py-3 rounded-xl text-sm"></div>
                 <div class="space-y-2"><label class="text-xs text-gray-400 font-bold uppercase">Nouveau</label><input type="password" class="w-full input-dark px-4 py-3 rounded-xl text-sm"></div>
-                <div class="pt-4 flex justify-end"><button class="border border-white/20 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-white/10 transition" onclick="saveSite()">Mettre à jour</button></div>
+                <div class="pt-4 flex justify-end"><button class="border border-white/20 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-white/10 transition">Mettre à jour</button></div>
             </div>
         </div>
 
@@ -392,7 +393,7 @@
                 </div>
                 <div class="flex gap-2">
                     <input type="text" value="sk_live_PROD_V3_SECURE_KEY" readonly class="w-full bg-abysse border border-purple-500/30 rounded-xl px-4 py-3 text-xs font-mono text-purple-300">
-                    <button class="bg-purple-600 text-white px-4 rounded-xl hover:bg-purple-500 transition" onclick="saveSite()"><i class="fa-regular fa-copy"></i></button>
+                    <button class="bg-purple-600 text-white px-4 rounded-xl hover:bg-purple-500 transition"><i class="fa-regular fa-copy"></i></button>
                 </div>
                 <p class="text-[10px] text-gray-500 mt-4"><i class="fa-solid fa-circle-info mr-1"></i> Ne partagez jamais cette clé.</p>
             </div>
@@ -400,7 +401,7 @@
 
     </main>
 
-    <!-- MODAL TICKET & IMPORT & PROPAGATION & DISCOVERY -->
+    <!-- MODAL TICKET -->
     <div id="ticket-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
         <div class="bento-card p-6 w-96 rounded-xl border border-white/10">
             <h3 class="font-bold text-lg mb-4">Nouveau Ticket</h3>
@@ -408,11 +409,12 @@
             <textarea id="tk-msg" placeholder="Description..." class="w-full input-dark p-2 rounded mb-4 h-24"></textarea>
             <div class="flex justify-end gap-2">
                 <button onclick="document.getElementById('ticket-modal').classList.add('hidden')" class="text-gray-400 px-3 py-1">Annuler</button>
-                <button onclick="submitTicket()" class="bg-cyan-500 text-black font-bold px-4 py-2 rounded">Envoyer</button>
+                <button onclick="submitTicket()" class="bg-cyan text-black font-bold px-4 py-2 rounded hover:bg-white transition">Envoyer</button>
             </div>
         </div>
     </div>
 
+    <!-- MODAL PROPAGATION -->
     <div id="propagate-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
         <div class="bento-card p-8 rounded-bento w-[500px] border border-cyan/30 shadow-2xl shadow-cyan/10">
             <div class="flex items-center gap-3 mb-4">
@@ -423,7 +425,7 @@
                 <div class="flex justify-between text-xs mb-2"><span class="text-gray-500">Segment :</span><span class="text-white font-bold" id="prop-segment">--</span></div>
                 <div class="flex justify-between text-xs mb-2"><span class="text-gray-500">Lot Cible :</span><span class="text-cyan font-bold" id="prop-lot">--</span></div>
                 <div class="h-px bg-white/10 my-2"></div>
-                <p class="text-[10px] text-gray-400 italic"><i class="fa-solid fa-triangle-exclamation mr-1 text-yellow-500"></i> Seuls les sites compatibles (même Segment & Lot) seront mis à jour.</p>
+                <p class="text-[10px] text-gray-400 italic"><i class="fa-solid fa-triangle-exclamation mr-1 text-yellow-500"></i> Seuls les sites compatibles seront mis à jour.</p>
             </div>
             <div class="mb-6">
                 <label class="text-[10px] text-gray-500 font-bold uppercase mb-1 block">Date d'effet du nouveau prix</label>
@@ -436,6 +438,7 @@
         </div>
     </div>
 
+    <!-- MODAL IMPORT -->
     <div id="import-modal" class="fixed inset-0 bg-black/90 z-[99] hidden flex items-center justify-center backdrop-blur-sm">
         <div class="bento-card p-8 rounded-bento w-[600px] relative">
             <button onclick="toggleImportModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
@@ -444,18 +447,18 @@
             <div class="flex gap-4 mb-6">
                 <a href="/api/settings/template_csv" class="flex-1 bg-white/5 hover:bg-cyan/20 border border-white/10 hover:border-cyan text-white p-4 rounded-xl transition text-center group">
                     <div class="text-cyan font-bold text-lg mb-1"><i class="fa-solid fa-bolt"></i> ÉLEC</div>
-                    <div class="text-[10px] text-gray-400 group-hover:text-white">Télécharger Modèle V5</div>
+                    <div class="text-[10px] text-gray-400 group-hover:text-white">Télécharger Modèle V6</div>
                 </a>
                 <a href="/api/settings/template_csv_gaz" class="flex-1 bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500 text-white p-4 rounded-xl transition text-center group">
                     <div class="text-red-500 font-bold text-lg mb-1"><i class="fa-solid fa-fire"></i> GAZ</div>
-                    <div class="text-[10px] text-gray-400 group-hover:text-white">Télécharger Modèle V1</div>
+                    <div class="text-[10px] text-gray-400 group-hover:text-white">Télécharger Modèle V6</div>
                 </a>
             </div>
             <div class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-white transition cursor-pointer mb-4 group" onclick="document.getElementById('csv-upload').click()">
                 <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 group-hover:text-white mb-2 transition"></i>
-                <div class="text-sm font-bold text-white">Glisser votre fichier CSV rempli</div>
+                <div class="text-sm font-bold text-white" id="csv-label">Glisser votre fichier CSV rempli</div>
                 <div class="text-[10px] text-gray-500 mt-1">(Élec ou Gaz, détection automatique des colonnes)</div>
-                <input type="file" id="csv-upload" class="hidden" accept=".csv" onchange="showToast('Fichier sélectionné')">
+                <input type="file" id="csv-upload" class="hidden" accept=".csv,.xlsx" onchange="fileSelected(this)">
             </div>
             <button class="w-full bg-white text-black font-bold py-3 rounded-lg mt-4 hover:bg-gray-200 transition shadow-lg" onclick="processImport()">LANCER L'ANALYSE</button>
         </div>
@@ -482,6 +485,11 @@
     </div>
 
     <script>
+        let SITES = [];
+        let CURRENT_ID = null;
+        let currentEnergy = 'elec';
+
+        // --- NAVIGATION ---
         function switchTab(id) {
             document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
             document.getElementById('tab-' + id).classList.remove('hidden');
@@ -490,438 +498,25 @@
             if(id === 'clients') loadSites();
             if(id === 'support') loadTickets();
         }
+
+        // --- UTILS UI ---
         function toggleImportModal() { document.getElementById('import-modal').classList.toggle('hidden'); }
         function toggleDiscoveryModal() { document.getElementById('discovery-modal').classList.toggle('hidden'); }
         function openTicketModal() { document.getElementById('ticket-modal').classList.remove('hidden'); }
-        function showToast(msg) { const t = document.getElementById('toast'); t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`; t.className = "show"; setTimeout(() => t.className = "", 3000); }
-
-        // --- CORE SAVE LOGIC (CORRIGÉ & STANDARDISÉ) ---
-        async function saveSite() {
-            const btn = document.activeElement;
-            const original = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>...';
-            
-            const rawId = document.getElementById('id-input').value;
-            const cleanId = rawId ? rawId.replace(/\s/g, '') : "draft";
-            
-            // CONSTRUCTION DU JSON STANDARDISÉ (CLEFS PROPRES)
-            const data = {
-                client_name: document.getElementById('site-name-input').value,
-                identity: {
-                    id: cleanId, 
-                    siret: cleanId, 
-                    name: document.getElementById('company-name').value, 
-                    site_name: document.getElementById('site-name-input').value,
-                    naf: document.getElementById('naf-input').value,
-                    lot_name: document.getElementById('lot-input').value
-                },
-                location: { 
-                    address: document.getElementById('address-input').value,
-                    zip_code: document.getElementById('zip-input').value,
-                    city: document.getElementById('city-input').value,
-                    surface: parseFloat(document.getElementById('surface-input').value) || 0,
-                    typologie: document.getElementById('inp-type').value
-                },
-                contract: {
-                    pdl: document.getElementById('ref-input').value,
-                    power: parseFloat(document.getElementById('val-input').value) || 0,
-                    segment: document.getElementById('segment-display').value,
-                    provider: document.getElementById('provider-input').value,
-                    fta: document.getElementById('fta-input').value,
-                    start_date: document.getElementById('date-start').value,
-                    end_date: document.getElementById('date-end').value,
-                    // ICI : ON ENVOIE LES CLÉS STANDARDS (hph, hch...)
-                    power_details: {
-                        hph: parseFloat(document.getElementById('ps-hph').value) || 0,
-                        hch: parseFloat(document.getElementById('ps-hch').value) || 0,
-                        hpe: parseFloat(document.getElementById('ps-hpe').value) || 0,
-                        hce: parseFloat(document.getElementById('ps-hce').value) || 0
-                    }
-                },
-                pricing: {
-                    // ICI AUSSI : CLÉS STANDARDS
-                    hph: parseFloat(document.getElementById('price-hph').value) || 0,
-                    hch: parseFloat(document.getElementById('price-hch').value) || 0,
-                    hpe: parseFloat(document.getElementById('price-hpe').value) || 0,
-                    hce: parseFloat(document.getElementById('price-hce').value) || 0,
-                    fix: parseFloat(document.getElementById('price-fix').value) || 0,
-                    tax: parseFloat(document.getElementById('price-tax').value) || 0
-                }
-            };
-            
-            try {
-                // On utilise la route update_site si l'ID existe déjà pour être sûr
-                const endpoint = CURRENT_ID ? '/api/settings/update_site' : '/api/settings/save_client';
-                const res = await fetch(endpoint, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-                if((await res.json()).success) { showToast("Sauvegardé !"); loadSites(); }
-            } catch(e) { alert("Erreur réseau"); }
-            btn.innerHTML = original;
+        function showToast(msg) { 
+            const t = document.getElementById('toast'); 
+            t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`; 
+            t.className = "show"; 
+            setTimeout(() => t.className = "", 3000); 
         }
-
-        // --- LOAD FORM (LECTURE INTELLIGENTE) ---
-        async function loadForm(id) {
-            CURRENT_ID = id;
-            try {
-                const res = await fetch(`/api/dashboard/data/${id}`);
-                const data = await res.json();
-                
-                document.getElementById('form-title').innerText = "Modifier Site";
-                document.getElementById('form-id').innerText = id;
-                
-                // MAPPING
-                document.getElementById('id-input').value = data.identity?.id || "";
-                document.getElementById('company-name').value = data.identity?.name || "";
-                document.getElementById('site-name-input').value = data.identity?.site_name || "";
-                document.getElementById('naf-input').value = data.identity?.naf || "";
-                document.getElementById('lot-input').value = data.identity?.lot_name || "";
-                
-                document.getElementById('address-input').value = data.location?.address || "";
-                document.getElementById('zip-input').value = data.location?.zip_code || "";
-                document.getElementById('city-input').value = data.location?.city || "";
-                document.getElementById('surface-input').value = data.location?.surface || "";
-                document.getElementById('inp-type').value = data.location?.typologie || "Admin";
-
-                document.getElementById('ref-input').value = data.contract?.pdl || "";
-                document.getElementById('val-input').value = data.contract?.power || "";
-                document.getElementById('segment-display').value = data.contract?.segment || "";
-                document.getElementById('provider-input').value = data.contract?.provider || "EDF";
-                
-                document.getElementById('fta-input').value = data.contract?.fta || "-";
-                document.getElementById('date-start').value = data.contract?.start_date || "";
-                document.getElementById('date-end').value = data.contract?.end_date || "";
-                
-                // PUISSANCES (Gestion des variantes)
-                const pd = data.contract?.power_details || {};
-                document.getElementById('ps-hph').value = pd.hph || pd.ps_hph || "";
-                document.getElementById('ps-hch').value = pd.hch || pd.ps_hch || "";
-                document.getElementById('ps-hpe').value = pd.hpe || pd.ps_hpe || "";
-                document.getElementById('ps-hce').value = pd.hce || pd.ps_hce || "";
-
-                // PRIX (Gestion des variantes)
-                const p = data.pricing || {};
-                document.getElementById('price-hph').value = p.hph || p.price_hph || "";
-                document.getElementById('price-hch').value = p.hch || p.price_hch || "";
-                document.getElementById('price-hpe').value = p.hpe || p.price_hpe || "";
-                document.getElementById('price-hce').value = p.hce || p.price_hce || "";
-                document.getElementById('price-fix').value = p.fix || p.price_fix || "";
-                document.getElementById('price-tax').value = p.tax || p.price_tax || "";
-                
-            } catch(e) { console.error(e); }
-        }
-
-        // ... (Reste des fonctions inchangées: resetForm, generateMandatePDF, etc.) ...
-        // ... Pour économiser l'espace, je ne recolle pas tout le bas du fichier qui est identique ...
-        // ... Assure-toi de garder les fonctions runDiscovery, importDiscovery, etc.
-        
-        function resetForm() {
-            CURRENT_ID = null;
-            document.getElementById('form-title').innerText = "Nouveau Site";
-            document.querySelectorAll('input').forEach(i => i.value = '');
-        }
-
-        function generateMandatePDF() {
-            const company = document.getElementById('partner-name').value || "Société";
-            const siret = document.getElementById('partner-siret').value || "00000000000000";
-            const city = document.getElementById('partner-city').value || "Ville";
-            
-            const win = window.open('', '_blank');
-            win.document.write(`
-                <html><head><title>MANDAT SGE</title></head><body style="font-family:sans-serif; padding:40px;">
-                <h1 style="text-align:center;">MANDAT DE COLLECTE DE DONNÉES</h1>
-                <p>Je soussigné, représentant légal de la société <b>${company}</b> (SIRET: ${siret}),<br>
-                autorise ENERGISTRAT à collecter mes données de consommation (P10, C5, Courbes de charge) auprès des gestionnaires de réseaux (Enedis/GRDF).</p>
-                <br><br>
-                <p>Fait à ${city}, le ${new Date().toLocaleDateString()}</p>
-                <br><br><br>
-                <p>Signature et Cachet :</p>
-                </body></html>
-            `);
-            win.document.close();
-            win.print();
-        }
-
-        async function uploadMandate(input) {
-            if (input.files && input.files[0]) {
-                const status = document.getElementById('consent-status');
-                status.innerText = "VALIDÉ";
-                status.className = "bg-green-500/20 text-green-400 px-2 py-1 rounded text-[10px] font-bold";
-                showToast("Mandat stocké dans le coffre-fort !");
+        function fileSelected(input) {
+            if(input.files && input.files[0]) {
+                document.getElementById('csv-label').innerText = input.files[0].name;
+                document.getElementById('csv-label').classList.add('text-cyan');
             }
         }
 
-        async function checkPartnerIdentity() {
-            const val = document.getElementById('partner-siret').value.replace(/\s/g, '');
-            const status = document.getElementById('partner-status');
-            if(val.length >= 9) {
-                status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i>';
-                try {
-                    const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${val}`);
-                    const data = await res.json();
-                    if(data.results && data.results.length > 0) {
-                        const etab = data.results[0];
-                        status.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>';
-                        document.getElementById('partner-name').value = etab.nom_complet;
-                        document.getElementById('partner-tva').value = "FR" + (12 + 3 * (parseInt(val) % 97)) % 97 + val.substring(0, 9);
-                        if(etab.siege) {
-                            document.getElementById('partner-address').value = etab.siege.adresse;
-                            document.getElementById('partner-zip').value = etab.siege.code_postal;
-                            document.getElementById('partner-city').value = etab.siege.libelle_commune;
-                        }
-                    } else status.innerHTML = '<i class="fa-solid fa-xmark text-red-500"></i>';
-                } catch(e) { status.innerHTML = '?'; }
-            }
-        }
-
-        async function savePartnerConfig() {
-            const btn = document.activeElement;
-            const original = btn.innerHTML;
-            btn.innerHTML = '...';
-            
-            const data = {
-                siret: document.getElementById('partner-siret').value,
-                name: document.getElementById('partner-name').value,
-                address: document.getElementById('partner-address').value,
-                zip: document.getElementById('partner-zip').value,
-                city: document.getElementById('partner-city').value,
-                contact: document.getElementById('partner-contact-name').value,
-                email: document.getElementById('partner-email').value
-            };
-
-            try {
-                const res = await fetch('/api/partner/save_config', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
-                });
-                if((await res.json()).success) showToast("Profil Entreprise Sauvegardé !");
-            } catch(e) { alert("Erreur réseau"); }
-            btn.innerHTML = original;
-        }
-
-        async function processImport() {
-            const input = document.getElementById('csv-upload');
-            if (!input.files || input.files.length === 0) return alert("Veuillez sélectionner un fichier CSV.");
-            const file = input.files[0];
-            const formData = new FormData();
-            formData.append("file", file);
-            const btn = document.querySelector('#import-modal button:last-child');
-            const original = btn.innerText;
-            btn.innerText = "TRAITEMENT EN COURS...";
-            try {
-                const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData });
-                const data = await res.json();
-                if(data.success) { toggleImportModal(); showToast(`Succès : ${data.imported} sites importés !`); } 
-                else { alert("Erreur Import : " + (data.error || "Inconnue")); }
-            } catch(e) { console.error(e); alert("Erreur réseau"); }
-            btn.innerText = original;
-        }
-
-        function openPropagationModal() {
-            const segment = document.getElementById('segment-display').value;
-            const lot = document.getElementById('lot-input').value;
-            if(segment === '--') { alert("Segment technique manquant."); return; }
-            document.getElementById('prop-segment').innerText = segment;
-            document.getElementById('prop-lot').innerText = lot || "(Aucun Lot)";
-            document.getElementById('propagate-modal').classList.remove('hidden');
-        }
-
-        async function confirmPropagation() {
-            const dateEffet = document.getElementById('prop-date').value;
-            const segment = document.getElementById('segment-display').value;
-            const lot = document.getElementById('lot-input').value;
-            const sourceId = document.getElementById('id-input').value;
-            if(!dateEffet) return alert("Date d'effet requise.");
-            if(!sourceId) return alert("ID requis.");
-            const btn = document.querySelector('#propagate-modal button:last-child');
-            btn.innerHTML = 'TRAITEMENT...';
-            let pricing = {};
-            if(currentEnergy === 'gaz') {
-                pricing = {
-                    fix: document.getElementById('price-gaz-fix').value,
-                    hph: document.getElementById('price-gaz-mol').value, 
-                    hch: "0", hpe: "0", hce: "0",
-                    tax: document.getElementById('price-gaz-tax').value
-                };
-            } else {
-                pricing = {
-                    fix: document.getElementById('price-fix').value,
-                    hph: document.getElementById('price-hph').value,
-                    hch: document.getElementById('price-hch').value,
-                    hpe: document.getElementById('price-hpe').value,
-                    hce: document.getElementById('price-hce').value,
-                    tax: document.getElementById('price-tax').value
-                };
-            }
-            const payload = {
-                source_client_id: sourceId, target_date: dateEffet,
-                filters: { segment: segment, lot_name: lot }, pricing_data: pricing
-            };
-            try {
-                const res = await fetch('/api/settings/propagate_tariff', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-                const response = await res.json();
-                if(res.ok && response.success) { document.getElementById('propagate-modal').classList.add('hidden'); showToast(`Succès : ${response.updated_count} sites mis à jour !`); } 
-                else { alert("Erreur : " + (response.detail || "Inconnue")); }
-            } catch(e) { console.error(e); alert("Erreur réseau"); }
-            btn.innerHTML = 'CONFIRMER';
-        }
-
-        async function checkIdentity() {
-            const val = document.getElementById('id-input').value.replace(/\s/g, '');
-            const status = document.getElementById('id-status');
-            if(val.length >= 9) {
-                status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i>';
-                try {
-                    const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${val}`);
-                    const data = await res.json();
-                    if(data.results && data.results.length > 0) {
-                        const etab = data.results[0];
-                        status.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>';
-                        document.getElementById('company-name').value = etab.nom_complet;
-                        if(!document.getElementById('site-name-input').value) document.getElementById('site-name-input').value = etab.nom_complet;
-                        if(etab.siege && etab.siege.adresse) {
-                            document.getElementById('address-input').value = etab.siege.adresse;
-                            document.getElementById('zip-input').value = etab.siege.code_postal;
-                            document.getElementById('city-input').value = etab.siege.libelle_commune;
-                        } else if (etab.adresse) {
-                            document.getElementById('address-input').value = etab.adresse;
-                        }
-                        if(etab.activite_principale) document.getElementById('naf-input').value = etab.activite_principale;
-                    } else status.innerHTML = '<i class="fa-solid fa-xmark text-red-500"></i>';
-                } catch(e) { status.innerHTML = '?'; }
-            }
-        }
-
-        let timeout = null;
-        async function searchAddress() {
-            const query = document.getElementById('address-input').value;
-            const list = document.getElementById('address-suggestions');
-            if(query.length < 4) { list.classList.add('hidden'); return; }
-            clearTimeout(timeout);
-            timeout = setTimeout(async () => {
-                try {
-                    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`);
-                    const data = await res.json();
-                    list.innerHTML = '';
-                    if(data.features) {
-                        list.classList.remove('hidden');
-                        data.features.forEach(item => {
-                            const div = document.createElement('div');
-                            div.className = 'suggestion-item text-gray-300';
-                            div.innerText = item.properties.label;
-                            div.onclick = () => { 
-                                document.getElementById('address-input').value = item.properties.label; 
-                                document.getElementById('zip-input').value = item.properties.postcode;
-                                document.getElementById('city-input').value = item.properties.city;
-                                list.classList.add('hidden'); 
-                            };
-                            list.appendChild(div);
-                        });
-                    }
-                } catch(e) {}
-            }, 300);
-        }
-        document.addEventListener('click', function(e) { if (!document.getElementById('address-input').contains(e.target)) document.getElementById('address-suggestions').classList.add('hidden'); });
-
-        async function submitTicket() {
-            const subject = document.getElementById('tk-subject').value;
-            const msg = document.getElementById('tk-msg').value;
-            if(!subject) return alert("Sujet requis");
-            const btn = document.querySelector('#ticket-modal button:last-child');
-            btn.innerText = "...";
-            try {
-                const res = await fetch('/api/support/ticket', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ subject: subject, message: msg, user: "Admin" }) });
-                if((await res.json()).success) { document.getElementById('ticket-modal').classList.add('hidden'); showToast("Ticket créé !"); loadTickets(); }
-            } catch(e) { alert("Erreur réseau"); }
-            btn.innerText = "Envoyer";
-        }
-        async function loadTickets() {
-            const list = document.getElementById('ticket-list'); 
-            if(!list) return;
-            list.innerHTML = ''; 
-            document.getElementById('loading-tickets').style.display = 'block';
-            try {
-                const res = await fetch('/api/support/tickets'); 
-                const data = await res.json(); 
-                document.getElementById('loading-tickets').style.display = 'none';
-                if(data.tickets) data.tickets.forEach(t => { 
-                    list.innerHTML += `<tr class="ticket-row hover:bg-white/5"><td class="font-mono text-gray-400">${t.id}</td><td class="font-bold text-white">${t.subject}</td><td class="text-gray-400">${t.created_at}</td><td class="font-bold ${t.status==='OPEN'?'text-green-400':'text-gray-500'}">${t.status}</td></tr>`; 
-                });
-            } catch(e) {}
-        }
-
-        // AUTO-DISCOVERY (Restitué)
-        let DISCO_RESULTS = [];
-        async function runDiscovery() {
-            const siren = document.getElementById('disco-siren').value.replace(/\s/g, '');
-            const container = document.getElementById('disco-results');
-            container.innerHTML = '<div class="text-center mt-10"><i class="fa-solid fa-spinner fa-spin text-purple-500"></i></div>';
-            
-            try {
-                const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${siren}&etat_administratif=A&limite_resultats=100`);
-                const data = await res.json();
-                DISCO_RESULTS = [];
-                container.innerHTML = '';
-                
-                if(data.results) {
-                    data.results.forEach(r => {
-                        if(r.matching_etablissements) {
-                            r.matching_etablissements.forEach(e => processEtab(e, r.nom_complet));
-                        } else processEtab(r, r.nom_complet);
-                    });
-                }
-                
-                function processEtab(e, name) {
-                    if(e.etat_administratif !== 'A') return;
-                    DISCO_RESULTS.push({ siret: e.siret, name: name + ' - ' + (e.libelle_commune || ''), address: e.adresse, zip: e.code_postal, city: e.libelle_commune });
-                }
-
-                document.getElementById('disco-count').innerText = DISCO_RESULTS.length;
-                
-                if(DISCO_RESULTS.length > 0) {
-                    const table = document.createElement('table');
-                    table.className = "w-full text-left text-xs";
-                    table.innerHTML = `<thead><tr><th class="p-2"><input type="checkbox" onclick="toggleAllDisco(this)"></th><th class="p-2">Nom</th><th class="p-2">Ville</th></tr></thead><tbody class="divide-y divide-white/5"></tbody>`;
-                    DISCO_RESULTS.forEach((s, i) => {
-                        table.querySelector('tbody').innerHTML += `<tr><td class="p-2"><input type="checkbox" class="disco-cb accent-purple-500" value="${i}" onchange="updateImportBtn()"></td><td class="p-2 font-bold">${s.name}</td><td class="p-2 text-cyan-400">${s.city}</td></tr>`;
-                    });
-                    container.appendChild(table);
-                } else container.innerHTML = '<div class="text-center mt-10 text-gray-500">Aucun résultat.</div>';
-
-            } catch(e) { container.innerHTML = 'Erreur API.'; }
-        }
-
-        function toggleAllDisco(src) { document.querySelectorAll('.disco-cb').forEach(cb => cb.checked = src.checked); updateImportBtn(); }
-        function updateImportBtn() { 
-            const n = document.querySelectorAll('.disco-cb:checked').length;
-            const btn = document.getElementById('btn-import-disco');
-            btn.disabled = n === 0;
-            btn.classList.toggle('opacity-50', n === 0);
-            btn.classList.toggle('cursor-not-allowed', n === 0);
-            btn.innerText = n > 0 ? `IMPORTER (${n})` : "IMPORTER";
-        }
-
-        async function importDiscovery() {
-            const idxs = Array.from(document.querySelectorAll('.disco-cb:checked')).map(cb => cb.value);
-            const btn = document.getElementById('btn-import-disco');
-            btn.innerText = "CRÉATION...";
-            
-            for(const i of idxs) {
-                const s = DISCO_RESULTS[i];
-                const payload = {
-                    client_name: s.name,
-                    identity: { id: s.siret, siret: s.siret, name: s.name, site_name: s.name },
-                    location: { address: s.address, zip_code: s.zip, city: s.city, typologie: "Admin" },
-                    contract: { pdl: s.siret }
-                };
-                await fetch('/api/settings/save_client', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-            }
-            toggleDiscoveryModal();
-            showToast(`${idxs.length} sites créés !`);
-            loadSites();
-        }
-
-        // --- LOAD SITES ---
-        let SITES = [];
-        let CURRENT_ID = null;
-
+        // --- LECTURE FIRESTORE (LA PURETÉ DU MAPPAGE) ---
         async function loadSites() {
             const term = document.getElementById('search-site') ? document.getElementById('search-site').value.toLowerCase() : "";
             try {
@@ -934,17 +529,198 @@
                         container.innerHTML = '';
                         SITES.filter(s => s.name.toLowerCase().includes(term)).forEach(s => {
                             const div = document.createElement('div');
-                            div.className = "p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer mb-2 transition";
+                            div.className = "p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer mb-2 transition border border-transparent hover:border-cyan/30";
                             div.onclick = () => loadForm(s.id);
-                            div.innerHTML = `<div class="font-bold text-xs text-white truncate">${s.name}</div><div class="flex justify-between mt-1"><span class="text-[10px] text-gray-500 font-mono">${s.pdl || 'No PDL'}</span><span class="text-[10px] text-cyan-400">${s.city || ''}</span></div>`;
+                            
+                            const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire text-red-500 mr-2"></i>' : '<i class="fa-solid fa-bolt text-cyan mr-2"></i>';
+                            div.innerHTML = `
+                                <div class="font-bold text-xs text-white truncate flex items-center">${icon} ${s.name}</div>
+                                <div class="flex justify-between mt-1 items-center">
+                                    <span class="text-[9px] text-gray-500 font-mono bg-black/50 px-1 rounded">${s.pdl || 'N/A'}</span>
+                                    <span class="text-[9px] text-gray-400 uppercase">${s.city || ''}</span>
+                                </div>
+                            `;
                             container.appendChild(div);
                         });
                     }
                 }
-            } catch(e) {}
+            } catch(e) { console.error("Erreur chargement liste", e); }
         }
 
-        let currentEnergy = 'elec';
+        async function loadForm(id) {
+            CURRENT_ID = id;
+            document.getElementById('form-loader').classList.remove('hidden');
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                const data = await res.json();
+                
+                document.getElementById('form-title').innerText = "Modifier Site";
+                document.getElementById('form-id').innerText = id;
+                
+                // MAPPAGE IDENTITÉ (Aligné sur la V6)
+                const identity = data.identity || {};
+                document.getElementById('id-input').value = identity.siret || identity.id || "";
+                document.getElementById('company-name').value = identity.name || identity.entity_name || "";
+                document.getElementById('site-name-input').value = identity.site_name || "";
+                document.getElementById('naf-input').value = identity.naf || "";
+                document.getElementById('lot-input').value = identity.ref_copro || identity.lot_name || "";
+                
+                // MAPPAGE LOCALISATION
+                const loc = data.location || {};
+                document.getElementById('address-input').value = loc.address || "";
+                document.getElementById('zip-input').value = loc.zip_code || "";
+                document.getElementById('city-input').value = loc.city || "";
+                document.getElementById('surface-input').value = loc.surface || "";
+                document.getElementById('inp-type').value = loc.typologie || "";
+
+                // MAPPAGE CONTRAT
+                const contract = data.contract || {};
+                document.getElementById('ref-input').value = contract.pdl || contract.pce || "";
+                document.getElementById('val-input').value = contract.power || "";
+                document.getElementById('segment-display').value = contract.segment || "";
+                document.getElementById('provider-input').value = contract.provider || "";
+                document.getElementById('fta-input').value = contract.fta || "";
+                document.getElementById('date-start').value = contract.start_date || "";
+                document.getElementById('date-end').value = contract.end_date || "";
+                
+                // BASCULE VISUELLE ÉNERGIE
+                if(data.energy_type === 'gaz') setEnergy('gaz'); else setEnergy('elec');
+
+                // MAPPAGE PUISSANCES DÉTAILLÉES
+                const pd = contract.power_details || {};
+                document.getElementById('ps-hph').value = pd.hph || pd.ps_hph || contract.ps_hph || "";
+                document.getElementById('ps-hch').value = pd.hch || pd.ps_hch || contract.ps_hch || "";
+                document.getElementById('ps-hpe').value = pd.hpe || pd.ps_hpe || contract.ps_hpe || "";
+                document.getElementById('ps-hce').value = pd.hce || pd.ps_hce || contract.ps_hce || "";
+
+                // MAPPAGE PRIX
+                const p = data.pricing || {};
+                if(currentEnergy === 'gaz') {
+                    document.getElementById('price-gaz-fix').value = p.fix || p.abonnement || "";
+                    document.getElementById('price-gaz-mol').value = p.hph || p.prix_molecule || p.price_kwh || "";
+                    document.getElementById('price-gaz-tax').value = p.tax || p.taxes || "";
+                } else {
+                    document.getElementById('price-hph').value = p.hph || p.price_hph || p.prix_hph || "";
+                    document.getElementById('price-hch').value = p.hch || p.price_hch || "";
+                    document.getElementById('price-hpe').value = p.hpe || p.price_hpe || "";
+                    document.getElementById('price-hce').value = p.hce || p.price_hce || "";
+                    document.getElementById('price-fix').value = p.fix || p.abonnement || p.price_fix || "";
+                    document.getElementById('price-tax').value = p.tax || p.taxes || "";
+                }
+                
+            } catch(e) { console.error("Erreur chargement formulaire", e); }
+            document.getElementById('form-loader').classList.add('hidden');
+        }
+
+        function resetForm() {
+            CURRENT_ID = null;
+            document.getElementById('form-title').innerText = "Nouveau Site";
+            document.getElementById('form-id').innerText = "ID: NEW";
+            document.querySelectorAll('input').forEach(i => i.value = '');
+            document.getElementById('segment-display').value = "--";
+            setEnergy('elec');
+        }
+
+        // --- ÉCRITURE FIRESTORE (SAUVEGARDE MANUELLE) ---
+        async function saveSite() {
+            const btn = document.activeElement;
+            if(!btn) return;
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Enregistrement...';
+            
+            // On récupère la clé (SIRET ou PDL)
+            const inputSiret = document.getElementById('id-input').value.replace(/\s/g, '');
+            const inputPdl = document.getElementById('ref-input').value.replace(/\s/g, '');
+            const cleanId = inputPdl || inputSiret;
+            
+            if(!cleanId) {
+                alert("Veuillez renseigner au moins le SIRET ou le PDL/PRM.");
+                btn.innerHTML = original;
+                return;
+            }
+
+            const data = {
+                id: CURRENT_ID || cleanId, // Permet l'update si on a déjà chargé le formulaire
+                identity: {
+                    id: CURRENT_ID || cleanId, 
+                    siret: inputSiret, 
+                    name: document.getElementById('company-name').value, 
+                    site_name: document.getElementById('site-name-input').value,
+                    naf: document.getElementById('naf-input').value,
+                    ref_copro: document.getElementById('lot-input').value
+                },
+                location: { 
+                    address: document.getElementById('address-input').value,
+                    zip_code: document.getElementById('zip-input').value,
+                    city: document.getElementById('city-input').value,
+                    surface: parseFloat(document.getElementById('surface-input').value) || 0,
+                    typologie: document.getElementById('inp-type').value
+                },
+                contract: {
+                    pdl: inputPdl,
+                    power: parseFloat(document.getElementById('val-input').value) || 0,
+                    segment: document.getElementById('segment-display').value,
+                    provider: document.getElementById('provider-input').value,
+                    fta: document.getElementById('fta-input').value,
+                    start_date: document.getElementById('date-start').value,
+                    end_date: document.getElementById('date-end').value,
+                    energy_type: currentEnergy,
+                    power_details: {
+                        hph: parseFloat(document.getElementById('ps-hph').value) || 0,
+                        hch: parseFloat(document.getElementById('ps-hch').value) || 0,
+                        hpe: parseFloat(document.getElementById('ps-hpe').value) || 0,
+                        hce: parseFloat(document.getElementById('ps-hce').value) || 0
+                    }
+                },
+                pricing: {
+                    hph: currentEnergy === 'gaz' ? parseFloat(document.getElementById('price-gaz-mol').value) || 0 : parseFloat(document.getElementById('price-hph').value) || 0,
+                    hch: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('price-hch').value) || 0,
+                    hpe: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('price-hpe').value) || 0,
+                    hce: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('price-hce').value) || 0,
+                    fix: currentEnergy === 'gaz' ? parseFloat(document.getElementById('price-gaz-fix').value) || 0 : parseFloat(document.getElementById('price-fix').value) || 0,
+                    tax: currentEnergy === 'gaz' ? parseFloat(document.getElementById('price-gaz-tax').value) || 0 : parseFloat(document.getElementById('price-tax').value) || 0
+                }
+            };
+            
+            try {
+                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+                const response = await res.json();
+                if(response.success) { 
+                    showToast("Site enregistré dans la Data Unity !"); 
+                    CURRENT_ID = response.id; 
+                    loadSites(); 
+                } else {
+                    alert("Erreur serveur : " + response.error);
+                }
+            } catch(e) { alert("Erreur réseau de communication."); }
+            btn.innerHTML = original;
+        }
+
+        // --- IMPORT DE MASSE ---
+        async function processImport() {
+            const input = document.getElementById('csv-upload');
+            if (!input.files || input.files.length === 0) return alert("Veuillez sélectionner un fichier CSV ou Excel.");
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append("file", file);
+            const btn = document.querySelector('#import-modal button:last-child');
+            const original = btn.innerText;
+            btn.innerText = "INGESTION EN COURS...";
+            try {
+                const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData });
+                const data = await res.json();
+                if(data.success) { 
+                    toggleImportModal(); 
+                    showToast(`Succès : ${data.imported} sites importés !`); 
+                    loadSites();
+                } else { 
+                    alert("Erreur Import : " + (data.error || "Inconnue")); 
+                }
+            } catch(e) { console.error(e); alert("Erreur réseau"); }
+            btn.innerText = original;
+        }
+
+        // --- UI GADGETS ---
         function setEnergy(type) {
             currentEnergy = type;
             const btnElec = document.getElementById('btn-elec'); 
@@ -955,6 +731,7 @@
             const card = document.getElementById('card-energy');
             const gridElec = document.getElementById('grid-elec');
             const gridGaz = document.getElementById('grid-gaz');
+            
             if(type === 'elec') {
                 btnElec.className = "px-3 py-1 text-[10px] font-bold rounded bg-cyan text-black transition shadow-lg";
                 btnGaz.className = "px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
@@ -970,7 +747,7 @@
                 gridElec.classList.add('hidden');
                 gridGaz.classList.remove('hidden');
             }
-            document.getElementById('val-input').value = ''; document.getElementById('segment-display').value = '--';
+            inferContract();
         }
 
         function inferContract() {
@@ -978,12 +755,37 @@
             const disp = document.getElementById('segment-display');
             if(isNaN(val)) { disp.value = '--'; return; }
             if(currentEnergy === 'elec') {
-                if (val <= 36) disp.value = "C5 (Bleu)"; else if (val <= 250) disp.value = "C4 (Jaune)"; else disp.value = "HTA (Vert)";
+                if (val <= 36) disp.value = "C5"; else if (val <= 250) disp.value = "C4"; else disp.value = "HTA";
             } else {
-                if (val < 6) disp.value = "T1 (Base/B0)"; else if (val < 300) disp.value = "T2 (B1)"; else if (val < 5000) disp.value = "T3 (B2i)"; else disp.value = "T4 (GT)";
+                if (val < 6) disp.value = "T1"; else if (val < 300) disp.value = "T2"; else if (val < 5000) disp.value = "T3"; else disp.value = "T4";
             }
         }
 
+        async function checkIdentity() {
+            const val = document.getElementById('id-input').value.replace(/\s/g, '');
+            const status = document.getElementById('id-status');
+            if(val.length >= 9) {
+                status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i>';
+                try {
+                    const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${val}`);
+                    const data = await res.json();
+                    if(data.results && data.results.length > 0) {
+                        const etab = data.results[0];
+                        status.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>';
+                        document.getElementById('company-name').value = etab.nom_complet;
+                        if(!document.getElementById('site-name-input').value) document.getElementById('site-name-input').value = etab.nom_complet;
+                        if(etab.activite_principale) document.getElementById('naf-input').value = etab.activite_principale;
+                        if(etab.siege && etab.siege.adresse) {
+                            document.getElementById('address-input').value = etab.siege.adresse;
+                            document.getElementById('zip-input').value = etab.siege.code_postal;
+                            document.getElementById('city-input').value = etab.siege.libelle_commune;
+                        }
+                    } else status.innerHTML = '<i class="fa-solid fa-xmark text-red-500"></i>';
+                } catch(e) { status.innerHTML = '?'; }
+            }
+        }
+
+        // INIT
         switchTab('general');
         loadSites();
     </script>
