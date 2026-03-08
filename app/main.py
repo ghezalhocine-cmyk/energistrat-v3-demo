@@ -5,6 +5,7 @@ import traceback
 import urllib.request
 import urllib.parse
 import base64
+import uuid
 import asyncio
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
@@ -488,11 +489,9 @@ def get_rte_token(client_id, client_secret):
 # ==========================================
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request, user = Depends(get_current_user)):
-    # FIX: Si l'utilisateur est déjà validé par Firebase, on le laisse passer
     if user: 
         return RedirectResponse(url="/ops_nexus")
         
-    # FIX: S'il n'est pas validé (faux cookie), on force la page de login et on détruit le cookie toxique
     response = templates.TemplateResponse("login.html", {"request": request})
     response.delete_cookie("access_token")
     return response
@@ -608,7 +607,6 @@ async def api_dealdesk_analyze(request: Request):
 # ==========================================
 # API SUBVENTIONS & CERFA
 # ==========================================
-
 @app.get("/api/tools/subventions")
 async def api_subventions_analyze(user = Depends(get_current_user)):
     raw_sites = db.get_all_sites()
@@ -1168,15 +1166,29 @@ def normalize_full_data(data):
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request):
     try:
-        data = await request.json()
-        data = normalize_full_data(data)
-        raw_id = data.get("identity", {}).get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
-        data["identity"]["id"] = raw_id
+        raw_data = await request.json()
+        data = normalize_full_data(raw_data)
+        
+        raw_id = None
+        if "identity" in data and data["identity"].get("id"):
+            raw_id = data["identity"]["id"]
+        elif "id" in data and data["id"]:
+            raw_id = data["id"]
+        elif "siret" in data and data["siret"]:
+            raw_id = data["siret"]
+            
+        if not raw_id:
+            raw_id = f"CLI_{uuid.uuid4().hex[:8]}"
+            
+        if "identity" not in data:
+            data["identity"] = {}
+        data["identity"]["id"] = str(raw_id)
+        
         safe_id = get_safe_id(raw_id)
         
         existing_data = db.get_site(safe_id)
         if existing_data:
-            for section in['technical', 'location', 'identity', 'contract', 'pricing', 'kpis', 'financials', 'rgpd']:
+            for section in ['technical', 'location', 'identity', 'contract', 'pricing', 'kpis', 'financials', 'rgpd']:
                 if section in data:
                     if section not in existing_data: 
                         existing_data[section] = {}
@@ -1185,9 +1197,16 @@ async def api_save_client(request: Request):
         else:
             final_data = data
             
+        if not db:
+            return JSONResponse({"success": False, "error": "Moteur DB hors ligne."})
+            
         db.save_site(safe_id, final_data)
+        
         return JSONResponse({"success": True, "id": raw_id})
+        
     except Exception as e: 
+        print(f"CRASH api_save_client: {str(e)}")
+        traceback.print_exc()
         return JSONResponse({"success": False, "error": str(e)})
 
 @app.get("/api/settings/m57")
