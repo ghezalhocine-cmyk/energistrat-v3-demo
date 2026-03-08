@@ -2143,6 +2143,49 @@ async def catch_all_deep(request: Request, full_path: str):
         return JSONResponse({}, 404)
     return templates.TemplateResponse("index.html", {"request": request})
 
+# ==========================================
+# CHANTIER B : OUTIL DE MIGRATION FIRESTORE (SECRET)
+# ==========================================
+@app.get("/api/ops/force_migration")
+async def force_migration_to_firestore(user = Depends(get_current_user)):
+    # Sécurité absolue : Seul ton compte Admin peut lancer ça
+    if not user or user.get("role") != "ADMIN":
+        return JSONResponse({"error": "Accès refusé. Réservé au Tiers de Confiance."}, 401)
+
+    try:
+        # Importation dynamique du nouveau connecteur
+        from app.core.cortex_db import db_service
+        if not db_service or not db_service.db:
+            return JSONResponse({"error": "La connexion à Firestore a échoué."}, 500)
+
+        migrated_count = 0
+        files = glob.glob(os.path.join(DATA_DIR, "*.json"))
+
+        for p in files:
+            # On ignore les fichiers systèmes locaux
+            if any(x in p for x in ["master", "market", "m57", "carbon", "rte", "sentinel"]):
+                continue
+            try:
+                with open(p, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    site_id = data.get("identity", {}).get("id")
+                    
+                    if site_id:
+                        safe_id = str(site_id).replace('/', '_').replace(' ', '_').replace('+', '').strip()
+                        # L'arme lourde : On pousse le JSON dans le Cloud Google
+                        db_service.save_site(safe_id, data)
+                        migrated_count += 1
+            except Exception as e:
+                print(f"Erreur sur la migration de {p} : {e}")
+
+        return JSONResponse({
+            "success": True,
+            "message": "MIGRATION DATA UNITY TERMINÉE AVEC SUCCÈS",
+            "sites_transferes_vers_cloud": migrated_count
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, 500)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)    
