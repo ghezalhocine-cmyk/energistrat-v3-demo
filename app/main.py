@@ -29,15 +29,13 @@ except ImportError:
 class FallbackPDFBuilder:
     def __init__(self):
         self.logo_svg = """<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="30" rx="8" y="5" fill="#00E5FF"/><path d="M10 15L20 15L15 25Z" fill="#001529"/><text x="40" y="27" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#001529">ENERGISTRAT</text></svg>"""
-    
     def generate_bilan_ag(self, client_id, data, fin, kpis):
         return "<h1>Générateur PDF de Secours</h1>"
-    
     def generate_bilan_ag_cluster(self, cluster_name, site_count, vol_total, budget_total, vol_elec, vol_gaz, ghost_total):
         return "<h1>Générateur PDF Grappe</h1>"
 
 # ==============================================================================
-# BLOC IMPORT CORTEX ROBUSTE
+# BLOC IMPORT CORTEX ROBUSTE (AVEC CORTEX_RTE)
 # ==============================================================================
 try:
     from app.core.cortex_ingest import ingest
@@ -50,6 +48,7 @@ try:
     from app.core.cortex_finance import finance
     from app.core.cortex_auth import auth
     from app.core.cortex_db import db
+    from app.core.cortex_rte import rte
     try:
         from app.core.cortex_pdf import pdf_builder
     except ImportError:
@@ -68,6 +67,7 @@ except Exception as e_prod:
         from core.cortex_finance import finance
         from core.cortex_auth import auth
         from core.cortex_db import db
+        from core.cortex_rte import rte
         try:
             from core.cortex_pdf import pdf_builder
         except ImportError:
@@ -77,52 +77,50 @@ except Exception as e_prod:
         class MockAuth:
             def verify_token(self, t): return {"uid": "mock", "email": "admin@energistrat.com", "role": "ADMIN", "sub": "admin"}
         auth = MockAuth()
-        
         class MockDB:
-            def get_all_sites(self): return []
+            def get_all_sites(self): return[]
             def get_site(self, sid): return {}
             def save_site(self, sid, d): return True
             def delete_site(self, sid): return True
             def get_setting(self, n): return {}
             def save_setting(self, n, d): return True
-            def get_sentinel_alerts(self): return {"last_scan": "Jamais", "alert_count": 0, "alerts": []}
+            def get_sentinel_alerts(self): return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
             def save_sentinel_alerts(self, d): return True
             def get_all_users(self): return []
             def get_user_profile(self, u): return {}
             def save_user_profile(self, u, d): return True
         db = MockDB()
-        
         class MockFinance:
             def parse_invoice(self, c, f): return {"status": "ERROR"}
             def audit_invoice(self, i, s): return {}
             def simulate_landing(self, s): return {}
         finance = MockFinance()
-        
         class MockRouter:
             def get_api_status(self): return {"status": "DEGRADED"}
             def analyze_file_stream(self, c, f): return {"status": "ERROR"}
         router = MockRouter()
-        
         class MockMarket:
             def valoriser_strategie(self, l, b): return {"error": "Market missing"}
         market = MockMarket()
-        
         class MockAggregator:
             def aggregate_sites(self, s, y): return None
         aggregator = MockAggregator()
-        
         class MockCortex:
             def enrich_site_financials(self, data): return {"volume_mwh": 0, "budget_annual": 0, "meta": {"is_gas": False}, "kpis": {"pmc_eur_mwh": 0, "ghost_savings": 0}}
             def analyze_portfolio(self, sites): return {"global": {}, "green_league": {}}
             def generate_dqe_structure(self, s): return pd.DataFrame() if PANDAS_READY else None
         cortex = MockCortex()
+        class MockRTE:
+            def get_wholesale_market(self): return {"success": False, "error": "RTE Module Offline"}
+            def get_pulse_dashboard_data(self): return {"success": False, "error": "RTE Module Offline"}
+        rte = MockRTE()
         
         ingest = None
         physics = None
         forecast = None
         pdf_builder = FallbackPDFBuilder()
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V8.3-SAFE")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V9.0-RTE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -134,107 +132,45 @@ app.add_middleware(
 
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
-if not os.path.exists(DATA_DIR): 
-    os.makedirs(DATA_DIR, exist_ok=True)
-    
+if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
 TEMPLATE_DIR = os.path.join(BASE_DIR, "app/templates")
-if not os.path.exists(TEMPLATE_DIR): 
-    TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
+if not os.path.exists(TEMPLATE_DIR): TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
-
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-if not os.path.exists(STATIC_DIR): 
-    STATIC_DIR = os.path.join(BASE_DIR, "app/static")
-if os.path.exists(STATIC_DIR): 
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
+if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # --- MODELES ---
-class SessionRequest(BaseModel): 
-    id_token: str
-
-class MarketUpdateModel(BaseModel): 
-    elec: Dict[str, Any]
-    gaz: Dict[str, Any]
-    trve: Optional[Dict[str, Any]] = None
-    targets: Optional[Dict[str, Any]] = None
-
-class StrategyRequest(BaseModel): 
-    site_id: str
-    bloc_kw: float
-
-class AggregationRequest(BaseModel): 
-    site_ids: List[str]
-    years: int = 3
-
-class PropagateRequest(BaseModel): 
-    source_client_id: str
-    target_date: str
-    filters: Dict[str, str]
-    pricing_data: Dict[str, Any]
-
-class M57SettingsModel(BaseModel): 
-    bp_elec: float = 0.0
-    bp_gaz: float = 0.0
-    consumed_elec: float = 0.0
-    consumed_gaz: float = 0.0
-    bp_irve: float = 0.0
-    consumed_irve: float = 0.0
-    bp_enr: float = 0.0
-    consumed_enr: float = 0.0
-
-class CarbonSettingsModel(BaseModel): 
-    baseline_year: int = 2010
-    baseline_kwh_sqm: float = 0.0
-
-class RTESettingsModel(BaseModel): 
-    client_id: str = ""
-    client_secret: str = ""
+class SessionRequest(BaseModel): id_token: str
+class MarketUpdateModel(BaseModel): elec: Dict[str, Any]; gaz: Dict[str, Any]; trve: Optional[Dict[str, Any]] = None; targets: Optional[Dict[str, Any]] = None
+class StrategyRequest(BaseModel): site_id: str; bloc_kw: float
+class AggregationRequest(BaseModel): site_ids: List[str]; years: int = 3
+class PropagateRequest(BaseModel): source_client_id: str; target_date: str; filters: Dict[str, str]; pricing_data: Dict[str, Any]
+class M57SettingsModel(BaseModel): bp_elec: float = 0.0; bp_gaz: float = 0.0; consumed_elec: float = 0.0; consumed_gaz: float = 0.0; bp_irve: float = 0.0; consumed_irve: float = 0.0; bp_enr: float = 0.0; consumed_enr: float = 0.0
+class CarbonSettingsModel(BaseModel): baseline_year: int = 2010; baseline_kwh_sqm: float = 0.0
+class RTESettingsModel(BaseModel): client_id: str = ""; client_secret: str = ""
 
 def json_compliant(data):
-    if isinstance(data, dict): 
-        return {k: json_compliant(v) for k, v in data.items()}
-    elif isinstance(data, list): 
-        return [json_compliant(v) for v in data]
+    if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
+    elif isinstance(data, list): return [json_compliant(v) for v in data]
     elif isinstance(data, float):
         if math.isnan(data) or math.isinf(data): return 0.0
     return data
 
-def get_safe_id(raw_id): 
-    return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
-
+def get_safe_id(raw_id): return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
 def get_market_ref():
     m = db.get_setting("Market")
-    if m:
-        return m
-    return { "updated_at": datetime.now().isoformat(), "elec": { "cal_n1": 85.0 }, "gaz": { "peg_n1": 35.0 }, "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 } }
+    return m if m else { "updated_at": datetime.now().isoformat(), "elec": { "cal_n1": 85.0 }, "gaz": { "peg_n1": 35.0 }, "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 } }
 
 async def get_current_user(request: Request):
     t = request.cookies.get("access_token")
-    if not t: 
-        return None
-    if t.startswith("Bearer "): 
-        t = t.split(" ")[1]
+    if not t: return None
+    if t.startswith("Bearer "): t = t.split(" ")[1]
     return auth.verify_token(t)
 
-def get_rte_token(client_id, client_secret):
-    url = "https://digital.iservices.rte-france.com/token/oauth/"
-    auth_str = f"{client_id}:{client_secret}"
-    b64_auth = base64.b64encode(auth_str.encode('utf-8')).decode('utf-8')
-    headers = { "Authorization": f"Basic {b64_auth}", "Content-Type": "application/x-www-form-urlencoded" }
-    req = urllib.request.Request(url, data=urllib.parse.urlencode({}).encode('utf-8'), headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req) as res: 
-            return json.loads(res.read().decode('utf-8')).get("access_token")
-    except: 
-        return None
-
-# ==========================================
-# AUTHENTIFICATION
-# ==========================================
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request, user = Depends(get_current_user)):
-    if user: 
-        return RedirectResponse(url="/ops_nexus" if user.get("role") == "ADMIN" else "/dashboard/citoyen")
+    if user: return RedirectResponse(url="/ops_nexus" if user.get("role") == "ADMIN" else "/dashboard/citoyen")
     res = templates.TemplateResponse("login.html", {"request": request})
     res.delete_cookie("access_token")
     return res
@@ -242,8 +178,7 @@ async def view_login(request: Request, user = Depends(get_current_user)):
 @app.post("/api/auth/session")
 async def api_session(payload: SessionRequest, response: Response):
     u = auth.verify_token(payload.id_token)
-    if not u: 
-        return JSONResponse({"detail": "Token invalide"}, status_code=401)
+    if not u: return JSONResponse({"detail": "Token invalide"}, status_code=401)
     response.set_cookie(key="access_token", value=f"Bearer {payload.id_token}", httponly=True, max_age=3600*24, samesite="lax", secure=True if "https" in str(response.headers) else False)
     return {"success": True, "role": u.get("role", "USER")}
 
@@ -253,53 +188,43 @@ async def logout(response: Response):
     return RedirectResponse(url="/login")
 
 @app.get("/api/ops/sentinel/alerts")
-async def api_get_sentinel_alerts(): 
-    return db.get_sentinel_alerts()
+async def api_get_sentinel_alerts(): return db.get_sentinel_alerts()
 
 @app.post("/api/dealdesk/analyze")
 async def api_dealdesk_analyze(request: Request):
     b = await request.json()
     q = str(b.get('query', '')).strip().lower()
     if not q: return JSONResponse({"success": False, "error": "Requête vide."})
-    
-    sd = None
-    for s in db.get_all_sites():
-        if q in str(s.get('contract', {}).get('pdl', '')).strip() or q in str(s.get('identity', {}).get('site_name', '')).strip().lower():
-            sd = s
-            break
-            
+    sd = next((s for s in db.get_all_sites() if q in str(s.get('contract', {}).get('pdl', '')).strip() or q in str(s.get('identity', {}).get('site_name', '')).strip().lower()), None)
     if not sd: return JSONResponse({"success": False, "error": "Introuvable."})
-    
     try: vol = cortex.enrich_site_financials(sd).get('volume_mwh', 0)
     except: vol = 0
     p = float(sd.get('contract', {}).get('power', 0))
-    return JSONResponse({
-        "success": True, 
-        "site": { "name": sd.get('identity',{}).get('site_name', 'Inconnu'), "pdl": sd.get('contract',{}).get('pdl', 'N/A'), "volume": round(vol, 2), "power": p }, 
-        "segment": "B2B_HEAVY" if vol > 5000 else ("C4_MID" if p > 36 or vol > 250 else "C5_MASS")
-    })
+    return JSONResponse({"success": True, "site": { "name": sd.get('identity',{}).get('site_name', 'Inconnu'), "pdl": sd.get('contract',{}).get('pdl', 'N/A'), "volume": round(vol, 2), "power": p }, "segment": "B2B_HEAVY" if vol > 5000 else ("C4_MID" if p > 36 or vol > 250 else "C5_MASS")})
 
 @app.get("/api/tools/gridmap/capacity")
 async def api_gridmap_capacity():
-    results = []
-    for s in db.get_all_sites():
-        if s.get('contract', {}).get('pdl') and "CLI_" not in str(s.get('identity', {}).get('id')):
-            p = float(s.get('contract', {}).get('power', 0))
-            results.append({
-                "pdl": s.get('contract', {}).get('pdl'), 
-                "name": s.get('identity', {}).get('site_name', 'Site'), 
-                "city": s.get('location', {}).get('city', 'Inconnue'), 
-                "power_kva": p, 
-                "residual_capacity_kva": 150 if p > 250 else (50 if p > 100 else 15)
-            })
-    return JSONResponse({"success": True, "nodes": results})
+    return JSONResponse({"success": True, "nodes": [{"pdl": s.get('contract', {}).get('pdl'), "name": s.get('identity', {}).get('site_name', 'Site'), "city": s.get('location', {}).get('city', 'Inconnue'), "power_kva": float(s.get('contract', {}).get('power', 0)), "residual_capacity_kva": 150 if float(s.get('contract', {}).get('power', 0)) > 250 else (50 if float(s.get('contract', {}).get('power', 0)) > 100 else 15)} for s in db.get_all_sites() if s.get('contract', {}).get('pdl') and "CLI_" not in str(s.get('identity', {}).get('id'))]})
 
 @app.get("/api/ops/tenants")
 async def api_get_tenants(user = Depends(get_current_user)):
-    """Le CRM pour récupérer la liste des entreprises (Tenant)"""
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Non autorisé"}, 401)
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     return JSONResponse({"success": True, "tenants": db.get_all_users()})
+
+# ==========================================
+# CORTEX RTE (LE NOUVEAU SATELLITE DE MARCHÉ)
+# ==========================================
+@app.get("/api/tools/sniper/market")
+async def api_sniper_market(user = Depends(get_current_user)):
+    """Délègue l'appel au marché financier à cortex_rte.py"""
+    if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
+    return JSONResponse(rte.get_wholesale_market())
+
+@app.get("/api/rte/live")
+async def get_rte_live_data(user = Depends(get_current_user)):
+    """Délègue la météo du réseau et l'alerte PP1 à cortex_rte.py"""
+    if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
+    return JSONResponse(rte.get_pulse_dashboard_data())
     # ==========================================
 # API SUBVENTIONS & CERFA
 # ==========================================
@@ -638,6 +563,13 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
         if city and city != 'Inconnue': all_cities.add(city)
         if prov: all_providers.add(prov)
         
+        raw_id = s.get('identity', {}).get('id')
+        safe_id = get_safe_id(raw_id)
+        
+        pdl_display = contract.get('pdl')
+        if not pdl_display or len(str(pdl_display)) < 5: 
+            pdl_display = contract.get('pce', '-')
+        
         vol_engine = fin.get('volume_mwh', 0)
         vol_router = float(s.get('kpis', {}).get('volume_mwh', 0))
         final_vol = vol_engine if vol_engine > 0 else vol_router
@@ -661,7 +593,7 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
             "alert": fin.get('kpis', {}).get('pmc_eur_mwh', 0) > 300,
             "ghost_savings": fin.get('kpis', {}).get('ghost_savings', 0), 
             "power": contract.get('power', 0), 
-            "pdl": contract.get('pdl') or contract.get('pce', '-'), 
+            "pdl": pdl_display, 
             "surface": s.get('location', {}).get('surface', 0),
             "tenant_id": s.get('identity', {}).get('tenant_id', 'Orphelin')
         })
@@ -914,6 +846,11 @@ async def view_ops_nexus(request: Request, user = Depends(get_current_user)):
 async def ops_ingest_page(request: Request, user = Depends(get_current_user)):
     if not user or user.get("role") not in ["ADMIN", "OPS_TECH"]: return RedirectResponse(url="/login")
     return templates.TemplateResponse("ops_ingest.html", {"request": request, "api_status": router.get_api_status() if router else {}})
+
+@app.get("/pulse", response_class=HTMLResponse)
+async def view_pulse(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse(url="/login")
+    return templates.TemplateResponse("pulse.html", {"request": request})
 
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
