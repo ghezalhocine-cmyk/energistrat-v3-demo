@@ -208,7 +208,7 @@ class FallbackPDFBuilder:
         </div></body></html>"""
 
 # ==============================================================================
-# BLOC IMPORT CORTEX ROBUSTE (AVEC FIRESTORE V6)
+# BLOC IMPORT CORTEX ROBUSTE (AVEC FIRESTORE V8)
 # ==============================================================================
 try:
     from app.core.cortex_ingest import ingest
@@ -299,7 +299,7 @@ except Exception as e_prod:
         forecast = None
         pdf_builder = FallbackPDFBuilder()
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V6.1-FIRESTORE-SAFE")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V8.0-FIRESTORE-SAFE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -342,6 +342,12 @@ class StrategyRequest(BaseModel):
 class AggregationRequest(BaseModel):
     site_ids: List[str]
     years: int = 3
+
+class PropagateRequest(BaseModel):
+    source_client_id: str
+    target_date: str
+    filters: Dict[str, str]
+    pricing_data: Dict[str, Any]
 
 class M57SettingsModel(BaseModel):
     bp_elec: float = 0.0
@@ -485,7 +491,7 @@ def get_rte_token(client_id, client_secret):
         return None
 
 # ==========================================
-# AUTHENTIFICATION (MODE FIREBASE + FIX REDIRECT LOOP)
+# AUTHENTIFICATION (MODE FIREBASE)
 # ==========================================
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request, user = Depends(get_current_user)):
@@ -603,8 +609,7 @@ async def api_dealdesk_analyze(request: Request):
         "legal": legal_info, 
         "segment": segment
     })
-
-# ==========================================
+    # ==========================================
 # API SUBVENTIONS & CERFA
 # ==========================================
 @app.get("/api/tools/subventions")
@@ -1208,6 +1213,55 @@ async def api_save_client(request: Request):
         print(f"CRASH api_save_client: {str(e)}")
         traceback.print_exc()
         return JSONResponse({"success": False, "error": str(e)})
+
+# ==========================================
+# LA ROUTE DE PROPAGATION TARIFAIRE (RESTAURÉE)
+# ==========================================
+@app.post("/api/settings/propagate_tariff")
+async def api_propagate_tariff(payload: PropagateRequest, user = Depends(get_current_user)):
+    try:
+        if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+        
+        sites = db.get_all_sites()
+        updated_count = 0
+        
+        for data in sites:
+            try:
+                contract = data.get('contract', {})
+                identity = data.get('identity', {})
+                site_id = identity.get('id')
+                
+                if not site_id: continue
+                
+                # Vérification des filtres (Segment et Lot)
+                segment_match = (str(payload.filters.get('segment', '')).lower() == str(contract.get('segment', '')).lower())
+                
+                lot_match = True
+                if payload.filters.get('lot_name') and payload.filters.get('lot_name') != "Aucun":
+                    lot_match = (str(payload.filters.get('lot_name')).lower() == str(identity.get('ref_copro', '')).lower() or 
+                                 str(payload.filters.get('lot_name')).lower() == str(identity.get('lot_name', '')).lower())
+                
+                if segment_match and lot_match:
+                    if 'pricing' not in data: data['pricing'] = {}
+                    
+                    # Mise à jour des prix
+                    for k, v in payload.pricing_data.items():
+                        if v and str(v) != "0":
+                            data['pricing'][k] = float(v)
+                            
+                    # On sauvegarde la date d'effet dans le contrat
+                    contract['start_date'] = payload.target_date
+                    data['contract'] = contract
+                    
+                    db.save_site(site_id, data)
+                    updated_count += 1
+            except:
+                continue
+                
+        return JSONResponse({"success": True, "updated_count": updated_count})
+    except Exception as e:
+        print(f"Erreur propagation: {e}")
+        return JSONResponse({"success": False, "detail": str(e)})
 
 @app.get("/api/settings/m57")
 async def get_m57_settings():
@@ -1958,7 +2012,7 @@ async def view_sante(request: Request, user = Depends(get_current_user)):
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
     PUBLIC_PAGES =["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html"]
-    if any(x in page_name for x in[".js", ".css", ".png", ".jpg"]): 
+    if any(x in page_name for x in [".js", ".css", ".png", ".jpg"]): 
         return JSONResponse({}, 404)
         
     target_file = page_name if page_name.endswith(".html") else f"{page_name}.html"
