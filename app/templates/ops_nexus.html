@@ -166,7 +166,6 @@
                         <div class="text-[10px] font-bold text-oph uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
                     </a>
 
-                    <!-- LE NOUVEAU PROFIL SANTE.OS -->
                     <a href="/sante" class="bento-card p-6 block hover:border-sante group module-card border-t-2 border-sante bg-gradient-to-b from-card to-sante/5" data-tags="sante hopital clinique chu ehpad eprd medical">
                         <div class="w-12 h-12 rounded-full bg-sante/10 text-sante flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition shadow-[0_0_15px_rgba(14,165,233,0.3)]"><i class="fa-solid fa-hospital"></i></div>
                         <h3 class="text-base font-black text-white mb-1">Santé.OS</h3>
@@ -229,7 +228,6 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="grid-satellites">
                     
-                    <!-- LE SATELLITE FINANCE RENOMMÉ ET MIS EN AVANT -->
                     <a href="/finance" class="bento-card p-6 flex flex-col gap-3 hover:border-gold group module-card border-t-4 border-gold bg-gradient-to-b from-card to-gold/5" data-tags="finance factures audit pdf facturex ocr pmp surfacturation">
                         <div class="flex justify-between items-start">
                             <div class="w-12 h-12 rounded-xl bg-gold/10 text-gold flex items-center justify-center text-2xl group-hover:scale-105 transition shadow-[0_0_15px_rgba(245,158,11,0.3)]"><i class="fa-solid fa-file-invoice-dollar"></i></div>
@@ -309,7 +307,6 @@
                         <div><h3 class="text-sm font-black text-white">Deal Desk (Légal)</h3><p class="text-[10px] text-gray-400 mt-1">Tunnel signature avec qualif INSEE.</p></div>
                     </a>
 
-                    <!-- LES NOUVEAUX SATELLITES EXPERTS -->
                     <a href="/immo" class="bento-card p-6 flex flex-col gap-3 hover:border-purple group module-card border-t-4 border-purple bg-gradient-to-b from-card to-purple/10" data-tags="immo dpe tertiaire decote valeur fonciere naf ademe">
                         <div class="flex justify-between items-start">
                             <div class="w-12 h-12 rounded-xl bg-purple/10 text-purple flex items-center justify-center text-2xl group-hover:scale-105 transition shadow-[0_0_15px_rgba(168,85,247,0.3)]"><i class="fa-solid fa-city"></i></div>
@@ -411,7 +408,7 @@
     </main>
 
     <!-- ========================================== -->
-    <!-- SCRIPTS LOGIQUES                           -->
+    <!-- SCRIPTS LOGIQUES (CORRIGÉS)                 -->
     <!-- ========================================== -->
     <script>
         // Moteur de recherche local (Command Palette)
@@ -440,6 +437,13 @@
                     const el = document.getElementById('kpi-count');
                     let start = 0;
                     const end = data.fleet.length;
+                    
+                    // Si on a 0 client, on affiche juste 0
+                    if (end === 0) {
+                        el.innerText = "0";
+                        return;
+                    }
+
                     const duration = 1000;
                     const increment = end / (duration / 16);
                     
@@ -464,9 +468,9 @@
             try {
                 const res = await fetch('/api/tools/sniper/market');
                 const data = await res.json();
-                if(data.success) {
-                    const elec = data.current_prices.elec.toFixed(2);
-                    const gaz = data.current_prices.gaz.toFixed(2);
+                if(data.success && data.current_prices) {
+                    const elec = data.current_prices.elec ? data.current_prices.elec.toFixed(2) : "--";
+                    const gaz = data.current_prices.gaz ? data.current_prices.gaz.toFixed(2) : "--";
                     const trend = data.status === 'BEAR' ? '<span class="text-cyan">↘ BAISSIER</span>' : '<span class="text-alert">↗ HAUSSIER</span>';
                     
                     document.getElementById('market-ticker').innerHTML = `
@@ -480,6 +484,7 @@
             }
         }
 
+        // Lancement au chargement de la page
         document.addEventListener('DOMContentLoaded', () => {
             fetchSystemHealth();
             fetchMarketTicker();
