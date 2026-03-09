@@ -23,72 +23,13 @@ try:
 except ImportError:
     PANDAS_READY = False
 
-# ==============================================================================
-# LE MOTEUR PDF DE SECOURS (ANTI-CRASH)
-# ==============================================================================
 class FallbackPDFBuilder:
     def __init__(self):
         self.logo_svg = """<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="30" rx="8" y="5" fill="#00E5FF"/><path d="M10 15L20 15L15 25Z" fill="#001529"/><text x="40" y="27" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#001529">ENERGISTRAT</text></svg>"""
-
     def generate_bilan_ag(self, client_id, data, fin, kpis):
-        try:
-            identity = data.get('identity', {})
-            loc = data.get('location', {})
-            site_name = str(identity.get('site_name') or identity.get('name') or "Copropriété")
-            address = f"{loc.get('address', '')} - {loc.get('city', '')}".strip(" -")
-            
-            try: vol_mwh = float(fin.get('volume_mwh') or 0)
-            except: vol_mwh = 0.0
-            
-            if vol_mwh == 0: 
-                try: vol_mwh = float(kpis.get('volume_mwh') or 0)
-                except: vol_mwh = 0.0
-                
-            try: budget = float(fin.get('budget_annual') or 0)
-            except: budget = 0.0
-            
-            if budget == 0: budget = vol_mwh * 180.0
-            budget_non_negocie = budget * 1.15 
-            economie = budget_non_negocie - budget
-            is_gas = fin.get('meta', {}).get('is_gas', False) if isinstance(fin, dict) else False
-            talon_pct = 0.15 if is_gas else 0.30
-            talon_monthly = (vol_mwh * talon_pct) / 12.0
-            
-            try: ghost = float(kpis.get('ghost_savings') or 0)
-            except: ghost = 0.0
-            
-            r2_simule = 0.88 if ghost < (vol_mwh * 0.1) else 0.65
-            etat_chaufferie = "Excellente régulation climatique." if r2_simule > 0.85 else "Dérive thermique constatée. Réglage recommandé."
-            couleur_chaufferie = "#10B981" if r2_simule > 0.85 else "#EF4444"
-            annee_en_cours = datetime.now().year
-            date_edition = datetime.now().strftime('%d/%m/%Y')
-
-            return f"""
-            <!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>BILAN_AG_{site_name.replace(' ', '_')}</title>
-            <style>@page {{ size: A4; margin: 0; }} body {{ font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #1e293b; background: white; margin: 0; padding: 0; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }} .page {{ width: 210mm; min-height: 296mm; padding: 20mm; box-sizing: border-box; page-break-after: always; position: relative; }} .header-brand {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #001529; padding-bottom: 15px; margin-bottom: 30px; }} h1 {{ color: #001529; font-size: 22px; margin: 0; text-transform: uppercase; letter-spacing: -0.5px; }} .subtitle {{ color: #00E5FF; font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }} h2 {{ color: #001529; font-size: 16px; border-left: 5px solid #00E5FF; padding-left: 12px; margin-top: 35px; text-transform: uppercase; letter-spacing: 1px; }} .info-box {{ background: #001529; color: white; border-radius: 12px; padding: 20px; margin-bottom: 25px; display: flex; gap: 20px; }} .info-label {{ font-size: 10px; text-transform: uppercase; color: #00E5FF; font-weight: bold; margin-bottom: 5px; }} .info-value {{ font-size: 16px; font-weight: bold; }} .kpi-grid {{ display: flex; gap: 20px; margin-bottom: 30px; }} .kpi-card {{ flex: 1; border: 2px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center; background: #f8fafc; }} .kpi-val {{ font-size: 26px; font-weight: 900; color: #001529; margin: 10px 0; font-family: monospace; }} .shield-box {{ background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #22c55e; padding: 20px; border-radius: 12px; }} .legal-box {{ background: #f1f5f9; border-left: 4px solid #94a3b8; padding: 15px; margin-top: 40px; font-size: 10px; color: #475569; }} .footer-doc {{ position: absolute; bottom: 15mm; left: 20mm; right: 20mm; border-top: 2px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 9px; font-weight: bold; color: #94a3b8; text-transform: uppercase; }} .no-print {{ position: fixed; top: 20px; right: 20px; z-index: 1000; }} .btn-print {{ background: #001529; color: #00E5FF; border: 2px solid #00E5FF; padding: 12px 24px; border-radius: 8px; font-weight: 900; cursor: pointer; text-transform: uppercase; }} @media print {{ .no-print {{ display: none; }} }}</style>
-            </head><body onload="setTimeout(function(){{ window.print(); }}, 800);"><div class="no-print"><button class="btn-print" onclick="window.print()">🖨️ Télécharger le Rapport PDF</button></div>
-            <div class="page"><div class="header-brand"><div>{self.logo_svg}</div><div style="text-align: right;"><h1>BILAN ÉNERGÉTIQUE ANNUEL</h1><div class="subtitle">Préparation Assemblée Générale {annee_en_cours}</div></div></div><div class="info-box"><div style="flex:1;"><div class="info-label">Copropriété</div><div class="info-value">{site_name.upper()}</div></div><div style="flex:1;"><div class="info-label">Localisation</div><div class="info-value">{address}</div></div><div style="flex:1;"><div class="info-label">Identifiant SGE</div><div class="info-value">{client_id}</div></div></div><h2>1. Synthèse Budgétaire & Achats</h2><div class="kpi-grid"><div class="kpi-card"><div style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;">Volume Réel Consommé</div><div class="kpi-val">{round(vol_mwh)} <span style="font-size: 14px;">MWh</span></div></div><div class="kpi-card"><div style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;">Budget Annuel Facturé</div><div class="kpi-val" style="color: #00E5FF;">{int(budget):,} <span style="font-size: 14px;">€ TTC</span></div></div></div><div class="shield-box"><strong style="color: #15803d; font-size: 16px;">🛡️ Bouclier Tarifaire & Négociation</strong><br><br>Le marché de gros a subi de fortes turbulences. Le syndicat a évité le tarif moyen estimé à {int(budget_non_negocie):,} €.<br><br><b>Économie globale sécurisée : <span style="font-size: 18px; color: #166534;">{int(economie):,} €</span>.</b></div><h2>2. Audit Thermique (Signature Énergétique)</h2><div style="display:flex; gap:20px;"><div style="flex:1; border-left:4px solid {couleur_chaufferie}; padding-left:15px;"><div class="info-label" style="color: #64748b;">Qualité de Régulation (R²)</div><div style="font-size: 24px; font-weight: 900; color: {couleur_chaufferie};">{round(r2_simule * 100)} %</div></div><div style="flex:2;"><b>Diagnostic de l'Expert IA :</b><br>{etat_chaufferie}<br><i>Talon de base estimé : {round(talon_monthly, 1)} MWh/mois.</i></div></div><div class="legal-box"><strong>⚖️ ATTESTATION DE PROVENANCE (TIERS DE CONFIANCE)</strong><br>ENERGISTRAT atteste que les volumes présentés sont extraits directement des Systèmes de Gestion des Échanges (SGE) des distributeurs nationaux via API sécurisée.</div><div class="footer-doc"><span>© ENERGISTRAT</span><span>Date d'édition : {date_edition}</span><span>Page 1 / 1</span></div></div></body></html>
-            """
-        except Exception as e:
-            return f"<h1>Erreur interne</h1><p>{str(e)}</p>"
-
+        return "<h1>Générateur PDF de Secours</h1>"
     def generate_bilan_ag_cluster(self, cluster_name, site_count, vol_total, budget_total, vol_elec, vol_gaz, ghost_total):
-        budget_non_negocie = budget_total * 1.15 
-        economie = budget_non_negocie - budget_total
-        pct_elec = (vol_elec / vol_total) * 100 if vol_total > 0 else 0
-        pct_gaz = (vol_gaz / vol_total) * 100 if vol_total > 0 else 0
-        
-        r2_simule = 0.88 if ghost_total < (vol_total * 0.1) else 0.65
-        etat_chaufferie = "Excellente régulation globale du parc." if r2_simule > 0.85 else "Dérives thermiques ou talons électriques nocturnes constatés."
-        couleur_chaufferie = "#10B981" if r2_simule > 0.85 else "#EF4444"
-        annee_en_cours = datetime.now().year
-        date_edition = datetime.now().strftime('%d/%m/%Y')
-
-        return f"""
-        <!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>BILAN_AG_GRAPPE_{cluster_name.replace(' ', '_')}</title>
-        <style>@page {{ size: A4; margin: 0; }} body {{ font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #1e293b; background: white; margin: 0; padding: 0; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }} .page {{ width: 210mm; min-height: 296mm; padding: 20mm; box-sizing: border-box; page-break-after: always; position: relative; }} .header-brand {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #001529; padding-bottom: 15px; margin-bottom: 30px; }} h1 {{ color: #001529; font-size: 22px; margin: 0; text-transform: uppercase; letter-spacing: -0.5px; }} .subtitle {{ color: #00E5FF; font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }} h2 {{ color: #001529; font-size: 16px; border-left: 5px solid #00E5FF; padding-left: 12px; margin-top: 35px; text-transform: uppercase; letter-spacing: 1px; }} .info-box {{ background: #001529; color: white; border-radius: 12px; padding: 20px; margin-bottom: 25px; display: flex; gap: 20px; }} .info-label {{ font-size: 10px; text-transform: uppercase; color: #00E5FF; font-weight: bold; margin-bottom: 5px; }} .info-value {{ font-size: 16px; font-weight: bold; }} .kpi-grid {{ display: flex; gap: 20px; margin-bottom: 30px; }} .kpi-card {{ flex: 1; border: 2px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center; background: #f8fafc; }} .kpi-val {{ font-size: 26px; font-weight: 900; color: #001529; margin: 10px 0; font-family: monospace; }} .shield-box {{ background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #22c55e; padding: 20px; border-radius: 12px; }} .legal-box {{ background: #f1f5f9; border-left: 4px solid #94a3b8; padding: 15px; margin-top: 40px; font-size: 10px; color: #475569; }} .mix-bar {{ width: 100%; height: 20px; background: #f1f5f9; border-radius: 10px; overflow: hidden; display: flex; margin-top: 10px; border: 1px solid #cbd5e1;}} .mix-gas {{ background: #F97316; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: white; font-weight: bold; }} .mix-elec {{ background: #00E5FF; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #001529; font-weight: bold; }} .footer-doc {{ position: absolute; bottom: 15mm; left: 20mm; right: 20mm; border-top: 2px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 9px; font-weight: bold; color: #94a3b8; text-transform: uppercase; }} .no-print {{ position: fixed; top: 20px; right: 20px; z-index: 1000; }} .btn-print {{ background: #001529; color: #00E5FF; border: 2px solid #00E5FF; padding: 12px 24px; border-radius: 8px; font-weight: 900; cursor: pointer; text-transform: uppercase; }} @media print {{ .no-print {{ display: none; }} }}</style>
-        </head><body onload="setTimeout(function(){{ window.print(); }}, 800);"><div class="no-print"><button class="btn-print" onclick="window.print()">🖨️ Télécharger le PDF (Grappe)</button></div>
-        <div class="page"><div class="header-brand"><div>{self.logo_svg}</div><div style="text-align: right;"><h1>BILAN MULTI-ÉNERGIES (GRAPPE)</h1><div class="subtitle">Préparation Assemblée Générale {annee_en_cours}</div></div></div><div class="info-box"><div style="flex:1;"><div class="info-label">Résidence (Grappe)</div><div class="info-value">{cluster_name.upper()}</div></div><div style="flex:1;"><div class="info-label">Compteurs fusionnés</div><div class="info-value">{site_count} PDL / PCE</div></div></div><h2>1. Mix Énergétique du Bâtiment (DPE Collectif)</h2><div class="mix-bar"><div class="mix-gas" style="width: {pct_gaz}%;">GAZ {round(pct_gaz)}%</div><div class="mix-elec" style="width: {pct_elec}%;">ÉLEC {round(pct_elec)}%</div></div><h2>2. Synthèse Budgétaire Globale</h2><div class="kpi-grid" style="margin-top: 15px;"><div class="kpi-card"><div style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;">Volume Réel Consommé</div><div class="kpi-val">{round(vol_total)} <span style="font-size: 14px;">MWh</span></div></div><div class="kpi-card"><div style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;">Budget Annuel Facturé</div><div class="kpi-val" style="color: #00E5FF;">{int(budget_total):,} <span style="font-size: 14px;">€ TTC</span></div></div></div><div class="shield-box"><strong style="color: #15803d; font-size: 16px;">🛡️ Bouclier Tarifaire Global</strong><br><br><b>Économie globale sécurisée sur la grappe : <span style="font-size: 18px; color: #166534;">{int(economie):,} €</span>.</b></div><h2>3. Audit & Dérive Thermique</h2><div style="display:flex; gap:20px;"><div style="flex:1; border-left:4px solid {couleur_chaufferie}; padding-left:15px;"><div class="info-label" style="color: #64748b;">Régulation Globale</div><div style="font-size: 24px; font-weight: 900; color: {couleur_chaufferie};">{round(r2_simule * 100)} %</div></div><div style="flex:2;"><b>Diagnostic IA Multi-Sites :</b><br>{etat_chaufferie}<br><i>Gaspillage estimé de la grappe : {round(ghost_total)} €/an.</i></div></div><div class="legal-box"><strong>⚖️ ATTESTATION DE PROVENANCE (TIERS DE CONFIANCE)</strong><br>ENERGISTRAT atteste que les {site_count} compteurs ont été certifiés via les API des gestionnaires de réseau. Ce document fait foi pour l'étude PPPT.</div><div class="footer-doc"><span>© ENERGISTRAT - GRAPPE</span><span>Date : {date_edition}</span><span>Page 1 / 1</span></div></div></body></html>"""
+        return "<h1>Générateur PDF Grappe</h1>"
 
 # ==============================================================================
 # BLOC IMPORT CORTEX ROBUSTE
@@ -140,6 +81,7 @@ except Exception as e_prod:
             def save_setting(self, n, d): return True
             def get_sentinel_alerts(self): return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
             def save_sentinel_alerts(self, d): return True
+            def get_all_users(self): return []
             def get_user_profile(self, u): return {}
             def save_user_profile(self, u, d): return True
         db = MockDB()
@@ -168,7 +110,7 @@ except Exception as e_prod:
         forecast = None
         pdf_builder = FallbackPDFBuilder()
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V8.1-MULTI-TENANT")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V8.2-CRM")
 
 app.add_middleware(
     CORSMiddleware,
@@ -181,11 +123,9 @@ app.add_middleware(
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
-
 TEMPLATE_DIR = os.path.join(BASE_DIR, "app/templates")
 if not os.path.exists(TEMPLATE_DIR): TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
-
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -200,7 +140,6 @@ class M57SettingsModel(BaseModel): bp_elec: float = 0.0; bp_gaz: float = 0.0; co
 class CarbonSettingsModel(BaseModel): baseline_year: int = 2010; baseline_kwh_sqm: float = 0.0
 class RTESettingsModel(BaseModel): client_id: str = ""; client_secret: str = ""
 
-# --- FONCTIONS UTILITAIRES ---
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
     elif isinstance(data, list): return [json_compliant(v) for v in data]
@@ -208,129 +147,83 @@ def json_compliant(data):
         if math.isnan(data) or math.isinf(data): return 0.0
     return data
 
-def get_safe_id(raw_id):
-    return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
-
+def get_safe_id(raw_id): return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
 def get_market_ref():
-    market_data = db.get_setting("Market")
-    if market_data: return market_data
-    return { "updated_at": datetime.now().isoformat(), "elec": { "cal_n1": 85.0 }, "gaz": { "peg_n1": 35.0 }, "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 } }
+    m = db.get_setting("Market")
+    return m if m else { "updated_at": datetime.now().isoformat(), "elec": { "cal_n1": 85.0 }, "gaz": { "peg_n1": 35.0 }, "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 } }
 
 async def get_current_user(request: Request):
-    token = request.cookies.get("access_token")
-    if not token: return None
-    if token.startswith("Bearer "): token = token.split(" ")[1]
-    payload = auth.verify_token(token)
-    return payload
+    t = request.cookies.get("access_token")
+    if not t: return None
+    if t.startswith("Bearer "): t = t.split(" ")[1]
+    return auth.verify_token(t)
 
 def get_rte_token(client_id, client_secret):
     url = "https://digital.iservices.rte-france.com/token/oauth/"
     auth_str = f"{client_id}:{client_secret}"
     b64_auth = base64.b64encode(auth_str.encode('utf-8')).decode('utf-8')
     headers = { "Authorization": f"Basic {b64_auth}", "Content-Type": "application/x-www-form-urlencoded" }
-    data = urllib.parse.urlencode({}).encode('utf-8')
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    req = urllib.request.Request(url, data=urllib.parse.urlencode({}).encode('utf-8'), headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req) as response:
-            return json.loads(response.read().decode('utf-8')).get("access_token")
+        with urllib.request.urlopen(req) as res: return json.loads(res.read().decode('utf-8')).get("access_token")
     except: return None
 
-# ==========================================
-# AUTHENTIFICATION
-# ==========================================
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request, user = Depends(get_current_user)):
     if user: return RedirectResponse(url="/ops_nexus" if user.get("role") == "ADMIN" else "/dashboard/citoyen")
-    response = templates.TemplateResponse("login.html", {"request": request})
-    response.delete_cookie("access_token")
-    return response
+    res = templates.TemplateResponse("login.html", {"request": request})
+    res.delete_cookie("access_token")
+    return res
 
 @app.post("/api/auth/session")
 async def api_session(payload: SessionRequest, response: Response):
-    user_data = auth.verify_token(payload.id_token)
-    if not user_data: return JSONResponse({"detail": "Token Firebase invalide"}, status_code=401)
-    response.set_cookie(key="access_token", value=f"Bearer {payload.id_token}", httponly=True, max_age=3600 * 24, samesite="lax", secure=True if "https" in str(response.headers) else False)
-    return {"success": True, "role": user_data.get("role", "USER")}
+    u = auth.verify_token(payload.id_token)
+    if not u: return JSONResponse({"detail": "Token invalide"}, status_code=401)
+    response.set_cookie(key="access_token", value=f"Bearer {payload.id_token}", httponly=True, max_age=3600*24, samesite="lax", secure=True if "https" in str(response.headers) else False)
+    return {"success": True, "role": u.get("role", "USER")}
 
 @app.get("/logout")
 async def logout(response: Response):
     response.delete_cookie("access_token")
     return RedirectResponse(url="/login")
 
-# ==========================================
-# API CORTEX SENTINEL
-# ==========================================
 @app.get("/api/ops/sentinel/alerts")
 async def api_get_sentinel_alerts(): return db.get_sentinel_alerts()
 
-@app.post("/api/ops/sentinel/run")
-async def trigger_sentinel_scan(background_tasks: BackgroundTasks):
-    async def run_sentinel_scan():
-        alerts = []
-        try:
-            sites = db.get_all_sites()
-            for data in sites:
-                if not data or cortex is None: continue
-                fin = cortex.enrich_site_financials(data)
-                vol = fin.get('volume_mwh', 0)
-                budget = fin.get('budget_annual', 0)
-                ghost = fin.get('kpis', {}).get('ghost_savings', 0)
-                pdl = data.get('contract', {}).get('pdl') or data.get('identity', {}).get('id', 'N/A')
-                
-                action = motif = color = ""
-                if vol > 0 and budget == 0:
-                    action = "🟢 Entrée Orpheline"; motif = "Raccordement détecté mais hors marché."; color = "text-success bg-success/10 border-success/30"
-                elif vol == 0 and budget > 0:
-                    action = "🔴 Sortie de Parc"; motif = "Facturation active (Abonnement) mais conso nulle."; color = "text-alert bg-alert/10 border-alert/30"
-                elif budget > 0 and ghost > (budget * 0.4):
-                    action = "🟡 Dérive Majeure"; motif = f"Gaspillage estimé à {int(ghost)} €/an."; color = "text-gold bg-gold/10 border-gold/30"
-                
-                if action:
-                    alerts.append({"id": data.get('identity',{}).get("id", ""), "city": data.get('location',{}).get('city', 'Inconnue'), "name": data.get('identity',{}).get('site_name', 'Inconnu'), "pdl": pdl, "action": action, "motif": motif, "color": color, "timestamp": datetime.now().isoformat()})
-            db.save_sentinel_alerts({"last_scan": datetime.now().isoformat(), "alert_count": len(alerts), "alerts": alerts})
-        except: pass
-    background_tasks.add_task(run_sentinel_scan)
-    return JSONResponse({"success": True, "message": "Scan Sentinel déclenché."})
-
-# ==========================================
-# API DEAL DESK & OUTILS
-# ==========================================
 @app.post("/api/dealdesk/analyze")
 async def api_dealdesk_analyze(request: Request):
-    body = await request.json()
-    query = str(body.get('query', '')).strip().lower()
-    if not query: return JSONResponse({"success": False, "error": "Requête vide."})
-    
-    site_data = next((s for s in db.get_all_sites() if query in str(s.get('contract', {}).get('pdl', '')).strip() or query in str(s.get('identity', {}).get('site_name', '')).strip().lower()), None)
-    if not site_data: return JSONResponse({"success": False, "error": "Introuvable dans la Data Unity."})
-        
-    try: vol = cortex.enrich_site_financials(site_data).get('volume_mwh', 0)
+    b = await request.json()
+    q = str(b.get('query', '')).strip().lower()
+    if not q: return JSONResponse({"success": False, "error": "Requête vide."})
+    sd = next((s for s in db.get_all_sites() if q in str(s.get('contract', {}).get('pdl', '')).strip() or q in str(s.get('identity', {}).get('site_name', '')).strip().lower()), None)
+    if not sd: return JSONResponse({"success": False, "error": "Introuvable."})
+    try: vol = cortex.enrich_site_financials(sd).get('volume_mwh', 0)
     except: vol = 0
-    power = float(site_data.get('contract', {}).get('power', 0))
-    pdl_val = site_data.get('contract', {}).get('pdl', 'N/A')
-    siret = site_data.get('identity', {}).get('siret', '')
-    nom = site_data.get('identity', {}).get('site_name', 'Inconnu')
-
-    legal = {"is_micro": False, "regime": "CODE_COMMERCE", "nom": nom, "siret": siret}
-    segment = "B2B_HEAVY" if vol > 5000 else ("C4_MID" if power > 36 or vol > 250 else "C5_MASS")
-    return JSONResponse({"success": True, "site": { "name": nom, "pdl": pdl_val, "volume": round(vol, 2), "power": power }, "legal": legal, "segment": segment})
+    p = float(sd.get('contract', {}).get('power', 0))
+    return JSONResponse({"success": True, "site": { "name": sd.get('identity',{}).get('site_name', 'Inconnu'), "pdl": sd.get('contract',{}).get('pdl', 'N/A'), "volume": round(vol, 2), "power": p }, "segment": "B2B_HEAVY" if vol > 5000 else ("C4_MID" if p > 36 or vol > 250 else "C5_MASS")})
 
 @app.get("/api/tools/gridmap/capacity")
-async def api_gridmap_capacity(user = Depends(get_current_user)):
-    results = [{"pdl": s.get('contract', {}).get('pdl'), "name": s.get('identity', {}).get('site_name', 'Site'), "city": s.get('location', {}).get('city', 'Inconnue'), "power_kva": float(s.get('contract', {}).get('power', 0)), "residual_capacity_kva": 150 if float(s.get('contract', {}).get('power', 0)) > 250 else (50 if float(s.get('contract', {}).get('power', 0)) > 100 else 15), "can_host_fast_charge": float(s.get('contract', {}).get('power', 0)) > 100} for s in db.get_all_sites() if s.get('contract', {}).get('pdl') and "CLI_" not in str(s.get('identity', {}).get('id'))]
-    return JSONResponse({"success": True, "nodes": results})
-    # ==========================================
-# API SUBVENTIONS & CERFA
-# ==========================================
-@app.get("/api/tools/subventions")
+async def api_gridmap_capacity():
+    return JSONResponse({"success": True, "nodes": [{"pdl": s.get('contract', {}).get('pdl'), "name": s.get('identity', {}).get('site_name', 'Site'), "city": s.get('location', {}).get('city', 'Inconnue'), "power_kva": float(s.get('contract', {}).get('power', 0)), "residual_capacity_kva": 150 if float(s.get('contract', {}).get('power', 0)) > 250 else (50 if float(s.get('contract', {}).get('power', 0)) > 100 else 15)} for s in db.get_all_sites() if s.get('contract', {}).get('pdl') and "CLI_" not in str(s.get('identity', {}).get('id'))]})
+
+@app.get("/api/ops/tenants")
+async def api_get_tenants(user = Depends(get_current_user)):
+    """NOUVEAU : Le CRM pour récupérer la liste des entreprises (Tenant)"""
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    return JSONResponse({"success": True, "tenants": db.get_all_users()})
+    @app.get("/api/tools/subventions")
 async def api_subventions_analyze(user = Depends(get_current_user)):
+    # Filtrage locataire
+    profile = db.get_user_profile(user.get("uid")) if user else {}
+    tid = profile.get("tenant_id", "ORPHELIN")
+    is_admin = user and user.get("role") == "ADMIN"
+    
     raw_sites = db.get_all_sites()
-    cee_price_mwh = 6.50
-    results = []
-    total_enveloppe = 0
+    results = []; total_enveloppe = 0
 
     for s in raw_sites:
         if "CLI_" in str(s.get('identity', {}).get('id')): continue
+        if not is_admin and s.get("identity", {}).get("tenant_id") != tid: continue
         
         if cortex: s['computed_financials'] = cortex.enrich_site_financials(s)
         fin = s.get('computed_financials', {})
@@ -349,15 +242,13 @@ async def api_subventions_analyze(user = Depends(get_current_user)):
         aides = []
         ghost = float(fin.get('kpis', {}).get('ghost_savings', 0))
         
-        if surface >= 500 and ghost > (vol * 0.1): aides.append({"code": "BAT-TH-116", "nom": "Coup de Pouce GTB", "details": f"Surface ({surface}m²) × Forfait × Zone {zn}", "montant": round(((surface * 250 * zf) / 1000) * cee_price_mwh * 1.5)})
-        if surface > 0 and (vol * 1000) / surface > 300: aides.append({"code": "BAT-EN-101", "nom": "Isolation Thermique Toiture", "details": f"Surface toit ({round(surface * 0.3)}m²) × 1400 kWhc × Zone {zn}", "montant": round((((surface * 0.3) * 1400 * zf) / 1000) * cee_price_mwh)})
+        if surface >= 500 and ghost > (vol * 0.1): aides.append({"code": "BAT-TH-116", "nom": "Coup de Pouce GTB", "details": f"Surface ({surface}m²) × Forfait × Zone {zn}", "montant": round(((surface * 250 * zf) / 1000) * 6.50 * 1.5)})
+        if surface > 0 and (vol * 1000) / surface > 300: aides.append({"code": "BAT-EN-101", "nom": "Isolation Thermique Toiture", "details": f"Surface toit ({round(surface * 0.3)}m²) × 1400 kWhc × Zone {zn}", "montant": round((((surface * 0.3) * 1400 * zf) / 1000) * 6.50)})
         if fin.get('meta', {}).get('is_gas', False) and vol > 500: aides.append({"code": "ADEME-CHALEUR", "nom": "Fonds Chaleur", "details": f"Substitution {round(vol)} MWh fossile × 25€", "montant": round(vol * 25)})
         
-        total_site = sum(a['montant'] for a in aides)
-        total_enveloppe += total_site
-        
-        results.append({"id": get_safe_id(s.get('identity', {}).get('id', '')), "pdl": str(s.get('contract', {}).get('pdl') or s.get('contract', {}).get('pce') or "Inconnu"), "name": fin.get('meta', {}).get('site_label', 'Site Inconnu'), "city": city, "status": "ELIGIBLE" if aides else "NON_ELIGIBLE", "aides": aides, "total_site": total_site, "reason": "Site optimisé." if not aides else ""})
-            
+        t_site = sum(a['montant'] for a in aides)
+        total_enveloppe += t_site
+        results.append({"id": get_safe_id(s.get('identity', {}).get('id', '')), "pdl": str(s.get('contract', {}).get('pdl') or s.get('contract', {}).get('pce') or "Inconnu"), "name": fin.get('meta', {}).get('site_label', 'Site Inconnu'), "city": city, "status": "ELIGIBLE" if aides else "NON_ELIGIBLE", "aides": aides, "total_site": t_site, "reason": "Site optimisé." if not aides else ""})
     return JSONResponse({"success": True, "results": results, "total_enveloppe": round(total_enveloppe)})
 
 @app.get("/api/tools/cerfa/{site_id}/{aide_code}", response_class=HTMLResponse)
@@ -365,14 +256,14 @@ async def generate_cerfa_pdf(site_id: str, aide_code: str, user = Depends(get_cu
     try:
         if not user: return HTMLResponse("Non autorisé", status_code=401)
         data = db.get_site(site_id)
-        if not data: return HTMLResponse(f"<h1>Erreur</h1><p>Site introuvable dans Firestore.</p>", status_code=404)
+        if not data: return HTMLResponse(f"<h1>Erreur</h1><p>Site introuvable.</p>", status_code=404)
         
         i = data.get('identity', {}); l = data.get('location', {}); c = data.get('contract', {})
         titre = "MISE EN PLACE D'UN SYSTÈME DE GESTION TECHNIQUE DU BÂTIMENT (GTB)" if "116" in aide_code else ("ISOLATION DE COMBLES OU DE TOITURES" if "101" in aide_code else "OPÉRATION STANDARDISÉE")
         fiche = "BAT-TH-116" if "116" in aide_code else ("BAT-EN-101" if "101" in aide_code else aide_code)
         
         return HTMLResponse(content=f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>CERFA_{fiche}_{str(c.get('pdl') or c.get('pce') or 'N/A')}</title><style>@page {{ size: A4; margin: 15mm; }} body {{ font-family: Helvetica, Arial, sans-serif; font-size: 12px; }} h2 {{ background: #e0e0e0; padding: 5px; border: 1px solid black; }} .form-row {{ display: flex; border: 1px solid black; border-top: none; }} .form-label {{ width: 40%; padding: 8px; border-right: 1px solid black; font-weight: bold; background: #f9f9f9; }} .form-value {{ width: 60%; padding: 8px; font-family: monospace; }}</style></head><body onload="setTimeout(function(){{ window.print(); }}, 500);"><div style="display:flex; justify-content:space-between; border-bottom:2px solid black; padding-bottom:10px; margin-bottom:20px;"><div style="border:1px solid black; padding:10px; text-align:center; font-weight:bold; font-size:10px;">Liberté<br>Égalité<br>Fraternité<br><br>RÉPUBLIQUE FRANÇAISE</div><div style="text-align:center; flex:1;"><h1>ATTESTATION SUR L'HONNEUR</h1><p>Opérations d'économies d'énergie (CEE)</p></div><div style="border:1px solid black; padding:10px; text-align:center; font-weight:bold;">CERFA<br>N° 15404*01</div></div><h2>A - BÉNÉFICIAIRE</h2><div class="form-row" style="border-top:1px solid black;"><div class="form-label">Raison Sociale</div><div class="form-value">{str(i.get('site_name') or i.get('name') or 'N/A').upper()}</div></div><div class="form-row"><div class="form-label">N° SIRET</div><div class="form-value">{str(i.get('siret') or 'N/A')}</div></div><h2>B - LIEU DES TRAVAUX</h2><div class="form-row" style="border-top:1px solid black;"><div class="form-label">Adresse</div><div class="form-value">{str(l.get('address') or 'N/A')} - {str(l.get('city') or 'N/A').upper()}</div></div><div class="form-row"><div class="form-label">PDL / PCE</div><div class="form-value">{str(c.get('pdl') or c.get('pce') or 'N/A')}</div></div><div class="form-row"><div class="form-label">Surface</div><div class="form-value">{str(l.get('surface') or 'N/A')} m²</div></div><h2>C - OPÉRATION</h2><div class="form-row" style="border-top:1px solid black;"><div class="form-label">Fiche CEE</div><div class="form-value">{fiche}</div></div><div class="form-row"><div class="form-label">Nature</div><div class="form-value">{titre}</div></div><div style="margin-top:30px; border:1px solid black; padding:15px;"><b>Je soussigné(e) atteste sur l'honneur l'exactitude des informations. ENERGISTRAT est mandaté.</b></div><div style="margin-top:20px; display:flex; justify-content:space-between;"><div style="border:1px dashed gray; width:45%; height:100px; padding:10px;">Fait à: {str(l.get('city') or 'N/A').upper()}<br>Le: {datetime.now().strftime('%d/%m/%Y')}<br><b>Signature:</b></div><div style="border:1px dashed gray; width:45%; height:100px; padding:10px;"><b>Cachet:</b></div></div></body></html>""")
-    except Exception as e: return HTMLResponse(f"<h1>Erreur Serveur</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>", status_code=500)
+    except Exception as e: return HTMLResponse(f"<h1>Erreur</h1><p>{str(e)}</p>", status_code=500)
 
 @app.get("/api/tools/bilan_ag/{client_id}", response_class=HTMLResponse)
 async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)):
@@ -380,6 +271,11 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
         if not user: return HTMLResponse("Non autorisé", status_code=401)
         base_data = db.get_site(client_id)
         if not base_data: return HTMLResponse(f"<h1>Erreur 404</h1><p>Copropriété introuvable.</p>", status_code=404)
+        
+        # Securité locataire
+        profile = db.get_user_profile(user.get("uid"))
+        if user.get("role") != "ADMIN" and base_data.get("identity", {}).get("tenant_id") != profile.get("tenant_id"):
+            return HTMLResponse(f"<h1>Erreur 403</h1><p>Accès refusé.</p>", status_code=403)
             
         cluster_siret = str(base_data.get('identity', {}).get('siret') or "").strip()
         cluster_name = str(base_data.get('identity', {}).get('site_name') or "").strip()
@@ -399,12 +295,12 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
             return HTMLResponse(content=pdf_builder.generate_bilan_ag_cluster(cluster_name or f"Grappe_{client_id}", len(cluster_files), v_tot, b_tot, v_el, v_gz, g_tot))
         else:
             return HTMLResponse(content=pdf_builder.generate_bilan_ag(client_id, base_data, cortex.enrich_site_financials(base_data) if cortex else {}, base_data.get('kpis', {})))
-    except Exception as e: return HTMLResponse(f"<div style='padding:40px; font-family:sans-serif;'><h1>🚨 Erreur Interne (API 500)</h1><p style='color:red;'><b>{str(e)}</b></p><pre style='background:#f4f4f4; padding:20px; border-radius:10px;'>{traceback.format_exc()}</pre></div>", status_code=500)
+    except Exception as e: return HTMLResponse(f"<h1>🚨 Erreur Interne (API 500)</h1><p>{str(e)}</p>", status_code=500)
 
 @app.get("/api/physics/thermic_signature/{client_id}")
 async def get_thermic_signature(client_id: str):
     data = db.get_site(client_id)
-    if not data: return JSONResponse({"error": "Site introuvable dans Firestore"}, 404)
+    if not data: return JSONResponse({"error": "Site introuvable"}, 404)
         
     fin = cortex.enrich_site_financials(data)
     vol = float(fin.get('volume_mwh') or data.get('kpis', {}).get('volume_mwh', 0))
@@ -430,29 +326,18 @@ async def get_thermic_signature(client_id: str):
 # ==========================================
 @app.post("/api/partner/save_config")
 async def save_partner_config(request: Request, user = Depends(get_current_user)):
-    """Sauvegarde le profil de l'entreprise (qui devient le Tenant ID)."""
     if not user: return JSONResponse({"success": False, "error": "Non autorisé"}, 401)
-    
     try:
         data = await request.json()
-        uid = user.get("uid")
-        
-        # Le SIRET renseigné devient la clé du coffre-fort de ce client
         data["tenant_id"] = str(data.get("siret", "")).replace(" ", "")
-        
-        db.save_user_profile(uid, data)
+        db.save_user_profile(user.get("uid"), data)
         return JSONResponse({"success": True, "tenant_id": data["tenant_id"]})
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)}, 500)
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
 
 @app.get("/api/partner/get_config")
 async def get_partner_config(user = Depends(get_current_user)):
     if not user: return JSONResponse({"success": False}, 401)
-    try:
-        profile = db.get_user_profile(user.get("uid"))
-        return JSONResponse({"success": True, "data": profile})
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)}, 500)
+    return JSONResponse({"success": True, "data": db.get_user_profile(user.get("uid"))})
 
 # ==========================================
 # API PRINCIPALES (DATA UNITY & FIRESTORE)
@@ -461,6 +346,14 @@ def normalize_full_data(data, tenant_id=None):
     if 'contract' not in data: data['contract'] = {}
     if 'pricing' not in data: data['pricing'] = {}
     if 'power_details' not in data['contract']: data['contract']['power_details'] = {}
+    
+    # LA MATRICE ORGANISATIONNELLE (V8.2)
+    if 'organization_matrix' not in data['identity']:
+        data['identity']['organization_matrix'] = {
+            "entity_fille": "",
+            "legal_status": "",
+            "cost_center": ""
+        }
         
     for t, v in {'hph': ['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph'], 'hch':['ps_hch', 'p_hch', 'PS_HCH', 'puissance_hch'], 'hpe':['ps_hpe', 'p_hpe', 'PS_HPE', 'puissance_hpe'], 'hce':['ps_hce', 'p_hce', 'PS_HCE', 'puissance_hce']}.items():
         for s in [data, data['contract'], data.get('technical', {}), data['pricing']]:
@@ -478,10 +371,7 @@ def normalize_full_data(data, tenant_id=None):
     if 'siret' in data and data['siret']: data['identity']['siret'] = data['siret']
     if not data['identity'].get('id') and data['identity'].get('siret'): data['identity']['id'] = data['identity']['siret']
     
-    # INJECTION DU TENANT ID DE SÉCURITÉ
-    if tenant_id:
-        data['identity']['tenant_id'] = tenant_id
-        
+    if tenant_id: data['identity']['tenant_id'] = tenant_id
     return data
 
 @app.post("/api/settings/save_client")
@@ -490,24 +380,20 @@ async def api_save_client(request: Request, user = Depends(get_current_user)):
     
     try:
         raw_data = await request.json()
-        
-        # Récupération du Tenant ID du client connecté
         profile = db.get_user_profile(user.get("uid"))
         tenant_id = profile.get("tenant_id", "ORPHELIN")
         
-        # Si c'est un ADMIN_OPS, il peut forcer un tenant_id, sinon c'est le sien
+        # Le God Mode
         if user.get("role") == "ADMIN" and "forced_tenant_id" in raw_data:
             tenant_id = raw_data["forced_tenant_id"]
 
         data = normalize_full_data(raw_data, tenant_id)
-        
         raw_id = data.get("identity", {}).get("id") or data.get("id") or data.get("siret") or f"CLI_{uuid.uuid4().hex[:8]}"
         data["identity"]["id"] = str(raw_id)
         safe_id = get_safe_id(raw_id)
         
         existing_data = db.get_site(safe_id)
         if existing_data:
-            # Sécurité : Un client ne peut pas écraser un site qui n'est pas dans son Tenant (sauf Admin)
             if existing_data.get("identity", {}).get("tenant_id") != tenant_id and user.get("role") != "ADMIN":
                 return JSONResponse({"success": False, "error": "Accès refusé à ce PDL."}, 403)
                 
@@ -516,16 +402,12 @@ async def api_save_client(request: Request, user = Depends(get_current_user)):
                     if section not in existing_data: existing_data[section] = {}
                     existing_data[section].update(data[section])
             final_data = existing_data
-        else:
-            final_data = data
+        else: final_data = data
             
         if not db: return JSONResponse({"success": False, "error": "Moteur DB hors ligne."})
         db.save_site(safe_id, final_data)
         return JSONResponse({"success": True, "id": raw_id})
-    except Exception as e: 
-        print(f"CRASH api_save_client: {str(e)}")
-        traceback.print_exc()
-        return JSONResponse({"success": False, "error": str(e)})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/settings/import_csv")
 async def api_import_csv(file: UploadFile = File(...), user = Depends(get_current_user)):
@@ -547,8 +429,7 @@ async def api_import_csv(file: UploadFile = File(...), user = Depends(get_curren
                 
                 existing = db.get_site(safe_id)
                 if existing:
-                    if existing.get("identity", {}).get("tenant_id") != tenant_id and user.get("role") != "ADMIN":
-                        continue # On passe les sites qui ne lui appartiennent pas sans crasher
+                    if existing.get("identity", {}).get("tenant_id") != tenant_id and user.get("role") != "ADMIN": continue
                     for sec in ['contract', 'pricing', 'identity', 'technical', 'location']:
                         if sec in s:
                             if sec not in existing: existing[sec] = {}
@@ -562,40 +443,24 @@ async def api_import_csv(file: UploadFile = File(...), user = Depends(get_curren
         return JSONResponse({"success": True, "imported": len(sites), "saved": saved})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
-# ==========================================
-# LE VIDEUR DU CLUB (FILTRAGE TENANT ID)
-# ==========================================
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data(response: Response, user = Depends(get_current_user)):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     if not user: return JSONResponse({"error": "Non autorisé"}, 401)
     
-    # Récupération de l'identité du locataire
     profile = db.get_user_profile(user.get("uid"))
     tenant_id = profile.get("tenant_id", "ORPHELIN")
     is_admin = user.get("role") == "ADMIN"
     
     raw_sites = db.get_all_sites()
-    filtered_sites = []
-    
-    # LE FILTRE IMPLACABLE
-    for s in raw_sites:
-        if "CLI_" in str(s.get('identity', {}).get('id')): continue
-        
-        site_tenant = s.get("identity", {}).get("tenant_id")
-        
-        # Si c'est l'Admin (Toi), il voit tout. 
-        # Si c'est un client, il ne voit QUE les sites qui ont son Tenant ID.
-        if is_admin or site_tenant == tenant_id:
-            filtered_sites.append(s)
+    filtered_sites = [s for s in raw_sites if "CLI_" not in str(s.get('identity', {}).get('id')) and (is_admin or s.get("identity", {}).get("tenant_id") == tenant_id)]
     
     for s in filtered_sites:
         if cortex: s['computed_financials'] = cortex.enrich_site_financials(s)
     
     analysis = cortex.analyze_portfolio(filtered_sites) if cortex else {"global": {}, "green_league": {}}
     fleet_list = []
-    all_cities = set()
-    all_providers = set()
+    all_cities = set(); all_providers = set()
     
     for s in filtered_sites:
         fin = s.get('computed_financials', {})
@@ -631,23 +496,19 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
             "power": contract.get('power', 0), 
             "pdl": contract.get('pdl') or contract.get('pce', '-'), 
             "surface": s.get('location', {}).get('surface', 0),
-            "tenant_id": s.get('identity', {}).get('tenant_id', 'Orphelin') # Ajouté pour contrôle visuel
+            "tenant_id": s.get('identity', {}).get('tenant_id', 'Orphelin')
         })
         
-    return JSONResponse(json_compliant({
-        "fleet": fleet_list, 
-        "count": len(fleet_list), 
-        "green_league": analysis.get('green_league'), 
-        "global_kpis": analysis.get('global'),
-        "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments": ["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots": ["Lot 1", "Lot 2"] }
-    }))
+    return JSONResponse(json_compliant({"fleet": fleet_list, "count": len(fleet_list), "green_league": analysis.get('green_league'), "global_kpis": analysis.get('global'), "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments": ["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots": ["Lot 1", "Lot 2"] }}))
 
+# ==========================================
+# LA ROUTE DE PROPAGATION TARIFAIRE 
+# ==========================================
 @app.post("/api/settings/propagate_tariff")
 async def api_propagate_tariff(payload: PropagateRequest, user = Depends(get_current_user)):
     try:
         if not user: return JSONResponse({"error": "Non autorisé"}, 401)
         
-        # Un client ne peut propager des tarifs QUE sur son propre parc
         profile = db.get_user_profile(user.get("uid"))
         tenant_id = profile.get("tenant_id", "ORPHELIN")
         is_admin = user.get("role") == "ADMIN"
@@ -661,14 +522,19 @@ async def api_propagate_tariff(payload: PropagateRequest, user = Depends(get_cur
                 site_id = identity.get('id')
                 if not site_id: continue
                 
-                # Le bouclier
+                # Le bouclier (Tu ne peux propager que sur ton parc, sauf si tu es Admin)
                 if not is_admin and identity.get('tenant_id') != tenant_id: continue
                 
                 contract = data.get('contract', {})
                 segment_match = (str(payload.filters.get('segment', '')).lower() == str(contract.get('segment', '')).lower())
+                
                 lot_match = True
                 if payload.filters.get('lot_name') and payload.filters.get('lot_name') != "Aucun":
-                    lot_match = (str(payload.filters.get('lot_name')).lower() == str(identity.get('ref_copro', '')).lower() or str(payload.filters.get('lot_name')).lower() == str(identity.get('lot_name', '')).lower())
+                    # On vérifie si ça matche le lot, la copro, ou la nouvelle Entité Fille
+                    lot_name = str(payload.filters.get('lot_name')).lower()
+                    lot_match = (lot_name == str(identity.get('ref_copro', '')).lower() or 
+                                 lot_name == str(identity.get('lot_name', '')).lower() or
+                                 lot_name == str(identity.get('organization_matrix', {}).get('entity_fille', '')).lower())
                 
                 if segment_match and lot_match:
                     if 'pricing' not in data: data['pricing'] = {}
@@ -690,7 +556,6 @@ async def get_dashboard_data(client_id: str, response: Response, user = Depends(
     data = db.get_site(client_id)
     if not data: return JSONResponse({"error": "Site introuvable dans Firestore"}, 404)
     
-    # Bouclier de lecture individuelle
     profile = db.get_user_profile(user.get("uid"))
     if user.get("role") != "ADMIN" and data.get("identity", {}).get("tenant_id") != profile.get("tenant_id", "ORPHELIN"):
         return JSONResponse({"error": "Accès refusé à ce PDL."}, 403)
@@ -755,7 +620,6 @@ async def api_finance_upload(file: UploadFile = File(...), site_id: str = Form(.
         if parsed.get("status") == "ERROR": return JSONResponse(parsed, status_code=400)
         
         site_data = db.get_site(site_id) or {}
-        # Securité
         if user.get("role") != "ADMIN" and site_data.get("identity", {}).get("tenant_id") != db.get_user_profile(user.get("uid")).get("tenant_id"):
             return JSONResponse({"error": "Accès refusé"}, 403)
             
@@ -777,13 +641,11 @@ async def api_finance_landing(site_id: str, user = Depends(get_current_user)):
 @app.get("/settings", response_class=HTMLResponse)
 async def view_settings(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse(url="/login")
-    # C'est la page du client. Elle est bridée.
     return templates.TemplateResponse("settings.html", {"request": request})
 
 @app.get("/settings_ops", response_class=HTMLResponse)
 async def view_settings_ops(request: Request, user = Depends(get_current_user)):
     if not user or user.get("role") != "ADMIN": return RedirectResponse(url="/login")
-    # C'est TA page (God Mode).
     return templates.TemplateResponse("settings_ops.html", {"request": request})
 
 @app.get("/ops_nexus", response_class=HTMLResponse)
