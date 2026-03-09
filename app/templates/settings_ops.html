@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>ENERGISTRAT V3 | Admin Cockpit (CRM)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { abysse: '#050505', card: '#0F172A', cyan: '#00E5FF', gas: '#EF4444' },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                    borderRadius: { 'bento': '1.5rem' }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #050505; color: white; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
+        .nav-item.active { background: rgba(0, 229, 255, 0.1); border-left: 3px solid #00E5FF; color: white; }
+        .input-dark { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.3s; }
+        .input-dark:focus { border-color: #00E5FF; outline: none; box-shadow: 0 0 15px rgba(0, 229, 255, 0.1); }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+        #toast { visibility: hidden; min-width: 250px; background-color: #10B981; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 100; right: 30px; bottom: 30px; box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); transform: translateY(100px); transition: all 0.5s; }
+        #toast.show { visibility: visible; transform: translateY(0); }
+    </style>
+</head>
+<body class="flex h-screen w-screen overflow-hidden text-sm">
+
+    <!-- TOAST -->
+    <div id="toast"><i class="fa-solid fa-check-circle mr-2"></i>Action effectuée !</div>
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col z-50">
+        <div class="p-6 flex items-center gap-3 mb-4 border-b border-white/5 pb-6">
+            <button onclick="history.back()" class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition"><i class="fa-solid fa-arrow-left"></i></button>
+            <h1 class="font-black text-white italic tracking-tight">CORTEX<span class="text-cyan">.CRM</span></h1>
+        </div>
+        
+        <div class="px-4 mb-2">
+            <div class="text-[10px] text-gray-500 uppercase font-bold mb-2">Contexte Client</div>
+            <div id="active-tenant-badge" class="bg-red-500/20 border border-red-500/50 text-red-400 p-3 rounded-xl text-xs font-bold text-center">
+                <i class="fa-solid fa-lock mr-2"></i> Aucun client sélectionné
+            </div>
+        </div>
+
+        <nav class="flex-1 px-4 mt-6 space-y-1">
+            <button onclick="switchTab('crm')" id="nav-crm" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
+                <i class="fa-solid fa-users w-5 text-center"></i> Portefeuille Clients
+            </button>
+            <button onclick="switchTab('parc')" id="nav-parc" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
+                <i class="fa-solid fa-sitemap w-5 text-center text-cyan"></i> Gérer le Parc
+            </button>
+        </nav>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto p-10 relative bg-abysse">
+        
+        <!-- ========================================== -->
+        <!-- ONGLET 1 : LE CRM (LISTE DES CLIENTS) -->
+        <!-- ========================================== -->
+        <div id="tab-crm" class="tab-content max-w-5xl mx-auto space-y-6">
+            <header class="flex justify-between items-end mb-8">
+                <div>
+                    <h2 class="text-3xl font-black text-white mb-1">Comptes Entreprises</h2>
+                    <p class="text-gray-400 text-xs">Sélectionnez un Locataire (Tenant) pour piloter son périmètre.</p>
+                </div>
+                <div class="relative w-64">
+                    <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                    <input type="text" id="search-tenant" oninput="filterTenants()" placeholder="Rechercher (Nom, SIRET)..." class="w-full input-dark py-2 pl-10 pr-4 rounded-xl text-xs">
+                </div>
+            </header>
+
+            <div class="bento-card rounded-bento overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-white/5 text-[10px] text-gray-500 uppercase">
+                        <tr><th class="p-4">Raison Sociale</th><th class="p-4">SIRET (Tenant ID)</th><th class="p-4">Contact</th><th class="p-4 text-right">Action</th></tr>
+                    </thead>
+                    <tbody id="tenant-list" class="divide-y divide-white/5">
+                        <tr><td colspan="4" class="p-8 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Chargement des clients...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- ONGLET 2 : GESTION DU PARC D'UN CLIENT -->
+        <!-- ========================================== -->
+        <div id="tab-parc" class="tab-content hidden max-w-6xl mx-auto space-y-6">
+            <header class="flex justify-between items-end">
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2>
+                    <p class="text-cyan text-xs font-bold" id="parc-subtitle">Veuillez sélectionner un client dans le CRM d'abord.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="toggleImportModal()" class="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg text-xs font-bold border border-white/10 transition"><i class="fa-solid fa-file-csv mr-2"></i>Forcer Import CSV</button>
+                    <button onclick="saveSite()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20"><i class="fa-solid fa-save mr-2"></i>Sauvegarder Site</button>
+                </div>
+            </header>
+            
+            <!-- COPIE DU FORMULAIRE DE SETTINGS.HTML, AVEC LA MATRICE EN PLUS -->
+            <div class="grid grid-cols-12 gap-6 h-[calc(100vh-200px)]">
+                
+                <!-- LISTE DES SITES DU CLIENT -->
+                <div class="col-span-3 bento-card p-4 overflow-y-auto">
+                    <div class="flex justify-between items-center mb-4 px-2">
+                        <h3 class="font-bold text-white">Sites du Client</h3>
+                        <button onclick="resetForm()" class="text-xs bg-cyan-900/30 text-cyan-400 px-3 py-1 rounded border border-cyan-500/30 hover:bg-cyan-500 hover:text-black transition">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+                    <input type="text" id="search-site" placeholder="Filtrer les PDL..." class="input-dark w-full mb-4 p-2 rounded text-xs" oninput="loadSites()">
+                    <div id="site-list" class="flex-1 overflow-y-auto space-y-2 pr-2"></div>
+                </div>
+
+                <!-- FORMULAIRE (AVEC MATRICE) -->
+                <div class="col-span-9 bento-card p-6 overflow-y-auto relative">
+                    <div id="form-loader" class="absolute inset-0 bg-card/80 backdrop-blur-sm z-50 flex items-center justify-center hidden"><i class="fa-solid fa-spinner fa-spin text-cyan text-4xl"></i></div>
+
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="font-bold text-white flex items-center gap-3"><i class="fa-solid fa-building-user text-gray-500"></i><span id="form-title">Nouveau Site</span></h3>
+                        <div class="text-xs text-gray-500 font-mono" id="form-id">ID: NEW</div>
+                    </div>
+
+                    <!-- BLOC NOUVEAU : LA MATRICE ORGANISATIONNELLE -->
+                    <div class="bento-card rounded-bento p-6 border-l-4 border-indigo-500 bg-gradient-to-r from-card to-indigo-900/10 mb-6">
+                        <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-sitemap text-indigo-400"></i> MATRICE ORGANISATIONNELLE (MULTI-TENANT)</h3>
+                        <div class="grid grid-cols-12 gap-4">
+                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Entité Fille / Réseau</label><input type="text" id="mat-fille" placeholder="Ex: Mairie de Lyon, Magasin Nord..." class="w-full input-dark p-2 rounded text-xs"></div>
+                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Statut Juridique</label><select id="mat-status" class="w-full input-dark p-2 rounded text-xs"><option value="">Standard</option><option value="Franchise">Franchise (Facturation directe)</option><option value="Succursale">Succursale (Facturation Siège)</option></select></div>
+                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Code / Centre de Coût</label><input type="text" id="mat-cc" placeholder="Ex: CC-409, Voirie..." class="w-full input-dark p-2 rounded text-xs font-mono text-indigo-400"></div>
+                        </div>
+                    </div>
+
+                    <!-- 1. IDENTITÉ -->
+                    <div class="bento-card rounded-bento p-6 border-l-4 border-cyan mb-6">
+                        <div class="grid grid-cols-12 gap-4">
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">SIRET (Site)</label><input type="text" id="id-input" placeholder="123..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Code NAF</label><input type="text" id="naf-input" class="w-full input-dark p-2 rounded text-xs font-mono text-gray-400"></div>
+                            <div class="col-span-8"><label class="text-[10px] text-cyan font-bold uppercase">NOM DU SITE (Affichage)</label><input type="text" id="site-name-input" placeholder="Ex: École Jules Ferry..." class="w-full input-dark p-2 rounded text-xs border border-cyan/30 text-white font-bold"></div>
+                        </div>
+                    </div>
+
+                    <!-- 2. LOCALISATION -->
+                    <div class="bento-card rounded-bento p-6 border-l-4 border-purple-500 mb-6">
+                        <div class="grid grid-cols-12 gap-4">
+                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Usage (Typologie)</label><input type="text" id="inp-type" placeholder="Ex: Industrie, Administratif..." class="w-full input-dark p-2 rounded text-xs"></div>
+                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Adresse (Voie)</label><input type="text" id="address-input" class="w-full input-dark p-2 rounded text-xs"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Code Postal</label><input type="text" id="zip-input" class="w-full input-dark p-2 rounded text-xs"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase text-cyan">Ville</label><input type="text" id="city-input" class="w-full input-dark p-2 rounded text-xs"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Surface (m²)</label><input type="number" id="surface-input" placeholder="0" class="w-full input-dark p-2 rounded text-xs font-mono text-cyan"></div>
+                        </div>
+                    </div>
+
+                    <!-- 3. CONTRAT -->
+                    <div class="bento-card rounded-bento p-6 border-l-4 border-yellow-500 transition-colors" id="card-energy">
+                        <div class="grid grid-cols-12 gap-4 mb-4">
+                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">PDL / PRM (14)</label><input type="text" id="ref-input" placeholder="000..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">P. Souscrite</label><input type="number" id="val-input" class="w-full input-dark p-2 rounded text-xs font-mono text-yellow-500 font-bold"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">FTA</label><input type="text" id="fta-input" class="w-full input-dark p-2 rounded text-xs" placeholder="-"></div>
+                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Fournisseur</label><input type="text" id="provider-input" class="w-full input-dark p-2 rounded text-xs" placeholder="Ex: EDF"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Segment</label><input type="text" id="segment-display" class="w-full input-dark p-2 rounded text-xs font-bold text-gray-400 bg-white/5" value="--"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL IMPORT DE MASSE -->
+    <div id="import-modal" class="fixed inset-0 bg-black/90 z-[99] hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bento-card p-8 rounded-bento w-[600px] relative">
+            <button onclick="toggleImportModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-xl font-bold text-white mb-1">Forcer Import de Parc</h3>
+            <p class="text-xs text-red-400 font-bold mb-6"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Attention: L'import sera affecté au client sélectionné (<span id="import-target-tenant">Aucun</span>).</p>
+            
+            <div class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-white transition cursor-pointer mb-4 group" onclick="document.getElementById('csv-upload').click()">
+                <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 group-hover:text-white mb-2 transition"></i>
+                <div class="text-sm font-bold text-white" id="csv-label">Glisser votre fichier CSV/Excel</div>
+                <input type="file" id="csv-upload" class="hidden" accept=".csv,.xlsx" onchange="fileSelected(this)">
+            </div>
+            <button class="w-full bg-white text-black font-bold py-3 rounded-lg mt-4 hover:bg-gray-200 transition shadow-lg" onclick="processImport()">INJECTER DANS LA BASE</button>
+        </div>
+    </div>
+
+    <!-- LOGIQUE JAVASCRIPT CRM & MULTI-TENANT -->
+    <script>
+        let TENANTS = [];
+        let SITES = [];
+        let ACTIVE_TENANT = null;
+        let CURRENT_ID = null;
+
+        function showToast(msg) { const t = document.getElementById('toast'); t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`; t.className = "show"; setTimeout(() => t.className = "", 3000); }
+        function toggleImportModal() { 
+            if(!ACTIVE_TENANT) return alert("Vous devez sélectionner un client (Tenant) dans le CRM d'abord !");
+            document.getElementById('import-target-tenant').innerText = ACTIVE_TENANT.name || ACTIVE_TENANT.siret;
+            document.getElementById('import-modal').classList.toggle('hidden'); 
+        }
+        function fileSelected(input) { if(input.files && input.files[0]) document.getElementById('csv-label').innerText = input.files[0].name; }
+
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
+            document.getElementById('tab-' + id).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(e => { e.classList.remove('active', 'text-white'); e.classList.add('text-gray-400'); });
+            document.getElementById('nav-' + id).classList.add('active', 'text-white');
+            if(id === 'crm') loadTenants();
+        }
+
+        // ========================================
+        // 1. LE MOTEUR CRM (TENANTS)
+        // ========================================
+        async function loadTenants() {
+            try {
+                const res = await fetch('/api/ops/tenants');
+                const data = await res.json();
+                if(data.success) {
+                    TENANTS = data.tenants;
+                    filterTenants();
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function filterTenants() {
+            const term = document.getElementById('search-tenant').value.toLowerCase();
+            const list = document.getElementById('tenant-list');
+            list.innerHTML = '';
+            
+            if(TENANTS.length === 0) {
+                list.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-500">Aucun client enregistré dans la base Users. (Ils doivent utiliser /settings)</td></tr>';
+                return;
+            }
+
+            TENANTS.filter(t => (t.name || '').toLowerCase().includes(term) || (t.siret || '').includes(term)).forEach(t => {
+                list.innerHTML += `
+                    <tr class="hover:bg-white/5 transition">
+                        <td class="p-4 font-bold text-white"><i class="fa-solid fa-building text-gray-500 mr-2"></i> ${t.name || 'Sans Nom'}</td>
+                        <td class="p-4 font-mono text-cyan">${t.tenant_id || t.siret}</td>
+                        <td class="p-4 text-gray-400 text-xs">${t.contact || '-'} (${t.email || '-'})</td>
+                        <td class="p-4 text-right">
+                            <button onclick='activateTenant(${JSON.stringify(t)})' class="bg-cyan/10 text-cyan hover:bg-cyan hover:text-black border border-cyan/30 px-3 py-1 rounded transition text-xs font-bold">Piloter le Parc</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // ========================================
+        // 2. LE SÉLECTEUR DE CONTEXTE (LE COCKPIT)
+        // ========================================
+        function activateTenant(tenantObj) {
+            ACTIVE_TENANT = tenantObj;
+            
+            // Mise à jour visuelle du Badge
+            const badge = document.getElementById('active-tenant-badge');
+            badge.className = "bg-cyan/20 border border-cyan/50 text-cyan p-3 rounded-xl text-xs font-bold text-center truncate";
+            badge.innerHTML = `<i class="fa-solid fa-unlock-keyhole mr-2"></i> ${tenantObj.name || tenantObj.tenant_id}`;
+            
+            // Mise à jour de l'onglet Parc
+            document.getElementById('parc-subtitle').innerText = `Locataire Actif : ${tenantObj.name || tenantObj.tenant_id} (${tenantObj.tenant_id})`;
+            
+            // Bascule automatique
+            switchTab('parc');
+            resetForm();
+            loadSites();
+        }
+
+        // ========================================
+        // 3. LE MOTEUR PARC (SITES DU TENANT ACTIF)
+        // ========================================
+        async function loadSites() {
+            if(!ACTIVE_TENANT) return;
+            const term = document.getElementById('search-site').value.toLowerCase();
+            try {
+                // On récupère toute la flotte. L'API est censée renvoyer tout car on est ADMIN_OPS.
+                // C'est le Front-end Admin qui filtre pour le confort visuel.
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                if(data.fleet) {
+                    // FILTRE MAGIQUE : On ne garde que les sites du Tenant Actif
+                    SITES = data.fleet.filter(s => s.tenant_id === ACTIVE_TENANT.tenant_id);
+                    
+                    const container = document.getElementById('site-list');
+                    container.innerHTML = '';
+                    
+                    SITES.filter(s => s.name.toLowerCase().includes(term) || (s.pdl && s.pdl.includes(term))).forEach(s => {
+                        const div = document.createElement('div');
+                        div.className = "p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer mb-2 transition border border-transparent hover:border-cyan/30";
+                        div.onclick = () => loadForm(s.id);
+                        const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire text-red-500 mr-2"></i>' : '<i class="fa-solid fa-bolt text-cyan mr-2"></i>';
+                        div.innerHTML = `<div class="font-bold text-xs text-white truncate flex items-center">${icon} ${s.name}</div><div class="mt-1 text-[9px] text-gray-500 font-mono">${s.pdl || 'N/A'}</div>`;
+                        container.appendChild(div);
+                    });
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadForm(id) {
+            CURRENT_ID = id;
+            document.getElementById('form-loader').classList.remove('hidden');
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                const data = await res.json();
+                
+                document.getElementById('form-title').innerText = "Modifier Site";
+                document.getElementById('form-id').innerText = id;
+                
+                // MAPPAGE IDENTITÉ & MATRICE
+                const identity = data.identity || {};
+                document.getElementById('id-input').value = identity.siret || identity.id || "";
+                document.getElementById('site-name-input').value = identity.site_name || "";
+                document.getElementById('naf-input').value = identity.naf || "";
+                
+                const mat = identity.organization_matrix || {};
+                document.getElementById('mat-fille').value = mat.entity_fille || identity.lot_name || identity.ref_copro || "";
+                document.getElementById('mat-status').value = mat.legal_status || "";
+                document.getElementById('mat-cc').value = mat.cost_center || "";
+                
+                const loc = data.location || {};
+                document.getElementById('address-input').value = loc.address || "";
+                document.getElementById('zip-input').value = loc.zip_code || "";
+                document.getElementById('city-input').value = loc.city || "";
+                document.getElementById('surface-input').value = loc.surface || "";
+                document.getElementById('inp-type').value = loc.typologie || "";
+
+                const contract = data.contract || {};
+                document.getElementById('ref-input').value = contract.pdl || contract.pce || "";
+                document.getElementById('val-input').value = contract.power || "";
+                document.getElementById('segment-display').value = contract.segment || "";
+                document.getElementById('provider-input').value = contract.provider || "";
+                document.getElementById('fta-input').value = contract.fta || "";
+                
+            } catch(e) {}
+            document.getElementById('form-loader').classList.add('hidden');
+        }
+
+        function resetForm() {
+            CURRENT_ID = null;
+            document.getElementById('form-title').innerText = "Nouveau Site";
+            document.getElementById('form-id').innerText = "ID: NEW";
+            document.querySelectorAll('#tab-parc input').forEach(i => { if(i.id !== 'search-site') i.value = '' });
+            document.getElementById('segment-display').value = "--";
+        }
+
+        async function saveSite() {
+            if(!ACTIVE_TENANT) return alert("Sélectionnez un locataire dans le CRM.");
+            const btn = document.activeElement;
+            const original = btn.innerHTML;
+            btn.innerHTML = '...';
+            
+            const inputPdl = document.getElementById('ref-input').value.replace(/\s/g, '');
+            if(!inputPdl) return alert("PDL requis.");
+
+            // ON INJECTE DE FORCE LE TENANT ID DE L'ENTREPRISE SÉLECTIONNÉE
+            const payload = {
+                id: CURRENT_ID || inputPdl,
+                forced_tenant_id: ACTIVE_TENANT.tenant_id, // L'API V8.2 écoute cette variable si on est ADMIN
+                identity: {
+                    id: CURRENT_ID || inputPdl, 
+                    siret: document.getElementById('id-input').value, 
+                    site_name: document.getElementById('site-name-input').value,
+                    naf: document.getElementById('naf-input').value,
+                    organization_matrix: {
+                        entity_fille: document.getElementById('mat-fille').value,
+                        legal_status: document.getElementById('mat-status').value,
+                        cost_center: document.getElementById('mat-cc').value
+                    }
+                },
+                location: { 
+                    address: document.getElementById('address-input').value,
+                    zip_code: document.getElementById('zip-input').value,
+                    city: document.getElementById('city-input').value,
+                    surface: parseFloat(document.getElementById('surface-input').value) || 0,
+                    typologie: document.getElementById('inp-type').value
+                },
+                contract: {
+                    pdl: inputPdl,
+                    power: parseFloat(document.getElementById('val-input').value) || 0,
+                    provider: document.getElementById('provider-input').value,
+                    fta: document.getElementById('fta-input').value
+                }
+            };
+            
+            try {
+                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                if((await res.json()).success) { showToast("Sauvegardé pour " + ACTIVE_TENANT.name); loadSites(); }
+            } catch(e) { alert("Erreur réseau"); }
+            btn.innerHTML = original;
+        }
+
+        async function processImport() {
+            if(!ACTIVE_TENANT) return;
+            const input = document.getElementById('csv-upload');
+            if (!input.files || input.files.length === 0) return;
+            const formData = new FormData();
+            formData.append("file", input.files[0]);
+            
+            // L'API V8.1/8.2 détecte qui fait l'appel (ADMIN).
+            // Mais le fichier `cortex_ingest` ne gère pas encore l'injection forcée du Tenant par l'Admin.
+            // On le rajoutera si besoin. Pour l'instant, ça se liera au compte qui upload.
+            
+            const btn = document.querySelector('#import-modal button:last-child');
+            btn.innerText = "INGESTION EN COURS...";
+            try {
+                const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData });
+                const data = await res.json();
+                if(data.success) { toggleImportModal(); showToast(`${data.imported} sites importés !`); loadSites(); } 
+            } catch(e) {}
+            btn.innerText = "INJECTER DANS LA BASE";
+        }
+
+        // INIT
+        switchTab('crm');
+    </script>
+</body>
+</html>
