@@ -52,10 +52,19 @@ class CortexDB:
         except Exception: return False
 
     # ==========================================
-    # GESTION DES PROFILS UTILISATEURS (MULTI-TENANT)
+    # GESTION DES PROFILS UTILISATEURS / CRM (MULTI-TENANT)
     # ==========================================
+    def get_all_users(self) -> list:
+        """Récupère l'intégralité des profils locataires (Le CRM Ops)"""
+        if not self.db: return list()
+        try:
+            docs = self.db.collection("Users").stream()
+            return [doc.to_dict() for doc in docs]
+        except Exception as e:
+            print(f"⚠️ Erreur get_all_users : {e}")
+            return list()
+
     def get_user_profile(self, uid: str) -> dict:
-        """Récupère les informations d'un utilisateur (ex: son Tenant ID / SIRET)"""
         if not self.db: return dict()
         try:
             doc = self.db.collection("Users").document(uid).get()
@@ -64,7 +73,6 @@ class CortexDB:
         except Exception: return dict()
 
     def save_user_profile(self, uid: str, data: dict) -> bool:
-        """Sauvegarde les informations d'un utilisateur"""
         if not self.db: return False
         try:
             self.db.collection("Users").document(uid).set(data, merge=True)
