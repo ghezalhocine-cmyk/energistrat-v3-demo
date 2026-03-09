@@ -266,9 +266,10 @@
                         </div>
 
                         <div class="bg-white/5 p-4 rounded-xl border border-white/5">
-                            <div class="text-[10px] font-bold text-gray-400 uppercase mb-3 flex justify-between">
+                            <div class="text-[10px] font-bold text-gray-400 uppercase mb-3 flex justify-between items-center">
                                 <span id="price-title">Structure Tarifaire (€ HT)</span>
-                                <span class="text-cyan cursor-pointer hover:underline" onclick="openPropagationModal()"><i class="fa-solid fa-copy mr-1"></i>Dupliquer</span>
+                                <!-- LE BOUTON DUPLIQUER EST DE RETOUR -->
+                                <button onclick="openPropagationModal()" class="text-cyan cursor-pointer hover:underline bg-cyan/10 px-2 py-1 rounded border border-cyan/30 transition"><i class="fa-solid fa-copy mr-1"></i>Dupliquer au Lot</button>
                             </div>
                             
                             <div id="grid-elec" class="grid grid-cols-6 gap-2">
@@ -280,6 +281,7 @@
                                 <div><label id="lbl-tax" class="text-[9px] text-gray-500 uppercase">CSPE / TICGN</label><input type="number" id="price-tax" placeholder="22.5" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
                             </div>
 
+                            <!-- PUISSANCES DETAILLEES -->
                             <div id="grid-ps" class="grid grid-cols-6 gap-2 mt-4 border-t border-white/5 pt-4">
                                  <div class="col-span-6 mb-2"><span class="text-[9px] font-bold text-gray-500 uppercase">Puissances Souscrites Détaillées (kW)</span></div>
                                  <div class="col-start-2"><input type="number" id="ps-hph" placeholder="P1 (HPH)" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
@@ -557,7 +559,7 @@
                 document.getElementById('form-title').innerText = "Modifier Site";
                 document.getElementById('form-id').innerText = id;
                 
-                // MAPPAGE IDENTITÉ (Aligné sur la V6)
+                // MAPPAGE IDENTITÉ
                 const identity = data.identity || {};
                 document.getElementById('id-input').value = identity.siret || identity.id || "";
                 document.getElementById('company-name').value = identity.name || identity.entity_name || "";
@@ -628,7 +630,6 @@
             const original = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Enregistrement...';
             
-            // On récupère la clé (SIRET ou PDL)
             const inputSiret = document.getElementById('id-input').value.replace(/\s/g, '');
             const inputPdl = document.getElementById('ref-input').value.replace(/\s/g, '');
             const cleanId = inputPdl || inputSiret;
@@ -640,7 +641,7 @@
             }
 
             const data = {
-                id: CURRENT_ID || cleanId, // Permet l'update si on a déjà chargé le formulaire
+                id: CURRENT_ID || cleanId, 
                 identity: {
                     id: CURRENT_ID || cleanId, 
                     siret: inputSiret, 
@@ -694,6 +695,66 @@
                 }
             } catch(e) { alert("Erreur réseau de communication."); }
             btn.innerHTML = original;
+        }
+
+        // --- GESTION PROPAGATION TARIFAIRE ---
+        function openPropagationModal() {
+            const segment = document.getElementById('segment-display').value;
+            const lot = document.getElementById('lot-input').value;
+            if(!segment || segment === '--') { alert("Le Segment (C4, C5...) doit être défini pour propager un tarif."); return; }
+            document.getElementById('prop-segment').innerText = segment;
+            document.getElementById('prop-lot').innerText = lot || "(Aucun Lot, propagation sur tout le segment)";
+            document.getElementById('propagate-modal').classList.remove('hidden');
+        }
+
+        async function confirmPropagation() {
+            const dateEffet = document.getElementById('prop-date').value;
+            const segment = document.getElementById('segment-display').value;
+            const lot = document.getElementById('lot-input').value;
+            const sourceId = document.getElementById('id-input').value || CURRENT_ID;
+            
+            if(!dateEffet) return alert("Date d'effet requise.");
+            if(!sourceId) return alert("ID source requis. Veuillez sauvegarder ce site d'abord.");
+            
+            const btn = document.querySelector('#propagate-modal button:last-child');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> TRAITEMENT...';
+            
+            let pricing = {};
+            if(currentEnergy === 'gaz') {
+                pricing = {
+                    fix: document.getElementById('price-gaz-fix').value,
+                    hph: document.getElementById('price-gaz-mol').value, 
+                    hch: "0", hpe: "0", hce: "0",
+                    tax: document.getElementById('price-gaz-tax').value
+                };
+            } else {
+                pricing = {
+                    fix: document.getElementById('price-fix').value,
+                    hph: document.getElementById('price-hph').value,
+                    hch: document.getElementById('price-hch').value,
+                    hpe: document.getElementById('price-hpe').value,
+                    hce: document.getElementById('price-hce').value,
+                    tax: document.getElementById('price-tax').value
+                };
+            }
+            
+            const payload = {
+                source_client_id: sourceId, 
+                target_date: dateEffet,
+                filters: { segment: segment, lot_name: lot }, 
+                pricing_data: pricing
+            };
+            
+            try {
+                const res = await fetch('/api/settings/propagate_tariff', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                const response = await res.json();
+                if(res.ok && response.success) { 
+                    document.getElementById('propagate-modal').classList.add('hidden'); 
+                    showToast(`Succès : ${response.updated_count} sites mis à jour !`); 
+                } 
+                else { alert("Erreur : " + (response.detail || "Inconnue")); }
+            } catch(e) { console.error(e); alert("Erreur réseau"); }
+            btn.innerHTML = 'CONFIRMER';
         }
 
         // --- IMPORT DE MASSE ---
