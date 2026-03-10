@@ -10,7 +10,7 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: { abysse: '#050505', card: '#0F172A', cyan: '#00E5FF', gas: '#EF4444' },
+                    colors: { abysse: '#050505', card: '#0F172A', cyan: '#00E5FF', gas: '#EF4444', sat: '#8B5CF6' },
                     fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
                     borderRadius: { 'bento': '1.5rem' }
                 }
@@ -30,20 +30,18 @@
 </head>
 <body class="flex h-screen w-screen overflow-hidden text-sm">
 
-    <!-- TOAST -->
     <div id="toast"><i class="fa-solid fa-check-circle mr-2"></i>Action effectuée !</div>
 
-    <!-- SIDEBAR -->
     <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col z-50">
         <div class="p-6 flex items-center gap-3 mb-4 border-b border-white/5 pb-6">
-            <button onclick="history.back()" class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition"><i class="fa-solid fa-arrow-left"></i></button>
+            <a href="/ops_nexus" class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition"><i class="fa-solid fa-arrow-left"></i></a>
             <h1 class="font-black text-white italic tracking-tight">CORTEX<span class="text-cyan">.CRM</span></h1>
         </div>
         
         <div class="px-4 mb-2">
-            <div class="text-[10px] text-gray-500 uppercase font-bold mb-2">Contexte Client</div>
+            <div class="text-[10px] text-gray-500 uppercase font-bold mb-2">Locataire (Tenant) Actif</div>
             <div id="active-tenant-badge" class="bg-red-500/20 border border-red-500/50 text-red-400 p-3 rounded-xl text-xs font-bold text-center">
-                <i class="fa-solid fa-lock mr-2"></i> Aucun client sélectionné
+                <i class="fa-solid fa-lock mr-2"></i> Aucun
             </div>
         </div>
 
@@ -54,103 +52,90 @@
             <button onclick="switchTab('parc')" id="nav-parc" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
                 <i class="fa-solid fa-sitemap w-5 text-center text-cyan"></i> Gérer le Parc
             </button>
+            <button onclick="switchTab('store')" id="nav-store" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
+                <i class="fa-solid fa-rocket w-5 text-center text-purple-400"></i> App Store (Modules)
+            </button>
+            
+            <div class="mt-8 mb-2 px-4 text-[10px] font-bold text-gray-600 uppercase">Configuration Globale</div>
+            
+            <button onclick="switchTab('api')" id="nav-api" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
+                <i class="fa-solid fa-key w-5 text-center text-yellow-500"></i> Clés API (RTE / Météo)
+            </button>
         </nav>
     </aside>
 
     <main class="flex-1 overflow-y-auto p-10 relative bg-abysse">
         
-        <!-- ========================================== -->
-        <!-- ONGLET 1 : LE CRM (LISTE DES CLIENTS) -->
-        <!-- ========================================== -->
+        <!-- ONGLET 1 : LE CRM -->
         <div id="tab-crm" class="tab-content max-w-5xl mx-auto space-y-6">
             <header class="flex justify-between items-end mb-8">
-                <div>
-                    <h2 class="text-3xl font-black text-white mb-1">Comptes Entreprises</h2>
-                    <p class="text-gray-400 text-xs">Sélectionnez un Locataire (Tenant) pour piloter son périmètre.</p>
-                </div>
-                <div class="relative w-64">
-                    <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                    <input type="text" id="search-tenant" oninput="filterTenants()" placeholder="Rechercher (Nom, SIRET)..." class="w-full input-dark py-2 pl-10 pr-4 rounded-xl text-xs">
-                </div>
+                <div><h2 class="text-3xl font-black text-white mb-1">Comptes Entreprises</h2><p class="text-gray-400 text-xs">Sélectionnez un Locataire pour piloter son périmètre.</p></div>
+                <div class="relative w-64"><i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i><input type="text" id="search-tenant" oninput="filterTenants()" placeholder="Rechercher (Nom, SIRET)..." class="w-full input-dark py-2 pl-10 pr-4 rounded-xl text-xs"></div>
             </header>
-
             <div class="bento-card rounded-bento overflow-hidden">
                 <table class="w-full text-left">
-                    <thead class="bg-white/5 text-[10px] text-gray-500 uppercase">
-                        <tr><th class="p-4">Raison Sociale</th><th class="p-4">SIRET (Tenant ID)</th><th class="p-4">Contact</th><th class="p-4 text-right">Action</th></tr>
-                    </thead>
-                    <tbody id="tenant-list" class="divide-y divide-white/5">
-                        <tr><td colspan="4" class="p-8 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Chargement des clients...</td></tr>
-                    </tbody>
+                    <thead class="bg-white/5 text-[10px] text-gray-500 uppercase"><tr><th class="p-4">Raison Sociale</th><th class="p-4">SIRET (Tenant ID)</th><th class="p-4">Contact</th><th class="p-4 text-right">Action</th></tr></thead>
+                    <tbody id="tenant-list" class="divide-y divide-white/5"><tr><td colspan="4" class="p-8 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Chargement...</td></tr></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- ONGLET 2 : GESTION DU PARC D'UN CLIENT -->
-        <!-- ========================================== -->
-        <div id="tab-parc" class="tab-content hidden max-w-6xl mx-auto space-y-6">
+        <!-- ONGLET 2 : LE PARC DU CLIENT (FORMULAIRE COMPLET + MATRICE) -->
+        <div id="tab-parc" class="tab-content hidden max-w-7xl mx-auto space-y-6">
             <header class="flex justify-between items-end">
-                <div>
-                    <h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2>
-                    <p class="text-cyan text-xs font-bold" id="parc-subtitle">Veuillez sélectionner un client dans le CRM d'abord.</p>
-                </div>
+                <div><h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2><p class="text-cyan text-xs font-bold" id="parc-subtitle">Veuillez sélectionner un client dans le CRM d'abord.</p></div>
                 <div class="flex gap-2">
-                    <button onclick="toggleImportModal()" class="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg text-xs font-bold border border-white/10 transition"><i class="fa-solid fa-file-csv mr-2"></i>Forcer Import CSV</button>
+                    <button onclick="toggleImportModal()" class="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg text-xs font-bold border border-white/10 transition"><i class="fa-solid fa-file-csv mr-2"></i>Import CSV</button>
                     <button onclick="saveSite()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20"><i class="fa-solid fa-save mr-2"></i>Sauvegarder Site</button>
                 </div>
             </header>
             
-            <div class="grid grid-cols-12 gap-6 h-[calc(100vh-200px)]">
-                
-                <!-- LISTE DES SITES DU CLIENT -->
-                <div class="col-span-3 bento-card p-4 overflow-y-auto">
+            <div class="grid grid-cols-12 gap-6">
+                <!-- LISTE GAUCHE -->
+                <div class="col-span-3 bento-card p-4 h-[calc(100vh-200px)] overflow-y-auto flex flex-col">
                     <div class="flex justify-between items-center mb-4 px-2">
                         <h3 class="font-bold text-white">Sites du Client</h3>
-                        <button onclick="resetForm()" class="text-xs bg-cyan-900/30 text-cyan-400 px-3 py-1 rounded border border-cyan-500/30 hover:bg-cyan-500 hover:text-black transition">
-                            <i class="fa-solid fa-plus"></i>
-                        </button>
+                        <button onclick="resetForm()" class="text-xs bg-cyan-900/30 text-cyan-400 px-3 py-1 rounded border border-cyan-500/30 hover:bg-cyan-500 hover:text-black transition"><i class="fa-solid fa-plus"></i></button>
                     </div>
-                    <input type="text" id="search-site" placeholder="Filtrer les PDL..." class="input-dark w-full mb-4 p-2 rounded text-xs" oninput="loadSites()">
+                    <input type="text" id="search-site" placeholder="Filtrer (Nom, PDL)..." class="input-dark w-full mb-4 p-2 rounded text-xs" oninput="loadSites()">
                     <div id="site-list" class="flex-1 overflow-y-auto space-y-2 pr-2"></div>
                 </div>
 
-                <!-- FORMULAIRE (LA ROLLS ROYCE) -->
-                <div class="col-span-9 bento-card p-6 overflow-y-auto relative">
+                <!-- FORMULAIRE DROITE -->
+                <div class="col-span-9 bento-card p-6 h-[calc(100vh-200px)] overflow-y-auto relative">
                     <div id="form-loader" class="absolute inset-0 bg-card/80 backdrop-blur-sm z-50 flex items-center justify-center hidden"><i class="fa-solid fa-spinner fa-spin text-cyan text-4xl"></i></div>
-
+                    
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="font-bold text-white flex items-center gap-3"><i class="fa-solid fa-building-user text-gray-500"></i><span id="form-title">Nouveau Site</span></h3>
                         <div class="text-xs text-gray-500 font-mono" id="form-id">ID: NEW</div>
                     </div>
 
-                    <!-- MATRICE ORGANISATIONNELLE (POUR LE SDE/RETAIL) -->
-                    <div class="bento-card rounded-bento p-6 border-l-4 border-indigo-500 bg-gradient-to-r from-card to-indigo-900/10 mb-6">
-                        <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-sitemap text-indigo-400"></i> MATRICE ORGANISATIONNELLE (MULTI-TENANT)</h3>
+                    <!-- MATRICE ORGANISATIONNELLE (POUR SDE / RETAIL) -->
+                    <div class="bento-card rounded-bento p-6 border-l-4 border-purple-500 bg-gradient-to-r from-card to-purple-900/10 mb-6">
+                        <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-sitemap text-purple-400"></i> MATRICE ORGANISATIONNELLE</h3>
                         <div class="grid grid-cols-12 gap-4">
-                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Entité Fille / Réseau</label><input type="text" id="mat-fille" placeholder="Ex: Mairie de Lyon, Magasin Nord..." class="w-full input-dark p-2 rounded text-xs border border-indigo-500/30 text-white font-bold"></div>
-                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Statut Juridique</label><select id="mat-status" class="w-full input-dark p-2 rounded text-xs"><option value="">Standard</option><option value="Franchise">Franchise (Facturation directe)</option><option value="Succursale">Succursale (Facturation Siège)</option></select></div>
-                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Code / Centre de Coût</label><input type="text" id="mat-cc" placeholder="Ex: CC-409, Voirie..." class="w-full input-dark p-2 rounded text-xs font-mono text-indigo-400"></div>
+                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Entité Fille (Mairie, Magasin)</label><input type="text" id="mat-fille" placeholder="Ex: Mairie Annexe..." class="w-full input-dark p-2 rounded text-xs border border-purple-500/30 text-white font-bold"></div>
+                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Statut / Regroupement</label><input type="text" id="mat-status" placeholder="Ex: Franchise, Lot 1..." class="w-full input-dark p-2 rounded text-xs"></div>
+                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Centre de Coût (Analytique)</label><input type="text" id="mat-cc" placeholder="Ex: CC-409, Voirie..." class="w-full input-dark p-2 rounded text-xs font-mono text-purple-400"></div>
                         </div>
                     </div>
 
                     <!-- 1. IDENTITÉ -->
                     <div class="bento-card rounded-bento p-6 border-l-4 border-cyan mb-6">
                         <div class="grid grid-cols-12 gap-4">
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">SIRET (Site)</label><input type="text" id="id-input" placeholder="14 chiffres..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
+                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">SIRET (Du Site)</label><input type="text" id="id-input" placeholder="14 chiffres..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
                             <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Code NAF</label><input type="text" id="naf-input" class="w-full input-dark p-2 rounded text-xs font-mono text-gray-400"></div>
-                            <div class="col-span-8"><label class="text-[10px] text-cyan font-bold uppercase">NOM DU SITE (Affichage)</label><input type="text" id="site-name-input" placeholder="Ex: École Jules Ferry..." class="w-full input-dark p-2 rounded text-xs border border-cyan/30 text-white font-bold"></div>
+                            <div class="col-span-7"><label class="text-[10px] text-cyan font-bold uppercase">NOM DU SITE (Affichage Dashboard)</label><input type="text" id="site-name-input" placeholder="Ex: École Jules Ferry..." class="w-full input-dark p-2 rounded text-xs border border-cyan/30 text-white font-bold"></div>
                         </div>
                     </div>
 
                     <!-- 2. LOCALISATION -->
-                    <div class="bento-card rounded-bento p-6 border-l-4 border-purple-500 mb-6">
+                    <div class="bento-card rounded-bento p-6 mb-6 bg-white/5 border border-white/5">
                         <div class="grid grid-cols-12 gap-4">
                             <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Usage (Typologie)</label><input type="text" id="inp-type" placeholder="Ex: Industrie, Administratif..." class="w-full input-dark p-2 rounded text-xs"></div>
-                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Adresse (Voie)</label><input type="text" id="address-input" class="w-full input-dark p-2 rounded text-xs"></div>
+                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Adresse (Voie)</label><input type="text" id="address-input" class="w-full input-dark p-2 rounded text-xs"></div>
                             <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Code Postal</label><input type="text" id="zip-input" class="w-full input-dark p-2 rounded text-xs"></div>
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase text-cyan">Ville</label><input type="text" id="city-input" class="w-full input-dark p-2 rounded text-xs"></div>
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Surface (m²)</label><input type="number" id="surface-input" placeholder="0" class="w-full input-dark p-2 rounded text-xs font-mono text-cyan"></div>
+                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Ville</label><input type="text" id="city-input" class="w-full input-dark p-2 rounded text-xs"></div>
                         </div>
                     </div>
 
@@ -166,7 +151,7 @@
                         
                         <div class="grid grid-cols-12 gap-4 mb-4">
                             <div class="col-span-3"><label id="lbl-ref" class="text-[10px] text-gray-500 font-bold uppercase">PDL / PRM (14) *</label><input type="text" id="ref-input" placeholder="3000..." class="w-full input-dark p-2 rounded text-xs font-mono border-cyan/50 text-white font-bold"></div>
-                            <div class="col-span-2"><label id="lbl-puiss" class="text-[10px] text-gray-500 font-bold uppercase">P. Souscrite</label><input type="number" id="val-input" class="w-full input-dark p-2 rounded text-xs font-mono text-yellow-500 font-bold"></div>
+                            <div class="col-span-2"><label id="lbl-puiss" class="text-[10px] text-gray-500 font-bold uppercase">P. Souscrite</label><input type="number" id="val-input" class="w-full input-dark p-2 rounded text-xs font-mono text-yellow-500 font-bold" oninput="inferContract()"></div>
                             <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">FTA (Achem.)</label><input type="text" id="fta-input" class="w-full input-dark p-2 rounded text-xs" placeholder="-"></div>
                             <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Fournisseur</label><input type="text" id="provider-input" class="w-full input-dark p-2 rounded text-xs" placeholder="Ex: EDF"></div>
                             <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Segment</label><input type="text" id="segment-display" class="w-full input-dark p-2 rounded text-xs font-bold text-gray-400 bg-white/5" value="--"></div>
@@ -181,8 +166,7 @@
                         <div class="bg-white/5 p-4 rounded-xl border border-white/5">
                             <div class="text-[10px] font-bold text-gray-400 uppercase mb-3 flex justify-between items-center">
                                 <span>Structure Tarifaire (€ HT)</span>
-                                <!-- LE BOUTON DUPLIQUER (MASSIF) -->
-                                <button onclick="openPropagationModal()" class="text-cyan cursor-pointer hover:underline bg-cyan/10 px-2 py-1 rounded border border-cyan/30 transition"><i class="fa-solid fa-copy mr-1"></i>Dupliquer au Lot/Matrice</button>
+                                <button onclick="openPropagationModal()" class="text-cyan cursor-pointer hover:bg-cyan/20 bg-cyan/10 px-3 py-1.5 rounded-lg border border-cyan/30 transition"><i class="fa-solid fa-copy mr-2"></i>Propager au Lot</button>
                             </div>
                             
                             <div id="grid-elec" class="grid grid-cols-6 gap-2">
@@ -208,6 +192,78 @@
                                 <div><label class="text-[9px] text-gray-500 uppercase">TICGN / Taxes</label><input type="number" id="price-gaz-tax" placeholder="8.44" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ONGLET 3 : APP STORE / ACTIVATION SATELLITES -->
+        <div id="tab-store" class="tab-content hidden max-w-6xl mx-auto space-y-6">
+            <header class="flex justify-between items-end mb-8">
+                <div><h2 class="text-3xl font-black text-white mb-1">Magasin d'Applications (IA)</h2><p class="text-gray-400 text-xs">Activez ou désactivez des modules pour le locataire sélectionné.</p></div>
+            </header>
+            
+            <div class="grid grid-cols-3 gap-6">
+                <!-- MODULE 1 -->
+                <div class="bento-card p-6 flex flex-col justify-between border-t-2 border-sat">
+                    <div>
+                        <div class="w-12 h-12 rounded-xl bg-sat/10 text-sat flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-satellite-dish"></i></div>
+                        <h3 class="font-bold text-white mb-2">Cortex PULSE (Réseau RTE)</h3>
+                        <p class="text-xs text-gray-400">Alerte jours de pointe PP1 (Garantie de Capacité) et Météo EcoWatt.</p>
+                    </div>
+                    <div class="mt-6 flex justify-between items-center border-t border-white/5 pt-4">
+                        <span class="text-xs font-bold text-gray-500">Abonnement Requis</span>
+                        <button class="bg-sat text-white px-4 py-2 rounded text-xs font-bold shadow-lg shadow-sat/30 hover:bg-white hover:text-black transition">Activer le module</button>
+                    </div>
+                </div>
+
+                <!-- MODULE 2 -->
+                <div class="bento-card p-6 flex flex-col justify-between border-t-2 border-orange">
+                    <div>
+                        <div class="w-12 h-12 rounded-xl bg-orange/10 text-orange flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-temperature-arrow-up"></i></div>
+                        <h3 class="font-bold text-white mb-2">Cortex THERMIC (DJU)</h3>
+                        <p class="text-xs text-gray-400">Analyse de la signature énergétique et détection de gaspillage de chauffage (Talon).</p>
+                    </div>
+                    <div class="mt-6 flex justify-between items-center border-t border-white/5 pt-4">
+                        <span class="text-xs font-bold text-success">Activé par défaut</span>
+                        <span class="text-xs font-bold text-gray-500"><i class="fa-solid fa-check"></i> INCLUS</span>
+                    </div>
+                </div>
+
+                <!-- MODULE 3 -->
+                <div class="bento-card p-6 flex flex-col justify-between border-t-2 border-purple-500">
+                    <div>
+                        <div class="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-city"></i></div>
+                        <h3 class="font-bold text-white mb-2">Cortex IMMO</h3>
+                        <p class="text-xs text-gray-400">Prédicteur de DPE Tertiaire et calcul de décote de la valeur foncière.</p>
+                    </div>
+                    <div class="mt-6 flex justify-between items-center border-t border-white/5 pt-4">
+                        <span class="text-xs font-bold text-gray-500">Upgrade Requis</span>
+                        <button class="bg-white/10 text-white px-4 py-2 rounded text-xs font-bold hover:bg-white hover:text-black transition">Débloquer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ONGLET 4 : API & CLÉS (RTE) -->
+        <div id="tab-api" class="tab-content hidden max-w-6xl mx-auto space-y-6">
+            <header class="flex justify-between items-end mb-8">
+                <div><h2 class="text-3xl font-black text-white mb-1">Configuration des API</h2><p class="text-gray-400 text-xs">Clés maîtresses globales de l'infrastructure.</p></div>
+                <button onclick="saveRteConfig()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg"><i class="fa-solid fa-save mr-2"></i>Enregistrer Clés</button>
+            </header>
+            
+            <div class="bento-card rounded-bento p-8 border-l-4 border-sat bg-gradient-to-r from-card to-sat/10">
+                <h3 class="text-lg font-bold text-white flex items-center gap-3 mb-6"><i class="fa-solid fa-satellite-dish text-sat"></i> Open Data RTE (Marché & Réseau)</h3>
+                <p class="text-xs text-gray-400 mb-6 max-w-2xl">Insérez ici vos clés d'API (OAuth2) fournies par le portail data.rte-france.com. Ces clés alimenteront Cortex Sniper, le Ticker Boursier et le Radar PP1.</p>
+                
+                <div class="space-y-4 max-w-2xl">
+                    <div>
+                        <label class="text-[10px] text-gray-500 font-bold uppercase">Client ID (ID Application)</label>
+                        <input type="text" id="rte-client-id" placeholder="Votre Client ID..." class="w-full input-dark p-3 rounded-xl font-mono text-sm mt-1 border-white/20">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 font-bold uppercase">Client Secret (Clé Secrète)</label>
+                        <input type="password" id="rte-client-secret" placeholder="••••••••••••••••••••••••••••••" class="w-full input-dark p-3 rounded-xl font-mono text-sm mt-1 border-white/20">
                     </div>
                 </div>
             </div>
@@ -265,7 +321,7 @@
 
         function showToast(msg) { const t = document.getElementById('toast'); t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`; t.className = "show"; setTimeout(() => t.className = "", 3000); }
         function toggleImportModal() { 
-            if(!ACTIVE_TENANT) return alert("Vous devez sélectionner un client (Tenant) dans le CRM d'abord !");
+            if(!ACTIVE_TENANT) return alert("Vous devez sélectionner un client dans le CRM d'abord !");
             document.getElementById('import-target-tenant').innerText = ACTIVE_TENANT.name || ACTIVE_TENANT.siret;
             document.getElementById('import-modal').classList.toggle('hidden'); 
         }
@@ -277,6 +333,7 @@
             document.querySelectorAll('.nav-item').forEach(e => { e.classList.remove('active', 'text-white'); e.classList.add('text-gray-400'); });
             document.getElementById('nav-' + id).classList.add('active', 'text-white');
             if(id === 'crm') loadTenants();
+            if(id === 'api') loadRteConfig();
         }
 
         // ========================================
@@ -317,22 +374,19 @@
             });
         }
 
-        // ========================================
-        // 2. LE SÉLECTEUR DE CONTEXTE (LE COCKPIT)
-        // ========================================
         function activateTenant(tenantObj) {
             ACTIVE_TENANT = tenantObj;
             const badge = document.getElementById('active-tenant-badge');
             badge.className = "bg-cyan/20 border border-cyan/50 text-cyan p-3 rounded-xl text-xs font-bold text-center truncate";
             badge.innerHTML = `<i class="fa-solid fa-unlock-keyhole mr-2"></i> ${tenantObj.name || tenantObj.tenant_id}`;
-            document.getElementById('parc-subtitle').innerText = `Locataire Actif : ${tenantObj.name || tenantObj.tenant_id} (${tenantObj.tenant_id})`;
+            document.getElementById('parc-subtitle').innerText = `Locataire Actif : ${tenantObj.name || tenantObj.tenant_id}`;
             switchTab('parc');
             resetForm();
             loadSites();
         }
 
         // ========================================
-        // 3. LE MOTEUR PARC (SITES DU TENANT ACTIF)
+        // 2. LE MOTEUR PARC & FORMULAIRE COMPLET
         // ========================================
         async function loadSites() {
             if(!ACTIVE_TENANT) return;
@@ -350,11 +404,11 @@
                         div.className = "p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer mb-2 transition border border-transparent hover:border-cyan/30";
                         div.onclick = () => loadForm(s.id);
                         const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire text-red-500 mr-2"></i>' : '<i class="fa-solid fa-bolt text-cyan mr-2"></i>';
-                        div.innerHTML = `<div class="font-bold text-xs text-white truncate flex items-center">${icon} ${s.name}</div><div class="mt-1 text-[9px] text-gray-500 font-mono">${s.pdl || 'N/A'}</div>`;
+                        div.innerHTML = `<div class="font-bold text-xs text-white truncate flex items-center">${icon} ${s.name}</div><div class="mt-1 text-[9px] text-gray-500 font-mono flex justify-between"><span>${s.pdl || 'N/A'}</span><span class="text-cyan">${s.city || ''}</span></div>`;
                         container.appendChild(div);
                     });
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) {}
         }
 
         async function loadForm(id) {
@@ -367,7 +421,6 @@
                 document.getElementById('form-title').innerText = "Modifier Site";
                 document.getElementById('form-id').innerText = id;
                 
-                // MAPPAGE IDENTITÉ & MATRICE
                 const identity = data.identity || {};
                 document.getElementById('id-input').value = identity.siret || identity.id || "";
                 document.getElementById('site-name-input').value = identity.site_name || "";
@@ -391,6 +444,8 @@
                 document.getElementById('segment-display').value = contract.segment || "";
                 document.getElementById('provider-input').value = contract.provider || "";
                 document.getElementById('fta-input').value = contract.fta || "";
+                document.getElementById('date-start').value = contract.start_date || "";
+                document.getElementById('date-end').value = contract.end_date || "";
                 
                 if(data.energy_type === 'gaz') setEnergy('gaz'); else setEnergy('elec');
 
@@ -400,10 +455,10 @@
                 document.getElementById('ps-hpe').value = pd.hpe || pd.ps_hpe || contract.ps_hpe || "";
                 document.getElementById('ps-hce').value = pd.hce || pd.ps_hce || contract.ps_hce || "";
 
-                // MAPPAGE PRIX AVEC BOUCLIER ANTI-DÉLIRE
+                // LE BOUCLIER ANTI-DÉLIRE CSPE : MAX 100
                 const p = data.pricing || {};
                 let taxVal = parseFloat(p.tax || p.taxes || p.price_tax || 22.5);
-                if(isNaN(taxVal) || taxVal > 100) taxVal = 22.5; // Le bouclier est là !
+                if(isNaN(taxVal) || taxVal > 100) taxVal = 22.5;
 
                 if(currentEnergy === 'gaz') {
                     document.getElementById('price-gaz-fix').value = p.fix || p.abonnement || "";
@@ -426,7 +481,7 @@
             CURRENT_ID = null;
             document.getElementById('form-title').innerText = "Nouveau Site";
             document.getElementById('form-id').innerText = "ID: NEW";
-            document.querySelectorAll('#tab-parc input').forEach(i => { if(i.id !== 'search-site' && i.id !== 'search-tenant') i.value = '' });
+            document.querySelectorAll('#tab-parc input').forEach(i => { if(i.id !== 'search-site') i.value = '' });
             document.getElementById('segment-display').value = "--";
             setEnergy('elec');
         }
@@ -439,6 +494,9 @@
             
             const inputPdl = document.getElementById('ref-input').value.replace(/\s/g, '');
             if(!inputPdl) return alert("PDL requis.");
+
+            let taxValue = currentEnergy === 'gaz' ? parseFloat(document.getElementById('price-gaz-tax').value) : parseFloat(document.getElementById('price-tax').value);
+            if(isNaN(taxValue) || taxValue > 100) taxValue = 22.5;
 
             const payload = {
                 id: CURRENT_ID || inputPdl,
@@ -464,8 +522,11 @@
                 contract: {
                     pdl: inputPdl,
                     power: parseFloat(document.getElementById('val-input').value) || 0,
+                    segment: document.getElementById('segment-display').value,
                     provider: document.getElementById('provider-input').value,
                     fta: document.getElementById('fta-input').value,
+                    start_date: document.getElementById('date-start').value,
+                    end_date: document.getElementById('date-end').value,
                     energy_type: currentEnergy,
                     power_details: {
                         hph: parseFloat(document.getElementById('ps-hph').value) || 0,
@@ -480,19 +541,21 @@
                     hpe: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('price-hpe').value) || 0,
                     hce: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('price-hce').value) || 0,
                     fix: currentEnergy === 'gaz' ? parseFloat(document.getElementById('price-gaz-fix').value) || 0 : parseFloat(document.getElementById('price-fix').value) || 0,
-                    tax: currentEnergy === 'gaz' ? parseFloat(document.getElementById('price-gaz-tax').value) || 0 : parseFloat(document.getElementById('price-tax').value) || 22.5
+                    tax: taxValue
                 }
             };
             
             try {
                 const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-                if((await res.json()).success) { showToast("Sauvegardé"); loadSites(); }
+                const response = await res.json();
+                if(response.success) { showToast("Sauvegardé"); CURRENT_ID = response.id; loadSites(); } 
+                else { alert("Erreur: " + response.error); }
             } catch(e) { alert("Erreur réseau"); }
             btn.innerHTML = original;
         }
 
         // ========================================
-        // 4. LE MASSE UPDATE (PROPAGATION)
+        // 3. PROPAGATION DE MASSE & IMPORT
         // ========================================
         function openPropagationModal() {
             const segment = document.getElementById('segment-display').value;
@@ -500,7 +563,7 @@
             if(!segment || segment === '--') return alert("Segment requis pour propager.");
             document.getElementById('prop-segment').innerText = segment;
             document.getElementById('prop-lot').innerText = lot || "(Toute l'entreprise)";
-            document.getElementById('prop-client').innerText = ACTIVE_TENANT.name;
+            document.getElementById('prop-client').innerText = ACTIVE_TENANT ? ACTIVE_TENANT.name : "";
             document.getElementById('propagate-modal').classList.remove('hidden');
         }
 
@@ -522,7 +585,6 @@
             }
             
             const payload = { source_client_id: sourceId, target_date: dateEffet, filters: { segment: segment, lot_name: lot }, pricing_data: pricing };
-            
             try {
                 const res = await fetch('/api/settings/propagate_tariff', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
                 const response = await res.json();
@@ -547,6 +609,38 @@
             btn.innerText = "INJECTER DANS LA BASE";
         }
 
+        // ========================================
+        // 4. API & CLES RTE
+        // ========================================
+        async function loadRteConfig() {
+            try {
+                const res = await fetch('/api/settings/rte');
+                const data = await res.json();
+                if(data.client_id) {
+                    document.getElementById('rte-client-id').value = data.client_id;
+                    document.getElementById('rte-client-secret').value = data.client_secret;
+                }
+            } catch(e) {}
+        }
+        
+        async function saveRteConfig() {
+            const btn = document.activeElement;
+            const original = btn.innerHTML;
+            btn.innerHTML = '...';
+            const data = {
+                client_id: document.getElementById('rte-client-id').value,
+                client_secret: document.getElementById('rte-client-secret').value
+            };
+            try {
+                const res = await fetch('/api/settings/rte', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+                if((await res.json()).success) showToast("Clés API Sauvegardées");
+            } catch(e) {}
+            btn.innerHTML = original;
+        }
+
+        // ========================================
+        // GADGETS UI
+        // ========================================
         function setEnergy(type) {
             currentEnergy = type;
             const btnElec = document.getElementById('btn-elec'); const btnGaz = document.getElementById('btn-gaz');
@@ -562,8 +656,20 @@
                 card.style.borderColor = "#EF4444";
                 document.getElementById('grid-elec').classList.add('hidden'); document.getElementById('grid-ps').classList.add('hidden'); document.getElementById('grid-gaz').classList.remove('hidden');
             }
+            inferContract();
         }
-        
+
+        function inferContract() {
+            const val = parseFloat(document.getElementById('val-input').value);
+            const disp = document.getElementById('segment-display');
+            if(isNaN(val)) { disp.value = '--'; return; }
+            if(currentEnergy === 'elec') {
+                if (val <= 36) disp.value = "C5"; else if (val <= 250) disp.value = "C4"; else disp.value = "HTA";
+            } else {
+                if (val < 6) disp.value = "T1"; else if (val < 300) disp.value = "T2"; else if (val < 5000) disp.value = "T3"; else disp.value = "T4";
+            }
+        }
+
         switchTab('crm');
     </script>
 </body>
