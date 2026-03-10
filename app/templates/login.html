@@ -69,11 +69,17 @@
             <i class="fa-solid fa-shield-halved text-success"></i> 
             <span>Protégé par Google Firebase Authentication & MFA</span>
         </div>
+        
+        <div class="mt-4 text-center">
+            <a href="/onboarding" class="text-xs text-cyan hover:text-white transition">Nouveau client ? Démarrer l'Audit</a>
+        </div>
     </div>
 
+    <!-- SCRIPT LOGIQUE & FIREBASE ROUTER -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // CLÉS PUBLIQUES DE TON PROJET
         const firebaseConfig = {
@@ -87,6 +93,21 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // MAPPING DES ROLES VERS LES DASHBOARDS
+        const dashboardMap = {
+            'pme': '/pme',
+            'industry': '/industry',
+            'retail': '/retail',
+            'mairie': '/mairie',
+            'sde': '/sde',
+            'oph': '/oph',
+            'syndic': '/syndic',
+            'sante': '/sante',
+            'citizen': '/citoyen',
+            'supplier': '/supplier'
+        };
 
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -102,9 +123,12 @@
             errorMsg.classList.add('hidden');
 
             try {
+                // 1. Authentification Firebase
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                const idToken = await userCredential.user.getIdToken();
+                const user = userCredential.user;
+                const idToken = await user.getIdToken();
 
+                // 2. Création Session Backend
                 const res = await fetch('/api/auth/session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -114,17 +138,29 @@
                 const result = await res.json();
 
                 if (res.ok && result.success) {
-                    btnText.innerText = "ACCÈS AUTORISÉ";
-                    btnIcon.className = "fa-solid fa-check";
+                    btnText.innerText = "ROUTAGE EN COURS...";
+                    btnIcon.className = "fa-solid fa-network-wired";
                     
-                    // FIX V10 : ROUTAGE INTELLIGENT SELON LE RÔLE
-                    setTimeout(() => {
-                        if (result.role === "ADMIN") {
-                            window.location.href = "/ops_nexus";
-                        } else {
-                            window.location.href = "/settings"; // Espace Client
+                    // 3. Routage Intelligent
+                    if (result.role === "ADMIN") {
+                        window.location.href = "/ops_nexus";
+                    } else {
+                        try {
+                            // Lecture du rôle dans la Data Unity
+                            const userDoc = await getDoc(doc(db, "Users", user.uid));
+                            if (userDoc.exists() && userDoc.data().role) {
+                                const role = userDoc.data().role;
+                                const targetDashboard = dashboardMap[role] || "/settings";
+                                window.location.href = targetDashboard;
+                            } else {
+                                // Fallback si le compte n'a pas fini l'onboarding
+                                window.location.href = "/settings";
+                            }
+                        } catch(err) {
+                            console.error("Erreur lecture rôle", err);
+                            window.location.href = "/settings";
                         }
-                    }, 800);
+                    }
                 } else {
                     throw new Error("Erreur de session Backend.");
                 }
