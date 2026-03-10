@@ -30,8 +30,10 @@
 </head>
 <body class="flex h-screen w-screen overflow-hidden text-sm">
 
+    <!-- TOAST -->
     <div id="toast"><i class="fa-solid fa-check-circle mr-2"></i>Action effectuée !</div>
 
+    <!-- SIDEBAR -->
     <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col z-50">
         <div class="p-6 flex items-center gap-3 mb-4 border-b border-white/5 pb-6">
             <a href="/ops_nexus" class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition"><i class="fa-solid fa-arrow-left"></i></a>
@@ -66,24 +68,47 @@
 
     <main class="flex-1 overflow-y-auto p-10 relative bg-abysse">
         
-        <!-- ONGLET 1 : LE CRM -->
+        <!-- ========================================== -->
+        <!-- ONGLET 1 : LE CRM (LISTE DES CLIENTS) -->
+        <!-- ========================================== -->
         <div id="tab-crm" class="tab-content max-w-5xl mx-auto space-y-6">
             <header class="flex justify-between items-end mb-8">
-                <div><h2 class="text-3xl font-black text-white mb-1">Comptes Entreprises</h2><p class="text-gray-400 text-xs">Sélectionnez un Locataire pour piloter son périmètre.</p></div>
-                <div class="relative w-64"><i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i><input type="text" id="search-tenant" oninput="filterTenants()" placeholder="Rechercher (Nom, SIRET)..." class="w-full input-dark py-2 pl-10 pr-4 rounded-xl text-xs"></div>
+                <div>
+                    <h2 class="text-3xl font-black text-white mb-1">Comptes Entreprises</h2>
+                    <p class="text-gray-400 text-xs">Sélectionnez un Locataire pour piloter son périmètre.</p>
+                </div>
+                <div class="flex gap-3">
+                    <div class="relative w-64">
+                        <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                        <input type="text" id="search-tenant" oninput="filterTenants()" placeholder="Rechercher (Nom, SIRET)..." class="w-full input-dark py-2 pl-10 pr-4 rounded-xl text-xs">
+                    </div>
+                    <button onclick="openCreateTenantModal()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20">
+                        <i class="fa-solid fa-plus mr-2"></i>Nouveau Locataire
+                    </button>
+                </div>
             </header>
+
             <div class="bento-card rounded-bento overflow-hidden">
                 <table class="w-full text-left">
-                    <thead class="bg-white/5 text-[10px] text-gray-500 uppercase"><tr><th class="p-4">Raison Sociale</th><th class="p-4">SIRET (Tenant ID)</th><th class="p-4">Contact</th><th class="p-4 text-right">Action</th></tr></thead>
-                    <tbody id="tenant-list" class="divide-y divide-white/5"><tr><td colspan="4" class="p-8 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Chargement...</td></tr></tbody>
+                    <thead class="bg-white/5 text-[10px] text-gray-500 uppercase">
+                        <tr><th class="p-4">Raison Sociale</th><th class="p-4">SIRET (Tenant ID)</th><th class="p-4">Créé par</th><th class="p-4 text-right">Action</th></tr>
+                    </thead>
+                    <tbody id="tenant-list" class="divide-y divide-white/5">
+                        <tr><td colspan="4" class="p-8 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Chargement...</td></tr>
+                    </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- ONGLET 2 : LE PARC DU CLIENT (AVEC ADOPTION ORPHELINS) -->
+        <!-- ========================================== -->
+        <!-- ONGLET 2 : LE PARC DU CLIENT -->
+        <!-- ========================================== -->
         <div id="tab-parc" class="tab-content hidden max-w-7xl mx-auto space-y-6">
             <header class="flex justify-between items-end">
-                <div><h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2><p class="text-cyan text-xs font-bold" id="parc-subtitle">Veuillez sélectionner un client dans le CRM d'abord.</p></div>
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2>
+                    <p class="text-cyan text-xs font-bold" id="parc-subtitle">Veuillez sélectionner un client dans le CRM d'abord.</p>
+                </div>
                 <div class="flex gap-2">
                     <button onclick="toggleImportModal()" class="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg text-xs font-bold border border-white/10 transition"><i class="fa-solid fa-file-csv mr-2"></i>Forcer Import CSV</button>
                     <button onclick="saveSite()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20"><i class="fa-solid fa-save mr-2"></i>Sauvegarder Site</button>
@@ -91,13 +116,15 @@
             </header>
             
             <div class="grid grid-cols-12 gap-6 h-[calc(100vh-200px)]">
+                
                 <!-- LISTE GAUCHE -->
                 <div class="col-span-3 bento-card p-4 h-full overflow-y-auto flex flex-col relative">
+                    
                     <!-- LE BOUTON D'ADOPTION DES ORPHELINS -->
                     <button onclick="openOrphanModal()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-3 rounded-xl mb-4 transition shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2">
                         <i class="fa-solid fa-magnifying-glass"></i> Scanner les Orphelins
                     </button>
-                    
+
                     <div class="flex justify-between items-center mb-4 px-2">
                         <h3 class="font-bold text-white">Sites du Client</h3>
                         <button onclick="resetForm()" class="text-xs bg-cyan-900/30 text-cyan-400 px-3 py-1 rounded border border-cyan-500/30 hover:bg-cyan-500 hover:text-black transition"><i class="fa-solid fa-plus"></i></button>
@@ -128,7 +155,7 @@
                     <!-- 1. IDENTITÉ -->
                     <div class="bento-card rounded-bento p-6 border-l-4 border-cyan mb-6">
                         <div class="grid grid-cols-12 gap-4">
-                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">SIRET (Du Site)</label><input type="text" id="id-input" placeholder="14 chiffres..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
+                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">SIRET (Site)</label><input type="text" id="id-input" placeholder="14 chiffres..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
                             <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Code NAF</label><input type="text" id="naf-input" class="w-full input-dark p-2 rounded text-xs font-mono text-gray-400"></div>
                             <div class="col-span-7"><label class="text-[10px] text-cyan font-bold uppercase">NOM DU SITE (Affichage Dashboard)</label><input type="text" id="site-name-input" placeholder="Ex: École Jules Ferry..." class="w-full input-dark p-2 rounded text-xs border border-cyan/30 text-white font-bold"></div>
                         </div>
@@ -161,6 +188,11 @@
                             <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">FTA (Achem.)</label><input type="text" id="fta-input" class="w-full input-dark p-2 rounded text-xs" placeholder="-"></div>
                             <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Fournisseur</label><input type="text" id="provider-input" class="w-full input-dark p-2 rounded text-xs" placeholder="Ex: EDF"></div>
                             <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Segment</label><input type="text" id="segment-display" class="w-full input-dark p-2 rounded text-xs font-bold text-gray-400 bg-white/5" value="--"></div>
+                        </div>
+
+                        <div class="grid grid-cols-12 gap-4 mb-4">
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Date Début</label><input type="date" id="date-start" class="w-full input-dark p-2 rounded text-xs text-gray-400"></div>
+                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Date Fin</label><input type="date" id="date-end" class="w-full input-dark p-2 rounded text-xs text-gray-400"></div>
                         </div>
 
                         <div class="bg-white/5 p-4 rounded-xl border border-white/5">
@@ -275,6 +307,32 @@
 
     </main>
 
+    <!-- MODAL CREATE TENANT -->
+    <div id="create-tenant-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bento-card p-8 rounded-bento w-[500px] border border-cyan/30 shadow-2xl shadow-cyan/10">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-full bg-cyan/20 flex items-center justify-center"><i class="fa-solid fa-building text-cyan"></i></div>
+                <div><h3 class="text-lg font-bold text-white">Nouveau Locataire (Tenant)</h3><p class="text-xs text-gray-400">Créer un profil Entreprise maître.</p></div>
+            </div>
+            
+            <div class="space-y-4 mb-8">
+                <div>
+                    <label class="text-[10px] text-gray-500 font-bold uppercase mb-1 block">SIRET de l'Entité Mère (Tenant ID) *</label>
+                    <input type="text" id="new-tenant-siret" placeholder="14 chiffres purs..." class="w-full input-dark p-3 rounded-xl text-sm font-mono text-cyan">
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-500 font-bold uppercase mb-1 block">Raison Sociale (Nom du Client) *</label>
+                    <input type="text" id="new-tenant-name" placeholder="Ex: Mairie de Grenoble..." class="w-full input-dark p-3 rounded-xl text-sm text-white">
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-3">
+                <button onclick="document.getElementById('create-tenant-modal').classList.add('hidden')" class="text-gray-400 text-xs font-bold px-4 py-3 hover:text-white transition">ANNULER</button>
+                <button onclick="createTenant()" class="bg-cyan text-black text-xs font-bold px-6 py-3 rounded-xl hover:bg-cyan/90 transition shadow-lg shadow-cyan/20">CRÉER LE LOCATAIRE</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL ADOPTION ORPHELINS (LE MASSIF) -->
     <div id="orphan-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
         <div class="bento-card p-8 rounded-bento w-[800px] h-[600px] border border-indigo-500/30 shadow-2xl shadow-indigo-500/10 flex flex-col relative">
@@ -341,7 +399,7 @@
         </div>
     </div>
 
-    <!-- LOGIQUE JAVASCRIPT -->
+    <!-- LOGIQUE JAVASCRIPT CRM & MULTI-TENANT -->
     <script>
         let TENANTS = [];
         let SITES = [];
@@ -387,7 +445,7 @@
             list.innerHTML = '';
             
             if(TENANTS.length === 0) {
-                list.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-500">Aucun client enregistré. (Ils doivent se connecter sur /settings)</td></tr>';
+                list.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-500">Aucun client enregistré dans la base.</td></tr>';
                 return;
             }
 
@@ -396,13 +454,46 @@
                     <tr class="hover:bg-white/5 transition">
                         <td class="p-4 font-bold text-white"><i class="fa-solid fa-building text-gray-500 mr-2"></i> ${t.name || 'Sans Nom'}</td>
                         <td class="p-4 font-mono text-cyan">${t.tenant_id || t.siret}</td>
-                        <td class="p-4 text-gray-400 text-xs">${t.contact || '-'} (${t.email || '-'})</td>
+                        <td class="p-4 text-gray-400 text-xs">${t.contact || '-'}</td>
                         <td class="p-4 text-right">
                             <button onclick='activateTenant(${JSON.stringify(t)})' class="bg-cyan/10 text-cyan hover:bg-cyan hover:text-black border border-cyan/30 px-3 py-1 rounded transition text-xs font-bold">Gérer le Parc</button>
                         </td>
                     </tr>
                 `;
             });
+        }
+
+        function openCreateTenantModal() {
+            document.getElementById('create-tenant-modal').classList.remove('hidden');
+        }
+
+        async function createTenant() {
+            const siret = document.getElementById('new-tenant-siret').value.replace(/\s/g, '');
+            const name = document.getElementById('new-tenant-name').value;
+            
+            if(!siret || !name) return alert("Le SIRET et le Nom sont obligatoires.");
+            
+            const btn = document.querySelector('#create-tenant-modal button:last-child');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...';
+            
+            try {
+                const res = await fetch('/api/ops/create_tenant', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({siret: siret, name: name})
+                });
+                const data = await res.json();
+                if(data.success) {
+                    document.getElementById('create-tenant-modal').classList.add('hidden');
+                    showToast("Locataire créé avec succès !");
+                    loadTenants();
+                } else {
+                    alert("Erreur de création : " + data.error);
+                }
+            } catch(e) {
+                alert("Erreur réseau");
+            }
+            btn.innerHTML = 'CRÉER LE LOCATAIRE';
         }
 
         function activateTenant(tenantObj) {
@@ -654,7 +745,62 @@
         }
 
         // ========================================
-        // 4. API & CLES RTE (AVEC FIX D'ERREUR 405)
+        // 4. PROPAGATION
+        // ========================================
+        function openPropagationModal() {
+            const segment = document.getElementById('segment-display').value;
+            const lot = document.getElementById('mat-fille').value;
+            if(!segment || segment === '--') return alert("Segment requis pour propager.");
+            document.getElementById('prop-segment').innerText = segment;
+            document.getElementById('prop-lot').innerText = lot || "(Toute l'entreprise)";
+            document.getElementById('prop-client').innerText = ACTIVE_TENANT ? ACTIVE_TENANT.name : "";
+            document.getElementById('propagate-modal').classList.remove('hidden');
+        }
+
+        async function confirmPropagation() {
+            const dateEffet = document.getElementById('prop-date').value;
+            const segment = document.getElementById('segment-display').value;
+            const lot = document.getElementById('mat-fille').value;
+            const sourceId = document.getElementById('id-input').value || CURRENT_ID;
+            
+            if(!dateEffet || !sourceId) return alert("Date et Sauvegarde initiale requises.");
+            const btn = document.querySelector('#propagate-modal button:last-child');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...';
+            
+            let pricing = {};
+            if(currentEnergy === 'gaz') {
+                pricing = { fix: document.getElementById('price-gaz-fix').value, hph: document.getElementById('price-gaz-mol').value, tax: document.getElementById('price-gaz-tax').value };
+            } else {
+                pricing = { fix: document.getElementById('price-fix').value, hph: document.getElementById('price-hph').value, hch: document.getElementById('price-hch').value, hpe: document.getElementById('price-hpe').value, hce: document.getElementById('price-hce').value, tax: document.getElementById('price-tax').value };
+            }
+            
+            const payload = { source_client_id: sourceId, target_date: dateEffet, filters: { segment: segment, lot_name: lot }, pricing_data: pricing };
+            try {
+                const res = await fetch('/api/settings/propagate_tariff', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                const response = await res.json();
+                if(response.success) { document.getElementById('propagate-modal').classList.add('hidden'); showToast(`${response.updated_count} sites mis à jour !`); } 
+            } catch(e) {}
+            btn.innerHTML = 'CONFIRMER';
+        }
+
+        async function processImport() {
+            if(!ACTIVE_TENANT) return;
+            const input = document.getElementById('csv-upload');
+            if (!input.files || input.files.length === 0) return;
+            const formData = new FormData();
+            formData.append("file", input.files[0]);
+            const btn = document.querySelector('#import-modal button:last-child');
+            btn.innerText = "INGESTION EN COURS...";
+            try {
+                const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData });
+                const data = await res.json();
+                if(data.success) { toggleImportModal(); showToast(`${data.imported} sites importés !`); loadSites(); } 
+            } catch(e) {}
+            btn.innerText = "INJECTER DANS LA BASE";
+        }
+
+        // ========================================
+        // 5. API & CLES RTE
         // ========================================
         async function loadRteConfig() {
             const errBox = document.getElementById('api-error');
