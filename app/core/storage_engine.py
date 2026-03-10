@@ -6,10 +6,14 @@ from pathlib import Path
 import logging
 import shutil
 
-# CONFIGURATION DU CHEMIN (EVOLUTION V4.3 : CHEMIN ABSOLU ROBUSTE)
+# --- IMPORT CLOUD STORAGE (NOUVEAU) ---
+import firebase_admin
+from firebase_admin import storage
+
+# CONFIGURATION DU CHEMIN (CACHE TEMPORAIRE POUR CLOUD RUN)
 DATA_ROOT = Path(os.getcwd()) / "data"
 
-# Initialisation Sécurisée du Root
+# Initialisation Sécurisée du Root Local (Fallback)
 try:
     if not DATA_ROOT.exists():
         DATA_ROOT.mkdir(parents=True, exist_ok=True)
@@ -22,21 +26,34 @@ INDEX_FILE = DATA_ROOT / "master_index.json"
 VAULT_FILE = DATA_ROOT / "system" / "secure_vault.json"
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("STORAGE_ENGINE_V4_5_PLATINUM")
+logger = logging.getLogger("STORAGE_ENGINE_V10_CLOUD_NATIVE")
 
 class StorageEngine:
     """
-    CORTEX STORAGE ENGINE
+    CORTEX STORAGE ENGINE V10 (FIREBASE CLOUD STORAGE)
     Gestion centralisée des I/O, du RGPD et du Coffre-fort numérique.
     """
     def __init__(self):
-        self.version = "4.5 (Finance Extension)"
+        self.version = "10.0 (Firebase Cloud Storage Edition)"
         self.index = {}
         self._ensure_structure()
         self.load_index()
+        
+        # INITIALISATION DU BUCKET FIREBASE STORAGE
+        self.bucket = None
+        try:
+            # Sécurité anti-crash si initiale déjà faite par cortex_auth
+            if not firebase_admin._apps:
+                firebase_admin.initialize_app(options={'projectId': 'energistrat-saas'})
+            
+            # Connexion au bucket officiel Firebase
+            self.bucket = storage.bucket("energistrat-saas.appspot.com")
+            logger.info("🟢 CORTEX STORAGE : Connecté au bucket energistrat-saas.appspot.com")
+        except Exception as e:
+            logger.error(f"🔴 CORTEX STORAGE : Impossible de se connecter à Firebase Storage. Fallback local activé. Erreur: {e}")
 
     def _ensure_structure(self):
-        # RESTAURATION DE TOUS LES DOSSIERS HISTORIQUES (ANTI-REGRESSION)
+        # RESTAURATION DE TOUS LES DOSSIERS HISTORIQUES (ANTI-REGRESSION / CACHE CLOUD RUN)
         dirs = [
             DATA_ROOT / "raw_uploads", 
             DATA_ROOT / "raw_uploads" / "API",
@@ -46,15 +63,15 @@ class StorageEngine:
             DATA_ROOT / "tickets", 
             DATA_ROOT / "archives" / "INBOX", 
             DATA_ROOT / "system",
-            DATA_ROOT / "mandats", # Coffre RGPD
-            DATA_ROOT / "invoices" # NOUVEAU : Coffre Factures (Finance)
+            DATA_ROOT / "mandats", # Cache Coffre RGPD
+            DATA_ROOT / "invoices" # Cache Coffre Factures (Finance)
         ]
         for d in dirs: 
             d.mkdir(parents=True, exist_ok=True)
 
         if not INDEX_FILE.exists():
             initial = {
-                "meta": {"version": "4.5", "created": datetime.datetime.now().isoformat()}, 
+                "meta": {"version": self.version, "created": datetime.datetime.now().isoformat()}, 
                 "organizations": {}, 
                 "sites": {}
             }
@@ -79,20 +96,88 @@ class StorageEngine:
             os.replace(temp, INDEX_FILE)
         except Exception: pass
 
-    # --- RECONCILIATION ENGINE (SCAN PLAT) ---
+    # ==========================================
+    # MODULE RGPD & MANDATS (CLOUD STORAGE)
+    # ==========================================
+    def save_mandate_file(self, client_id, file_content, filename):
+        """Stocke le PDF signé dans le Cloud Google (Chiffré) avec un fallback local."""
+        try:
+            cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
+            clean_name = f"MANDAT_{datetime.datetime.now().strftime('%Y%m%d')}_{filename}"
+            
+            cloud_url = None
+            if self.bucket:
+                blob_path = f"mandats/{cid}/{clean_name}"
+                blob = self.bucket.blob(blob_path)
+                c_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/octet-stream"
+                blob.upload_from_string(file_content, content_type=c_type)
+                
+                # Génération URL Signée (Validité 7 Jours pour consultation Client/Admin)
+                cloud_url = blob.generate_signed_url(version="v4", expiration=datetime.timedelta(days=7), method="GET")
+                logger.info(f"[GCS] Mandat RGPD sécurisé dans le cloud : {blob_path}")
+
+            # Cache local Cloud Run (Pour accès immédiat par d'autres fonctions Python)
+            vault_dir = DATA_ROOT / "mandats" / cid
+            vault_dir.mkdir(parents=True, exist_ok=True)
+            file_path = vault_dir / clean_name
+            with open(file_path, "wb") as f: f.write(file_content)
+            
+            return {
+                "success": True, 
+                "path": str(file_path),
+                "cloud_url": cloud_url,
+                "message": "Cloud Storage OK" if cloud_url else "Local Cache Only"
+            }
+        except Exception as e: 
+            return {"success": False, "error": str(e)}
+
+    # ==========================================
+    # MODULE FINANCE / FACTURES (CLOUD STORAGE)
+    # ==========================================
+    def save_invoice_file(self, client_id, file_content, filename):
+        """Stocke la facture PDF pour audit OCR ultérieur dans le Cloud Google."""
+        try:
+            cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
+            clean_name = f"FACTURE_{datetime.datetime.now().strftime('%Y-%m-%d')}_{filename}"
+            
+            cloud_url = None
+            if self.bucket:
+                blob_path = f"invoices/{cid}/{clean_name}"
+                blob = self.bucket.blob(blob_path)
+                c_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/octet-stream"
+                blob.upload_from_string(file_content, content_type=c_type)
+                
+                # Génération URL Signée (Validité 7 Jours pour affichage dans le Dashboard)
+                cloud_url = blob.generate_signed_url(version="v4", expiration=datetime.timedelta(days=7), method="GET")
+                logger.info(f"[GCS] Facture sécurisée dans le cloud : {blob_path}")
+
+            # Cache local Cloud Run (Essentiel pour le Parser OCR qui a besoin du fichier physique)
+            vault_dir = DATA_ROOT / "invoices" / cid
+            vault_dir.mkdir(parents=True, exist_ok=True)
+            file_path = vault_dir / clean_name
+            with open(file_path, "wb") as f: f.write(file_content)
+            
+            return {
+                "success": True, 
+                "path": str(file_path),
+                "cloud_url": cloud_url,
+                "message": "Cloud Storage OK" if cloud_url else "Local Cache Only"
+            }
+        except Exception as e: 
+            return {"success": False, "error": str(e)}
+
+    # ==========================================
+    # --- RECONCILIATION ENGINE (SCAN PLAT LEGACY) ---
+    # ==========================================
     def find_site_by_pdl(self, pdl):
-        """Recherche un site via son PDL dans tous les fichiers JSON."""
+        """Recherche un site via son PDL dans les fichiers JSON locaux (Legacy)."""
         if not pdl: return None
-        # Recherche rapide dans l'index si disponible (Optimisation future)
-        
-        # Scan fichiers
         for client_file in DATA_ROOT.glob("*.json"):
             if "master_index" in client_file.name or "market_ref" in client_file.name: continue
             try:
                 with open(client_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     contract = data.get("contract", {})
-                    # Nettoyage pour comparaison
                     stored_pdl = str(contract.get("pdl", "")).replace(" ", "").strip()
                     target_pdl = str(pdl).replace(" ", "").strip()
                     
@@ -112,27 +197,25 @@ class StorageEngine:
             except Exception: continue
         return None
 
-    # --- ERP CLIENTS (ECRITURE PLATE) ---
+    # ==========================================
+    # --- ERP CLIENTS LEGACY (ANTI-REGRESSION) ---
+    # ==========================================
     def save_client_settings(self, client_id, data):
+        """⚠️ Legacy: Les nouveaux enregistrements doivent passer par cortex_db.py (Firestore)"""
         try:
             cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
             if not cid: cid = f"site_{uuid.uuid4().hex[:8]}"
             path = DATA_ROOT / f"{cid}.json"
             
-            # Préservation des données RGPD existantes si non fournies
             if path.exists():
                 try:
                     with open(path, 'r', encoding='utf-8') as f:
                         existing = json.load(f)
-                        if "rgpd" in existing and "rgpd" not in data:
-                            data["rgpd"] = existing["rgpd"]
-                        # Preservation des mesures si on ne fait qu'une update settings
-                        if "measurements" in existing and "measurements" not in data:
-                            data["measurements"] = existing["measurements"]
+                        if "rgpd" in existing and "rgpd" not in data: data["rgpd"] = existing["rgpd"]
+                        if "measurements" in existing and "measurements" not in data: data["measurements"] = existing["measurements"]
                 except: pass
 
             data["_meta"] = {"updated_at": datetime.datetime.now().isoformat()}
-            
             if "client_name" not in data:
                 data["client_name"] = data.get("identity", {}).get("site_name") or data.get("identity", {}).get("name") or cid
 
@@ -157,57 +240,35 @@ class StorageEngine:
             logger.error(f"Load Error: {e}")
             return None
 
-    # --- MODULE RGPD & MANDATS ---
-    def save_mandate_file(self, client_id, file_content, filename):
-        """Stocke le PDF signé dans un coffre sécurisé."""
-        try:
-            cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
-            vault_dir = DATA_ROOT / "mandats" / cid
-            vault_dir.mkdir(parents=True, exist_ok=True)
-            
-            clean_name = f"MANDAT_{datetime.datetime.now().strftime('%Y%m%d')}_{filename}"
-            file_path = vault_dir / clean_name
-            
-            with open(file_path, "wb") as f: f.write(file_content)
-            return {"success": True, "path": str(file_path)}
-        except Exception as e: return {"success": False, "error": str(e)}
-
-    # --- MODULE FINANCE (EXTENSION POUR FACTURES) ---
-    def save_invoice_file(self, client_id, file_content, filename):
-        """
-        Stocke la facture PDF pour audit ultérieur.
-        """
-        try:
-            cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
-            vault_dir = DATA_ROOT / "invoices" / cid
-            vault_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Nommage : FACTURE_2026-03-01_NomFichier.pdf
-            clean_name = f"FACTURE_{datetime.datetime.now().strftime('%Y-%m-%d')}_{filename}"
-            file_path = vault_dir / clean_name
-            
-            with open(file_path, "wb") as f: f.write(file_content)
-            return {"success": True, "path": str(file_path)}
-        except Exception as e: return {"success": False, "error": str(e)}
-
-    # --- ADMINISTRATION ---
     def delete_client(self, client_id):
         try:
             cid = "".join(x for x in client_id if x.isalnum() or x in "_-")
             path = DATA_ROOT / f"{cid}.json"
+            
+            # Suppression GCS si existant
+            if self.bucket:
+                try:
+                    blobs = self.bucket.list_blobs(prefix=f"invoices/{cid}/")
+                    for blob in blobs: blob.delete()
+                    blobs_m = self.bucket.list_blobs(prefix=f"mandats/{cid}/")
+                    for blob in blobs_m: blob.delete()
+                except Exception as e:
+                    logger.warning(f"Impossible de supprimer les fichiers Cloud de {cid}: {e}")
+
             if path.exists():
                 os.remove(path)
                 if cid in self.index["sites"]:
                     del self.index["sites"][cid]
                     self.save_index()
-                # Nettoyage Mandats & Factures
                 shutil.rmtree(DATA_ROOT / "mandats" / cid, ignore_errors=True)
                 shutil.rmtree(DATA_ROOT / "invoices" / cid, ignore_errors=True)
                 return {"success": True}
             return {"success": False, "error": "Not found"}
         except Exception as e: return {"success": False, "error": str(e)}
 
-    # --- PARTNERS & TICKETING ---
+    # ==========================================
+    # --- PARTNERS & TICKETING LEGACY ---
+    # ==========================================
     def save_partner_config(self, pid, data):
         try:
             clean = "".join(x for x in pid if x.isalnum() or x in "_-")
