@@ -119,7 +119,7 @@ except Exception as e_prod:
         forecast = None
         pdf_builder = FallbackPDFBuilder()
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V9.2-CREATE-TENANT")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V10.0-ANTI-MILLIONS")
 
 app.add_middleware(
     CORSMiddleware,
@@ -219,14 +219,12 @@ async def api_get_tenants(user = Depends(get_current_user)):
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     return JSONResponse({"success": True, "tenants": db.get_all_users()})
 
-# LA NOUVELLE ROUTE (CRÉATEUR DE TENANT)
 @app.post("/api/ops/create_tenant")
 async def api_create_tenant(payload: TenantCreateRequest, user = Depends(get_current_user)):
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     try:
         tenant_id = str(payload.siret).replace(" ", "")
         data = { "tenant_id": tenant_id, "siret": tenant_id, "name": payload.name, "created_by": "ADMIN" }
-        # On utilise le SIRET comme ID unique du document locataire
         db.save_user_profile(f"TENANT_{tenant_id}", data)
         return JSONResponse({"success": True, "tenant": data})
     except Exception as e:
@@ -237,13 +235,11 @@ async def api_create_tenant(payload: TenantCreateRequest, user = Depends(get_cur
 # ==========================================
 @app.get("/api/tools/sniper/market")
 async def api_sniper_market(user = Depends(get_current_user)):
-    """Délègue l'appel au marché financier à cortex_rte.py"""
     if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
     return JSONResponse(rte.get_wholesale_market())
 
 @app.get("/api/rte/live")
 async def get_rte_live_data(user = Depends(get_current_user)):
-    """Délègue la météo du réseau et l'alerte PP1 à cortex_rte.py"""
     if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
     return JSONResponse(rte.get_pulse_dashboard_data())
     # ==========================================
@@ -251,7 +247,6 @@ async def get_rte_live_data(user = Depends(get_current_user)):
 # ==========================================
 @app.get("/api/ops/orphans")
 async def api_get_orphans(keyword: str = "", user = Depends(get_current_user)):
-    """Recherche des sites sans Tenant ou correspondant à un mot clé"""
     if not user or user.get("role") != "ADMIN": 
         return JSONResponse({"error": "Non autorisé"}, 401)
         
@@ -276,7 +271,6 @@ async def api_get_orphans(keyword: str = "", user = Depends(get_current_user)):
 
 @app.post("/api/ops/adopt")
 async def api_adopt_sites(payload: AdoptionRequest, user = Depends(get_current_user)):
-    """Rattache une liste de sites à un Tenant ID (Mass-Update)"""
     if not user or user.get("role") != "ADMIN": 
         return JSONResponse({"error": "Non autorisé"}, 401)
         
@@ -410,6 +404,24 @@ async def get_thermic_signature(client_id: str):
     return JSONResponse({"success": True, "points": points, "regression": {"a": round(a, 4), "b": round(b, 2), "r2": round(r2, 3)}, "diagnostics": {"talon_mensuel": round(talon_monthly, 2), "sensibilite": round(a * 1000, 2), "is_optimized": r2 > 0.85}})
 
 # ==========================================
+# GESTION DES PROFILS PARTENAIRES
+# ==========================================
+@app.post("/api/partner/save_config")
+async def save_partner_config(request: Request, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"success": False, "error": "Non autorisé"}, 401)
+    try:
+        data = await request.json()
+        data["tenant_id"] = str(data.get("siret", "")).replace(" ", "")
+        db.save_user_profile(user.get("uid"), data)
+        return JSONResponse({"success": True, "tenant_id": data["tenant_id"]})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
+
+@app.get("/api/partner/get_config")
+async def get_partner_config(user = Depends(get_current_user)):
+    if not user: return JSONResponse({"success": False}, 401)
+    return JSONResponse({"success": True, "data": db.get_user_profile(user.get("uid"))})
+
+# ==========================================
 # API PRINCIPALES (DATA UNITY & FIRESTORE)
 # ==========================================
 def normalize_full_data(data, tenant_id=None):
@@ -536,10 +548,19 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
         vol_router = float(s.get('kpis', {}).get('volume_mwh', 0))
         final_vol = vol_engine if vol_engine > 0 else vol_router
 
+        # ====================================================
+        # FIX V10 : LE BOUCLIER FINANCIER (ANTI-MILLIONS)
+        # ====================================================
         final_budget = fin.get('budget_annual', 0)
         if final_budget == 0 and final_vol > 0:
             avg_price = float(s.get('pricing', {}).get('price_kwh') or s.get('pricing', {}).get('prix_kwh') or s.get('pricing', {}).get('hph') or 0.20)
-            final_budget = fin.get('budget_subscription', 0) + (final_vol * 1000 * avg_price)
+            if avg_price > 2.0: avg_price = avg_price / 1000.0 # Force la conversion si saisi en MWh
+            
+            tax = float(s.get('pricing', {}).get('tax') or s.get('pricing', {}).get('taxes') or 22.5)
+            if tax > 100: tax = 22.5 # Si Excel a mis 74000 par erreur, on bloque à 22.5
+            
+            sub_cost = float(s.get('pricing', {}).get('fix') or s.get('pricing', {}).get('abonnement') or 0)
+            final_budget = sub_cost + (final_vol * 1000 * avg_price) + (final_vol * tax)
 
         fleet_list.append({
             "id": get_safe_id(s.get('identity', {}).get('id')), 
@@ -622,21 +643,20 @@ async def get_dashboard_data(client_id: str, response: Response, user = Depends(
     pricing = financials['pricing_details']
     display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
 
-    vol_display = financials['volume_mwh']
-    kpis_raw = data.get('kpis', {})
-    if vol_display == 0 and 'volume_mwh' in kpis_raw: vol_display = float(kpis_raw['volume_mwh'])
-
-    budget_display = financials['budget_annual']
-    volume_multiplier = 1000 if vol_display <= 100000 else 1
+    # ====================================================
+    # FIX V10 : LE BOUCLIER FINANCIER POUR LA PAGE DETAIL
+    # ====================================================
+    vol_display = float(financials['volume_mwh'] or data.get('kpis', {}).get('volume_mwh', 0))
+    p_data = data.get('pricing', {})
     
-    if financials['volume_mwh'] == 0 and vol_display > 0:
-        p_data = data.get('pricing', {})
-        u_price = 0.20
-        for k in ['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
-            if k in p_data and p_data[k]: 
-                try: u_price = float(p_data[k]); break
-                except: pass
-        budget_display = financials.get('budget_subscription', 0) + (vol_display * volume_multiplier * u_price)
+    u_price = float(p_data.get('price_kwh') or p_data.get('prix_kwh') or p_data.get('hph') or 0.20)
+    if u_price > 2.0: u_price = u_price / 1000.0
+    
+    tax_val = float(p_data.get('tax') or p_data.get('taxes') or 22.5)
+    if tax_val > 100: tax_val = 22.5
+    
+    sub_val = float(p_data.get('fix') or p_data.get('abonnement') or 0)
+    budget_display = sub_val + (vol_display * 1000 * u_price) + (vol_display * tax_val)
 
     pd = contract.get('power_details', {})
     if not contract.get('ps_hph'): contract['ps_hph'] = pd.get('hph') or contract.get('p_hph') or contract.get('P_HPH') or "-"
