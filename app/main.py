@@ -119,7 +119,7 @@ except Exception as e_prod:
         forecast = None
         pdf_builder = FallbackPDFBuilder()
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V9.1-MASS-ADOPT")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V9.2-CREATE-TENANT")
 
 app.add_middleware(
     CORSMiddleware,
@@ -146,6 +146,7 @@ class StrategyRequest(BaseModel): site_id: str; bloc_kw: float
 class AggregationRequest(BaseModel): site_ids: List[str]; years: int = 3
 class PropagateRequest(BaseModel): source_client_id: str; target_date: str; filters: Dict[str, str]; pricing_data: Dict[str, Any]
 class AdoptionRequest(BaseModel): target_tenant_id: str; site_ids: List[str]
+class TenantCreateRequest(BaseModel): siret: str; name: str
 class M57SettingsModel(BaseModel): bp_elec: float = 0.0; bp_gaz: float = 0.0; consumed_elec: float = 0.0; consumed_gaz: float = 0.0; bp_irve: float = 0.0; consumed_irve: float = 0.0; bp_enr: float = 0.0; consumed_enr: float = 0.0
 class CarbonSettingsModel(BaseModel): baseline_year: int = 2010; baseline_kwh_sqm: float = 0.0
 class RTESettingsModel(BaseModel): client_id: str = ""; client_secret: str = ""
@@ -218,6 +219,19 @@ async def api_get_tenants(user = Depends(get_current_user)):
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     return JSONResponse({"success": True, "tenants": db.get_all_users()})
 
+# LA NOUVELLE ROUTE (CRÉATEUR DE TENANT)
+@app.post("/api/ops/create_tenant")
+async def api_create_tenant(payload: TenantCreateRequest, user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    try:
+        tenant_id = str(payload.siret).replace(" ", "")
+        data = { "tenant_id": tenant_id, "siret": tenant_id, "name": payload.name, "created_by": "ADMIN" }
+        # On utilise le SIRET comme ID unique du document locataire
+        db.save_user_profile(f"TENANT_{tenant_id}", data)
+        return JSONResponse({"success": True, "tenant": data})
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, 500)
+
 # ==========================================
 # CORTEX RTE (SATELLITE DE MARCHÉ)
 # ==========================================
@@ -249,7 +263,6 @@ async def api_get_orphans(keyword: str = "", user = Depends(get_current_user)):
         tenant_id = identity.get('tenant_id')
         name = str(identity.get('site_name', '')).lower()
         
-        # On remonte les vrais orphelins, ou ceux dont le nom matche la recherche
         if not tenant_id or tenant_id == "ORPHELIN" or tenant_id == "" or (kw and kw in name):
             orphans.append({
                 "id": get_safe_id(identity.get('id', '')),
@@ -395,24 +408,6 @@ async def get_thermic_signature(client_id: str):
     r2 = 1 - (sum((p['y'] - (a * p['x'] + b))**2 for p in points) / ss_tot) if ss_tot != 0 else 0
     
     return JSONResponse({"success": True, "points": points, "regression": {"a": round(a, 4), "b": round(b, 2), "r2": round(r2, 3)}, "diagnostics": {"talon_mensuel": round(talon_monthly, 2), "sensibilite": round(a * 1000, 2), "is_optimized": r2 > 0.85}})
-
-# ==========================================
-# GESTION DES PROFILS PARTENAIRES (POUPÉES RUSSES)
-# ==========================================
-@app.post("/api/partner/save_config")
-async def save_partner_config(request: Request, user = Depends(get_current_user)):
-    if not user: return JSONResponse({"success": False, "error": "Non autorisé"}, 401)
-    try:
-        data = await request.json()
-        data["tenant_id"] = str(data.get("siret", "")).replace(" ", "")
-        db.save_user_profile(user.get("uid"), data)
-        return JSONResponse({"success": True, "tenant_id": data["tenant_id"]})
-    except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
-
-@app.get("/api/partner/get_config")
-async def get_partner_config(user = Depends(get_current_user)):
-    if not user: return JSONResponse({"success": False}, 401)
-    return JSONResponse({"success": True, "data": db.get_user_profile(user.get("uid"))})
 
 # ==========================================
 # API PRINCIPALES (DATA UNITY & FIRESTORE)
