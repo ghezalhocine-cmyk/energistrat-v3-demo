@@ -56,7 +56,7 @@
             </div>
 
             <div id="error-msg" class="hidden bg-alert/10 border border-alert/30 text-alert text-xs p-3 rounded-xl font-bold flex items-center gap-2">
-                <i class="fa-solid fa-triangle-exclamation"></i> <span>Identifiants incorrects.</span>
+                <i class="fa-solid fa-triangle-exclamation"></i> <span id="error-txt">Identifiants incorrects.</span>
             </div>
 
             <button type="submit" id="btn-submit" class="w-full bg-cyan text-abysse font-black py-4 rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.4)] hover:bg-white transition flex justify-center items-center gap-3">
@@ -71,12 +71,11 @@
         </div>
     </div>
 
-    <!-- SDK FIREBASE V9 (MODULAR) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-        // LES CLÉS DE TON SAAS (GÉNÉRALEMENT PUBLIQUES)
+        // CLÉS PUBLIQUES DE TON PROJET
         const firebaseConfig = {
             apiKey: "AIzaSyBMn-3l7kYmllgYkx-8ORsf8uU-HCZGJ-k",
             authDomain: "energistrat-saas.firebaseapp.com",
@@ -103,39 +102,39 @@
             errorMsg.classList.add('hidden');
 
             try {
-                // 1. On demande à Firebase de vérifier l'utilisateur
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                
-                // 2. Si OK, on récupère le jeton crypté (ID Token)
                 const idToken = await userCredential.user.getIdToken();
 
-                // 3. On envoie ce jeton à NOTRE API Backend pour créer le Cookie de Session
                 const res = await fetch('/api/auth/session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id_token: idToken })
                 });
 
-                if (res.ok) {
+                const result = await res.json();
+
+                if (res.ok && result.success) {
                     btnText.innerText = "ACCÈS AUTORISÉ";
                     btnIcon.className = "fa-solid fa-check";
-                    setTimeout(() => window.location.href = "/ops_nexus", 800);
+                    
+                    // FIX V10 : ROUTAGE INTELLIGENT SELON LE RÔLE
+                    setTimeout(() => {
+                        if (result.role === "ADMIN") {
+                            window.location.href = "/ops_nexus";
+                        } else {
+                            window.location.href = "/settings"; // Espace Client
+                        }
+                    }, 800);
                 } else {
                     throw new Error("Erreur de session Backend.");
                 }
 
             } catch (error) {
-                console.error("Login Failed:", error.code, error.message);
+                console.error("Login Failed:", error);
                 btnText.innerText = "DÉVERROUILLER L'ACCÈS";
                 btnIcon.className = "fa-solid fa-arrow-right";
                 errorMsg.classList.remove('hidden');
-                
-                if(error.code === 'auth/multi-factor-auth-required') {
-                    // TODO: Gestion visuelle du MFA (SMS) à intégrer dans la prochaine évolution
-                    errorMsg.innerHTML = '<i class="fa-solid fa-mobile"></i> <span>Double authentification (MFA) requise.</span>';
-                } else {
-                    errorMsg.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> <span>Identifiants incorrects.</span>';
-                }
+                document.getElementById('error-txt').innerText = error.code === 'auth/multi-factor-auth-required' ? 'Double authentification (MFA) requise.' : 'Identifiants incorrects.';
             }
         });
     </script>
