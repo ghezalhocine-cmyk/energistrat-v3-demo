@@ -35,7 +35,7 @@ class FallbackPDFBuilder:
         return "<h1>Générateur PDF Grappe</h1>"
 
 # ==============================================================================
-# BLOC IMPORT CORTEX ROBUSTE (AVEC CORTEX_RTE)
+# BLOC IMPORT CORTEX ROBUSTE
 # ==============================================================================
 try:
     from app.core.cortex_ingest import ingest
@@ -114,13 +114,12 @@ except Exception as e_prod:
             def get_wholesale_market(self): return {"success": False, "error": "RTE Module Offline"}
             def get_pulse_dashboard_data(self): return {"success": False, "error": "RTE Module Offline"}
         rte = MockRTE()
-        
         ingest = None
         physics = None
         forecast = None
         pdf_builder = FallbackPDFBuilder()
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V9.0-RTE")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V9.1-MASS-ADOPT")
 
 app.add_middleware(
     CORSMiddleware,
@@ -146,6 +145,7 @@ class MarketUpdateModel(BaseModel): elec: Dict[str, Any]; gaz: Dict[str, Any]; t
 class StrategyRequest(BaseModel): site_id: str; bloc_kw: float
 class AggregationRequest(BaseModel): site_ids: List[str]; years: int = 3
 class PropagateRequest(BaseModel): source_client_id: str; target_date: str; filters: Dict[str, str]; pricing_data: Dict[str, Any]
+class AdoptionRequest(BaseModel): target_tenant_id: str; site_ids: List[str]
 class M57SettingsModel(BaseModel): bp_elec: float = 0.0; bp_gaz: float = 0.0; consumed_elec: float = 0.0; consumed_gaz: float = 0.0; bp_irve: float = 0.0; consumed_irve: float = 0.0; bp_enr: float = 0.0; consumed_enr: float = 0.0
 class CarbonSettingsModel(BaseModel): baseline_year: int = 2010; baseline_kwh_sqm: float = 0.0
 class RTESettingsModel(BaseModel): client_id: str = ""; client_secret: str = ""
@@ -168,6 +168,9 @@ async def get_current_user(request: Request):
     if t.startswith("Bearer "): t = t.split(" ")[1]
     return auth.verify_token(t)
 
+# ==========================================
+# AUTHENTIFICATION
+# ==========================================
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request, user = Depends(get_current_user)):
     if user: return RedirectResponse(url="/ops_nexus" if user.get("role") == "ADMIN" else "/dashboard/citoyen")
@@ -187,6 +190,9 @@ async def logout(response: Response):
     response.delete_cookie("access_token")
     return RedirectResponse(url="/login")
 
+# ==========================================
+# API CORTEX SENTINEL
+# ==========================================
 @app.get("/api/ops/sentinel/alerts")
 async def api_get_sentinel_alerts(): return db.get_sentinel_alerts()
 
@@ -208,11 +214,12 @@ async def api_gridmap_capacity():
 
 @app.get("/api/ops/tenants")
 async def api_get_tenants(user = Depends(get_current_user)):
+    """Le CRM pour récupérer la liste des entreprises (Tenant)"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     return JSONResponse({"success": True, "tenants": db.get_all_users()})
 
 # ==========================================
-# CORTEX RTE (LE NOUVEAU SATELLITE DE MARCHÉ)
+# CORTEX RTE (SATELLITE DE MARCHÉ)
 # ==========================================
 @app.get("/api/tools/sniper/market")
 async def api_sniper_market(user = Depends(get_current_user)):
@@ -226,6 +233,52 @@ async def get_rte_live_data(user = Depends(get_current_user)):
     if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
     return JSONResponse(rte.get_pulse_dashboard_data())
     # ==========================================
+# L'OUTIL D'ADOPTION DE MASSE (POUPÉES RUSSES)
+# ==========================================
+@app.get("/api/ops/orphans")
+async def api_get_orphans(keyword: str = "", user = Depends(get_current_user)):
+    """Recherche des sites sans Tenant ou correspondant à un mot clé"""
+    if not user or user.get("role") != "ADMIN": 
+        return JSONResponse({"error": "Non autorisé"}, 401)
+        
+    orphans = []
+    kw = keyword.lower().strip()
+    
+    for s in db.get_all_sites():
+        identity = s.get('identity', {})
+        tenant_id = identity.get('tenant_id')
+        name = str(identity.get('site_name', '')).lower()
+        
+        # On remonte les vrais orphelins, ou ceux dont le nom matche la recherche
+        if not tenant_id or tenant_id == "ORPHELIN" or tenant_id == "" or (kw and kw in name):
+            orphans.append({
+                "id": get_safe_id(identity.get('id', '')),
+                "name": identity.get('site_name', 'Inconnu'),
+                "pdl": str(s.get('contract', {}).get('pdl', '')),
+                "city": s.get('location', {}).get('city', ''),
+                "current_tenant": tenant_id or "Aucun"
+            })
+            
+    return JSONResponse({"success": True, "orphans": orphans})
+
+@app.post("/api/ops/adopt")
+async def api_adopt_sites(payload: AdoptionRequest, user = Depends(get_current_user)):
+    """Rattache une liste de sites à un Tenant ID (Mass-Update)"""
+    if not user or user.get("role") != "ADMIN": 
+        return JSONResponse({"error": "Non autorisé"}, 401)
+        
+    updated_count = 0
+    for site_id in payload.site_ids:
+        data = db.get_site(site_id)
+        if data:
+            if 'identity' not in data: data['identity'] = {}
+            data['identity']['tenant_id'] = payload.target_tenant_id
+            if db.save_site(site_id, data):
+                updated_count += 1
+                
+    return JSONResponse({"success": True, "updated_count": updated_count})
+
+# ==========================================
 # API SUBVENTIONS & CERFA
 # ==========================================
 @app.get("/api/tools/subventions")
@@ -239,14 +292,10 @@ async def api_subventions_analyze(user = Depends(get_current_user)):
     total_enveloppe = 0
 
     for s in raw_sites:
-        if "CLI_" in str(s.get('identity', {}).get('id')): 
-            continue
-        if not is_admin and s.get("identity", {}).get("tenant_id") != tid: 
-            continue
+        if "CLI_" in str(s.get('identity', {}).get('id')): continue
+        if not is_admin and s.get("identity", {}).get("tenant_id") != tid: continue
         
-        if cortex: 
-            s['computed_financials'] = cortex.enrich_site_financials(s)
-            
+        if cortex: s['computed_financials'] = cortex.enrich_site_financials(s)
         fin = s.get('computed_financials', {})
         loc = s.get('location', {})
         vol = float(fin.get('volume_mwh', 0) or s.get('kpis', {}).get('volume_mwh', 0))
@@ -254,14 +303,7 @@ async def api_subventions_analyze(user = Depends(get_current_user)):
         city = str(loc.get('city', '')).upper()
         
         if surface == 0:
-            results.append({
-                "id": get_safe_id(s.get('identity', {}).get('id', '')), 
-                "pdl": str(s.get('contract', {}).get('pdl') or s.get('contract', {}).get('pce') or "Inconnu"), 
-                "name": fin.get('meta', {}).get('site_label', 'Site Inconnu'), 
-                "city": city, 
-                "status": "MISSING_DATA", 
-                "reason": "Surface manquante."
-            })
+            results.append({"id": get_safe_id(s.get('identity', {}).get('id', '')), "pdl": str(s.get('contract', {}).get('pdl') or s.get('contract', {}).get('pce') or "Inconnu"), "name": fin.get('meta', {}).get('site_label', 'Site Inconnu'), "city": city, "status": "MISSING_DATA", "reason": "Surface manquante."})
             continue
             
         zf = 1.3 if any(x in city for x in ['LILLE', 'PARIS', 'STRASBOURG', 'LYON', 'NANCY', 'REIMS', 'METZ']) else (0.8 if any(x in city for x in ['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON', 'PERPIGNAN', 'NIMES']) else 1.0)
@@ -270,27 +312,13 @@ async def api_subventions_analyze(user = Depends(get_current_user)):
         aides = []
         ghost = float(fin.get('kpis', {}).get('ghost_savings', 0))
         
-        if surface >= 500 and ghost > (vol * 0.1): 
-            aides.append({"code": "BAT-TH-116", "nom": "Coup de Pouce GTB", "details": f"Surface ({surface}m²) × Forfait × Zone {zn}", "montant": round(((surface * 250 * zf) / 1000) * 6.50 * 1.5)})
-        if surface > 0 and (vol * 1000) / surface > 300: 
-            aides.append({"code": "BAT-EN-101", "nom": "Isolation Thermique Toiture", "details": f"Surface toit ({round(surface * 0.3)}m²) × 1400 kWhc × Zone {zn}", "montant": round((((surface * 0.3) * 1400 * zf) / 1000) * 6.50)})
-        if fin.get('meta', {}).get('is_gas', False) and vol > 500: 
-            aides.append({"code": "ADEME-CHALEUR", "nom": "Fonds Chaleur", "details": f"Substitution {round(vol)} MWh fossile × 25€", "montant": round(vol * 25)})
+        if surface >= 500 and ghost > (vol * 0.1): aides.append({"code": "BAT-TH-116", "nom": "Coup de Pouce GTB", "details": f"Surface ({surface}m²) × Forfait × Zone {zn}", "montant": round(((surface * 250 * zf) / 1000) * 6.50 * 1.5)})
+        if surface > 0 and (vol * 1000) / surface > 300: aides.append({"code": "BAT-EN-101", "nom": "Isolation Thermique Toiture", "details": f"Surface toit ({round(surface * 0.3)}m²) × 1400 kWhc × Zone {zn}", "montant": round((((surface * 0.3) * 1400 * zf) / 1000) * 6.50)})
+        if fin.get('meta', {}).get('is_gas', False) and vol > 500: aides.append({"code": "ADEME-CHALEUR", "nom": "Fonds Chaleur", "details": f"Substitution {round(vol)} MWh fossile × 25€", "montant": round(vol * 25)})
         
         t_site = sum(a['montant'] for a in aides)
         total_enveloppe += t_site
-        
-        results.append({
-            "id": get_safe_id(s.get('identity', {}).get('id', '')), 
-            "pdl": str(s.get('contract', {}).get('pdl') or s.get('contract', {}).get('pce') or "Inconnu"), 
-            "name": fin.get('meta', {}).get('site_label', 'Site Inconnu'), 
-            "city": city, 
-            "status": "ELIGIBLE" if aides else "NON_ELIGIBLE", 
-            "aides": aides, 
-            "total_site": t_site, 
-            "reason": "Site optimisé." if not aides else ""
-        })
-        
+        results.append({"id": get_safe_id(s.get('identity', {}).get('id', '')), "pdl": str(s.get('contract', {}).get('pdl') or s.get('contract', {}).get('pce') or "Inconnu"), "name": fin.get('meta', {}).get('site_label', 'Site Inconnu'), "city": city, "status": "ELIGIBLE" if aides else "NON_ELIGIBLE", "aides": aides, "total_site": t_site, "reason": "Site optimisé." if not aides else ""})
     return JSONResponse({"success": True, "results": results, "total_enveloppe": round(total_enveloppe)})
 
 @app.get("/api/tools/cerfa/{site_id}/{aide_code}", response_class=HTMLResponse)
@@ -300,16 +328,12 @@ async def generate_cerfa_pdf(site_id: str, aide_code: str, user = Depends(get_cu
         data = db.get_site(site_id)
         if not data: return HTMLResponse(f"<h1>Erreur</h1><p>Site introuvable.</p>", status_code=404)
         
-        i = data.get('identity', {})
-        l = data.get('location', {})
-        c = data.get('contract', {})
-        
+        i = data.get('identity', {}); l = data.get('location', {}); c = data.get('contract', {})
         titre = "MISE EN PLACE D'UN SYSTÈME DE GESTION TECHNIQUE DU BÂTIMENT (GTB)" if "116" in aide_code else ("ISOLATION DE COMBLES OU DE TOITURES" if "101" in aide_code else "OPÉRATION STANDARDISÉE")
         fiche = "BAT-TH-116" if "116" in aide_code else ("BAT-EN-101" if "101" in aide_code else aide_code)
         
         return HTMLResponse(content=f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>CERFA_{fiche}_{str(c.get('pdl') or c.get('pce') or 'N/A')}</title><style>@page {{ size: A4; margin: 15mm; }} body {{ font-family: Helvetica, Arial, sans-serif; font-size: 12px; }} h2 {{ background: #e0e0e0; padding: 5px; border: 1px solid black; }} .form-row {{ display: flex; border: 1px solid black; border-top: none; }} .form-label {{ width: 40%; padding: 8px; border-right: 1px solid black; font-weight: bold; background: #f9f9f9; }} .form-value {{ width: 60%; padding: 8px; font-family: monospace; }}</style></head><body onload="setTimeout(function(){{ window.print(); }}, 500);"><div style="display:flex; justify-content:space-between; border-bottom:2px solid black; padding-bottom:10px; margin-bottom:20px;"><div style="border:1px solid black; padding:10px; text-align:center; font-weight:bold; font-size:10px;">Liberté<br>Égalité<br>Fraternité<br><br>RÉPUBLIQUE FRANÇAISE</div><div style="text-align:center; flex:1;"><h1>ATTESTATION SUR L'HONNEUR</h1><p>Opérations d'économies d'énergie (CEE)</p></div><div style="border:1px solid black; padding:10px; text-align:center; font-weight:bold;">CERFA<br>N° 15404*01</div></div><h2>A - BÉNÉFICIAIRE</h2><div class="form-row" style="border-top:1px solid black;"><div class="form-label">Raison Sociale</div><div class="form-value">{str(i.get('site_name') or i.get('name') or 'N/A').upper()}</div></div><div class="form-row"><div class="form-label">N° SIRET</div><div class="form-value">{str(i.get('siret') or 'N/A')}</div></div><h2>B - LIEU DES TRAVAUX</h2><div class="form-row" style="border-top:1px solid black;"><div class="form-label">Adresse</div><div class="form-value">{str(l.get('address') or 'N/A')} - {str(l.get('city') or 'N/A').upper()}</div></div><div class="form-row"><div class="form-label">PDL / PCE</div><div class="form-value">{str(c.get('pdl') or c.get('pce') or 'N/A')}</div></div><div class="form-row"><div class="form-label">Surface</div><div class="form-value">{str(l.get('surface') or 'N/A')} m²</div></div><h2>C - OPÉRATION</h2><div class="form-row" style="border-top:1px solid black;"><div class="form-label">Fiche CEE</div><div class="form-value">{fiche}</div></div><div class="form-row"><div class="form-label">Nature</div><div class="form-value">{titre}</div></div><div style="margin-top:30px; border:1px solid black; padding:15px;"><b>Je soussigné(e) atteste sur l'honneur l'exactitude des informations. ENERGISTRAT est mandaté.</b></div><div style="margin-top:20px; display:flex; justify-content:space-between;"><div style="border:1px dashed gray; width:45%; height:100px; padding:10px;">Fait à: {str(l.get('city') or 'N/A').upper()}<br>Le: {datetime.now().strftime('%d/%m/%Y')}<br><b>Signature:</b></div><div style="border:1px dashed gray; width:45%; height:100px; padding:10px;"><b>Cachet:</b></div></div></body></html>""")
-    except Exception as e: 
-        return HTMLResponse(f"<h1>Erreur Serveur</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>", status_code=500)
+    except Exception as e: return HTMLResponse(f"<h1>Erreur Serveur</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>", status_code=500)
 
 @app.get("/api/tools/bilan_ag/{client_id}", response_class=HTMLResponse)
 async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)):
@@ -341,17 +365,13 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
                 fin = cortex.enrich_site_financials(s) if cortex else {}
                 vol = float(fin.get('volume_mwh') or s.get('kpis', {}).get('volume_mwh') or 0)
                 b_tot += float(fin.get('budget_annual') or (vol * 180.0))
-                v_tot += vol
-                g_tot += float(fin.get('kpis', {}).get('ghost_savings') or s.get('kpis', {}).get('ghost_savings') or 0)
-                if fin.get('meta', {}).get('is_gas', False): 
-                    v_gz += vol 
-                else: 
-                    v_el += vol
+                v_tot += vol; g_tot += float(fin.get('kpis', {}).get('ghost_savings') or s.get('kpis', {}).get('ghost_savings') or 0)
+                if fin.get('meta', {}).get('is_gas', False): v_gz += vol 
+                else: v_el += vol
             return HTMLResponse(content=pdf_builder.generate_bilan_ag_cluster(cluster_name or f"Grappe_{client_id}", len(cluster_files), v_tot, b_tot, v_el, v_gz, g_tot))
         else:
             return HTMLResponse(content=pdf_builder.generate_bilan_ag(client_id, base_data, cortex.enrich_site_financials(base_data) if cortex else {}, base_data.get('kpis', {})))
-    except Exception as e: 
-        return HTMLResponse(f"<h1>🚨 Erreur Interne (API 500)</h1><p>{str(e)}</p>", status_code=500)
+    except Exception as e: return HTMLResponse(f"<h1>🚨 Erreur Interne (API 500)</h1><p>{str(e)}</p>", status_code=500)
 
 @app.get("/api/physics/thermic_signature/{client_id}")
 async def get_thermic_signature(client_id: str):
@@ -361,38 +381,23 @@ async def get_thermic_signature(client_id: str):
     fin = cortex.enrich_site_financials(data)
     vol = float(fin.get('volume_mwh') or data.get('kpis', {}).get('volume_mwh', 0))
     city = str(data.get('location', {}).get('city', 'Paris')).upper()
-    
-    dju_profile = [450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]
-    if any(x in city for x in ['LILLE', 'STRASBOURG', 'NANCY', 'METZ']): 
-        dju_profile = [x * 1.2 for x in dju_profile]
-    elif any(x in city for x in ['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']): 
-        dju_profile = [x * 0.7 for x in dju_profile]
-        
+    dju_profile = [x * 1.2 if any(v in city for v in ['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in ['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in [450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
     total_dju = sum(dju_profile) or 1
-    
     talon_monthly = (vol * (0.15 if fin.get('meta', {}).get('is_gas', False) else 0.30)) / 12
     chauf_ann = vol - (talon_monthly * 12)
     
     points = [{"x": round(dju_profile[m]), "y": round(((dju_profile[m]/total_dju)*chauf_ann) + talon_monthly, 2), "month": m+1} for m in range(12)]
-    
-    xm = sum(p['x'] for p in points) / 12
-    ym = sum(p['y'] for p in points) / 12
+    xm = sum(p['x'] for p in points) / 12; ym = sum(p['y'] for p in points) / 12
     den = sum((p['x'] - xm)**2 for p in points)
-    
     a = sum((p['x'] - xm) * (p['y'] - ym) for p in points) / den if den != 0 else 0
     b = ym - a * xm
     ss_tot = sum((p['y'] - ym)**2 for p in points)
     r2 = 1 - (sum((p['y'] - (a * p['x'] + b))**2 for p in points) / ss_tot) if ss_tot != 0 else 0
     
-    return JSONResponse({
-        "success": True, 
-        "points": points, 
-        "regression": {"a": round(a, 4), "b": round(b, 2), "r2": round(r2, 3)}, 
-        "diagnostics": {"talon_mensuel": round(talon_monthly, 2), "sensibilite": round(a * 1000, 2), "is_optimized": r2 > 0.85}
-    })
+    return JSONResponse({"success": True, "points": points, "regression": {"a": round(a, 4), "b": round(b, 2), "r2": round(r2, 3)}, "diagnostics": {"talon_mensuel": round(talon_monthly, 2), "sensibilite": round(a * 1000, 2), "is_optimized": r2 > 0.85}})
 
 # ==========================================
-# GESTION DES PROFILS PARTENAIRES
+# GESTION DES PROFILS PARTENAIRES (POUPÉES RUSSES)
 # ==========================================
 @app.post("/api/partner/save_config")
 async def save_partner_config(request: Request, user = Depends(get_current_user)):
@@ -402,8 +407,7 @@ async def save_partner_config(request: Request, user = Depends(get_current_user)
         data["tenant_id"] = str(data.get("siret", "")).replace(" ", "")
         db.save_user_profile(user.get("uid"), data)
         return JSONResponse({"success": True, "tenant_id": data["tenant_id"]})
-    except Exception as e: 
-        return JSONResponse({"success": False, "error": str(e)}, 500)
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
 
 @app.get("/api/partner/get_config")
 async def get_partner_config(user = Depends(get_current_user)):
@@ -417,31 +421,20 @@ def normalize_full_data(data, tenant_id=None):
     if 'contract' not in data: data['contract'] = {}
     if 'pricing' not in data: data['pricing'] = {}
     if 'power_details' not in data['contract']: data['contract']['power_details'] = {}
-    
     if 'identity' not in data: data['identity'] = {}
-    if 'organization_matrix' not in data['identity']:
-        data['identity']['organization_matrix'] = {
-            "entity_fille": "",
-            "legal_status": "",
-            "cost_center": ""
-        }
+    if 'organization_matrix' not in data['identity']: data['identity']['organization_matrix'] = {"entity_fille": "", "legal_status": "", "cost_center": ""}
         
     for t, v in {'hph': ['ps_hph', 'p_hph', 'PS_HPH', 'puissance_hph'], 'hch':['ps_hch', 'p_hch', 'PS_HCH', 'puissance_hch'], 'hpe':['ps_hpe', 'p_hpe', 'PS_HPE', 'puissance_hpe'], 'hce':['ps_hce', 'p_hce', 'PS_HCE', 'puissance_hce']}.items():
         for s in [data, data['contract'], data.get('technical', {}), data['pricing']]:
             if not s: continue
             for k in v:
-                if k in s and s[k]: 
-                    data['contract']['power_details'][t] = s[k]
-                    data['contract'][f"ps_{t}"] = s[k]
-                    break
+                if k in s and s[k]: data['contract']['power_details'][t] = s[k]; data['contract'][f"ps_{t}"] = s[k]; break
 
     for t, v in {'hph':['price_hph', 'prix_hph', 'P_HPH', 'tarif_hph'], 'hch':['price_hch', 'prix_hch', 'P_HCH', 'tarif_hch'], 'hpe':['price_hpe', 'prix_hpe', 'P_HPE', 'tarif_hpe'], 'hce':['price_hce', 'prix_hce', 'P_HCE', 'tarif_hce']}.items():
         for s in [data, data['contract'], data.get('technical', {}), data['pricing']]:
             if not s: continue
             for k in v:
-                if k in s and s[k]: 
-                    data['pricing'][t] = s[k]
-                    break
+                if k in s and s[k]: data['pricing'][t] = s[k]; break
 
     if 'siret' in data and data['siret']: data['identity']['siret'] = data['siret']
     if not data['identity'].get('id') and data['identity'].get('siret'): data['identity']['id'] = data['identity']['siret']
@@ -452,7 +445,6 @@ def normalize_full_data(data, tenant_id=None):
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request, user = Depends(get_current_user)):
     if not user: return JSONResponse({"success": False, "error": "Non autorisé"}, 401)
-    
     try:
         raw_data = await request.json()
         profile = db.get_user_profile(user.get("uid"))
@@ -476,16 +468,12 @@ async def api_save_client(request: Request, user = Depends(get_current_user)):
                     if section not in existing_data: existing_data[section] = {}
                     existing_data[section].update(data[section])
             final_data = existing_data
-        else:
-            final_data = data
+        else: final_data = data
             
         if not db: return JSONResponse({"success": False, "error": "Moteur DB hors ligne."})
         db.save_site(safe_id, final_data)
         return JSONResponse({"success": True, "id": raw_id})
-    except Exception as e: 
-        print(f"CRASH api_save_client: {str(e)}")
-        traceback.print_exc()
-        return JSONResponse({"success": False, "error": str(e)})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/settings/import_csv")
 async def api_import_csv(file: UploadFile = File(...), user = Depends(get_current_user)):
@@ -507,23 +495,19 @@ async def api_import_csv(file: UploadFile = File(...), user = Depends(get_curren
                 
                 existing = db.get_site(safe_id)
                 if existing:
-                    if existing.get("identity", {}).get("tenant_id") != tenant_id and user.get("role") != "ADMIN":
-                        continue
+                    if existing.get("identity", {}).get("tenant_id") != tenant_id and user.get("role") != "ADMIN": continue
                     for sec in ['contract', 'pricing', 'identity', 'technical', 'location']:
                         if sec in s:
                             if sec not in existing: existing[sec] = {}
                             existing[sec].update(s[sec])
                     final_s = existing
-                else: 
-                    final_s = s
+                else: final_s = s
                     
                 db.save_site(safe_id, final_s)
                 saved += 1
-            except: 
-                pass
+            except: pass
         return JSONResponse({"success": True, "imported": len(sites), "saved": saved})
-    except Exception as e: 
-        return JSONResponse({"success": False, "error": str(e)})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data(response: Response, user = Depends(get_current_user)):
@@ -535,24 +519,14 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
     is_admin = user.get("role") == "ADMIN"
     
     raw_sites = db.get_all_sites()
-    filtered_sites = []
-    
-    for s in raw_sites:
-        if "CLI_" in str(s.get('identity', {}).get('id')): 
-            continue
-        
-        site_tenant = s.get("identity", {}).get("tenant_id")
-        if is_admin or site_tenant == tenant_id:
-            filtered_sites.append(s)
+    filtered_sites = [s for s in raw_sites if "CLI_" not in str(s.get('identity', {}).get('id')) and (is_admin or s.get("identity", {}).get("tenant_id") == tenant_id)]
     
     for s in filtered_sites:
-        if cortex: 
-            s['computed_financials'] = cortex.enrich_site_financials(s)
+        if cortex: s['computed_financials'] = cortex.enrich_site_financials(s)
     
     analysis = cortex.analyze_portfolio(filtered_sites) if cortex else {"global": {}, "green_league": {}}
     fleet_list = []
-    all_cities = set()
-    all_providers = set()
+    all_cities = set(); all_providers = set()
     
     for s in filtered_sites:
         fin = s.get('computed_financials', {})
@@ -562,13 +536,6 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
         
         if city and city != 'Inconnue': all_cities.add(city)
         if prov: all_providers.add(prov)
-        
-        raw_id = s.get('identity', {}).get('id')
-        safe_id = get_safe_id(raw_id)
-        
-        pdl_display = contract.get('pdl')
-        if not pdl_display or len(str(pdl_display)) < 5: 
-            pdl_display = contract.get('pce', '-')
         
         vol_engine = fin.get('volume_mwh', 0)
         vol_router = float(s.get('kpis', {}).get('volume_mwh', 0))
@@ -593,18 +560,12 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
             "alert": fin.get('kpis', {}).get('pmc_eur_mwh', 0) > 300,
             "ghost_savings": fin.get('kpis', {}).get('ghost_savings', 0), 
             "power": contract.get('power', 0), 
-            "pdl": pdl_display, 
+            "pdl": contract.get('pdl') or contract.get('pce', '-'), 
             "surface": s.get('location', {}).get('surface', 0),
             "tenant_id": s.get('identity', {}).get('tenant_id', 'Orphelin')
         })
         
-    return JSONResponse(json_compliant({
-        "fleet": fleet_list, 
-        "count": len(fleet_list), 
-        "green_league": analysis.get('green_league'), 
-        "global_kpis": analysis.get('global'),
-        "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments": ["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots": ["Lot 1", "Lot 2"] }
-    }))
+    return JSONResponse(json_compliant({"fleet": fleet_list, "count": len(fleet_list), "green_league": analysis.get('green_league'), "global_kpis": analysis.get('global'), "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments": ["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots": ["Lot 1", "Lot 2"] }}))
 
 @app.post("/api/settings/propagate_tariff")
 async def api_propagate_tariff(payload: PropagateRequest, user = Depends(get_current_user)):
@@ -624,34 +585,26 @@ async def api_propagate_tariff(payload: PropagateRequest, user = Depends(get_cur
                 site_id = identity.get('id')
                 if not site_id: continue
                 
-                if not is_admin and identity.get('tenant_id') != tenant_id: 
-                    continue
+                if not is_admin and identity.get('tenant_id') != tenant_id: continue
                 
                 contract = data.get('contract', {})
                 segment_match = (str(payload.filters.get('segment', '')).lower() == str(contract.get('segment', '')).lower())
-                
                 lot_match = True
                 if payload.filters.get('lot_name') and payload.filters.get('lot_name') != "Aucun":
                     lot_name = str(payload.filters.get('lot_name')).lower()
-                    lot_match = (lot_name == str(identity.get('ref_copro', '')).lower() or 
-                                 lot_name == str(identity.get('lot_name', '')).lower() or
-                                 lot_name == str(identity.get('organization_matrix', {}).get('entity_fille', '')).lower())
+                    lot_match = (lot_name == str(identity.get('ref_copro', '')).lower() or lot_name == str(identity.get('lot_name', '')).lower() or lot_name == str(identity.get('organization_matrix', {}).get('entity_fille', '')).lower())
                 
                 if segment_match and lot_match:
                     if 'pricing' not in data: data['pricing'] = {}
                     for k, v in payload.pricing_data.items():
-                        if v and str(v) != "0": 
-                            data['pricing'][k] = float(v)
+                        if v and str(v) != "0": data['pricing'][k] = float(v)
                     contract['start_date'] = payload.target_date
                     data['contract'] = contract
                     db.save_site(site_id, data)
                     updated_count += 1
-            except: 
-                continue
-                
+            except: continue
         return JSONResponse({"success": True, "updated_count": updated_count})
-    except Exception as e: 
-        return JSONResponse({"success": False, "detail": str(e)})
+    except Exception as e: return JSONResponse({"success": False, "detail": str(e)})
 
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str, response: Response, user = Depends(get_current_user)):
@@ -668,8 +621,7 @@ async def get_dashboard_data(client_id: str, response: Response, user = Depends(
     financials = cortex.enrich_site_financials(data) if cortex else {'meta':{'is_gas':False}, 'kpis':{'unit_price_kwh':0, 'pmc_eur_mwh':0, 'ghost_savings':0}, 'volume_mwh':0, 'budget_annual':0, 'pricing_details':{}}
     mr = get_market_ref()
     ma = cortex.analyze_market_position(financials['kpis']['unit_price_kwh'], mr, is_gas=financials['meta']['is_gas']) if cortex else {"status": "ANALYSE"}
-    if 'ref_price' not in ma: 
-        ma = {"status": "ANALYSE", "ref_price": mr['gaz']['peg_n1'] if financials['meta']['is_gas'] else mr['elec']['cal_n1'], "details": {"market_label": "PEG N+1" if financials['meta']['is_gas'] else "CAL N+1"}}
+    if 'ref_price' not in ma: ma = {"status": "ANALYSE", "ref_price": mr['gaz']['peg_n1'] if financials['meta']['is_gas'] else mr['elec']['cal_n1'], "details": {"market_label": "PEG N+1" if financials['meta']['is_gas'] else "CAL N+1"}}
 
     contract = data.get('contract', {})
     pricing = financials['pricing_details']
@@ -677,8 +629,7 @@ async def get_dashboard_data(client_id: str, response: Response, user = Depends(
 
     vol_display = financials['volume_mwh']
     kpis_raw = data.get('kpis', {})
-    if vol_display == 0 and 'volume_mwh' in kpis_raw: 
-        vol_display = float(kpis_raw['volume_mwh'])
+    if vol_display == 0 and 'volume_mwh' in kpis_raw: vol_display = float(kpis_raw['volume_mwh'])
 
     budget_display = financials['budget_annual']
     volume_multiplier = 1000 if vol_display <= 100000 else 1
@@ -688,73 +639,27 @@ async def get_dashboard_data(client_id: str, response: Response, user = Depends(
         u_price = 0.20
         for k in ['price_kwh', 'prix_kwh', 'price_hph', 'prix_hph']:
             if k in p_data and p_data[k]: 
-                try: 
-                    u_price = float(p_data[k])
-                    break
-                except: 
-                    pass
+                try: u_price = float(p_data[k]); break
+                except: pass
         budget_display = financials.get('budget_subscription', 0) + (vol_display * volume_multiplier * u_price)
 
-    power_details = contract.get('power_details', {})
-    if not contract.get('ps_hph'): contract['ps_hph'] = power_details.get('hph') or contract.get('p_hph') or contract.get('P_HPH') or "-"
-    if not contract.get('ps_hch'): contract['ps_hch'] = power_details.get('hch') or contract.get('p_hch') or contract.get('P_HCH') or "-"
-    if not contract.get('ps_hpe'): contract['ps_hpe'] = power_details.get('hpe') or contract.get('p_hpe') or contract.get('P_HPE') or "-"
-    if not contract.get('ps_hce'): contract['ps_hce'] = power_details.get('hce') or contract.get('p_hce') or contract.get('P_HCE') or "-"
-
-    if not financials['meta'].get('provider'): financials['meta']['provider'] = contract.get('provider') or "Inconnu"
-    if not display_segment: display_segment = contract.get('segment') or "-"
+    pd = contract.get('power_details', {})
+    if not contract.get('ps_hph'): contract['ps_hph'] = pd.get('hph') or contract.get('p_hph') or contract.get('P_HPH') or "-"
+    if not contract.get('ps_hch'): contract['ps_hch'] = pd.get('hch') or contract.get('p_hch') or contract.get('P_HCH') or "-"
+    if not contract.get('ps_hpe'): contract['ps_hpe'] = pd.get('hpe') or contract.get('p_hpe') or contract.get('P_HPE') or "-"
+    if not contract.get('ps_hce'): contract['ps_hce'] = pd.get('hce') or contract.get('p_hce') or contract.get('P_HCE') or "-"
 
     return JSONResponse(json_compliant({
-        "energy_type": "gaz" if financials['meta']['is_gas'] else "elec", 
-        "identity": data.get('identity', {}), 
-        "location": data.get('location', {}), 
-        "technical": data.get('technical', {}), 
-        "financials": data.get('financials', {}),
-        "contract": {
-            "pdl": contract.get('pdl'), 
-            "provider": financials['meta'].get('provider'), 
-            "segment": display_segment, 
-            "start_date": contract.get('start_date'),
-            "end_date": contract.get('end_date'), 
-            "power": contract.get('power'), 
-            "p_max": contract.get('p_max'), 
-            "fta": contract.get('fta'),
-            "grd": contract.get('grd'), 
-            "cja": contract.get('cja'), 
-            "profil": contract.get('profil'), 
-            "tarif_acheminement": contract.get('tarif_acheminement'),
-            "power_details": power_details, 
-            "ps_hph": contract.get('ps_hph'), 
-            "ps_hch": contract.get('ps_hch'), 
-            "ps_hpe": contract.get('ps_hpe'),
-            "ps_hce": contract.get('ps_hce'), 
-            "consumption_details": contract.get('consumption_details', {})
-        },
-        "pricing": pricing, 
-        "kpis": {
-            "volume_mwh": vol_display, 
-            "budget": budget_display, 
-            "pmc": financials['kpis']['pmc_eur_mwh'], 
-            "ghost_savings": financials['kpis']['ghost_savings'], 
-            "talon_kw": data.get('kpis', {}).get('talon_kw', 0), 
-            "pmax_kw": data.get('kpis', {}).get('pmax_kw', 0), 
-            "cortex_advice": data.get('kpis', {}).get('cortex_advice', "Pas d'analyse."), 
-            "is_alert": data.get('kpis', {}).get('is_alert', False)
-        },
-        "cortex_insight": {
-            "message": "Analyse CORTEX terminée.", 
-            "conseil": "Prix optimisé." if ma['status'] == 'OPTIMISÉ' else "Surveillez ce contrat."
-        }, 
-        "market_analysis": ma, 
-        "electricity_price": financials['kpis']['unit_price_kwh']
+        "energy_type": "gaz" if financials['meta']['is_gas'] else "elec", "identity": data.get('identity', {}), "location": data.get('location', {}), "technical": data.get('technical', {}), "financials": data.get('financials', {}),
+        "contract": {"pdl": contract.get('pdl'), "provider": financials['meta'].get('provider') or contract.get('provider', 'Inconnu'), "segment": display_segment or contract.get('segment', '-'), "start_date": contract.get('start_date'), "end_date": contract.get('end_date'), "power": contract.get('power'), "p_max": contract.get('p_max'), "fta": contract.get('fta'), "grd": contract.get('grd'), "cja": contract.get('cja'), "profil": contract.get('profil'), "tarif_acheminement": contract.get('tarif_acheminement'), "power_details": pd, "ps_hph": contract.get('ps_hph'), "ps_hch": contract.get('ps_hch'), "ps_hpe": contract.get('ps_hpe'), "ps_hce": contract.get('ps_hce'), "consumption_details": contract.get('consumption_details', {})},
+        "pricing": pricing, "kpis": {"volume_mwh": vol_display, "budget": budget_display, "pmc": financials['kpis']['pmc_eur_mwh'], "ghost_savings": financials['kpis']['ghost_savings'], "talon_kw": data.get('kpis', {}).get('talon_kw', 0), "pmax_kw": data.get('kpis', {}).get('pmax_kw', 0), "cortex_advice": data.get('kpis', {}).get('cortex_advice', "Pas d'analyse."), "is_alert": data.get('kpis', {}).get('is_alert', False)},
+        "cortex_insight": {"message": "Analyse CORTEX terminée.", "conseil": "Prix optimisé." if ma['status'] == 'OPTIMISÉ' else "Surveillez ce contrat."}, "market_analysis": ma, "electricity_price": financials['kpis']['unit_price_kwh']
     }))
 
 @app.post("/api/ops/simulate_offer")
 async def api_simulate_offer(file: UploadFile = File(...)):
-    try: 
-        return JSONResponse(json_compliant(cortex.simulate_budget_from_bpu(await file.read(), db.get_all_sites())))
-    except Exception as e: 
-        return JSONResponse({"success": False, "error": str(e)})
+    try: return JSONResponse(json_compliant(cortex.simulate_budget_from_bpu(await file.read(), db.get_all_sites())))
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
 @app.post("/api/ops/analyze")
 async def api_analyze(file: UploadFile = File(...), target: str = Form("demo")):
@@ -771,25 +676,15 @@ async def generate_tender(request: Request, user = Depends(get_current_user)):
         
         selected = [s for s in (db.get_site(sid) for sid in body.get('site_ids', [])) if s and (is_admin or s.get("identity", {}).get("tenant_id") == tid)]
         df_dqe = cortex.generate_dqe_structure(selected)
-        df_el = df_dqe[df_dqe['Type'] == 'ELEC']
-        df_gz = df_dqe[df_dqe['Type'] == 'GAZ']
+        df_el = df_dqe[df_dqe['Type'] == 'ELEC']; df_gz = df_dqe[df_dqe['Type'] == 'GAZ']
         
         stream = io.BytesIO()
         with pd.ExcelWriter(stream, engine='openpyxl') as w:
-            if not df_el.empty: 
-                df_el.to_excel(w, index=False, sheet_name="DATA_ELEC")
-                df_el[["PDL", "Nom du site", "CP", "Ville", "Segment", "Vol. Annuel"]].assign(OFFRE_NOM="", PRIX_HPH_EUR_KWH="", ABONNEMENT_EUR_AN="").to_excel(w, index=False, sheet_name="REPONSE_ELEC")
-            if not df_gz.empty: 
-                df_gz.to_excel(w, index=False, sheet_name="DATA_GAZ")
-        
+            if not df_el.empty: df_el.to_excel(w, index=False, sheet_name="DATA_ELEC"); df_el[["PDL", "Nom du site", "CP", "Ville", "Segment", "Vol. Annuel"]].assign(OFFRE_NOM="", PRIX_HPH_EUR_KWH="", ABONNEMENT_EUR_AN="").to_excel(w, index=False, sheet_name="REPONSE_ELEC")
+            if not df_gz.empty: df_gz.to_excel(w, index=False, sheet_name="DATA_GAZ")
         stream.seek(0)
-        return StreamingResponse(
-            stream, 
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
-            headers={"Content-Disposition": f"attachment; filename=DQE_{datetime.now().strftime('%Y%m%d')}.xlsx"}
-        )
-    except Exception as e: 
-        return JSONResponse({"error": str(e)}, 500)
+        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_{datetime.now().strftime('%Y%m%d')}.xlsx"})
+    except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.post("/api/ingest/upload")
 async def ingest_files_mass(files: List[UploadFile] = File(...)):
@@ -799,30 +694,23 @@ async def ingest_files_mass(files: List[UploadFile] = File(...)):
 async def api_finance_upload(file: UploadFile = File(...), site_id: str = Form(...), user = Depends(get_current_user)):
     try:
         parsed = finance.parse_invoice(await file.read(), file.filename)
-        if parsed.get("status") == "ERROR": 
-            return JSONResponse(parsed, status_code=400)
+        if parsed.get("status") == "ERROR": return JSONResponse(parsed, status_code=400)
         
         site_data = db.get_site(site_id) or {}
         if user.get("role") != "ADMIN" and site_data.get("identity", {}).get("tenant_id") != db.get_user_profile(user.get("uid")).get("tenant_id"):
             return JSONResponse({"error": "Accès refusé"}, 403)
             
         return JSONResponse(json_compliant(finance.audit_invoice(parsed, site_data)))
-    except Exception as e: 
-        return JSONResponse({"error": str(e)}, 500)
+    except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 @app.get("/api/finance/landing/{site_id}")
 async def api_finance_landing(site_id: str, user = Depends(get_current_user)):
     site_data = db.get_site(site_id)
-    if not site_data: 
-        return JSONResponse({"error": "Site introuvable"}, 404)
-        
+    if not site_data: return JSONResponse({"error": "Site introuvable"}, 404)
     if user.get("role") != "ADMIN" and site_data.get("identity", {}).get("tenant_id") != db.get_user_profile(user.get("uid")).get("tenant_id"):
         return JSONResponse({"error": "Accès refusé"}, 403)
-        
-    try: 
-        return JSONResponse(json_compliant(finance.simulate_landing(site_data)))
-    except Exception as e: 
-        return JSONResponse({"error": str(e)}, 500)
+    try: return JSONResponse(json_compliant(finance.simulate_landing(site_data)))
+    except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 # ==========================================
 # VUES HTML (SÉCURISÉES)
