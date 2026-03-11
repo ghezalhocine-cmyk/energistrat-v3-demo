@@ -755,6 +755,28 @@ async def api_finance_landing(site_id: str, user = Depends(get_current_user)):
     try: return JSONResponse(json_compliant(finance.simulate_landing(site_data)))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
+class SolarRequest(BaseModel):
+    address: str
+    surface_roof: float
+    electricity_price: float
+
+@app.post("/api/physics/solar")
+async def api_physics_solar(payload: SolarRequest, user = Depends(get_current_user)):
+    """Route Zéro Mock : Interroge l'API PVGIS de l'Union Européenne"""
+    if not physics: return JSONResponse({"success": False, "error": "Moteur Physique hors ligne"})
+    
+    try:
+        # 1. Géolocalisation via Data.gouv
+        lat, lon = physics.get_coordinates_from_address(payload.address)
+        
+        # 2. Simulation PVGIS
+        result = physics.simulate_solar_roi(lat, lon, payload.surface_roof, payload.electricity_price)
+        if "error" in result: return JSONResponse({"success": False, "error": result["error"]})
+        
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
+
 # ==========================================
 # VUES HTML & ROUTAGE (ANTI-404 V10)
 # ==========================================
