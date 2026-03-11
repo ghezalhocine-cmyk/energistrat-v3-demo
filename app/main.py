@@ -121,7 +121,7 @@ except Exception as e_prod:
         physics = None
         pdf_builder = FallbackPDFBuilder()
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V10.0-HABITAT-COLLECTIF")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V10.0-MASTER")
 
 app.add_middleware(
     CORSMiddleware,
@@ -141,7 +141,7 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
 if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# --- MODELES ---
+# --- MODELES PYDANTIC ROBUSTES ---
 class SessionRequest(BaseModel): id_token: str
 class MarketUpdateModel(BaseModel): elec: Dict[str, Any]; gaz: Dict[str, Any]; trve: Optional[Dict[str, Any]] = None; targets: Optional[Dict[str, Any]] = None
 class StrategyRequest(BaseModel): site_id: str; bloc_kw: float
@@ -150,8 +150,10 @@ class PropagateRequest(BaseModel): source_client_id: str; target_date: str; filt
 class AdoptionRequest(BaseModel): target_tenant_id: str; site_ids: List[str]
 class TenantCreateRequest(BaseModel): siret: str; name: str
 class M57SettingsModel(BaseModel): bp_elec: float = 0.0; bp_gaz: float = 0.0; consumed_elec: float = 0.0; consumed_gaz: float = 0.0; bp_irve: float = 0.0; consumed_irve: float = 0.0; bp_enr: float = 0.0; consumed_enr: float = 0.0
+class CarbonSettingsModel(BaseModel): baseline_year: int = 2010; baseline_kwh_sqm: float = 0.0
 class VoteRequestModel(BaseModel): site_id: str; vote: bool
 class LegalSignModel(BaseModel): site_id: str; consent: bool
+class SolarRequest(BaseModel): address: str; surface_roof: float; electricity_price: float
 
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
@@ -189,10 +191,8 @@ async def api_session(payload: SessionRequest, response: Response):
     u = auth.verify_token(payload.id_token)
     if not u: return JSONResponse({"detail": "Token invalide"}, status_code=401)
     
-    # On inscrit le cookie de sécurité
     response.set_cookie(key="access_token", value=f"Bearer {payload.id_token}", httponly=True, max_age=3600*24, samesite="lax", secure=True if "https" in str(response.headers) else False)
     
-    # On lit le rôle en base pour renvoyer au frontend
     role = u.get("role", "USER")
     if role != "ADMIN":
         profile = db.get_user_profile(u.get("uid"))
@@ -207,6 +207,83 @@ async def logout(response: Response):
     return RedirectResponse(url="/login")
 
 # ==========================================
+# API CORTEX SENTINEL & RTE
+# ==========================================
+@app.get("/api/ops/sentinel/alerts")
+async def api_get_sentinel_alerts(): 
+    return db.get_sentinel_alerts()
+
+@app.post("/api/ops/sentinel/run")
+async def api_run_sentinel_scan(user = Depends(get_current_user)):
+    # La tâche tournerait ici en BackgroundTasks
+    return JSONResponse({"success": True, "message": "Scan SGE déclenché avec succès."})
+
+@app.get("/api/tools/sniper/market")
+async def api_sniper_market(user = Depends(get_current_user)):
+    if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
+    return JSONResponse(rte.get_wholesale_market())
+
+@app.get("/api/rte/live")
+async def get_rte_live_data(user = Depends(get_current_user)):
+    if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
+    return JSONResponse(rte.get_pulse_dashboard_data())
+
+@app.post("/api/dealdesk/analyze")
+async def api_dealdesk_analyze(request: Request):
+    b = await request.json()
+    q = str(b.get('query', '')).strip().lower()
+    if not q: return JSONResponse({"success": False, "error": "Requête vide."})
+    sd = next((s for s in db.get_all_sites() if q in str(s.get('contract', {}).get('pdl', '')).strip() or q in str(s.get('identity', {}).get('site_name', '')).strip().lower()), None)
+    if not sd: return JSONResponse({"success": False, "error": "Introuvable."})
+    try: vol = cortex.enrich_site_financials(sd).get('volume_mwh', 0)
+    except: vol = 0
+    p = float(sd.get('contract', {}).get('power', 0))
+    is_micro = vol < 36 and p <= 36
+    return JSONResponse({"success": True, "site": { "name": sd.get('identity',{}).get('site_name', 'Inconnu'), "pdl": sd.get('contract',{}).get('pdl', 'N/A'), "volume": round(vol, 2), "power": p }, "segment": "B2B_HEAVY" if vol > 5000 else ("C4_MID" if p > 36 or vol > 250 else "C5_MASS"), "legal": {"is_micro": is_micro}})
+
+# ==========================================
+# L'OUTIL D'ADOPTION DE MASSE (POUPÉES RUSSES)
+# ==========================================
+@app.get("/api/ops/orphans")
+async def api_get_orphans(keyword: str = "", user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    orphans = []
+    kw = keyword.lower().strip()
+    for s in db.get_all_sites():
+        identity = s.get('identity', {})
+        tenant_id = identity.get('tenant_id')
+        name = str(identity.get('site_name', '')).lower()
+        if not tenant_id or tenant_id == "ORPHELIN" or tenant_id == "" or (kw and kw in name):
+            orphans.append({ "id": get_safe_id(identity.get('id', '')), "name": identity.get('site_name', 'Inconnu'), "pdl": str(s.get('contract', {}).get('pdl', '')), "city": s.get('location', {}).get('city', ''), "current_tenant": tenant_id or "Aucun" })
+    return JSONResponse({"success": True, "orphans": orphans})
+
+@app.post("/api/ops/adopt")
+async def api_adopt_sites(payload: AdoptionRequest, user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    updated_count = 0
+    for site_id in payload.site_ids:
+        data = db.get_site(site_id)
+        if data:
+            if 'identity' not in data: data['identity'] = {}
+            data['identity']['tenant_id'] = payload.target_tenant_id
+            if db.save_site(site_id, data): updated_count += 1
+    return JSONResponse({"success": True, "updated_count": updated_count})
+
+@app.get("/api/ops/tenants")
+async def api_get_tenants(user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    return JSONResponse({"success": True, "tenants": db.get_all_users()})
+
+@app.post("/api/ops/create_tenant")
+async def api_create_tenant(payload: TenantCreateRequest, user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    try:
+        tenant_id = str(payload.siret).replace(" ", "")
+        data = { "tenant_id": tenant_id, "siret": tenant_id, "name": payload.name, "created_by": "ADMIN" }
+        db.save_user_profile(f"TENANT_{tenant_id}", data)
+        return JSONResponse({"success": True, "tenant": data})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
+        # ==========================================
 # API MÉTIERS : M57, FORECAST, VOTES & LOM
 # ==========================================
 @app.get("/api/settings/m57")
@@ -220,6 +297,19 @@ async def api_get_m57(user = Depends(get_current_user)):
 async def api_save_m57(payload: M57SettingsModel, user = Depends(get_current_user)):
     tenant_id = db.get_user_profile(user.get("uid")).get("tenant_id", "DEFAULT") if user else "DEFAULT"
     db.save_setting(f"M57_{tenant_id}", payload.dict())
+    return JSONResponse({"success": True})
+
+@app.get("/api/settings/carbon")
+async def api_get_carbon(user = Depends(get_current_user)):
+    """API Paramétrage RSE / Décret Tertiaire"""
+    tenant_id = db.get_user_profile(user.get("uid")).get("tenant_id", "DEFAULT") if user else "DEFAULT"
+    data = db.get_setting(f"CARBON_{tenant_id}")
+    return JSONResponse(data if data else {"baseline_year": 2010, "baseline_kwh_sqm": 0.0})
+
+@app.post("/api/settings/carbon")
+async def api_save_carbon(payload: CarbonSettingsModel, user = Depends(get_current_user)):
+    tenant_id = db.get_user_profile(user.get("uid")).get("tenant_id", "DEFAULT") if user else "DEFAULT"
+    db.save_setting(f"CARBON_{tenant_id}", payload.dict())
     return JSONResponse({"success": True})
 
 @app.get("/api/forecast/simulate/{client_id}")
@@ -245,77 +335,15 @@ async def api_forecast_simulate(client_id: str, user = Depends(get_current_user)
 @app.post("/api/vote")
 async def api_register_vote(payload: VoteRequestModel, user = Depends(get_current_user)):
     """API Pont B2B2C : Vote AG Citoyen -> Syndic"""
+    # Enregistrement du vote dans le Ledger (Firestore)
+    db.save_setting(f"VOTE_{payload.site_id}_{uuid.uuid4().hex[:6]}", {"vote": payload.vote, "timestamp": datetime.now().isoformat()})
     return JSONResponse({"success": True, "message": "Vote blockchain enregistré."})
 
 @app.post("/api/legal/sign")
 async def api_legal_sign(payload: LegalSignModel, user = Depends(get_current_user)):
     """API Loi LOM : Signature décharge pass mobilité"""
+    db.save_setting(f"LOM_{payload.site_id}_{uuid.uuid4().hex[:6]}", {"consent": payload.consent, "timestamp": datetime.now().isoformat()})
     return JSONResponse({"success": True, "message": "Signature LOM enregistrée."})
-
-# ==========================================
-# API CORTEX SENTINEL & RTE
-# ==========================================
-@app.get("/api/ops/sentinel/alerts")
-async def api_get_sentinel_alerts(): 
-    return db.get_sentinel_alerts()
-
-@app.post("/api/ops/sentinel/run")
-async def api_run_sentinel_scan(user = Depends(get_current_user)):
-    """Force le scan asynchrone des anomalies SGE"""
-    # La tâche tournerait ici en BackgroundTasks
-    return JSONResponse({"success": True, "message": "Scan SGE déclenché avec succès."})
-
-@app.get("/api/tools/sniper/market")
-async def api_sniper_market(user = Depends(get_current_user)):
-    if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
-    return JSONResponse(rte.get_wholesale_market())
-
-@app.get("/api/rte/live")
-async def get_rte_live_data(user = Depends(get_current_user)):
-    if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
-    return JSONResponse(rte.get_pulse_dashboard_data())
-    # ==========================================
-# L'OUTIL D'ADOPTION DE MASSE (POUPÉES RUSSES)
-# ==========================================
-@app.get("/api/ops/orphans")
-async def api_get_orphans(keyword: str = "", user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-        
-    orphans = []
-    kw = keyword.lower().strip()
-    
-    for s in db.get_all_sites():
-        identity = s.get('identity', {})
-        tenant_id = identity.get('tenant_id')
-        name = str(identity.get('site_name', '')).lower()
-        
-        if not tenant_id or tenant_id == "ORPHELIN" or tenant_id == "" or (kw and kw in name):
-            orphans.append({
-                "id": get_safe_id(identity.get('id', '')),
-                "name": identity.get('site_name', 'Inconnu'),
-                "pdl": str(s.get('contract', {}).get('pdl', '')),
-                "city": s.get('location', {}).get('city', ''),
-                "current_tenant": tenant_id or "Aucun"
-            })
-            
-    return JSONResponse({"success": True, "orphans": orphans})
-
-@app.post("/api/ops/adopt")
-async def api_adopt_sites(payload: AdoptionRequest, user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-        
-    updated_count = 0
-    for site_id in payload.site_ids:
-        data = db.get_site(site_id)
-        if data:
-            if 'identity' not in data: data['identity'] = {}
-            data['identity']['tenant_id'] = payload.target_tenant_id
-            if db.save_site(site_id, data):
-                updated_count += 1
-                
-    return JSONResponse({"success": True, "updated_count": updated_count})
 
 # ==========================================
 # API SUBVENTIONS & CERFA
@@ -584,7 +612,7 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
         final_budget = fin.get('budget_annual', 0)
         if final_budget == 0 and final_vol > 0:
             avg_price = float(s.get('pricing', {}).get('price_kwh') or s.get('pricing', {}).get('prix_kwh') or s.get('pricing', {}).get('hph') or 0.20)
-            if avg_price > 2.0: avg_price = avg_price / 1000.0 # Force la conversion si saisi en MWh
+            if avg_price > 2.0: avg_price = avg_price / 1000.0
             
             tax = float(s.get('pricing', {}).get('tax') or s.get('pricing', {}).get('taxes') or 22.5)
             if tax > 100: tax = 22.5 
@@ -673,7 +701,6 @@ async def get_dashboard_data(client_id: str, response: Response, user = Depends(
     pricing = financials['pricing_details']
     display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
 
-    # LE BOUCLIER FINANCIER POUR LA PAGE DETAIL
     vol_display = float(financials['volume_mwh'] or data.get('kpis', {}).get('volume_mwh', 0))
     p_data = data.get('pricing', {})
     
@@ -755,24 +782,15 @@ async def api_finance_landing(site_id: str, user = Depends(get_current_user)):
     try: return JSONResponse(json_compliant(finance.simulate_landing(site_data)))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-class SolarRequest(BaseModel):
-    address: str
-    surface_roof: float
-    electricity_price: float
-
 @app.post("/api/physics/solar")
 async def api_physics_solar(payload: SolarRequest, user = Depends(get_current_user)):
     """Route Zéro Mock : Interroge l'API PVGIS de l'Union Européenne"""
     if not physics: return JSONResponse({"success": False, "error": "Moteur Physique hors ligne"})
     
     try:
-        # 1. Géolocalisation via Data.gouv
         lat, lon = physics.get_coordinates_from_address(payload.address)
-        
-        # 2. Simulation PVGIS
         result = physics.simulate_solar_roi(lat, lon, payload.surface_roof, payload.electricity_price)
         if "error" in result: return JSONResponse({"success": False, "error": result["error"]})
-        
         return JSONResponse(result)
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)})
@@ -781,12 +799,12 @@ async def api_physics_solar(payload: SolarRequest, user = Depends(get_current_us
 # VUES HTML & ROUTAGE (ANTI-404 V10)
 # ==========================================
 
-# Liste de toutes les vues valides dans ENERGISTRAT V3
+# Liste des vues métier autorisées
 VALID_VIEWS = [
     "settings", "settings_pme", "settings_light", "settings_partner", "settings_ops",
     "ops_nexus", "ops_ingest", "ops_aggregator", "ops_market",
     "pme", "industry", "retail", "mairie", "sde", "oph", "syndic", "sante", "supplier", "citoyen",
-    "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance"
+    "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance", "dashboard_finance"
 ]
 
 PUBLIC_PAGES = [
@@ -797,25 +815,22 @@ PUBLIC_PAGES = [
 
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
-    # Sécurité anti-assets
     if any(x in page_name for x in [".js", ".css", ".png", ".jpg", ".ico", ".svg"]): 
         return JSONResponse({}, 404)
         
-    # Formatage du nom de fichier
     target_file = page_name if page_name.endswith(".html") else f"{page_name}.html"
     clean_name = page_name.replace(".html", "")
 
-    # Redirection Public vs Privé
     if target_file not in PUBLIC_PAGES and not user: 
         return RedirectResponse(url="/login")
 
-    # Validation du routage strict V10
+    # Protection absolue des routes Sidebars
     if clean_name in VALID_VIEWS or target_file in PUBLIC_PAGES:
         file_path = os.path.join(TEMPLATE_DIR, target_file)
         if os.path.exists(file_path): 
             return templates.TemplateResponse(target_file, {"request": request})
             
-    # Si introuvable ou invalide, retour à l'accueil
+    # Redirection propre
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/{full_path:path}")
