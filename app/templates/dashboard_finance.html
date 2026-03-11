@@ -12,188 +12,115 @@
             theme: {
                 extend: {
                     colors: {
-                        abysse: '#050505',
-                        card: '#0F172A',
-                        cyan: '#00E5FF',
-                        gold: '#F59E0B',
-                        danger: '#EF4444',
-                        success: '#10B981'
+                        abysse: '#050505', card: '#0F172A', cyan: '#00E5FF',
+                        gold: '#F59E0B', danger: '#EF4444', success: '#10B981',
+                        tax: '#A855F7' // Couleur spéciale pour le bouclier fiscal
                     },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'monospace'],
-                    }
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
                 }
             }
         }
     </script>
     <style>
         body { background-color: #050505; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
-        .bento-card { 
-            background: rgba(15, 23, 42, 0.6); 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
-            border-radius: 1rem; 
-            backdrop-filter: blur(12px);
-        }
-        .drag-active {
-            border-color: #00E5FF !important;
-            background-color: rgba(0, 229, 255, 0.1) !important;
-            transform: scale(1.02);
-        }
-        .tab-btn {
-            padding: 4px 12px;
-            border-radius: 999px;
-            font-size: 10px;
-            font-weight: bold;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid transparent;
-        }
-        .tab-active {
-            background-color: rgba(0, 229, 255, 0.1);
-            color: #00E5FF;
-            border-color: rgba(0, 229, 255, 0.3);
-        }
-        .tab-inactive {
-            color: #64748B;
-            border-color: rgba(255, 255, 255, 0.05);
-        }
-        .tab-inactive:hover { color: white; border-color: rgba(255, 255, 255, 0.2); }
+        .bento-card { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; backdrop-filter: blur(12px); }
+        .drag-active { border-color: #00E5FF !important; background-color: rgba(0, 229, 255, 0.1) !important; transform: scale(1.02); }
+        
+        /* Tampon Bon A Payer */
+        .stamp { font-family: 'JetBrains Mono', monospace; font-weight: 900; font-size: 1.5rem; text-transform: uppercase; border: 4px solid; padding: 0.5rem 1rem; border-radius: 0.5rem; transform: rotate(-15deg); display: inline-block; opacity: 0.8; }
+        .stamp-approved { color: #10B981; border-color: #10B981; text-shadow: 0 0 10px rgba(16,185,129,0.5); box-shadow: 0 0 15px rgba(16,185,129,0.2) inset; }
+        .stamp-rejected { color: #EF4444; border-color: #EF4444; text-shadow: 0 0 10px rgba(239,68,68,0.5); box-shadow: 0 0 15px rgba(239,68,68,0.2) inset; }
     </style>
 </head>
 <body class="flex h-screen w-screen">
 
-    <!-- SIDEBAR -->
     <aside class="w-20 bg-abysse border-r border-white/10 flex flex-col items-center py-6 gap-8 z-50">
         <div class="text-cyan text-2xl drop-shadow-[0_0_10px_rgba(0,229,255,0.5)]"><i class="fa-solid fa-bolt"></i></div>
-        <a href="/" class="text-gray-500 hover:text-white transition"><i class="fa-solid fa-house"></i></a>
-        <a href="/industry" class="text-gray-500 hover:text-white transition"><i class="fa-solid fa-industry"></i></a>
+        <button onclick="history.back()" class="text-gray-500 hover:text-white transition"><i class="fa-solid fa-arrow-left"></i></button>
         <div class="mt-auto mb-4 text-gold"><i class="fa-solid fa-scale-unbalanced"></i></div>
     </aside>
 
-    <!-- MAIN CONTENT -->
     <main class="flex-1 flex flex-col bg-abysse relative bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
         
-        <!-- HEADER -->
         <div class="h-20 border-b border-white/10 flex items-center justify-between px-10 bg-abysse/80 backdrop-blur z-40">
             <div>
                 <h1 class="text-2xl font-black text-white tracking-wider">FINANCIAL <span class="text-gold">TWIN</span></h1>
-                <div class="text-[10px] text-gray-500 font-mono mt-1">MODULE D'AUDIT & PROJECTION IA (2026)</div>
+                <div class="text-[10px] text-gray-500 font-mono mt-1">MODULE D'AUDIT COMPTABLE (FACTUR-X 2026)</div>
             </div>
             <div class="flex items-center gap-4">
+                <button onclick="exportAccounting()" id="btn-export" class="hidden bg-white/10 hover:bg-white text-white hover:text-black px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 border border-white/20">
+                    <i class="fa-solid fa-file-csv"></i> Export Compta (FEC)
+                </button>
                 <div class="px-3 py-1 rounded bg-white/5 border border-white/10 text-xs text-gray-400 font-mono">
-                    <i class="fa-solid fa-circle text-green-500 text-[8px] mr-2"></i>CORTEX ENGINE: READY
+                    <span id="target-site-label">Site : Détection Auto...</span>
                 </div>
             </div>
         </div>
 
-        <!-- DASHBOARD GRID -->
         <div class="flex-1 p-10 grid grid-cols-12 gap-8 overflow-y-auto">
             
-            <!-- COLONNE GAUCHE (4/12) : UPLOAD & SCORES -->
             <div class="col-span-4 space-y-6">
-                
-                <!-- UPLOAD ZONE -->
+                <!-- ZONE DE DROP (Mise à jour Factur-X) -->
                 <div id="drop-zone" class="bento-card p-8 border-2 border-dashed border-white/10 flex flex-col items-center justify-center hover:bg-white/5 hover:border-cyan/50 cursor-pointer transition group h-64 relative overflow-hidden" onclick="document.getElementById('file-input').click()">
-                    <div class="absolute inset-0 bg-cyan/5 opacity-0 group-hover:opacity-100 transition duration-500 pointer-events-none"></div>
-                    <i class="fa-solid fa-file-invoice text-5xl text-gray-600 group-hover:text-cyan mb-6 transition transform group-hover:scale-110 pointer-events-none"></i>
+                    <i class="fa-solid fa-file-invoice text-5xl text-gray-600 group-hover:text-cyan mb-4 transition transform group-hover:scale-110 pointer-events-none"></i>
                     <h3 class="font-bold text-white text-lg pointer-events-none">Déposer Facture</h3>
-                    <p class="text-xs text-gray-500 mt-2 text-center max-w-[200px] pointer-events-none">Glissez-déposez le PDF ici<br>(EDF, Engie, Factur-X)</p>
+                    <p class="text-xs text-gray-500 mt-2 text-center pointer-events-none">Format PDF classique ou <br><b class="text-cyan">XML Factur-X (Norme 2026)</b></p>
                     <input type="file" id="file-input" class="hidden" onchange="handleFiles(this.files)">
                     <div id="loading-spinner" class="hidden absolute inset-0 bg-card/90 flex flex-col items-center justify-center z-20">
                         <i class="fa-solid fa-circle-notch fa-spin text-3xl text-cyan"></i>
-                        <p class="text-xs text-cyan mt-3 font-mono">ANALYSE CORTEX EN COURS...</p>
+                        <p class="text-xs text-cyan mt-3 font-mono">EXTRACTION OCR / XML...</p>
                     </div>
                 </div>
 
-                <!-- RÉSULTATS (Cachés par défaut) -->
+                <!-- RESULTATS -->
                 <div id="audit-result" class="hidden space-y-6">
                     
-                    <!-- TRUST SCORE -->
-                    <div class="bento-card p-6 border-l-4 border-gray-600" id="card-score">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Score de Confiance</div>
-                                <div class="text-5xl font-mono font-bold text-white mt-2" id="res-score">--</div>
-                            </div>
-                            <div id="res-icon" class="text-3xl text-gray-600"><i class="fa-solid fa-shield-halved"></i></div>
-                        </div>
-                        <div class="mt-4 text-xs font-medium text-gray-400" id="res-message">En attente d'analyse...</div>
-                    </div>
-
-                    <!-- GHOST SAVINGS -->
-                    <div class="bento-card p-6 bg-danger/5 border border-danger/20 relative overflow-hidden hidden" id="card-ghost">
-                        <div class="absolute -right-4 -top-4 text-danger/10 text-9xl"><i class="fa-solid fa-ghost"></i></div>
-                        <div class="relative z-10">
-                            <div class="text-[10px] text-danger uppercase font-bold flex items-center gap-2">
-                                <i class="fa-solid fa-triangle-exclamation"></i> Anomalie Financière
-                            </div>
-                            <div class="text-3xl font-bold text-white mt-2" id="res-ghost">0.00 €</div>
-                            <div class="text-xs text-gray-400 mt-1">Gaspillage identifié (Pénalités)</div>
-                            <button class="mt-4 px-3 py-1.5 bg-danger hover:bg-red-600 text-white text-[10px] font-bold rounded transition">
-                                RÉCLAMER
-                            </button>
+                    <div class="bento-card p-6 border-l-4 border-gray-600 relative overflow-hidden" id="card-score">
+                        <!-- Tampon BAP -->
+                        <div class="absolute right-2 top-6" id="bap-stamp"></div>
+                        
+                        <div class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Score de Fiabilité</div>
+                        <div class="text-5xl font-mono font-bold text-white mt-2 mb-2" id="res-score">--</div>
+                        <div id="facturx-badge" class="hidden inline-flex items-center gap-2 bg-blue-900/40 text-blue-300 border border-blue-500/50 px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest mt-2">
+                            <i class="fa-solid fa-fingerprint"></i> Certifié e-Invoicing
                         </div>
                     </div>
 
-                    <!-- TECH SPECS -->
-                    <div class="bento-card p-5 space-y-3">
-                        <div class="flex justify-between items-center pb-2 border-b border-white/5">
-                            <span class="text-xs text-gray-500">PDL Détecté</span>
-                            <span class="text-sm font-mono text-cyan font-bold" id="res-pdl">--</span>
-                        </div>
-                        <div class="flex justify-between items-center pb-2 border-b border-white/5">
-                            <span class="text-xs text-gray-500">Volume Facturé</span>
-                            <span class="text-sm font-mono text-white" id="res-vol">-- kWh</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-gray-500">Prix Unitaire Calculé</span>
-                            <span class="text-sm font-mono text-white" id="res-price">-- €/kWh</span>
+                    <!-- BLOCS HP / HC -->
+                    <div class="bento-card p-5 space-y-3" id="blocks-container">
+                        <h4 class="text-[10px] text-gray-500 uppercase font-bold border-b border-white/5 pb-2 mb-2">Décomposition Tarifaire</h4>
+                        <div id="blocks-list" class="space-y-2"></div>
+                        <div class="pt-3 border-t border-white/5 flex justify-between items-center">
+                            <span class="text-xs text-white font-bold">Prix Moyen (PMP)</span>
+                            <span class="text-sm font-mono text-cyan font-bold" id="res-price">-- €/kWh</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- DROITE : GRAPH & LOGS -->
+            <!-- DROITE : GRAPH & ALERTES -->
             <div class="col-span-8 space-y-6">
                 
-                <!-- GRAPHIQUE AVEC ONGLETS -->
-                <div class="bento-card p-6 h-80 relative flex flex-col">
+                <div class="bento-card p-6 h-80 flex flex-col">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xs font-bold text-gray-400 uppercase">Analyse & Projection</h3>
-                        <div class="flex gap-2 bg-black/20 p-1 rounded-full">
-                            <button onclick="updateChart('financial')" id="btn-financial" class="tab-btn tab-active">Facture (€)</button>
-                            <button onclick="updateChart('audit')" id="btn-audit" class="tab-btn tab-inactive">Audit (kWh)</button>
-                            <button onclick="updateChart('trajectory')" id="btn-traj" class="tab-btn tab-inactive text-gold border-gold/20">Trajectoire</button>
-                        </div>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase">Décomposition de la Facture (€)</h3>
+                        <div class="text-xs text-gray-500 font-mono" id="res-pdl">PDL: --</div>
                     </div>
-                    
                     <div class="flex-1 relative">
                         <canvas id="invoiceChart"></canvas>
-                        <div id="chart-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-700 text-sm font-mono">
-                            EN ATTENTE DE DONNÉES
-                        </div>
+                        <div id="chart-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-700 text-sm font-mono">EN ATTENTE DE DONNÉES</div>
                     </div>
                 </div>
 
-                <!-- LISTE DES ANOMALIES -->
                 <div class="bento-card p-6 flex-1 min-h-[300px]">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Journal d'Audit (Anomalies & Alertes)</h3>
+                    <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Journal d'Audit & Recommandations</h3>
                     <div class="overflow-hidden rounded-lg border border-white/5">
                         <table class="w-full text-left">
                             <thead class="bg-white/5 text-[10px] text-gray-400 uppercase font-bold">
-                                <tr>
-                                    <th class="p-3">Sévérité</th>
-                                    <th class="p-3">Type</th>
-                                    <th class="p-3">Détail</th>
-                                    <th class="p-3 text-right">Impact</th>
-                                </tr>
+                                <tr><th class="p-3 w-24">Sévérité</th><th class="p-3">Type d'Anomalie</th><th class="p-3">Diagnostic CORTEX</th></tr>
                             </thead>
                             <tbody id="anomalies-list" class="text-xs text-gray-300 divide-y divide-white/5">
-                                <tr>
-                                    <td colspan="4" class="p-8 text-center text-gray-600 italic">Aucune facture analysée pour le moment.</td>
-                                </tr>
+                                <tr><td colspan="3" class="p-8 text-center text-gray-600 italic">Glissez une facture pour lancer l'audit.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -205,9 +132,14 @@
     <script>
         let invoiceChartInstance = null;
         let GLOBAL_DATA = null;
-        let TRAJECTORY_DATA = null;
 
-        // --- GESTION DRAG & DROP ---
+        // Récupération dynamique du site depuis l'URL
+        const urlParams = new URLSearchParams(window.location.search);
+        let TARGET_SITE_ID = urlParams.get('id') || 'DEMO_SITE';
+        if(TARGET_SITE_ID !== 'DEMO_SITE') {
+            document.getElementById('target-site-label').innerText = `Site Lié : ${TARGET_SITE_ID}`;
+        }
+
         const dropZone = document.getElementById('drop-zone');
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, preventDefaults, false);
@@ -218,18 +150,15 @@
         ['dragleave', 'drop'].forEach(eventName => dropZone.classList.remove('drag-active'));
         dropZone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files), false);
 
-        function handleFiles(files) {
-            if (files.length > 0) uploadInvoice(files[0]);
-        }
+        function handleFiles(files) { if (files.length > 0) uploadInvoice(files[0]); }
 
-        // --- LOGIQUE UPLOAD & FETCH PROJECTION ---
         async function uploadInvoice(file) {
             document.getElementById('loading-spinner').classList.remove('hidden');
             document.getElementById('chart-placeholder').classList.add('hidden');
 
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('site_id', 'DEMO_SITE');
+            formData.append('site_id', TARGET_SITE_ID);
 
             try {
                 const res = await fetch('/api/finance/upload', { method: 'POST', body: formData });
@@ -239,191 +168,123 @@
                     alert("Erreur CORTEX : " + response.message);
                     return;
                 }
-
                 GLOBAL_DATA = response;
-                
-                // --- FETCH PROJECTION (NOUVEAU) ---
-                if (response.technical && response.technical.pdl_detected) {
-                    try {
-                        const resTraj = await fetch(`/api/finance/landing/${response.technical.pdl_detected}`);
-                        TRAJECTORY_DATA = await resTraj.json();
-                        console.log("Trajectory loaded:", TRAJECTORY_DATA);
-                    } catch(e) {
-                        console.error("Forecast error", e);
-                    }
-                }
-
                 renderDashboard(response);
-
-            } catch(e) { console.error(e); alert("Erreur système."); } 
+            } catch(e) { alert("Erreur réseau"); } 
             finally { document.getElementById('loading-spinner').classList.add('hidden'); }
         }
 
-        // --- RENDU DASHBOARD ---
         function renderDashboard(data) {
             document.getElementById('audit-result').classList.remove('hidden');
 
-            // SCORES
+            // 1. GESTION DU BON A PAYER (BAP)
             const score = data.trust_score;
             document.getElementById('res-score').innerText = score + "/100";
-            
             const cardScore = document.getElementById('card-score');
-            const iconScore = document.getElementById('res-icon');
-            const msgScore = document.getElementById('res-message');
+            const stamp = document.getElementById('bap-stamp');
+            const btnExport = document.getElementById('btn-export');
             
-            cardScore.className = "bento-card p-6 border-l-4";
-            if(score < 50) {
-                cardScore.classList.add('border-danger');
-                iconScore.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-danger"></i>';
-                msgScore.innerText = "Facture critique. Ne pas payer.";
-                msgScore.className = "mt-4 text-xs font-bold text-danger";
-            } else if (score < 90) {
-                cardScore.classList.add('border-gold');
-                iconScore.innerHTML = '<i class="fa-solid fa-circle-exclamation text-gold"></i>';
-                msgScore.innerText = "Anomalies détectées.";
-                msgScore.className = "mt-4 text-xs font-bold text-gold";
-            } else {
+            cardScore.className = "bento-card p-6 border-l-4 relative overflow-hidden";
+            
+            if(data.bap_status === "APPROVED") {
                 cardScore.classList.add('border-success');
-                iconScore.innerHTML = '<i class="fa-solid fa-check-circle text-success"></i>';
-                msgScore.innerText = "Facture conforme.";
-                msgScore.className = "mt-4 text-xs font-bold text-success";
-            }
-
-            // GHOST SAVINGS
-            const ghost = data.financials.ghost_savings;
-            if(ghost > 0) {
-                document.getElementById('card-ghost').classList.remove('hidden');
-                document.getElementById('res-ghost').innerText = ghost.toFixed(2) + " €";
+                stamp.innerHTML = '<div class="stamp stamp-approved">BON À PAYER</div>';
+                btnExport.classList.remove('hidden'); // On peut exporter en compta
             } else {
-                document.getElementById('card-ghost').classList.add('hidden');
+                cardScore.classList.add('border-danger');
+                stamp.innerHTML = '<div class="stamp stamp-rejected">QUARANTAINE</div>';
+                btnExport.classList.add('hidden'); // Paiement bloqué
             }
 
-            // TECH SPECS
-            document.getElementById('res-pdl').innerText = data.technical.pdl_detected || "Non détecté";
-            document.getElementById('res-vol').innerText = Math.round(data.technical.volume_factured).toLocaleString() + " kWh";
-            document.getElementById('res-price').innerText = data.financials.unit_price_computed + " €";
+            // 2. BADGE FACTUR-X
+            if(data.technical.source === "FACTUR-X_XML_2026") {
+                document.getElementById('facturx-badge').classList.remove('hidden');
+                document.getElementById('res-score').className = "text-5xl font-mono font-black text-blue-400 mt-2 mb-2";
+            }
 
-            // ANOMALIES TABLE
+            document.getElementById('res-pdl').innerText = `PDL: ${data.technical.pdl_detected || "Non détecté"}`;
+            document.getElementById('res-price').innerText = data.financials.unit_price_computed + " €/kWh";
+
+            // 3. BLOCS HP/HC
+            const blocksList = document.getElementById('blocks-list');
+            blocksList.innerHTML = '';
+            const blocks = data.financials.consumption_blocks || {};
+            for(const [name, info] of Object.entries(blocks)) {
+                blocksList.innerHTML += `
+                    <div class="flex justify-between items-center text-[10px]">
+                        <span class="text-gray-400">${name}</span>
+                        <div class="text-right">
+                            <span class="text-white font-mono mr-2">${Math.round(info.volume_kwh)} kWh</span>
+                            <span class="text-cyan font-mono">${info.pmp_eur_kwh ? info.pmp_eur_kwh.toFixed(4) : '-'} €</span>
+                        </div>
+                    </div>`;
+            }
+            if(Object.keys(blocks).length === 0) blocksList.innerHTML = '<div class="text-[10px] text-gray-600">Postes non détaillés.</div>';
+
+            // 4. ANOMALIES & TAX SHIELD
             const tbody = document.getElementById('anomalies-list');
             tbody.innerHTML = '';
             if(data.anomalies && data.anomalies.length > 0) {
                 data.anomalies.forEach(ano => {
-                    let colorClass = "text-gray-400";
-                    let bgClass = "bg-gray-500/10 border-gray-500/30";
+                    let colorClass = "text-gray-400"; let bgClass = "bg-gray-500/10 border-gray-500/30";
                     if(ano.severity === "CRITICAL") { colorClass = "text-danger"; bgClass = "bg-danger/10 border-danger/30"; }
+                    if(ano.severity === "HIGH") { colorClass = "text-orange-500"; bgClass = "bg-orange-500/10 border-orange-500/30"; }
                     if(ano.severity === "MEDIUM") { colorClass = "text-gold"; bgClass = "bg-gold/10 border-gold/30"; }
+                    
+                    // LE BOUCLIER FISCAL
+                    if(ano.severity === "TAX_SHIELD") {
+                        colorClass = "text-tax font-black"; bgClass = "bg-tax/20 border-tax/50";
+                        ano.severity = "OPPORTUNITÉ";
+                    }
+
                     tbody.innerHTML += `
                         <tr class="hover:bg-white/5 transition border-b border-white/5">
                             <td class="p-3"><span class="px-2 py-1 rounded text-[9px] font-bold border ${bgClass} ${colorClass}">${ano.severity}</span></td>
-                            <td class="p-3 font-bold text-white">${ano.label}</td>
-                            <td class="p-3 text-gray-400">${ano.message}</td>
-                            <td class="p-3 text-right font-mono ${colorClass} cursor-pointer hover:underline">Action Requise</td>
+                            <td class="p-3 font-bold ${colorClass}">${ano.label}</td>
+                            <td class="p-3 text-gray-300 leading-relaxed">${ano.message}</td>
                         </tr>`;
                 });
             } else {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-success"><i class="fa-solid fa-check mb-2"></i><br>Aucune anomalie détectée.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="3" class="p-8 text-center text-success"><i class="fa-solid fa-check mb-2"></i><br>Aucune anomalie. Facture parfaite.</td></tr>`;
             }
 
-            // INITIAL CHART
-            updateChart('financial');
+            renderChart();
         }
 
-        // --- GESTION DES VUES (FINANCE / AUDIT / TRAJECTOIRE) ---
-        function updateChart(type) {
-            if(!GLOBAL_DATA) return;
-
-            // UI Tabs
-            const btnFin = document.getElementById('btn-financial');
-            const btnAud = document.getElementById('btn-audit');
-            const btnTraj = document.getElementById('btn-traj');
-            
-            [btnFin, btnAud, btnTraj].forEach(b => { 
-                b.classList.remove('tab-active'); 
-                b.classList.add('tab-inactive'); 
-            });
-            
-            if(type === 'financial') {
-                btnFin.classList.add('tab-active'); btnFin.classList.remove('tab-inactive');
-            } else if(type === 'audit') {
-                btnAud.classList.add('tab-active'); btnAud.classList.remove('tab-inactive');
-            } else {
-                btnTraj.classList.add('tab-active'); btnTraj.classList.remove('tab-inactive');
-            }
-
+        function renderChart() {
             const ctx = document.getElementById('invoiceChart').getContext('2d');
             if(invoiceChartInstance) invoiceChartInstance.destroy();
 
-            let config = {};
+            const amountEnergy = (GLOBAL_DATA.technical.volume_factured * GLOBAL_DATA.financials.unit_price_computed) || 0;
+            const amountGhost = GLOBAL_DATA.financials.ghost_savings;
+            let amountTaxes = GLOBAL_DATA.financials.amount_ttc - amountEnergy - amountGhost;
+            if(amountTaxes < 0) amountTaxes = 0;
 
-            if (type === 'financial') {
-                // VUE 1 : DÉCOMPOSITION
-                const amountEnergy = (GLOBAL_DATA.technical.volume_factured * GLOBAL_DATA.financials.unit_price_computed) || 0;
-                const amountGhost = GLOBAL_DATA.financials.ghost_savings;
-                let amountTaxes = GLOBAL_DATA.financials.amount_ttc - amountEnergy - amountGhost;
-                if(amountTaxes < 0) amountTaxes = 0;
+            invoiceChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Énergie', 'Taxes & Abo', 'Pénalités'],
+                    datasets: [{
+                        label: 'Montant (€)',
+                        data: [amountEnergy, amountTaxes, amountGhost],
+                        backgroundColor: ['#00E5FF', '#94A3B8', '#EF4444'],
+                        borderRadius: 4, barThickness: 40
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } }, x: { grid: { display: false }, ticks: { color: '#94A3B8' } } }
+                }
+            });
+        }
 
-                config = {
-                    type: 'bar',
-                    data: {
-                        labels: ['Énergie', 'Taxes & Abo', 'Pénalités'],
-                        datasets: [{
-                            label: 'Montant (€)',
-                            data: [amountEnergy, amountTaxes, amountGhost],
-                            backgroundColor: ['#00E5FF', '#94A3B8', '#EF4444'],
-                            borderRadius: 4, barThickness: 40
-                        }]
-                    }
-                };
-            } else if (type === 'audit') {
-                // VUE 2 : KWH
-                const volSGE = GLOBAL_DATA.technical.volume_sge;
-                config = {
-                    type: 'bar',
-                    data: {
-                        labels: ['Facturé', 'Mesuré (SGE)'],
-                        datasets: [{
-                            label: 'Volume (kWh)',
-                            data: [GLOBAL_DATA.technical.volume_factured, volSGE],
-                            backgroundColor: ['#00E5FF', '#10B981'],
-                            borderRadius: 4, barThickness: 40
-                        }]
-                    }
-                };
-            } else if (type === 'trajectory' && TRAJECTORY_DATA && TRAJECTORY_DATA.trajectory) {
-                // VUE 3 : TRAJECTOIRE (LIGNE)
-                const labels = TRAJECTORY_DATA.trajectory.map(t => t.month);
-                const data = TRAJECTORY_DATA.trajectory.map(t => t.cost_cumulative);
-                
-                config = {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Budget Cumulé (€)',
-                            data: data,
-                            borderColor: '#F59E0B', // Gold
-                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                            fill: true,
-                            tension: 0.4,
-                            pointRadius: 4,
-                            pointHoverRadius: 6
-                        }]
-                    }
-                };
-            }
-
-            if (config.type) {
-                config.options = {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } },
-                        x: { grid: { display: false }, ticks: { color: '#94A3B8' } }
-                    }
-                };
-                invoiceChartInstance = new Chart(ctx, config);
-            }
+        window.exportAccounting = function() {
+            if(!GLOBAL_DATA) return;
+            const csv = `Journal;Date;Compte;Libelle;Debit;Credit\nACH;${new Date().toLocaleDateString('fr-FR')};606120;Facture Energie ${GLOBAL_DATA.technical.pdl_detected};${GLOBAL_DATA.financials.amount_ttc};0\n`;
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a"); a.href = url; a.download = `Export_Compta_FEC_${GLOBAL_DATA.technical.pdl_detected}.csv`;
+            document.body.appendChild(a); a.click(); a.remove();
         }
     </script>
 </body>
