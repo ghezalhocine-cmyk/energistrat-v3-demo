@@ -4,59 +4,173 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ENERGISTRAT V10.0 | Retail.OS (Tertiaire & RSE)</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: { 
-                        abysse: '#050505', card: '#0F172A', sidebar: '#020617', 
-                        primary: '#A855F7', cyan: '#00E5FF', gas: '#EF4444', 
-                        success: '#10B981', warning: '#F59E0B', gold: '#FFD700', 
-                        silver: '#C0C0C0', bronze: '#CD7F32',
+                        abysse: '#050505', 
+                        card: '#0F172A', 
+                        sidebar: '#020617', 
+                        primary: '#A855F7', 
+                        cyan: '#00E5FF', 
+                        gas: '#EF4444', 
+                        success: '#10B981', 
+                        warning: '#F59E0B', 
+                        gold: '#FFD700', 
+                        silver: '#C0C0C0', 
+                        bronze: '#CD7F32',
                         rse: '#14B8A6' // Vert d'eau pour la conformité CSRD
                     },
-                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
-                    borderRadius: { 'bento': '1.5rem' }
+                    fontFamily: { 
+                        sans: ['Inter', 'sans-serif'], 
+                        mono: ['JetBrains Mono', 'monospace'] 
+                    },
+                    borderRadius: { 
+                        'bento': '1.5rem' 
+                    }
                 }
             }
         }
     </script>
+    
     <style>
-        body { background-color: #050505; color: #E2E8F0; font-family: 'Inter', sans-serif; overflow: hidden; }
-        .bento-card { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
-        tr.site-row { cursor: pointer; transition: background-color 0.15s ease; }
-        tr.site-row:hover td { background-color: rgba(168, 85, 247, 0.15) !important; color: white; }
-        .nav-item.active { background: rgba(168, 85, 247, 0.15); border-left: 4px solid #A855F7; color: white; }
+        body { 
+            background-color: #050505; 
+            color: #E2E8F0; 
+            font-family: 'Inter', sans-serif; 
+            overflow: hidden; 
+        }
         
-        .gauge-container { background: rgba(255,255,255,0.1); height: 6px; border-radius: 4px; overflow: hidden; position: relative; }
-        .gauge-fill { height: 100%; transition: width 1s ease-out; }
+        .bento-card { 
+            background: rgba(15, 23, 42, 0.8); 
+            backdrop-filter: blur(20px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+            border-radius: 1.5rem; 
+            transition: all 0.3s ease; 
+        }
         
-        #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
-        #action-bar.visible { transform: translateY(0); }
+        tr.site-row { 
+            cursor: pointer; 
+            transition: background-color 0.15s ease; 
+        }
         
-        .input-edit { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 6px; width: 100%; font-size: 12px; }
-        .input-edit:focus { border-color: #00E5FF; outline: none; }
+        tr.site-row:hover td { 
+            background-color: rgba(168, 85, 247, 0.15) !important; 
+            color: white; 
+        }
+        
+        .nav-item.active { 
+            background: rgba(168, 85, 247, 0.15); 
+            border-left: 4px solid #A855F7; 
+            color: white; 
+        }
+        
+        .gauge-container { 
+            background: rgba(255,255,255,0.1); 
+            height: 6px; 
+            border-radius: 4px; 
+            overflow: hidden; 
+            position: relative; 
+        }
+        
+        .gauge-fill { 
+            height: 100%; 
+            transition: width 1s ease-out; 
+        }
+        
+        #action-bar { 
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            transform: translateY(200%); 
+        }
+        
+        #action-bar.visible { 
+            transform: translateY(0); 
+        }
+        
+        .input-edit { 
+            background: rgba(255,255,255,0.05); 
+            border: 1px solid rgba(255,255,255,0.1); 
+            color: white; 
+            padding: 8px; 
+            border-radius: 6px; 
+            width: 100%; 
+            font-size: 12px; 
+        }
+        
+        .input-edit:focus { 
+            border-color: #00E5FF; 
+            outline: none; 
+        }
         
         /* SLIDER WAHOO */
-        input[type=range].stress-test { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type=range].stress-test::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #EF4444; cursor: pointer; margin-top: -6px; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
-        input[type=range].stress-test::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #334155; border-radius: 2px; }
+        input[type=range].stress-test { 
+            -webkit-appearance: none; 
+            width: 100%; 
+            background: transparent; 
+        }
+        
+        input[type=range].stress-test::-webkit-slider-thumb { 
+            -webkit-appearance: none; 
+            height: 16px; 
+            width: 16px; 
+            border-radius: 50%; 
+            background: #EF4444; 
+            cursor: pointer; 
+            margin-top: -6px; 
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); 
+        }
+        
+        input[type=range].stress-test::-webkit-slider-runnable-track { 
+            width: 100%; 
+            height: 4px; 
+            cursor: pointer; 
+            background: #334155; 
+            border-radius: 2px; 
+        }
 
         select { 
-            -webkit-appearance: none; appearance: none; 
+            -webkit-appearance: none; 
+            appearance: none; 
             background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
-            background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; 
-            background-color: #0F172A; color: white; padding: 5px;
+            background-repeat: no-repeat; 
+            background-position: right 0.5rem center; 
+            background-size: 1em; 
+            background-color: #0F172A; 
+            color: white; 
+            padding: 5px;
         }
-        option { background-color: #0F172A; color: white; padding: 5px; }
+        
+        option { 
+            background-color: #0F172A; 
+            color: white; 
+            padding: 5px; 
+        }
 
-        .view-section { display: none; } .view-section.active { display: block; animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        .view-section { 
+            display: none; 
+        } 
+        
+        .view-section.active { 
+            display: block; 
+            animation: fadeIn 0.3s ease-out; 
+        }
+        
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(10px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+        
+        ::-webkit-scrollbar { width: 6px; } 
+        ::-webkit-scrollbar-track { background: transparent; } 
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden">
@@ -75,12 +189,15 @@
         
         <div class="p-4 space-y-2">
             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-2 px-2">Gouvernance Réseau</div>
+            
             <button onclick="window.switchView('fleet')" id="nav-fleet" class="nav-item active w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition">
                 <i class="fa-solid fa-earth-europe w-5 text-center"></i> Pilotage Consolidé
             </button>
+            
             <button onclick="window.switchView('league')" id="nav-league" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition">
                 <i class="fa-solid fa-trophy w-5 text-center text-yellow-500"></i> Green League
             </button>
+            
             <button onclick="window.switchView('offer-lab')" id="nav-offer-lab" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition">
                 <i class="fa-solid fa-scale-balanced w-5 text-center text-cyan"></i> Dépouillement DQE
             </button>
@@ -88,15 +205,18 @@
         
         <div class="px-4 mt-2 mb-4">
             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-2 px-2">Conformité Légale</div>
+            
             <a href="/carbon" class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition group">
                 <i class="fa-solid fa-leaf w-5 text-center text-rse group-hover:text-teal-400"></i> Norme CSRD (Scope 2)
             </a>
+            
             <a href="/solar" class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition group">
                 <i class="fa-solid fa-solar-panel w-5 text-center text-yellow-500 group-hover:text-yellow-400"></i> Potentiel Ombrières (Loi)
             </a>
         </div>
 
         <div class="px-4 mt-auto">
+             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-2">Filtres Énergie</div>
              <div class="flex bg-white/5 p-1 rounded-lg mb-2">
                 <button onclick="window.filterEnergy('all')" id="btn-all" class="flex-1 py-1.5 text-[10px] font-bold rounded bg-primary text-white transition">MIXTE</button>
                 <button onclick="window.filterEnergy('elec')" id="btn-elec" class="flex-1 py-1.5 text-[10px] font-bold rounded text-gray-400 hover:text-white transition">ELEC</button>
@@ -127,7 +247,9 @@
                 
                 <!-- KPI CSRD (NOUVEAU) -->
                 <div class="text-right border-r border-white/10 pr-8">
-                    <div class="text-[10px] text-rse uppercase font-bold tracking-widest flex items-center justify-end gap-2"><i class="fa-solid fa-cloud"></i> Empreinte Scope 2</div>
+                    <div class="text-[10px] text-rse uppercase font-bold tracking-widest flex items-center justify-end gap-2">
+                        <i class="fa-solid fa-cloud"></i> Empreinte Scope 2
+                    </div>
                     <div class="text-lg font-bold text-white font-mono" id="carbon-display">-- tCO2e</div>
                 </div>
 
@@ -164,15 +286,21 @@
                     </div>
                     <div>
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Fournisseur</label>
-                        <select id="filter-provider" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded-lg p-2 text-white outline-none focus:border-primary cursor-pointer hover:bg-white/5 transition"><option value="all">Tous</option></select>
+                        <select id="filter-provider" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded-lg p-2 text-white outline-none focus:border-primary cursor-pointer hover:bg-white/5 transition">
+                            <option value="all">Tous</option>
+                        </select>
                     </div>
                     <div>
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Ville / Secteur</label>
-                        <select id="filter-city" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded-lg p-2 text-white outline-none focus:border-primary cursor-pointer hover:bg-white/5 transition"><option value="all">Toutes</option></select>
+                        <select id="filter-city" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded-lg p-2 text-white outline-none focus:border-primary cursor-pointer hover:bg-white/5 transition">
+                            <option value="all">Toutes</option>
+                        </select>
                     </div>
                     <div>
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Segment Tarifaire</label>
-                        <select id="filter-segment" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded-lg p-2 text-white outline-none focus:border-primary cursor-pointer hover:bg-white/5 transition"><option value="all">Tous</option></select>
+                        <select id="filter-segment" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded-lg p-2 text-white outline-none focus:border-primary cursor-pointer hover:bg-white/5 transition">
+                            <option value="all">Tous</option>
+                        </select>
                     </div>
                 </div>
 
@@ -211,7 +339,9 @@
                                     <th class="px-4 py-3 text-center bg-card">Conformité RSE (NILM)</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-white/5" id="fleet-table-body"></tbody>
+                            <tbody class="divide-y divide-white/5" id="fleet-table-body">
+                                <!-- Injecté par JS -->
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -225,24 +355,34 @@
                 </div>
                 <div class="grid grid-cols-3 gap-6 mb-8">
                     <div class="bento-card p-6 border-t-4 border-silver transform translate-y-4 text-center">
-                        <div class="text-4xl mb-2">🥈</div><div class="font-bold text-white text-lg" id="podium-2-name">--</div><div class="text-sm text-silver font-mono" id="podium-2-score">--</div>
+                        <div class="text-4xl mb-2">🥈</div>
+                        <div class="font-bold text-white text-lg" id="podium-2-name">--</div>
+                        <div class="text-sm text-silver font-mono" id="podium-2-score">--</div>
                     </div>
                     <div class="bento-card p-8 border-t-4 border-gold transform -translate-y-4 text-center shadow-[0_0_40px_rgba(245,158,11,0.2)] z-10">
-                        <div class="text-6xl mb-4">🥇</div><div class="font-black text-white text-2xl" id="podium-1-name">--</div><div class="text-lg text-gold font-mono font-bold mt-2" id="podium-1-score">--</div>
+                        <div class="text-6xl mb-4">🥇</div>
+                        <div class="font-black text-white text-2xl" id="podium-1-name">--</div>
+                        <div class="text-lg text-gold font-mono font-bold mt-2" id="podium-1-score">--</div>
                     </div>
                     <div class="bento-card p-6 border-t-4 border-bronze transform translate-y-4 text-center">
-                        <div class="text-4xl mb-2">🥉</div><div class="font-bold text-white text-lg" id="podium-3-name">--</div><div class="text-sm text-bronze font-mono" id="podium-3-score">--</div>
+                        <div class="text-4xl mb-2">🥉</div>
+                        <div class="font-bold text-white text-lg" id="podium-3-name">--</div>
+                        <div class="text-sm text-bronze font-mono" id="podium-3-score">--</div>
                     </div>
                 </div>
                 <div class="bento-card p-6 border-t-4 border-alert bg-alert/5">
                     <h3 class="text-sm font-bold text-alert uppercase tracking-widest mb-4"><i class="fa-solid fa-triangle-exclamation"></i> Agences Énergivores (Risque Loi ELAN)</h3>
-                    <div class="space-y-2" id="league-list"></div>
+                    <div class="space-y-2" id="league-list">
+                        <!-- Injecté par JS -->
+                    </div>
                 </div>
             </div>
 
             <!-- VUE 3 : DÉTAIL & SMART TWIN (ZÉRO MOCK) -->
             <div id="view-detail" class="view-section hidden space-y-6">
-                <button onclick="window.switchView('fleet')" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4"><i class="fa-solid fa-arrow-left"></i> RETOUR AU PARC</button>
+                <button onclick="window.switchView('fleet')" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4">
+                    <i class="fa-solid fa-arrow-left"></i> RETOUR AU PARC
+                </button>
                 <div class="flex justify-between items-start">
                     <div>
                         <div class="flex items-center gap-3">
@@ -262,10 +402,18 @@
                     <div class="bento-card col-span-1 p-6 flex flex-col justify-between border-t-4 border-primary">
                         <h3 class="text-white font-bold text-sm mb-4"><i class="fa-solid fa-bolt text-primary mr-2"></i> Optimisation TURPE</h3>
                         <div class="relative pt-2 pb-2">
-                            <div class="flex justify-between text-xs font-mono text-gray-500 mb-2"><span class="text-white font-bold" id="detail-reached">Atteint: --</span><span class="text-primary font-bold" id="detail-sub">Souscrit: --</span></div>
-                            <div class="gauge-container h-3 bg-white/10 rounded-full"><div id="detail-gauge" class="h-full rounded-full transition-all duration-1000" style="width: 0%"></div></div>
+                            <div class="flex justify-between text-xs font-mono text-gray-500 mb-2">
+                                <span class="text-white font-bold" id="detail-reached">Atteint: --</span>
+                                <span class="text-primary font-bold" id="detail-sub">Souscrit: --</span>
+                            </div>
+                            <div class="gauge-container h-3 bg-white/10 rounded-full">
+                                <div id="detail-gauge" class="h-full rounded-full transition-all duration-1000" style="width: 0%"></div>
+                            </div>
                         </div>
-                        <div class="mt-4 pt-4 border-t border-white/5 flex justify-between items-center"><span class="text-xs text-gray-500">Gain Financier Immédiat</span><span class="text-xl font-bold text-success" id="detail-gain">-- €</span></div>
+                        <div class="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
+                            <span class="text-xs text-gray-500">Gain Financier Immédiat</span>
+                            <span class="text-xl font-bold text-success" id="detail-gain">-- €</span>
+                        </div>
                     </div>
 
                     <!-- PONT SATELLITE SOLAR STUDIO -->
@@ -276,15 +424,20 @@
                             <span class="text-[9px] font-bold px-2 py-1 rounded bg-yellow-500 text-abysse">API EU</span>
                         </div>
                         <div class="text-xs text-gray-300 leading-relaxed font-medium mb-4 relative z-10">
-                            L'IA estime que la toiture de cette agence peut accueillir des panneaux solaires.
+                            L'IA estime que la toiture de cette agence peut accueillir des panneaux solaires pour baisser l'empreinte CSRD.
                         </div>
                         <a href="/solar" class="mt-auto block w-full text-center bg-white/10 hover:bg-yellow-500 hover:text-abysse text-white font-bold py-2 rounded-lg text-xs transition relative z-10">Ouvrir Solar Studio</a>
                     </div>
 
                     <!-- PRIX & MARCHÉ -->
                     <div class="bento-card col-span-1 p-6 flex flex-col border-t-4 border-cyan" id="market-card">
-                        <div class="flex justify-between items-start mb-4"><h3 class="font-bold text-white text-sm"><i class="fa-solid fa-file-contract text-cyan mr-2"></i> Structure Prix</h3><span id="market-badge" class="text-[9px] font-bold px-2 py-1 rounded bg-gray-700 text-gray-300">--</span></div>
-                        <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="detail-pricing"></div>
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="font-bold text-white text-sm"><i class="fa-solid fa-file-contract text-cyan mr-2"></i> Structure Prix</h3>
+                            <span id="market-badge" class="text-[9px] font-bold px-2 py-1 rounded bg-gray-700 text-gray-300">--</span>
+                        </div>
+                        <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="detail-pricing">
+                            <!-- Injecté par JS -->
+                        </div>
                     </div>
                 </div>
 
@@ -314,7 +467,7 @@
                     </div>
                     <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-cyan/30 border-dashed rounded-2xl cursor-pointer bg-white/5 hover:bg-white/10 transition group">
                         <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                            <i class="fa-solid fa-file-excel text-3xl text-gray-400 group-hover:text-cyan mb-2 transition"></i>
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400 group-hover:text-cyan mb-2 transition"></i>
                             <p class="text-sm text-gray-400"><span class="font-bold text-white">Cliquez pour uploader</span> le fichier Excel chiffré</p>
                         </div>
                         <input type="file" id="offer-file" class="hidden" accept=".xlsx" onchange="window.triggerOfferScan(this)">
@@ -324,17 +477,35 @@
                 <!-- RESULTAT STAGING -->
                 <div id="sim-results" class="hidden space-y-6">
                     <div class="grid grid-cols-3 gap-6">
-                        <div class="bento-card p-6 border-l-4 border-gray-500"><h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Budget Actuel (Ref)</h3><div class="text-2xl font-bold text-white" id="sim-current">-- €</div></div>
-                        <div class="bento-card p-6 border-l-4 border-cyan"><h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Offre Analysée</h3><div class="text-2xl font-bold text-cyan" id="sim-offer">-- €</div></div>
-                        <div class="bento-card p-6 border-l-4 border-green-500"><h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Impact P&L</h3><div class="text-3xl font-black text-green-500" id="sim-delta">-- €</div><div class="text-sm font-bold text-green-400" id="sim-pct">-- %</div></div>
+                        <div class="bento-card p-6 border-l-4 border-gray-500">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Budget Actuel (Ref)</h3>
+                            <div class="text-2xl font-bold text-white" id="sim-current">-- €</div>
+                        </div>
+                        <div class="bento-card p-6 border-l-4 border-cyan">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Offre Analysée</h3>
+                            <div class="text-2xl font-bold text-cyan" id="sim-offer">-- €</div>
+                        </div>
+                        <div class="bento-card p-6 border-l-4 border-green-500">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Impact P&L</h3>
+                            <div class="text-3xl font-black text-green-500" id="sim-delta">-- €</div>
+                            <div class="text-sm font-bold text-green-400" id="sim-pct">-- %</div>
+                        </div>
                     </div>
                     <div class="bento-card overflow-hidden">
                         <div class="max-h-64 overflow-y-auto">
                             <table class="w-full text-left text-xs text-gray-300">
                                 <thead class="bg-white/5 text-[9px] uppercase text-gray-400 font-bold sticky top-0">
-                                    <tr><th class="px-4 py-3">Site</th><th class="px-4 py-3 text-right">Volume SGE</th><th class="px-4 py-3 text-right">Actuel</th><th class="px-4 py-3 text-right">Candidat</th><th class="px-4 py-3 text-right">Écart</th></tr>
+                                    <tr>
+                                        <th class="px-4 py-3">Site</th>
+                                        <th class="px-4 py-3 text-right">Volume SGE</th>
+                                        <th class="px-4 py-3 text-right">Actuel</th>
+                                        <th class="px-4 py-3 text-right">Candidat</th>
+                                        <th class="px-4 py-3 text-right">Écart</th>
+                                    </tr>
                                 </thead>
-                                <tbody class="divide-y divide-white/5" id="sim-table-body"></tbody>
+                                <tbody class="divide-y divide-white/5" id="sim-table-body">
+                                    <!-- Injecté par JS -->
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -343,14 +514,18 @@
 
         </div>
 
-        <!-- ACTION BAR -->
+        <!-- ACTION BAR GLOABLE -->
         <div id="action-bar" class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-4 rounded-2xl shadow-[0_0_40px_rgba(255,255,255,0.2)] flex items-center gap-6 z-50 transform translate-y-32 transition-transform duration-300">
             <div class="font-bold"><span id="selected-count" class="text-primary">0</span> agences sélectionnées</div>
             <div class="h-6 w-px bg-gray-300"></div>
-            <button onclick="window.generateTender()" class="flex items-center gap-2 hover:text-cyan font-bold text-sm transition"><i class="fa-solid fa-file-contract"></i> Exporter Appel d'Offres</button>
+            <button onclick="window.generateTender()" class="flex items-center gap-2 hover:text-cyan font-bold text-sm transition">
+                <i class="fa-solid fa-file-contract"></i> Exporter Appel d'Offres
+            </button>
             <div class="h-6 w-px bg-gray-300"></div>
             <!-- BOUTON EXPORT OPERAT (DECRET TERTIAIRE) -->
-            <button onclick="window.exportOperat()" class="flex items-center gap-2 text-rse hover:text-teal-600 font-black text-sm transition"><i class="fa-solid fa-cloud-arrow-down"></i> Export OPERAT (Légal)</button>
+            <button onclick="window.exportOperat()" class="flex items-center gap-2 text-rse hover:text-teal-600 font-black text-sm transition">
+                <i class="fa-solid fa-cloud-arrow-down"></i> Export OPERAT (Légal)
+            </button>
         </div>
 
     </main>
@@ -361,12 +536,24 @@
             <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-primary"></i> Modifier l'Agence</h3>
             <div class="space-y-4">
                 <input type="hidden" id="edit-id">
-                <div><label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site</label><input type="text" id="edit-name" class="input-edit"></div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div><label class="text-[10px] text-gray-500 uppercase font-bold">Fournisseur</label><input type="text" id="edit-provider" class="input-edit"></div>
-                    <div><label class="text-[10px] text-gray-500 uppercase font-bold" id="lbl-edit-power">Puissance Souscrite</label><input type="number" id="edit-power" class="input-edit"></div>
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site</label>
+                    <input type="text" id="edit-name" class="input-edit">
                 </div>
-                <div><label class="text-[10px] text-gray-500 uppercase font-bold flex justify-between">Surface Commerciale (m²) <span class="text-primary text-[9px] italic">Critique pour Décret Tertiaire</span></label><input type="number" id="edit-surface" class="input-edit font-mono text-cyan" placeholder="Ex: 500"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase font-bold">Fournisseur</label>
+                        <input type="text" id="edit-provider" class="input-edit">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase font-bold" id="lbl-edit-power">Puissance Souscrite</label>
+                        <input type="number" id="edit-power" class="input-edit">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase font-bold flex justify-between">Surface Commerciale (m²) <span class="text-primary text-[9px] italic">Critique pour Décret Tertiaire</span></label>
+                    <input type="number" id="edit-surface" class="input-edit font-mono text-cyan" placeholder="Ex: 500">
+                </div>
             </div>
             <div class="flex justify-end gap-3 mt-8">
                 <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button>
@@ -379,57 +566,107 @@
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
     <script>
+        // --- 1. FONCTIONS GLOBALES ET UTILITAIRES ---
         const App = {
             toast: function(msg, type='info') {
                 const container = document.getElementById('toast-container');
                 if(!container) return;
-                const colors = { success: 'bg-green-600 border-green-500', error: 'bg-alert border-red-500', info: 'bg-primary border-primary text-white' };
+                const colors = { 
+                    success: 'bg-green-600 border-green-500', 
+                    error: 'bg-alert border-red-500', 
+                    info: 'bg-primary border-primary text-white' 
+                };
                 const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
                 const el = document.createElement('div');
                 el.className = `${colors[type] || colors.info} px-6 py-3 rounded-xl shadow-2xl text-xs font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
-                el.innerHTML = `<i class="fa-solid ${icon}"></i> ${msg}`;
+                el.innerHTML = `<span><i class="fa-solid ${icon}"></i></span> ${msg}`;
                 container.appendChild(el);
-                requestAnimationFrame(() => el.classList.remove('translate-y-10', 'opacity-0'));
-                setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
+                
+                requestAnimationFrame(() => {
+                    el.classList.remove('-translate-y-10', 'opacity-0');
+                });
+                
+                setTimeout(() => { 
+                    el.classList.add('opacity-0', '-translate-y-10'); 
+                    setTimeout(() => el.remove(), 300); 
+                }, 4000);
             }
         };
 
-        let FLEET_DATA =[];
+        function safeSetText(id, val) { 
+            const el = document.getElementById(id); 
+            if(el) el.innerText = val; 
+        }
+
+        function formatCurrency(val) { 
+            return new Intl.NumberFormat('fr-FR', { 
+                style: 'currency', 
+                currency: 'EUR', 
+                maximumFractionDigits: 0 
+            }).format(val); 
+        }
+
+        // --- VARIABLES D'ÉTAT ---
+        let FLEET_DATA = [];
         let FILTER_META = {};
         let LEAGUE_DATA = null;
         let CURRENT_DETAIL_SITE = null;
         let historyChartInstance = null;
         let SELECTED_IDS = new Set();
         let CURRENT_FILTER_ENERGY = 'all';
-        let mixChartInstance = null; let topChartInstance = null; let supplierChartInstance = null;
-
+        let mixChartInstance = null; 
+        let topChartInstance = null; 
+        let supplierChartInstance = null;
         let GLOBAL_BUDGET_BASE = 0;
         let STRESS_RATE = 0;
 
-        function safeSetText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
-        
+        // --- 2. ROUTAGE INTERNE (SPA) ---
         window.switchView = function(viewName) {
-            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
-            const btn = document.getElementById('nav-' + viewName);
-            if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
+            document.querySelectorAll('.nav-item').forEach(el => { 
+                el.classList.remove('active', 'text-white'); 
+                el.classList.add('text-gray-400'); 
+            });
             
-            const views =['view-fleet', 'view-league', 'view-detail', 'view-offer-lab'];
-            views.forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
+            const btn = document.getElementById('nav-' + viewName);
+            if(btn) { 
+                btn.classList.add('active', 'text-white'); 
+                btn.classList.remove('text-gray-400'); 
+            }
+            
+            const views = ['view-fleet', 'view-league', 'view-detail', 'view-offer-lab'];
+            views.forEach(id => { 
+                const el = document.getElementById(id); 
+                if(el) { 
+                    el.classList.add('hidden'); 
+                    el.classList.remove('active'); 
+                } 
+            });
             
             const targetEl = document.getElementById('view-' + viewName);
-            if(targetEl) targetEl.classList.remove('hidden');
-            targetEl.classList.add('active');
+            if(targetEl) {
+                targetEl.classList.remove('hidden');
+                targetEl.classList.add('active');
+            }
 
-            if(viewName === 'detail') { safeSetText('main-title', "Smart Twin & Intelligence"); document.getElementById('header-kpis').classList.add('hidden'); } 
-            else if (viewName === 'league') { safeSetText('main-title', "Green League RSE"); document.getElementById('header-kpis').classList.add('hidden'); calculateLeague(); } 
-            else if (viewName === 'offer-lab') { safeSetText('main-title', "Dépouillement DQE"); document.getElementById('header-kpis').classList.add('hidden'); } 
-            else { safeSetText('main-title', "Gouvernance Multi-sites"); document.getElementById('header-kpis').classList.remove('hidden'); }
+            if(viewName === 'detail') { 
+                safeSetText('main-title', "Smart Twin & Intelligence"); 
+                document.getElementById('header-kpis').classList.add('hidden'); 
+            } else if (viewName === 'league') { 
+                safeSetText('main-title', "Green League RSE"); 
+                document.getElementById('header-kpis').classList.add('hidden'); 
+                calculateLeague(); 
+            } else if (viewName === 'offer-lab') { 
+                safeSetText('main-title', "Dépouillement DQE"); 
+                document.getElementById('header-kpis').classList.add('hidden'); 
+            } else { 
+                safeSetText('main-title', "Gouvernance Multi-sites"); 
+                document.getElementById('header-kpis').classList.remove('hidden'); 
+            }
         }
 
-        // --- 1. MOTEUR D'INITIALISATION ZÉRO MOCK ---
+        // --- 3. MOTEUR D'INITIALISATION ZÉRO MOCK ---
         async function loadFleet() {
             try {
-                // Parallélisation des appels vitaux (Fleet + Market)
                 const [resFleet, resMarket] = await Promise.all([
                     fetch('/api/dashboard/fleet'),
                     fetch('/api/tools/sniper/market')
@@ -437,12 +674,10 @@
 
                 const data = await resFleet.json();
                 
-                // Traitement Sniper Market
                 if(resMarket.ok) {
                     const marketData = await resMarket.json();
                     if(marketData.success && marketData.current_prices) {
                         const trend = marketData.status === 'BEAR' ? 'Baisse' : 'Hausse';
-                        // Simulation de l'impact marché par rapport à 80€
                         const impact = Math.round(((marketData.current_prices.elec - 80) / 80) * 100);
                         document.getElementById('stress-val').innerText = `${trend} à ${marketData.current_prices.elec}€`;
                         if(impact > 0) {
@@ -462,18 +697,30 @@
                     initFilters();
                     window.applyFilters();
                 }
-            } catch(e) { console.error("Erreur Init Fleet:", e); }
+            } catch(e) { 
+                console.error("Erreur Init Fleet:", e); 
+            }
         }
 
-        // --- 2. STRESS TEST BOURSIER ---
+        // --- 4. GESTION DES FILTRES ET STRESS TEST ---
         window.updateStressTest = function(val) {
             STRESS_RATE = parseInt(val);
             document.getElementById('stress-val').innerText = `+${STRESS_RATE}% vs N-1`;
-            window.applyFilters(); // Recalcul et réaffichage pur
+            window.applyFilters(); 
         }
 
         function initFilters() {
-            const populate = (id, list) => { const sel = document.getElementById(id); if(!sel || !list) return; sel.innerHTML = '<option value="all">Tous</option>'; list.forEach(item => { const opt = document.createElement('option'); opt.value = item; opt.innerText = item; sel.appendChild(opt); }); };
+            const populate = (id, list) => { 
+                const sel = document.getElementById(id); 
+                if(!sel || !list) return; 
+                sel.innerHTML = '<option value="all">Tous</option>'; 
+                list.forEach(item => { 
+                    const opt = document.createElement('option'); 
+                    opt.value = item; 
+                    opt.innerText = item; 
+                    sel.appendChild(opt); 
+                }); 
+            };
             populate('filter-provider', FILTER_META.providers);
             populate('filter-city', FILTER_META.cities);
             populate('filter-segment', FILTER_META.segments);
@@ -485,21 +732,25 @@
             ['all', 'elec', 'gaz'].forEach(t => {
                 const btn = document.getElementById('btn-' + t);
                 if(btn) {
-                    btn.className = (t === type) ? "flex-1 py-1.5 text-[10px] font-bold rounded bg-primary text-white transition shadow-lg" : "flex-1 py-1.5 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
-                    if(t === type && t === 'gaz') btn.classList.replace('bg-primary', 'bg-gas');
+                    if (t === type) {
+                        btn.className = "flex-1 py-1.5 text-[10px] font-bold rounded bg-primary text-white transition shadow-lg";
+                        if(t === 'gaz') btn.classList.replace('bg-primary', 'bg-gas');
+                    } else {
+                        btn.className = "flex-1 py-1.5 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
+                    }
                 }
             });
             window.applyFilters();
         }
 
-        // --- 3. MOTEUR RSE (CALCUL CARBONE) ET FILTRAGE ---
         window.applyFilters = function() {
             const fProvider = document.getElementById('filter-provider').value;
             const fCity = document.getElementById('filter-city').value;
             const fSegment = document.getElementById('filter-segment').value;
             const search = document.getElementById('omni-search').value.toLowerCase(); 
 
-            let totalVolElec = 0; let totalVolGaz = 0;
+            let totalVolElec = 0; 
+            let totalVolGaz = 0;
 
             const filtered = FLEET_DATA.filter(site => {
                 const matchEnergy = (CURRENT_FILTER_ENERGY === 'all') || (site.energy === CURRENT_FILTER_ENERGY);
@@ -509,52 +760,63 @@
                 const matchSearch = !search || site.name.toLowerCase().includes(search) || site.id.toLowerCase().includes(search) || site.city.toLowerCase().includes(search);
                 
                 if(matchEnergy && matchProv && matchCity && matchSeg && matchSearch) {
-                    if(site.energy === 'gaz') totalVolGaz += site.volume; else totalVolElec += site.volume;
+                    if(site.energy === 'gaz') totalVolGaz += site.volume; 
+                    else totalVolElec += site.volume;
                     return true;
                 }
                 return false;
             });
             
-            // Calcul Empreinte Carbone Officielle (ADEME Base Carbone)
-            // Élec France: ~50 kg CO2/MWh | Gaz: ~220 kg CO2/MWh
+            // Calcul Empreinte Carbone Officielle CSRD (Facteurs ADEME)
             const tonnesCO2 = ((totalVolElec * 0.05) + (totalVolGaz * 0.22)).toFixed(1);
             document.getElementById('carbon-display').innerText = `${tonnesCO2} tCO2e`;
 
-            const stressedData = filtered.map(s => ({ ...s, budget: s.budget * (1 + STRESS_RATE/100) }));
+            const stressedData = filtered.map(s => ({ 
+                ...s, 
+                budget: s.budget * (1 + STRESS_RATE/100) 
+            }));
 
             renderTable(stressedData);
             updateGlobalKPIs(stressedData);
             updateCharts(stressedData);
         }
 
-        // --- 4. TABLEAU MASTER AVEC MOTEUR NILM (RISQUE D'IMAGE) ---
+        // --- 5. TABLEAU MASTER ET MOTEUR NILM RSE ---
         function renderTable(data) {
             const tbody = document.getElementById('fleet-table-body');
             if(!tbody) return;
-            tbody.innerHTML = '';
+            
+            const newTbody = document.createElement('tbody');
+            newTbody.id = 'fleet-table-body';
+            newTbody.className = "divide-y divide-white/5";
             
             data.forEach(site => {
                 const isGaz = site.energy === 'gaz';
                 const isSelected = SELECTED_IDS.has(site.id);
                 const row = document.createElement('tr');
+                
                 row.className = "site-row border-b border-white/5 hover:bg-white/5 cursor-pointer transition";
                 row.setAttribute('data-id', site.id);
                 row.setAttribute('onclick', 'window.openDetail(this)');
                 
-                // Logique NILM RSE (Froid vs Enseigne)
+                // Moteur NILM pour détecter le Risque d'Image (Enseigne allumée vs Froid Commercial)
                 let rseStatus = '<span class="text-success text-[10px] font-bold"><i class="fa-solid fa-check"></i> Talon Normal</span>';
+                
                 if (!isGaz && site.ghost_savings > site.budget * 0.2) {
-                    // Si gaspillage énorme, suspicion Enseigne allumée la nuit
                     rseStatus = '<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded text-[10px] font-bold border border-red-500/50 animate-pulse"><i class="fa-solid fa-lightbulb"></i> Alerte Enseigne / Froid</span>';
                 } else if (!isGaz && site.ghost_savings > 100) {
                     rseStatus = '<span class="text-gold text-[10px] font-bold"><i class="fa-solid fa-snowflake"></i> Optimisation Froid Req.</span>';
                 }
 
                 let provHtml = `<span class="text-[10px] bg-white/10 px-2 py-0.5 rounded font-bold">${(site.provider||'Inconnu').substring(0,8)}</span>`;
-                if((site.provider||'').toLowerCase().includes('edf')) provHtml = `<span class="text-[10px] bg-blue-600 px-2 py-0.5 rounded font-bold text-white">EDF</span>`;
+                if((site.provider||'').toLowerCase().includes('edf')) {
+                    provHtml = `<span class="text-[10px] bg-blue-600 px-2 py-0.5 rounded font-bold text-white">EDF</span>`;
+                }
                 
                 row.innerHTML = `
-                    <td class="px-4 py-3 text-center" onclick="event.stopPropagation()"><input type="checkbox" class="accent-primary w-4 h-4 cursor-pointer" onchange="window.toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}></td>
+                    <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
+                        <input type="checkbox" class="accent-primary w-4 h-4 cursor-pointer" onchange="window.toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}>
+                    </td>
                     <td class="px-4 py-3 font-bold text-white">${site.name}<div class="text-[9px] text-gray-500 font-mono">${site.id}</div></td>
                     <td class="px-4 py-3 text-gray-400 font-mono text-xs">${site.zip || ''}</td>
                     <td class="px-4 py-3">${provHtml}</td>
@@ -562,8 +824,9 @@
                     <td class="px-4 py-3 text-right font-bold text-white">${formatCurrency(site.budget)}</td>
                     <td class="px-4 py-3 text-center">${rseStatus}</td>
                 `;
-                tbody.appendChild(row);
+                newTbody.appendChild(row);
             });
+            tbody.parentNode.replaceChild(newTbody, tbody);
         }
 
         function updateGlobalKPIs(data) {
@@ -571,17 +834,61 @@
             safeSetText('budget-display', formatCurrency(totalBudget));
         }
 
-        // --- 5. DÉTAIL BÂTIMENT & SMART TWIN ---
-        window.openDetail = function(row) { const id = row.getAttribute('data-id'); if(id) window.loadDetail(id); }
+        function updateCharts(data) {
+            let budgetElec = 0; 
+            let budgetGaz = 0;
+            
+            data.forEach(s => { 
+                if(s.energy === 'gaz') budgetGaz += s.budget; 
+                else budgetElec += s.budget; 
+            });
+            
+            const ctxMix = document.getElementById('mixChart');
+            if(ctxMix) { 
+                if(mixChartInstance) mixChartInstance.destroy(); 
+                mixChartInstance = new Chart(ctxMix.getContext('2d'), { 
+                    type: 'doughnut', 
+                    data: { 
+                        labels: ['Élec', 'Gaz'], 
+                        datasets: [{ data: [budgetElec, budgetGaz], backgroundColor:['#00E5FF', '#EF4444'], borderWidth: 0 }] 
+                    }, 
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff' } } } } 
+                }); 
+            }
+            
+            const top5 = [...data].sort((a, b) => b.budget - a.budget).slice(0, 5);
+            const ctxTop = document.getElementById('topChart');
+            if(ctxTop) { 
+                if(topChartInstance) topChartInstance.destroy(); 
+                topChartInstance = new Chart(ctxTop.getContext('2d'), { 
+                    type: 'bar', 
+                    data: { 
+                        labels: top5.map(s => s.name.substring(0, 10)), 
+                        datasets:[{ label: 'Budget', data: top5.map(s => s.budget), backgroundColor: '#A855F7', borderRadius: 4 }] 
+                    }, 
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94A3B8' }, grid: { display: false } }, y: { display: false } } } 
+                }); 
+            }
+        }
+
+        // --- 6. DÉTAIL & SMART TWIN FORECAST (ZÉRO MOCK) ---
+        window.openDetail = function(row) { 
+            const id = row.getAttribute('data-id'); 
+            if(id) window.loadDetail(id); 
+        }
+
         window.loadDetail = async function(id) {
             try {
                 const res = await fetch(`/api/dashboard/data/${id}`);
                 const data = await res.json();
                 if(data.error) return;
+                
                 CURRENT_DETAIL_SITE = data; 
                 renderDetail(data);
                 window.switchView('detail');
-            } catch(e) { console.error(e); }
+            } catch(e) { 
+                console.error(e); 
+            }
         }
 
         function renderDetail(data) {
@@ -589,7 +896,24 @@
             safeSetText('detail-address', data.location.address);
             safeSetText('detail-surface', (data.location?.surface || 0) + ' m²');
             
-            // Appel direct à Cortex Forecast (Zéro Mock 5 ans)
+            const isGaz = data.energy_type === 'gaz';
+            const pSub = parseFloat(data.contract.power) || 0;
+            const pReach = parseFloat(data.kpis?.pmax_kw) || (pSub * 0.7); 
+            
+            safeSetText('detail-sub', `Souscrit: ${pSub}`);
+            safeSetText('detail-reached', `Atteint: ${pReach}`);
+            
+            const ratio = pSub > 0 ? (pReach / pSub) * 100 : 0;
+            const gauge = document.getElementById('detail-gauge');
+            if(gauge) {
+                gauge.style.width = `${ratio}%`;
+                gauge.className = `h-full rounded-full ${ratio > 95 ? 'bg-red-500' : (ratio < 60 ? 'bg-warning' : 'bg-success')}`;
+            }
+            
+            const gain = (!isGaz && ratio < 60) ? Math.floor((pSub - pReach*1.2) * 18) : 0;
+            safeSetText('detail-gain', gain > 0 ? `+ ${gain} €/an` : "OPTIMISÉ");
+            
+            // Appel direct à Cortex Forecast
             fetchForecast(data.identity.id);
         }
 
@@ -607,25 +931,51 @@
                     data: {
                         labels: data.labels || ['N', 'N+1', 'N+2', 'N+3', 'N+4'],
                         datasets:[
-                            { label: 'Projection Tendancielle (MWh)', data: data.dataset_trend, borderColor: '#EF4444', borderDash: [5, 5], tension: 0.4 },
-                            { label: 'Trajectoire Décret Tertiaire (Sobriété)', data: data.dataset_sobriety, borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 3, tension: 0.4, fill: true }
+                            { 
+                                label: 'Projection Tendancielle (MWh)', 
+                                data: data.dataset_trend, 
+                                borderColor: '#EF4444', 
+                                borderDash: [5, 5], 
+                                tension: 0.4 
+                            },
+                            { 
+                                label: 'Trajectoire Décret Tertiaire (Sobriété)', 
+                                data: data.dataset_sobriety, 
+                                borderColor: '#10B981', 
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)', 
+                                borderWidth: 3, 
+                                tension: 0.4, 
+                                fill: true 
+                            }
                         ]
                     },
                     options: {
-                        responsive: true, maintainAspectRatio: false,
-                        plugins: { title: { display: true, text: `Gain Cumulé sur 5 ans : ${data.gain_potential_mwh || 0} MWh`, color: '#fff' } },
-                        scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } }, x: { grid: { display: false } } }
+                        responsive: true, 
+                        maintainAspectRatio: false,
+                        plugins: { 
+                            title: { display: true, text: `Gain Cumulé sur 5 ans : ${data.gain_potential_mwh || 0} MWh`, color: '#fff' } 
+                        },
+                        scales: { 
+                            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } }, 
+                            x: { grid: { display: false } } 
+                        }
                     }
                 });
-            } catch(e) { console.error("Erreur Forecast", e); }
+            } catch(e) { 
+                console.error("Erreur Forecast", e); 
+            }
         }
 
-        // --- 6. EXPORT OPERAT (Légal CSRD) ---
+        // --- 7. EXPORT OPERAT (LÉGAL CSRD) ---
         window.exportOperat = function() {
-            if(SELECTED_IDS.size === 0) return App.toast("Sélectionnez les agences à déclarer sur OPERAT.", "error");
+            if(SELECTED_IDS.size === 0) {
+                return App.toast("Sélectionnez les agences à déclarer sur OPERAT.", "error");
+            }
+            
             App.toast("Génération du CSV OPERAT en cours...", "info");
             
             let csvContent = "data:text/csv;charset=utf-8,ID_Etablissement;SIRET;Surface_Declarative;Consommation_Annuelle_kWh;Vecteur\n";
+            
             FLEET_DATA.forEach(s => {
                 if(SELECTED_IDS.has(s.id)) {
                     // Mapping normé
@@ -638,44 +988,126 @@
                 const a = document.createElement("a");
                 a.setAttribute("href", encodedUri);
                 a.setAttribute("download", `Declaration_OPERAT_${new Date().getFullYear()}.csv`);
-                document.body.appendChild(a); a.click(); a.remove();
+                document.body.appendChild(a); 
+                a.click(); 
+                a.remove();
                 App.toast("Fichier OPERAT prêt pour dépôt sur le site de l'État.", "success");
             }, 1000);
         }
 
-        // --- ACTIONS GLOBALES (DQE, Selection, Charts) ---
-        window.toggleSelection = function(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
-        window.selectAll = function() { if(SELECTED_IDS.size === FLEET_DATA.length) SELECTED_IDS.clear(); else FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); window.applyFilters(); updateActionBar(); }
+        // --- 8. ACTIONS GLOBALES (SELECTION & DQE) ---
+        window.toggleSelection = function(id) { 
+            if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); 
+            else SELECTED_IDS.add(id); 
+            updateActionBar(); 
+        }
+        
+        window.selectAll = function() { 
+            if(SELECTED_IDS.size === FLEET_DATA.length) {
+                SELECTED_IDS.clear(); 
+            } else {
+                FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); 
+            }
+            window.applyFilters(); 
+            updateActionBar(); 
+        }
+        
         function updateActionBar() { 
             const count = SELECTED_IDS.size; 
             safeSetText('selected-count', count);
             const bar = document.getElementById('action-bar'); 
-            if(bar) { if(count > 0) bar.classList.add('visible'); else bar.classList.remove('visible'); bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; }
+            if(bar) { 
+                if(count > 0) bar.classList.add('visible'); 
+                else bar.classList.remove('visible'); 
+                bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; 
+            }
         }
+        
         window.generateTender = async function() {
             if(SELECTED_IDS.size === 0) return;
             App.toast("Compilation de l'Appel d'Offres...", "info");
             try {
-                const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: Array.from(SELECTED_IDS) }) });
+                const res = await fetch('/api/ops/generate_tender', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ site_ids: Array.from(SELECTED_IDS) }) 
+                });
+                
                 if(res.ok) {
-                    const blob = await res.blob(); const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a'); a.href = url; a.download = `DCE_Tertiaire_${SELECTED_IDS.size}_agences.xlsx`; document.body.appendChild(a); a.click(); a.remove();
+                    const blob = await res.blob(); 
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a'); 
+                    a.href = url; 
+                    a.download = `DCE_Tertiaire_${SELECTED_IDS.size}_agences.xlsx`; 
+                    document.body.appendChild(a); 
+                    a.click(); 
+                    a.remove();
                     App.toast("Fichier BPU généré.", "success");
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.error(e);
+            }
         }
-        function updateCharts(data) {
-            let budgetElec = 0, budgetGaz = 0;
-            data.forEach(s => { if(s.energy === 'gaz') budgetGaz += s.budget; else budgetElec += s.budget; });
-            const ctxMix = document.getElementById('mixChart');
-            if(ctxMix) { if(mixChartInstance) mixChartInstance.destroy(); mixChartInstance = new Chart(ctxMix.getContext('2d'), { type: 'doughnut', data: { labels: ['Élec', 'Gaz'], datasets: [{ data: [budgetElec, budgetGaz], backgroundColor:['#00E5FF', '#EF4444'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff' } } } } }); }
-            const top5 = [...data].sort((a, b) => b.budget - a.budget).slice(0, 5);
-            const ctxTop = document.getElementById('topChart');
-            if(ctxTop) { if(topChartInstance) topChartInstance.destroy(); topChartInstance = new Chart(ctxTop.getContext('2d'), { type: 'bar', data: { labels: top5.map(s => s.name.substring(0, 10)), datasets:[{ label: 'Budget', data: top5.map(s => s.budget), backgroundColor: '#A855F7', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94A3B8' }, grid: { display: false } }, y: { display: false } } } }); }
+
+        function calculateLeague() {
+            if (LEAGUE_DATA && LEAGUE_DATA.gold) {
+                updatePodium('1', LEAGUE_DATA.gold, true);
+                if(LEAGUE_DATA.silver) updatePodium('2', LEAGUE_DATA.silver, true);
+                if(LEAGUE_DATA.bronze) updatePodium('3', LEAGUE_DATA.bronze, true);
+            }
         }
-        function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
-        
+
+        function updatePodium(pos, site, isReal) {
+            const elName = document.getElementById('podium-' + pos + '-name');
+            const elScore = document.getElementById('podium-' + pos + '-score');
+            if(elName) elName.innerText = isReal ? site.nom_site : site.name;
+            if(elScore) elScore.innerText = isReal ? (Math.round(site.pmc) + " €/MWh") : (Math.round(site.ghost_savings) + " € Gaspillés");
+        }
+
+        // --- 9. ÉDITION RAPIDE MODAL ---
+        window.openEditModal = function() {
+            if(!CURRENT_DETAIL_SITE) return;
+            document.getElementById('edit-id').value = CURRENT_DETAIL_SITE.identity.id;
+            document.getElementById('edit-name').value = CURRENT_DETAIL_SITE.identity.site_name;
+            document.getElementById('edit-provider').value = CURRENT_DETAIL_SITE.contract.provider || "";
+            document.getElementById('edit-power').value = CURRENT_DETAIL_SITE.contract.power || 0;
+            document.getElementById('edit-surface').value = CURRENT_DETAIL_SITE.location?.surface || 0;
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        window.saveSiteChanges = async function() {
+            const id = document.getElementById('edit-id').value;
+            const original = CURRENT_DETAIL_SITE; 
+            original.identity.site_name = document.getElementById('edit-name').value;
+            original.contract.provider = document.getElementById('edit-provider').value;
+            original.contract.power = document.getElementById('edit-power').value;
+            const newSurface = parseFloat(document.getElementById('edit-surface').value);
+            if (!original.location) original.location = {};
+            original.location.surface = isNaN(newSurface) ? 0 : newSurface;
+
+            try {
+                const res = await fetch('/api/settings/save_client', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify(original) 
+                });
+                
+                if((await res.json()).success) { 
+                    document.getElementById('edit-modal').classList.add('hidden'); 
+                    App.toast("Modifications enregistrées !"); 
+                    loadFleet(); 
+                    window.loadDetail(id); 
+                } else { 
+                    App.toast("Erreur de sauvegarde", "error"); 
+                }
+            } catch(e) { 
+                App.toast("Erreur réseau", "error"); 
+            }
+        }
+
+        // Lancement au chargement de la page
         document.addEventListener('DOMContentLoaded', loadFleet);
+
     </script>
 </body>
 </html>
