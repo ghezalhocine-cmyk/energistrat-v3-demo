@@ -2,7 +2,8 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V17.0 | Retail Final (Surface & SGE)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V10.0 | Retail.OS (Tertiaire & RSE)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -11,21 +12,32 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: { abysse: '#050505', card: '#0F172A', sidebar: '#020617', primary: '#A855F7', cyan: '#00E5FF', gas: '#EF4444', success: '#10B981', warning: '#F59E0B', gold: '#FFD700', silver: '#C0C0C0', bronze: '#CD7F32' },
-                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
+                    colors: { 
+                        abysse: '#050505', card: '#0F172A', sidebar: '#020617', 
+                        primary: '#A855F7', cyan: '#00E5FF', gas: '#EF4444', 
+                        success: '#10B981', warning: '#F59E0B', gold: '#FFD700', 
+                        silver: '#C0C0C0', bronze: '#CD7F32',
+                        rse: '#14B8A6' // Vert d'eau pour la conformité CSRD
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                    borderRadius: { 'bento': '1.5rem' }
                 }
             }
         }
     </script>
     <style>
-        body { background-color: #050505; color: #E2E8F0; font-family: 'Inter', sans-serif; }
-        .bento-card { background: #0F172A; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1rem; position: relative; overflow: hidden; }
+        body { background-color: #050505; color: #E2E8F0; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .bento-card { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
         tr.site-row { cursor: pointer; transition: background-color 0.15s ease; }
         tr.site-row:hover td { background-color: rgba(168, 85, 247, 0.15) !important; color: white; }
+        .nav-item.active { background: rgba(168, 85, 247, 0.15); border-left: 4px solid #A855F7; color: white; }
+        
         .gauge-container { background: rgba(255,255,255,0.1); height: 6px; border-radius: 4px; overflow: hidden; position: relative; }
         .gauge-fill { height: 100%; transition: width 1s ease-out; }
+        
         #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
         #action-bar.visible { transform: translateY(0); }
+        
         .input-edit { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 6px; width: 100%; font-size: 12px; }
         .input-edit:focus { border-color: #00E5FF; outline: none; }
         
@@ -41,269 +53,269 @@
             background-color: #0F172A; color: white; padding: 5px;
         }
         option { background-color: #0F172A; color: white; padding: 5px; }
+
+        .view-section { display: none; } .view-section.active { display: block; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden">
 
     <!-- SIDEBAR -->
-    <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col flex-shrink-0 z-50">
-        <div class="h-16 flex items-center px-6 border-b border-white/5">
-            <div class="w-8 h-8 rounded bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white font-bold shadow-lg">E</div>
-            <span class="ml-3 font-bold tracking-wide text-white">RETAIL<span class="text-primary">.OS</span></span>
-        </div>
-        <div class="p-4 space-y-4">
-            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider">Navigation</div>
-            <div onclick="window.switchView('fleet')" id="nav-fleet" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 cursor-pointer hover:bg-white/5 transition">
-                <i class="fa-solid fa-earth-europe w-5 text-center"></i> Vision Parc
+    <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
+        <div class="h-20 flex items-center px-6 border-b border-white/5">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)]">
+                <i class="fa-solid fa-store"></i>
             </div>
-            <div onclick="window.switchView('league')" id="nav-league" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 cursor-pointer hover:bg-white/5 transition">
-                <i class="fa-solid fa-trophy w-5 text-center text-yellow-500"></i> Green League
-            </div>
-            <div onclick="window.switchView('offer-lab')" id="nav-offer-lab" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 cursor-pointer hover:bg-white/5 transition">
-                <i class="fa-solid fa-scale-balanced w-5 text-center text-cyan"></i> Comparateur
+            <div class="ml-3">
+                <div class="font-bold tracking-wide text-white leading-none">RETAIL<span class="text-primary">.OS</span></div>
+                <div class="text-[10px] text-gray-500 font-mono mt-1">Multi-sites & RSE</div>
             </div>
         </div>
         
-        <!-- FIX CORTEX: Outils Experts mis à jour vers les vrais Satellites IA -->
+        <div class="p-4 space-y-2">
+            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-2 px-2">Gouvernance Réseau</div>
+            <button onclick="window.switchView('fleet')" id="nav-fleet" class="nav-item active w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition">
+                <i class="fa-solid fa-earth-europe w-5 text-center"></i> Pilotage Consolidé
+            </button>
+            <button onclick="window.switchView('league')" id="nav-league" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition">
+                <i class="fa-solid fa-trophy w-5 text-center text-yellow-500"></i> Green League
+            </button>
+            <button onclick="window.switchView('offer-lab')" id="nav-offer-lab" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition">
+                <i class="fa-solid fa-scale-balanced w-5 text-center text-cyan"></i> Dépouillement DQE
+            </button>
+        </div>
+        
         <div class="px-4 mt-2 mb-4">
-            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-2">Outils Experts</div>
-            <a href="/immo" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition group">
-                <i class="fa-solid fa-city w-5 text-center text-purple-500 group-hover:text-purple-400"></i> Audit DPE & Foncier
+            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-2 px-2">Conformité Légale</div>
+            <a href="/carbon" class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition group">
+                <i class="fa-solid fa-leaf w-5 text-center text-rse group-hover:text-teal-400"></i> Norme CSRD (Scope 2)
             </a>
-            <a href="/gridmap" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition group">
-                <i class="fa-solid fa-map-location-dot w-5 text-center text-green-500 group-hover:text-green-400"></i> Déploiement IRVE
-            </a>
-            <a href="/solar" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition group">
-                <i class="fa-solid fa-solar-panel w-5 text-center text-yellow-500 group-hover:text-yellow-400"></i> Solar Studio
+            <a href="/solar" class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition group">
+                <i class="fa-solid fa-solar-panel w-5 text-center text-yellow-500 group-hover:text-yellow-400"></i> Potentiel Ombrières (Loi)
             </a>
         </div>
 
         <div class="px-4 mt-auto">
-             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-2">Filtres Énergie</div>
              <div class="flex bg-white/5 p-1 rounded-lg mb-2">
-                <button onclick="window.filterEnergy('all')" id="btn-all" class="flex-1 py-1 text-[10px] font-bold rounded bg-primary text-white transition">TOUT</button>
-                <button onclick="window.filterEnergy('elec')" id="btn-elec" class="flex-1 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition">ELEC</button>
-                <button onclick="window.filterEnergy('gaz')" id="btn-gaz" class="flex-1 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition">GAZ</button>
+                <button onclick="window.filterEnergy('all')" id="btn-all" class="flex-1 py-1.5 text-[10px] font-bold rounded bg-primary text-white transition">MIXTE</button>
+                <button onclick="window.filterEnergy('elec')" id="btn-elec" class="flex-1 py-1.5 text-[10px] font-bold rounded text-gray-400 hover:text-white transition">ELEC</button>
+                <button onclick="window.filterEnergy('gaz')" id="btn-gaz" class="flex-1 py-1.5 text-[10px] font-bold rounded text-gray-400 hover:text-white transition">GAZ</button>
             </div>
-            <select id="lot-select" onchange="window.applyFilters()" class="w-full bg-white/5 border border-white/10 text-xs rounded p-2 text-gray-300 focus:border-primary outline-none">
-                <option value="all">Tous les Lots</option>
+            <select id="lot-select" onchange="window.applyFilters()" class="w-full bg-white/5 border border-white/10 text-xs rounded-lg p-2.5 text-gray-300 focus:border-primary outline-none">
+                <option value="all">Toutes les Régions / Lots</option>
             </select>
         </div>
         
-        <!-- FIX CORTEX: Routage corrigé vers /settings et ajout du bouton retour Nexus -->
-        <div class="mt-auto p-4 border-t border-white/5 bg-black/20">
+        <div class="mt-4 p-4 border-t border-white/5 bg-black/20">
             <a href="/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group mb-2">
-                <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs text-white font-bold group-hover:bg-primary transition"><i class="fa-solid fa-database"></i></div>
-                <div class="flex-1 min-w-0"><div class="text-xs font-bold text-white">Data Unity</div><div class="text-[10px] text-gray-500">Paramétrage</div></div>
-            </a>
-            <a href="/ops_nexus" class="flex items-center gap-2 text-gray-500 hover:text-white transition text-xs pl-2">
-                <i class="fa-solid fa-arrow-left"></i> Retour Nexus Ops
+                <div class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs text-white font-bold group-hover:bg-primary transition"><i class="fa-solid fa-database"></i></div>
+                <div class="flex-1 min-w-0"><div class="text-xs font-bold text-white">Data Unity</div><div class="text-[10px] text-gray-500">Normalisation SGE</div></div>
             </a>
         </div>
     </aside>
 
     <!-- MAIN -->
     <main class="flex-1 flex flex-col min-w-0 bg-abysse relative">
-        <header class="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur sticky top-0 z-40">
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur sticky top-0 z-40">
             <div>
-                <h1 class="text-xl font-bold text-white" id="main-title">Vision Consolidée</h1>
-                <p class="text-xs text-gray-400" id="main-subtitle">Données Live • Cortex V49 Active</p>
+                <h1 class="text-2xl font-black text-white italic tracking-tight" id="main-title">Gouvernance Multi-sites</h1>
+                <p class="text-xs text-gray-400 font-mono mt-1" id="main-subtitle">Pilotage Achat & Décret Tertiaire</p>
             </div>
             
-            <!-- STRESS TEST WAHOO (NOUVEAU) -->
-            <div class="flex items-center gap-6" id="header-kpis">
+            <div class="flex items-center gap-8" id="header-kpis">
                 
-                <div class="bg-white/5 border border-white/10 rounded-lg px-4 py-2 w-48 group hover:border-red-500/50 transition">
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="text-[9px] text-gray-400 uppercase font-bold group-hover:text-red-400 transition"><i class="fa-solid fa-chart-line mr-1"></i> Stress Test</span>
-                        <span class="text-xs font-bold text-red-500" id="stress-val">+0%</span>
+                <!-- KPI CSRD (NOUVEAU) -->
+                <div class="text-right border-r border-white/10 pr-8">
+                    <div class="text-[10px] text-rse uppercase font-bold tracking-widest flex items-center justify-end gap-2"><i class="fa-solid fa-cloud"></i> Empreinte Scope 2</div>
+                    <div class="text-lg font-bold text-white font-mono" id="carbon-display">-- tCO2e</div>
+                </div>
+
+                <!-- STRESS TEST MARCHÉ DYNAMIQUE -->
+                <div class="bg-white/5 border border-white/10 rounded-xl px-4 py-2 w-56 group hover:border-alert/50 transition relative overflow-hidden">
+                    <div class="absolute left-0 top-0 bottom-0 w-1 bg-alert"></div>
+                    <div class="flex justify-between items-center mb-1 pl-2">
+                        <span class="text-[9px] text-gray-400 uppercase font-bold"><i class="fa-solid fa-satellite-dish mr-1 text-cyan"></i> Marché (RTE)</span>
+                        <span class="text-xs font-bold text-alert" id="stress-val">Analyse...</span>
                     </div>
-                    <input type="range" min="0" max="50" value="0" step="5" class="stress-test" oninput="window.updateStressTest(this.value)">
+                    <input type="range" min="0" max="50" value="0" step="1" class="stress-test ml-2 w-[calc(100%-8px)]" id="input-stress" oninput="window.updateStressTest(this.value)">
                 </div>
 
                 <div class="text-right">
-                    <div class="text-[10px] text-gray-500 uppercase font-bold">Budget Total</div>
-                    <div class="text-lg font-bold text-white font-mono" id="budget-display">-- €</div>
+                    <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Budget Total Projeté</div>
+                    <div class="text-2xl font-black text-primary font-mono" id="budget-display">-- €</div>
                 </div>
             </div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-8 pb-32" id="content-area">
             
-            <!-- VUE 1 : FLEET -->
+            <!-- VUE 1 : VISION PARC (FLEET) -->
             <div id="view-fleet" class="view-section active space-y-6">
-                <!-- BARRE DE FILTRES -->
-                <div class="grid grid-cols-5 gap-4 p-4 bg-white/5 rounded-xl border border-white/5 items-end">
+                
+                <!-- BARRE DE FILTRES OMNISEARCH -->
+                <div class="grid grid-cols-4 gap-4 p-4 bg-white/5 rounded-xl border border-white/5 items-end shadow-lg">
                     <div class="col-span-1">
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Recherche Rapide</label>
                         <div class="relative">
                             <i class="fa-solid fa-search absolute left-3 top-2.5 text-gray-500 text-xs"></i>
-                            <input type="text" id="omni-search" oninput="window.applyFilters()" placeholder="Nom, PDL, Ville..." class="w-full bg-abysse border border-white/10 text-xs rounded p-2 pl-8 text-white outline-none focus:border-cyan">
+                            <input type="text" id="omni-search" oninput="window.applyFilters()" placeholder="SIRET, Ville, Nom d'agence..." class="w-full bg-abysse border border-white/10 text-xs rounded-lg py-2 pl-8 pr-4 text-white outline-none focus:border-primary transition">
                         </div>
                     </div>
                     <div>
                         <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Fournisseur</label>
-                        <select id="filter-provider" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan cursor-pointer hover:bg-white/5 transition"><option value="all">Tous</option></select>
+                        <select id="filter-provider" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded-lg p-2 text-white outline-none focus:border-primary cursor-pointer hover:bg-white/5 transition"><option value="all">Tous</option></select>
                     </div>
                     <div>
-                        <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Ville</label>
-                        <select id="filter-city" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan cursor-pointer hover:bg-white/5 transition"><option value="all">Toutes</option></select>
+                        <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Ville / Secteur</label>
+                        <select id="filter-city" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded-lg p-2 text-white outline-none focus:border-primary cursor-pointer hover:bg-white/5 transition"><option value="all">Toutes</option></select>
                     </div>
                     <div>
-                        <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Segment</label>
-                        <select id="filter-segment" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan cursor-pointer hover:bg-white/5 transition"><option value="all">Tous</option></select>
-                    </div>
-                    <div>
-                        <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Lot</label>
-                        <select id="filter-lot" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded p-2 text-white outline-none focus:border-cyan cursor-pointer hover:bg-white/5 transition"><option value="all">Tous</option></select>
+                        <label class="text-[9px] text-gray-500 uppercase font-bold mb-1 block">Segment Tarifaire</label>
+                        <select id="filter-segment" onchange="window.applyFilters()" class="w-full bg-abysse border border-white/10 text-xs rounded-lg p-2 text-white outline-none focus:border-primary cursor-pointer hover:bg-white/5 transition"><option value="all">Tous</option></select>
                     </div>
                 </div>
 
                 <!-- GRAPHIQUES -->
                 <div class="grid grid-cols-4 gap-6 h-64">
                     <div class="bento-card p-6 flex flex-col col-span-1">
-                        <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Mix Énergétique</h3>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Mix Énergétique</h3>
                         <div class="flex-1 relative"><canvas id="mixChart"></canvas></div>
                     </div>
                     <div class="bento-card p-6 flex flex-col col-span-1">
-                        <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Parts de Marché</h3>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Exposition Fournisseurs</h3>
                         <div class="flex-1 relative"><canvas id="supplierChart"></canvas></div>
                     </div>
                     <div class="bento-card p-6 col-span-2 flex flex-col">
-                        <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Top 5 Budgets</h3>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Top 5 Agences les plus énergivores</h3>
                         <div class="flex-1 relative"><canvas id="topChart"></canvas></div>
                     </div>
                 </div>
 
-                <!-- TABLEAU -->
-                <div class="bento-card overflow-hidden">
-                    <div class="px-6 py-4 border-b border-white/5 flex justify-between items-center">
-                        <h3 class="font-bold text-white">Détail du Parc</h3>
-                        <div class="flex gap-2">
-                            <button onclick="window.selectAll()" class="text-xs bg-white/5 hover:bg-white/10 px-3 py-1 rounded text-white border border-white/10">Tout sélectionner</button>
-                        </div>
+                <!-- TABLEAU MASTER -->
+                <div class="bento-card overflow-hidden border-t-4 border-primary">
+                    <div class="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+                        <h3 class="font-bold text-white flex items-center gap-2"><i class="fa-solid fa-list-check text-primary"></i> Détail du Parc Immobilier</h3>
+                        <button onclick="window.selectAll()" class="text-xs font-bold bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg text-white border border-white/10 transition">Tout sélectionner</button>
                     </div>
-                    <table class="w-full text-left text-sm text-gray-300">
-                        <thead class="bg-white/5 text-[10px] uppercase text-gray-400 font-bold">
-                            <tr>
-                                <th class="px-4 py-3 w-10"></th>
-                                <th class="px-4 py-3">Site</th>
-                                <th class="px-4 py-3">CP</th>
-                                <th class="px-4 py-3">Ville</th>
-                                <th class="px-4 py-3">Fournisseur</th>
-                                <th class="px-4 py-3 text-center">Énergie</th>
-                                <th class="px-4 py-3 text-right">Conso (MWh)</th>
-                                <th class="px-4 py-3 text-right">Budget Est.</th>
-                                <th class="px-4 py-3 text-right">Atterrissage</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5" id="fleet-table-body"></tbody>
-                    </table>
+                    <div class="max-h-[500px] overflow-y-auto">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-card text-[10px] uppercase text-gray-400 font-bold sticky top-0 z-10 shadow-md">
+                                <tr>
+                                    <th class="px-4 py-3 w-10 text-center bg-card"></th>
+                                    <th class="px-4 py-3 bg-card">Site / Agence</th>
+                                    <th class="px-4 py-3 bg-card">Code Postal</th>
+                                    <th class="px-4 py-3 bg-card">Fournisseur</th>
+                                    <th class="px-4 py-3 text-right bg-card">Volume SGE</th>
+                                    <th class="px-4 py-3 text-right bg-card">Budget Projeté</th>
+                                    <th class="px-4 py-3 text-center bg-card">Conformité RSE (NILM)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5" id="fleet-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <!-- VUE 2 : GREEN LEAGUE -->
+            <!-- VUE 2 : GREEN LEAGUE (GAMIFICATION RSE) -->
             <div id="view-league" class="view-section hidden space-y-6">
                 <div class="text-center mb-8">
-                    <h2 class="text-3xl font-black text-white italic tracking-tight">CHAMPIONNAT <span class="text-success">EFFICACITÉ</span></h2>
-                    <p class="text-sm text-gray-500 mt-2">Classement basé sur le Prix Moyen Complet (€/MWh)</p>
+                    <h2 class="text-3xl font-black text-white italic tracking-tight">CHAMPIONNAT <span class="text-success">RSE</span></h2>
+                    <p class="text-sm text-gray-500 mt-2">Stimulez vos directeurs d'agence locaux pour atteindre les objectifs du Décret Tertiaire.</p>
                 </div>
                 <div class="grid grid-cols-3 gap-6 mb-8">
                     <div class="bento-card p-6 border-t-4 border-silver transform translate-y-4 text-center">
                         <div class="text-4xl mb-2">🥈</div><div class="font-bold text-white text-lg" id="podium-2-name">--</div><div class="text-sm text-silver font-mono" id="podium-2-score">--</div>
                     </div>
-                    <div class="bento-card p-6 border-t-4 border-gold transform -translate-y-4 text-center shadow-[0_0_30px_rgba(245,158,11,0.2)]">
-                        <div class="text-6xl mb-2">🥇</div><div class="font-bold text-white text-xl" id="podium-1-name">--</div><div class="text-sm text-gold font-mono" id="podium-1-score">--</div>
+                    <div class="bento-card p-8 border-t-4 border-gold transform -translate-y-4 text-center shadow-[0_0_40px_rgba(245,158,11,0.2)] z-10">
+                        <div class="text-6xl mb-4">🥇</div><div class="font-black text-white text-2xl" id="podium-1-name">--</div><div class="text-lg text-gold font-mono font-bold mt-2" id="podium-1-score">--</div>
                     </div>
                     <div class="bento-card p-6 border-t-4 border-bronze transform translate-y-4 text-center">
                         <div class="text-4xl mb-2">🥉</div><div class="font-bold text-white text-lg" id="podium-3-name">--</div><div class="text-sm text-bronze font-mono" id="podium-3-score">--</div>
                     </div>
                 </div>
-                <div class="bento-card p-6">
-                    <h3 class="text-xs font-bold text-red-400 uppercase mb-4">⚠️ Alerte : Prix Élevés (Cancres)</h3>
+                <div class="bento-card p-6 border-t-4 border-alert bg-alert/5">
+                    <h3 class="text-sm font-bold text-alert uppercase tracking-widest mb-4"><i class="fa-solid fa-triangle-exclamation"></i> Agences Énergivores (Risque Loi ELAN)</h3>
                     <div class="space-y-2" id="league-list"></div>
                 </div>
             </div>
 
-            <!-- VUE 3 : DÉTAIL & MODIFICATION -->
+            <!-- VUE 3 : DÉTAIL & SMART TWIN (ZÉRO MOCK) -->
             <div id="view-detail" class="view-section hidden space-y-6">
-                <button onclick="window.switchView('fleet')" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4"><i class="fa-solid fa-arrow-left"></i> RETOUR LISTE</button>
+                <button onclick="window.switchView('fleet')" class="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-2 mb-4"><i class="fa-solid fa-arrow-left"></i> RETOUR AU PARC</button>
                 <div class="flex justify-between items-start">
                     <div>
                         <div class="flex items-center gap-3">
                             <h2 class="text-3xl font-bold text-white" id="detail-title">--</h2>
-                            <button onclick="window.openEditModal()" class="text-gray-500 hover:text-cyan transition" title="Modifier le site"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button onclick="window.openEditModal()" class="text-gray-500 hover:text-primary transition" title="Modifier le site"><i class="fa-solid fa-pen-to-square"></i></button>
                         </div>
                         <div class="flex items-center gap-2 mt-2 text-sm text-gray-400">
-                            <span id="detail-address">--</span>
+                            <span id="detail-address"><i class="fa-solid fa-location-dot"></i> --</span>
                             <span class="text-gray-600">|</span>
-                            <span id="detail-surface" class="text-white font-mono">-- m²</span>
-                            <span id="detail-badge" class="px-2 py-0.5 rounded text-[10px] font-bold">--</span>
+                            <span id="detail-surface" class="text-cyan font-mono font-bold">-- m²</span>
                         </div>
                     </div>
-                    <div class="flex items-center gap-4 bg-white/5 border border-white/10 px-6 py-4 rounded-2xl coach-bubble max-w-md">
-                        <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary text-2xl"><i class="fa-solid fa-robot"></i></div>
-                        <div><div class="text-[10px] text-primary font-bold uppercase tracking-wider mb-1">Analyse Cortex</div><div class="text-sm text-white font-medium leading-tight" id="cortex-msg">--</div></div>
-                    </div>
-                </div>
-                
-                <div class="bento-card p-6 border-l-4 border-cyan/50">
-                    <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-file-contract text-cyan"></i> DONNÉES CONTRACTUELLES & TECHNIQUES</h3>
-                    <div class="grid grid-cols-4 gap-6 text-xs" id="dqe-grid"></div>
                 </div>
 
                 <div class="grid grid-cols-3 gap-6">
-                    <div class="bento-card col-span-1 p-6 flex flex-col justify-between">
-                        <h3 class="text-white font-bold text-sm mb-4">Optimisation</h3>
+                    <!-- OPTIMISATION PUISSANCE -->
+                    <div class="bento-card col-span-1 p-6 flex flex-col justify-between border-t-4 border-primary">
+                        <h3 class="text-white font-bold text-sm mb-4"><i class="fa-solid fa-bolt text-primary mr-2"></i> Optimisation TURPE</h3>
                         <div class="relative pt-2 pb-2">
-                            <div class="flex justify-between text-xs font-mono text-gray-500 mb-2"><span class="text-white font-bold" id="detail-reached">Max: --</span><span class="text-primary font-bold" id="detail-sub">Souscrit: --</span></div>
+                            <div class="flex justify-between text-xs font-mono text-gray-500 mb-2"><span class="text-white font-bold" id="detail-reached">Atteint: --</span><span class="text-primary font-bold" id="detail-sub">Souscrit: --</span></div>
                             <div class="gauge-container h-3 bg-white/10 rounded-full"><div id="detail-gauge" class="h-full rounded-full transition-all duration-1000" style="width: 0%"></div></div>
                         </div>
-                        <div class="mt-4 pt-4 border-t border-white/5 flex justify-between items-center"><span class="text-xs text-gray-500">Gain</span><span class="text-xl font-bold text-success" id="detail-gain">-- €</span></div>
+                        <div class="mt-4 pt-4 border-t border-white/5 flex justify-between items-center"><span class="text-xs text-gray-500">Gain Financier Immédiat</span><span class="text-xl font-bold text-success" id="detail-gain">-- €</span></div>
                     </div>
-                    <div class="bento-card col-span-1 p-6 flex flex-col bg-white/5 border-l-4 border-white/10" id="market-card">
-                        <div class="flex justify-between items-start mb-4"><h3 class="font-bold text-white text-sm">Marché</h3><span id="market-badge" class="text-[9px] font-bold px-2 py-1 rounded bg-gray-700 text-gray-300">NEUTRE</span></div>
-                        <div class="text-xs text-white leading-tight font-medium mb-4" id="market-advice">--</div>
-                        <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="detail-pricing"></div>
-                    </div>
-                    <div class="bento-card col-span-1 p-6 flex flex-col justify-between">
-                        <h3 class="text-white font-bold text-sm mb-4">Landing</h3>
-                        <div class="space-y-4">
-                            <div><div class="flex justify-between text-[10px] text-gray-400 mb-1"><span>Temps</span><span id="time-progress-txt" class="text-white">--%</span></div><div class="gauge-container"><div id="time-progress-bar" class="gauge-fill bg-gray-500" style="width: 0%"></div></div></div>
-                            <div><div class="flex justify-between text-[10px] text-gray-400 mb-1"><span>Budget</span><span id="budget-progress-txt" class="text-white font-bold">--%</span></div><div class="gauge-container"><div id="budget-progress-bar" class="gauge-fill bg-primary" style="width: 0%"></div></div></div>
+
+                    <!-- PONT SATELLITE SOLAR STUDIO -->
+                    <div class="bento-card col-span-1 p-6 flex flex-col bg-gradient-to-br from-card to-yellow-500/10 border-t-4 border-yellow-500 relative overflow-hidden group">
+                        <div class="absolute -right-4 -bottom-4 text-7xl text-yellow-500 opacity-10 group-hover:scale-110 transition"><i class="fa-solid fa-solar-panel"></i></div>
+                        <div class="flex justify-between items-start mb-4 relative z-10">
+                            <h3 class="font-bold text-white text-sm"><i class="fa-solid fa-sun text-yellow-500 mr-2"></i> Potentiel PVGIS</h3>
+                            <span class="text-[9px] font-bold px-2 py-1 rounded bg-yellow-500 text-abysse">API EU</span>
                         </div>
+                        <div class="text-xs text-gray-300 leading-relaxed font-medium mb-4 relative z-10">
+                            L'IA estime que la toiture de cette agence peut accueillir des panneaux solaires.
+                        </div>
+                        <a href="/solar" class="mt-auto block w-full text-center bg-white/10 hover:bg-yellow-500 hover:text-abysse text-white font-bold py-2 rounded-lg text-xs transition relative z-10">Ouvrir Solar Studio</a>
+                    </div>
+
+                    <!-- PRIX & MARCHÉ -->
+                    <div class="bento-card col-span-1 p-6 flex flex-col border-t-4 border-cyan" id="market-card">
+                        <div class="flex justify-between items-start mb-4"><h3 class="font-bold text-white text-sm"><i class="fa-solid fa-file-contract text-cyan mr-2"></i> Structure Prix</h3><span id="market-badge" class="text-[9px] font-bold px-2 py-1 rounded bg-gray-700 text-gray-300">--</span></div>
+                        <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="detail-pricing"></div>
                     </div>
                 </div>
 
-                <div class="bento-card col-span-3 p-6 mt-6 border-t border-white/5">
-                    <div class="flex justify-between items-center mb-6">
+                <!-- SMART TWIN (TRAJECTOIRE 5 ANS ZERO MOCK) -->
+                <div class="bento-card col-span-3 p-6 mt-6 border-l-4 border-future relative overflow-hidden">
+                    <div class="flex justify-between items-center mb-6 relative z-10">
                         <div>
-                            <h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-chart-line text-cyan"></i> TRAJECTOIRE ÉNERGÉTIQUE (5 ANS)</h3>
-                            <p class="text-[10px] text-gray-500 mt-1">Données consolidées et projetées par Cortex Engine</p>
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-crystal-ball text-primary"></i> SMART TWIN : PROJECTION DÉCRET TERTIAIRE</h3>
+                            <p class="text-[10px] text-gray-400 mt-1">Généré par CORTEX Forecast : Impact de la sobriété sur 5 ans vs Tendanciel.</p>
                         </div>
-                        <div id="sge-badge-anchor"></div>
                     </div>
-                    <div class="h-64 w-full relative"><canvas id="historyChart"></canvas></div>
+                    <div class="h-72 w-full relative z-10"><canvas id="historyChart"></canvas></div>
                 </div>
             </div>
 
-            <!-- VUE 4 : OFFER LAB (COMPARATEUR & PODIUM) -->
+            <!-- VUE 4 : OFFER LAB (DRAG & DROP BPU) -->
             <div id="view-offer-lab" class="view-section hidden space-y-6">
                 <div class="text-center mb-8">
-                    <h2 class="text-3xl font-black text-white italic tracking-tight">COMPARATEUR <span class="text-cyan">D'OFFRES</span></h2>
-                    <p class="text-sm text-gray-500 mt-2">Analysez les réponses BPU de vos fournisseurs en un clic.</p>
+                    <h2 class="text-3xl font-black text-white italic tracking-tight">LABORATOIRE <span class="text-cyan">D'OFFRES</span></h2>
+                    <p class="text-sm text-gray-500 mt-2">Dépouillement automatisé des fichiers BPU (Appels d'offres / Courtiers).</p>
                 </div>
 
                 <div class="max-w-2xl mx-auto mb-8 space-y-4">
                     <div class="relative">
-                        <label class="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Nom de l'offre (ex: EDF Fixe 2 ans)</label>
-                        <input type="text" id="offer-name" placeholder="Saisir le nom du fournisseur..." class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-cyan outline-none font-bold">
+                        <label class="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Nom du Fournisseur / Candidat</label>
+                        <input type="text" id="offer-name" placeholder="Ex: TotalEnergies - Lot National" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-cyan outline-none font-bold">
                     </div>
-
                     <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-cyan/30 border-dashed rounded-2xl cursor-pointer bg-white/5 hover:bg-white/10 transition group">
                         <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400 group-hover:text-cyan mb-2 transition"></i>
-                            <p class="text-sm text-gray-400"><span class="font-bold text-white">Cliquez pour uploader</span> le fichier Excel BPU rempli</p>
+                            <i class="fa-solid fa-file-excel text-3xl text-gray-400 group-hover:text-cyan mb-2 transition"></i>
+                            <p class="text-sm text-gray-400"><span class="font-bold text-white">Cliquez pour uploader</span> le fichier Excel chiffré</p>
                         </div>
                         <input type="file" id="offer-file" class="hidden" accept=".xlsx" onchange="window.triggerOfferScan(this)">
                     </label>
@@ -311,141 +323,88 @@
 
                 <!-- RESULTAT STAGING -->
                 <div id="sim-results" class="hidden space-y-6">
-                    <div class="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10">
-                        <div class="text-sm text-gray-400">Résultat de la simulation pour : <span class="text-white font-bold" id="lbl-sim-offer-name">--</span></div>
-                        <button onclick="window.addToPodium()" class="bg-cyan hover:bg-cyan/80 text-black font-bold px-4 py-2 rounded-lg text-xs transition shadow-[0_0_15px_rgba(0,229,255,0.3)]">
-                            <i class="fa-solid fa-thumbtack mr-2"></i> ÉPINGLER AU PODIUM
-                        </button>
-                    </div>
-
                     <div class="grid grid-cols-3 gap-6">
-                        <div class="bento-card p-6 border-l-4 border-gray-500">
-                            <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Budget Actuel (Ref)</h3>
-                            <div class="text-2xl font-bold text-white" id="sim-current">-- €</div>
-                        </div>
-                        <div class="bento-card p-6 border-l-4 border-cyan">
-                            <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Budget Offre</h3>
-                            <div class="text-2xl font-bold text-cyan" id="sim-offer">-- €</div>
-                        </div>
-                        <div class="bento-card p-6 border-l-4 border-green-500">
-                            <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Économie / Surcoût</h3>
-                            <div class="text-3xl font-black text-green-500" id="sim-delta">-- €</div>
-                            <div class="text-sm font-bold text-green-400" id="sim-pct">-- %</div>
-                        </div>
+                        <div class="bento-card p-6 border-l-4 border-gray-500"><h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Budget Actuel (Ref)</h3><div class="text-2xl font-bold text-white" id="sim-current">-- €</div></div>
+                        <div class="bento-card p-6 border-l-4 border-cyan"><h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Offre Analysée</h3><div class="text-2xl font-bold text-cyan" id="sim-offer">-- €</div></div>
+                        <div class="bento-card p-6 border-l-4 border-green-500"><h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Impact P&L</h3><div class="text-3xl font-black text-green-500" id="sim-delta">-- €</div><div class="text-sm font-bold text-green-400" id="sim-pct">-- %</div></div>
                     </div>
-
                     <div class="bento-card overflow-hidden">
-                        <div class="px-6 py-4 border-b border-white/5"><h3 class="font-bold text-white">Détail par Site</h3></div>
                         <div class="max-h-64 overflow-y-auto">
                             <table class="w-full text-left text-xs text-gray-300">
                                 <thead class="bg-white/5 text-[9px] uppercase text-gray-400 font-bold sticky top-0">
-                                    <tr><th class="px-4 py-3">Site</th><th class="px-4 py-3 text-right">Volume</th><th class="px-4 py-3 text-right">Actuel</th><th class="px-4 py-3 text-right">Offre</th><th class="px-4 py-3 text-right">Écart</th></tr>
+                                    <tr><th class="px-4 py-3">Site</th><th class="px-4 py-3 text-right">Volume SGE</th><th class="px-4 py-3 text-right">Actuel</th><th class="px-4 py-3 text-right">Candidat</th><th class="px-4 py-3 text-right">Écart</th></tr>
                                 </thead>
                                 <tbody class="divide-y divide-white/5" id="sim-table-body"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
-
-                <!-- SECTION PODIUM -->
-                <div id="podium-section" class="hidden space-y-6 pt-8 border-t border-white/10">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-2xl font-black text-white italic">CLASSEMENT <span class="text-gold">FINAL</span></h2>
-                        <button onclick="window.resetPodium()" class="text-xs text-red-400 hover:text-red-300 underline">Vider le classement</button>
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-6 items-end mb-8" id="podium-display">
-                        <div class="order-1 bento-card p-6 border-t-4 border-silver transform translate-y-4 text-center opacity-50" id="podium-silver">
-                            <div class="text-4xl mb-2">🥈</div>
-                            <div class="font-bold text-white text-lg name">--</div>
-                            <div class="text-sm text-silver font-mono score">-- €</div>
-                        </div>
-                        <div class="order-2 bento-card p-8 border-t-4 border-gold transform -translate-y-4 text-center shadow-[0_0_40px_rgba(255,215,0,0.2)] z-10" id="podium-gold">
-                            <div class="text-6xl mb-4">🥇</div>
-                            <div class="text-xs text-gold uppercase font-bold mb-1">Meilleure Offre</div>
-                            <div class="font-black text-white text-2xl name">--</div>
-                            <div class="text-lg text-white font-mono font-bold mt-2 score">-- €</div>
-                            <div class="text-xs text-green-400 mt-1 savings">--</div>
-                        </div>
-                        <div class="order-3 bento-card p-6 border-t-4 border-bronze transform translate-y-4 text-center opacity-50" id="podium-bronze">
-                            <div class="text-4xl mb-2">🥉</div>
-                            <div class="font-bold text-white text-lg name">--</div>
-                            <div class="text-sm text-bronze font-mono score">-- €</div>
-                        </div>
-                    </div>
-
-                    <div class="bento-card overflow-hidden">
-                        <table class="w-full text-left text-sm text-gray-300">
-                            <thead class="bg-white/5 text-[10px] uppercase text-gray-400 font-bold">
-                                <tr>
-                                    <th class="px-4 py-3 text-center w-12">#</th>
-                                    <th class="px-4 py-3">Fournisseur</th>
-                                    <th class="px-4 py-3 text-right">Budget Total</th>
-                                    <th class="px-4 py-3 text-right">Économie vs Actuel</th>
-                                    <th class="px-4 py-3 text-right">Écart vs 1er</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-white/5" id="podium-table-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-
             </div>
 
         </div>
 
-        <div id="action-bar" class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-50 transform translate-y-32 transition-transform duration-300">
-            <div class="font-bold"><span id="selected-count" class="text-primary">0</span> sites sélectionnés</div>
-            <div class="h-6 w-px bg-gray-200"></div>
-            <button onclick="window.generateTender()" class="flex items-center gap-2 hover:text-primary font-bold text-sm transition"><i class="fa-solid fa-file-contract"></i> Générer Appel d'Offre (CSV)</button>
+        <!-- ACTION BAR -->
+        <div id="action-bar" class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-4 rounded-2xl shadow-[0_0_40px_rgba(255,255,255,0.2)] flex items-center gap-6 z-50 transform translate-y-32 transition-transform duration-300">
+            <div class="font-bold"><span id="selected-count" class="text-primary">0</span> agences sélectionnées</div>
+            <div class="h-6 w-px bg-gray-300"></div>
+            <button onclick="window.generateTender()" class="flex items-center gap-2 hover:text-cyan font-bold text-sm transition"><i class="fa-solid fa-file-contract"></i> Exporter Appel d'Offres</button>
+            <div class="h-6 w-px bg-gray-300"></div>
+            <!-- BOUTON EXPORT OPERAT (DECRET TERTIAIRE) -->
+            <button onclick="window.exportOperat()" class="flex items-center gap-2 text-rse hover:text-teal-600 font-black text-sm transition"><i class="fa-solid fa-cloud-arrow-down"></i> Export OPERAT (Légal)</button>
         </div>
 
     </main>
 
-    <!-- MODAL EDITION -->
+    <!-- MODAL EDITION RAPIDE -->
     <div id="edit-modal" class="fixed inset-0 bg-black/90 z-[99] hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bento-card p-8 rounded-2xl w-[500px] relative border border-cyan/30 shadow-[0_0_50px_rgba(0,229,255,0.1)]">
-            <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-cyan"></i> Édition Rapide</h3>
+        <div class="bento-card p-8 rounded-2xl w-[500px] relative border border-primary/30 shadow-[0_0_50px_rgba(168,85,247,0.1)]">
+            <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-primary"></i> Modifier l'Agence</h3>
             <div class="space-y-4">
                 <input type="hidden" id="edit-id">
                 <div><label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site</label><input type="text" id="edit-name" class="input-edit"></div>
                 <div class="grid grid-cols-2 gap-4">
                     <div><label class="text-[10px] text-gray-500 uppercase font-bold">Fournisseur</label><input type="text" id="edit-provider" class="input-edit"></div>
-                    <div><label class="text-[10px] text-gray-500 uppercase font-bold" id="lbl-edit-power">Puissance</label><input type="number" id="edit-power" class="input-edit"></div>
+                    <div><label class="text-[10px] text-gray-500 uppercase font-bold" id="lbl-edit-power">Puissance Souscrite</label><input type="number" id="edit-power" class="input-edit"></div>
                 </div>
-                <div><label class="text-[10px] text-gray-500 uppercase font-bold">Prix Molécule (€/MWh)</label><input type="number" id="edit-price" class="input-edit" step="0.01"></div>
-                <div class="mt-4 pt-4 border-t border-white/5">
-                    <label class="text-[10px] text-gray-500 uppercase font-bold flex justify-between">Surface (m²) <span class="text-cyan text-[9px] italic">Impacte Green League</span></label>
-                    <input type="number" id="edit-surface" class="input-edit" placeholder="Ex: 500">
-                </div>
+                <div><label class="text-[10px] text-gray-500 uppercase font-bold flex justify-between">Surface Commerciale (m²) <span class="text-primary text-[9px] italic">Critique pour Décret Tertiaire</span></label><input type="number" id="edit-surface" class="input-edit font-mono text-cyan" placeholder="Ex: 500"></div>
             </div>
             <div class="flex justify-end gap-3 mt-8">
                 <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition">ANNULER</button>
-                <button onclick="window.saveSiteChanges()" class="bg-cyan text-black px-6 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg">ENREGISTRER</button>
+                <button onclick="window.saveSiteChanges()" class="bg-primary text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-purple-400 transition shadow-lg">ENREGISTRER</button>
             </div>
         </div>
     </div>
 
+    <!-- TOAST ENGINE -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
+
     <script>
+        const App = {
+            toast: function(msg, type='info') {
+                const container = document.getElementById('toast-container');
+                if(!container) return;
+                const colors = { success: 'bg-green-600 border-green-500', error: 'bg-alert border-red-500', info: 'bg-primary border-primary text-white' };
+                const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
+                const el = document.createElement('div');
+                el.className = `${colors[type] || colors.info} px-6 py-3 rounded-xl shadow-2xl text-xs font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
+                el.innerHTML = `<i class="fa-solid ${icon}"></i> ${msg}`;
+                container.appendChild(el);
+                requestAnimationFrame(() => el.classList.remove('translate-y-10', 'opacity-0'));
+                setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
+            }
+        };
+
         let FLEET_DATA =[];
         let FILTER_META = {};
         let LEAGUE_DATA = null;
-        let GLOBAL_CORTEX = null;
         let CURRENT_DETAIL_SITE = null;
         let historyChartInstance = null;
         let SELECTED_IDS = new Set();
         let CURRENT_FILTER_ENERGY = 'all';
-        let mixChartInstance = null;
-        let topChartInstance = null;
-        let supplierChartInstance = null;
+        let mixChartInstance = null; let topChartInstance = null; let supplierChartInstance = null;
 
-        // --- STRESS TEST VARS ---
         let GLOBAL_BUDGET_BASE = 0;
         let STRESS_RATE = 0;
-
-        // --- PODIUM VARS ---
-        let CURRENT_SIM_DATA = null; 
-        let PODIUM_STACK =[]; 
 
         function safeSetText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
         
@@ -453,102 +412,68 @@
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
+            
             const views =['view-fleet', 'view-league', 'view-detail', 'view-offer-lab'];
-            views.forEach(id => { const el = document.getElementById(id); if(el) { el.classList.add('hidden'); el.classList.remove('active'); } });
-            let targetId = 'view-fleet';
-            if (viewName === 'league') targetId = 'view-league';
-            if (viewName === 'detail') targetId = 'view-detail';
-            if (viewName === 'offer-lab') targetId = 'view-offer-lab';
-            const targetEl = document.getElementById(targetId);
-            if(targetEl) { targetEl.classList.remove('hidden'); targetEl.classList.add('active'); }
-            if(viewName === 'detail') {
-                safeSetText('main-title', "Détail & Conseil");
-                document.getElementById('header-kpis').classList.add('hidden');
-            } else if (viewName === 'league') {
-                safeSetText('main-title', "Green League");
-                document.getElementById('header-kpis').classList.add('hidden');
-                calculateLeague(); 
-            } else if (viewName === 'offer-lab') {
-                safeSetText('main-title', "Comparateur d'Offres");
-                document.getElementById('header-kpis').classList.add('hidden');
-            } else {
-                safeSetText('main-title', "Vision Consolidée");
-                document.getElementById('header-kpis').classList.remove('hidden');
-            }
+            views.forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
+            
+            const targetEl = document.getElementById('view-' + viewName);
+            if(targetEl) targetEl.classList.remove('hidden');
+            targetEl.classList.add('active');
+
+            if(viewName === 'detail') { safeSetText('main-title', "Smart Twin & Intelligence"); document.getElementById('header-kpis').classList.add('hidden'); } 
+            else if (viewName === 'league') { safeSetText('main-title', "Green League RSE"); document.getElementById('header-kpis').classList.add('hidden'); calculateLeague(); } 
+            else if (viewName === 'offer-lab') { safeSetText('main-title', "Dépouillement DQE"); document.getElementById('header-kpis').classList.add('hidden'); } 
+            else { safeSetText('main-title', "Gouvernance Multi-sites"); document.getElementById('header-kpis').classList.remove('hidden'); }
         }
 
-        window.openDetail = function(row) {
-            const id = row.getAttribute('data-id');
-            if (id) window.loadDetail(id);
-        }
-
-        window.loadDetail = async function(id) {
-            try {
-                const res = await fetch(`/api/dashboard/data/${id}`);
-                const data = await res.json();
-                if(data.error) return;
-                CURRENT_DETAIL_SITE = data; 
-                renderDetail(data);
-                window.switchView('detail');
-            } catch(e) { console.error(e); }
-        }
-
+        // --- 1. MOTEUR D'INITIALISATION ZÉRO MOCK ---
         async function loadFleet() {
             try {
-                const res = await fetch('/api/dashboard/fleet');
-                const data = await res.json();
+                // Parallélisation des appels vitaux (Fleet + Market)
+                const [resFleet, resMarket] = await Promise.all([
+                    fetch('/api/dashboard/fleet'),
+                    fetch('/api/tools/sniper/market')
+                ]);
+
+                const data = await resFleet.json();
+                
+                // Traitement Sniper Market
+                if(resMarket.ok) {
+                    const marketData = await resMarket.json();
+                    if(marketData.success && marketData.current_prices) {
+                        const trend = marketData.status === 'BEAR' ? 'Baisse' : 'Hausse';
+                        // Simulation de l'impact marché par rapport à 80€
+                        const impact = Math.round(((marketData.current_prices.elec - 80) / 80) * 100);
+                        document.getElementById('stress-val').innerText = `${trend} à ${marketData.current_prices.elec}€`;
+                        if(impact > 0) {
+                            document.getElementById('input-stress').value = Math.min(impact, 100);
+                            STRESS_RATE = Math.min(impact, 100);
+                        }
+                    }
+                }
+
                 if(data.fleet) {
                     FLEET_DATA = data.fleet;
                     LEAGUE_DATA = data.green_league;
-                    GLOBAL_CORTEX = data.cortex;
                     FILTER_META = data.filters_meta || {};
                     
-                    // INIT BUDGET BASE POUR STRESS TEST
                     GLOBAL_BUDGET_BASE = FLEET_DATA.reduce((acc, s) => acc + s.budget, 0);
                     
                     initFilters();
                     window.applyFilters();
-                    if (GLOBAL_CORTEX && GLOBAL_CORTEX.main_message) {
-                        const sub = document.getElementById('main-subtitle');
-                        if(sub) sub.innerHTML = `<span class="text-primary font-bold">CORTEX V49 :</span> ${GLOBAL_CORTEX.main_message}`;
-                    }
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) { console.error("Erreur Init Fleet:", e); }
         }
 
-        // --- STRESS TEST LOGIC ---
+        // --- 2. STRESS TEST BOURSIER ---
         window.updateStressTest = function(val) {
             STRESS_RATE = parseInt(val);
-            document.getElementById('stress-val').innerText = `+${STRESS_RATE}%`;
-            
-            // Update Global KPI
-            const impactedBudget = GLOBAL_BUDGET_BASE * (1 + STRESS_RATE/100);
-            safeSetText('budget-display', formatCurrency(impactedBudget));
-            
-            // Update Top Chart (Visual Wahoo)
-            if(topChartInstance) {
-                const newData = topChartInstance.data.datasets[0].data.map((val, i) => {
-                    // On recalcule basé sur la data originale (approximatif pour l'effet visuel)
-                    // Pour être précis, il faudrait stocker les budgets originaux du top 5
-                    return val * (1 + STRESS_RATE/100); 
-                });
-                // Note: Pour une vraie précision, on re-rend le chart, mais ici on veut juste l'effet
-                // On va plutôt rappeler applyFilters qui recalcule tout proprement
-                window.applyFilters();
-            }
+            document.getElementById('stress-val').innerText = `+${STRESS_RATE}% vs N-1`;
+            window.applyFilters(); // Recalcul et réaffichage pur
         }
 
         function initFilters() {
-            const populate = (id, list) => {
-                const sel = document.getElementById(id);
-                if(!sel || !list) return;
-                sel.innerHTML = '<option value="all">Tous</option>';
-                list.forEach(item => {
-                    const opt = document.createElement('option');
-                    opt.value = item; opt.innerText = item;
-                    sel.appendChild(opt);
-                });
-            };
+            const populate = (id, list) => { const sel = document.getElementById(id); if(!sel || !list) return; sel.innerHTML = '<option value="all">Tous</option>'; list.forEach(item => { const opt = document.createElement('option'); opt.value = item; opt.innerText = item; sel.appendChild(opt); }); };
             populate('filter-provider', FILTER_META.providers);
             populate('filter-city', FILTER_META.cities);
             populate('filter-segment', FILTER_META.segments);
@@ -560,87 +485,53 @@
             ['all', 'elec', 'gaz'].forEach(t => {
                 const btn = document.getElementById('btn-' + t);
                 if(btn) {
-                    btn.className = (t === type) ? "flex-1 py-1 text-[10px] font-bold rounded bg-primary text-white transition shadow-lg" : "flex-1 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
+                    btn.className = (t === type) ? "flex-1 py-1.5 text-[10px] font-bold rounded bg-primary text-white transition shadow-lg" : "flex-1 py-1.5 text-[10px] font-bold rounded text-gray-400 hover:text-white transition";
                     if(t === type && t === 'gaz') btn.classList.replace('bg-primary', 'bg-gas');
                 }
             });
             window.applyFilters();
         }
 
+        // --- 3. MOTEUR RSE (CALCUL CARBONE) ET FILTRAGE ---
         window.applyFilters = function() {
             const fProvider = document.getElementById('filter-provider').value;
             const fCity = document.getElementById('filter-city').value;
             const fSegment = document.getElementById('filter-segment').value;
-            const fLot = document.getElementById('filter-lot').value;
             const search = document.getElementById('omni-search').value.toLowerCase(); 
+
+            let totalVolElec = 0; let totalVolGaz = 0;
 
             const filtered = FLEET_DATA.filter(site => {
                 const matchEnergy = (CURRENT_FILTER_ENERGY === 'all') || (site.energy === CURRENT_FILTER_ENERGY);
                 const matchProv = (fProvider === 'all') || (site.provider === fProvider);
                 const matchCity = (fCity === 'all') || (site.city === fCity);
                 const matchSeg = (fSegment === 'all') || (site.segment === fSegment);
-                const matchLot = (fLot === 'all') || (site.lot === fLot);
                 const matchSearch = !search || site.name.toLowerCase().includes(search) || site.id.toLowerCase().includes(search) || site.city.toLowerCase().includes(search);
-                return matchEnergy && matchProv && matchCity && matchSeg && matchLot && matchSearch;
+                
+                if(matchEnergy && matchProv && matchCity && matchSeg && matchSearch) {
+                    if(site.energy === 'gaz') totalVolGaz += site.volume; else totalVolElec += site.volume;
+                    return true;
+                }
+                return false;
             });
             
-            // APPLIQUER STRESS TEST SUR LES DONNEES FILTREES
-            // On crée une copie pour l'affichage sans toucher aux données brutes
-            const stressedData = filtered.map(s => {
-                return { ...s, budget: s.budget * (1 + STRESS_RATE/100) };
-            });
+            // Calcul Empreinte Carbone Officielle (ADEME Base Carbone)
+            // Élec France: ~50 kg CO2/MWh | Gaz: ~220 kg CO2/MWh
+            const tonnesCO2 = ((totalVolElec * 0.05) + (totalVolGaz * 0.22)).toFixed(1);
+            document.getElementById('carbon-display').innerText = `${tonnesCO2} tCO2e`;
+
+            const stressedData = filtered.map(s => ({ ...s, budget: s.budget * (1 + STRESS_RATE/100) }));
 
             renderTable(stressedData);
             updateGlobalKPIs(stressedData);
             updateCharts(stressedData);
         }
 
-        window.openEditModal = function() {
-            if(!CURRENT_DETAIL_SITE) return;
-            document.getElementById('edit-id').value = CURRENT_DETAIL_SITE.identity.id;
-            document.getElementById('edit-name').value = CURRENT_DETAIL_SITE.identity.site_name;
-            document.getElementById('edit-provider').value = CURRENT_DETAIL_SITE.contract.provider || "";
-            document.getElementById('edit-power').value = CURRENT_DETAIL_SITE.contract.power || 0;
-            document.getElementById('edit-price').value = CURRENT_DETAIL_SITE.pricing.hph || 0;
-            document.getElementById('edit-surface').value = CURRENT_DETAIL_SITE.location?.surface || 0;
-            const isGaz = CURRENT_DETAIL_SITE.energy_type === 'gaz';
-            document.getElementById('lbl-edit-power').innerText = isGaz ? "CAR (MWh)" : "Puissance (kVA)";
-            document.getElementById('edit-modal').classList.remove('hidden');
-        }
-
-        window.saveSiteChanges = async function() {
-            const id = document.getElementById('edit-id').value;
-            const original = CURRENT_DETAIL_SITE; 
-            original.identity.site_name = document.getElementById('edit-name').value;
-            original.contract.provider = document.getElementById('edit-provider').value;
-            original.contract.power = document.getElementById('edit-power').value;
-            original.pricing.hph = document.getElementById('edit-price').value;
-            const newSurface = parseFloat(document.getElementById('edit-surface').value);
-            if (!original.location) original.location = {};
-            original.location.surface = isNaN(newSurface) ? 0 : newSurface;
-
-            try {
-                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
-                if((await res.json()).success) { document.getElementById('edit-modal').classList.add('hidden'); alert("Enregistré !"); loadFleet(); window.loadDetail(id); } 
-                else { alert("Erreur"); }
-            } catch(e) { alert("Erreur réseau"); }
-        }
-
-        function getProviderBadge(name) {
-            const n = (name || "").toUpperCase();
-            if(n.includes("EDF")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white border border-blue-400">EDF</span>`;
-            if(n.includes("TOTAL")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white border border-red-400">TOTAL</span>`;
-            if(n.includes("ENGIE")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan/20 text-cyan border border-cyan/30">ENGIE</span>`;
-            if(n.includes("GEG")) return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-green-600/20 text-green-400 border border-green-500/30">GEG</span>`;
-            return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-300">${name}</span>`;
-        }
-
+        // --- 4. TABLEAU MASTER AVEC MOTEUR NILM (RISQUE D'IMAGE) ---
         function renderTable(data) {
             const tbody = document.getElementById('fleet-table-body');
             if(!tbody) return;
-            const newTbody = document.createElement('tbody');
-            newTbody.id = 'fleet-table-body';
-            newTbody.className = "divide-y divide-white/5";
+            tbody.innerHTML = '';
             
             data.forEach(site => {
                 const isGaz = site.energy === 'gaz';
@@ -649,363 +540,141 @@
                 row.className = "site-row border-b border-white/5 hover:bg-white/5 cursor-pointer transition";
                 row.setAttribute('data-id', site.id);
                 row.setAttribute('onclick', 'window.openDetail(this)');
-                const city = site.city || '-';
-                const zip = site.zip || ''; 
-                const conso = site.volume || 0;
-                const prov = site.provider || 'Inconnu';
+                
+                // Logique NILM RSE (Froid vs Enseigne)
+                let rseStatus = '<span class="text-success text-[10px] font-bold"><i class="fa-solid fa-check"></i> Talon Normal</span>';
+                if (!isGaz && site.ghost_savings > site.budget * 0.2) {
+                    // Si gaspillage énorme, suspicion Enseigne allumée la nuit
+                    rseStatus = '<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded text-[10px] font-bold border border-red-500/50 animate-pulse"><i class="fa-solid fa-lightbulb"></i> Alerte Enseigne / Froid</span>';
+                } else if (!isGaz && site.ghost_savings > 100) {
+                    rseStatus = '<span class="text-gold text-[10px] font-bold"><i class="fa-solid fa-snowflake"></i> Optimisation Froid Req.</span>';
+                }
+
+                let provHtml = `<span class="text-[10px] bg-white/10 px-2 py-0.5 rounded font-bold">${(site.provider||'Inconnu').substring(0,8)}</span>`;
+                if((site.provider||'').toLowerCase().includes('edf')) provHtml = `<span class="text-[10px] bg-blue-600 px-2 py-0.5 rounded font-bold text-white">EDF</span>`;
                 
                 row.innerHTML = `
-                    <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
-                        <input type="checkbox" class="accent-primary w-4 h-4 cursor-pointer" onchange="window.toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}>
-                    </td>
-                    <td class="px-4 py-3 font-bold text-white">${site.name}</td>
-                    <td class="px-4 py-3 text-gray-400 font-mono text-xs">${zip}</td>
-                    <td class="px-4 py-3 text-gray-300">${city}</td>
-                    <td class="px-4 py-3">${getProviderBadge(prov)}</td>
-                    <td class="px-4 py-3 text-center"><span class="text-[10px] font-bold ${isGaz ? 'text-gas bg-gas/10' : 'text-cyan bg-cyan/10'} px-2 py-1 rounded">${isGaz ? 'GAZ' : 'ELEC'}</span></td>
-                    <td class="px-4 py-3 text-right font-mono text-gray-300">${Math.round(conso)} <span class="text-[10px] text-gray-600">MWh</span></td>
+                    <td class="px-4 py-3 text-center" onclick="event.stopPropagation()"><input type="checkbox" class="accent-primary w-4 h-4 cursor-pointer" onchange="window.toggleSelection('${site.id}')" ${isSelected ? 'checked' : ''}></td>
+                    <td class="px-4 py-3 font-bold text-white">${site.name}<div class="text-[9px] text-gray-500 font-mono">${site.id}</div></td>
+                    <td class="px-4 py-3 text-gray-400 font-mono text-xs">${site.zip || ''}</td>
+                    <td class="px-4 py-3">${provHtml}</td>
+                    <td class="px-4 py-3 text-right font-mono text-gray-300">${Math.round(site.volume)} <span class="text-[9px]">MWh</span></td>
                     <td class="px-4 py-3 text-right font-bold text-white">${formatCurrency(site.budget)}</td>
-                    <td class="px-4 py-3 text-right font-mono ${site.alert ? 'text-red-500' : 'text-success'}">${formatCurrency(site.landing)}</td>
+                    <td class="px-4 py-3 text-center">${rseStatus}</td>
                 `;
-                newTbody.appendChild(row);
+                tbody.appendChild(row);
             });
-            tbody.parentNode.replaceChild(newTbody, tbody);
-            safeSetText('site-count', data.length);
         }
 
         function updateGlobalKPIs(data) {
-            let totalBudget = 0;
-            data.forEach(s => totalBudget += s.budget);
+            const totalBudget = data.reduce((acc, s) => acc + s.budget, 0);
             safeSetText('budget-display', formatCurrency(totalBudget));
         }
 
-        function updateCharts(data) {
-            let budgetElec = 0, budgetGaz = 0;
-            data.forEach(s => { if(s.energy === 'gaz') budgetGaz += s.budget; else budgetElec += s.budget; });
-            const ctxMix = document.getElementById('mixChart');
-            if(ctxMix) {
-                if(mixChartInstance) mixChartInstance.destroy();
-                mixChartInstance = new Chart(ctxMix.getContext('2d'), { type: 'doughnut', data: { labels: ['Élec', 'Gaz'], datasets: [{ data: [budgetElec, budgetGaz], backgroundColor:['#00E5FF', '#EF4444'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 10 } } } } } });
-            }
-            const suppliers = {};
-            data.forEach(s => { const p = s.provider || 'Inconnu'; suppliers[p] = (suppliers[p] || 0) + s.budget; });
-            const sortedSuppliers = Object.entries(suppliers).sort((a, b) => b[1] - a[1]);
-            const labelsSup = sortedSuppliers.map(x => x[0]);
-            const dataSup = sortedSuppliers.map(x => x[1]);
-            const ctxSup = document.getElementById('supplierChart');
-            if(ctxSup) {
-                if(supplierChartInstance) supplierChartInstance.destroy();
-                supplierChartInstance = new Chart(ctxSup.getContext('2d'), { type: 'doughnut', data: { labels: labelsSup, datasets: [{ data: dataSup, backgroundColor:['#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#A855F7', '#64748B'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 9 }, boxWidth: 8 } } } } });
-            }
-            const top5 = [...data].sort((a, b) => b.budget - a.budget).slice(0, 5);
-            const ctxTop = document.getElementById('topChart');
-            if(ctxTop) {
-                if(topChartInstance) topChartInstance.destroy();
-                topChartInstance = new Chart(ctxTop.getContext('2d'), { type: 'bar', data: { labels: top5.map(s => s.name.substring(0, 10) + '...'), datasets:[{ label: 'Budget', data: top5.map(s => s.budget), backgroundColor: '#A855F7', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94A3B8', font: { size: 9 } }, grid: { display: false } }, y: { display: false } } } });
-            }
+        // --- 5. DÉTAIL BÂTIMENT & SMART TWIN ---
+        window.openDetail = function(row) { const id = row.getAttribute('data-id'); if(id) window.loadDetail(id); }
+        window.loadDetail = async function(id) {
+            try {
+                const res = await fetch(`/api/dashboard/data/${id}`);
+                const data = await res.json();
+                if(data.error) return;
+                CURRENT_DETAIL_SITE = data; 
+                renderDetail(data);
+                window.switchView('detail');
+            } catch(e) { console.error(e); }
         }
 
+        function renderDetail(data) {
+            safeSetText('detail-title', data.identity.site_name || "Site");
+            safeSetText('detail-address', data.location.address);
+            safeSetText('detail-surface', (data.location?.surface || 0) + ' m²');
+            
+            // Appel direct à Cortex Forecast (Zéro Mock 5 ans)
+            fetchForecast(data.identity.id);
+        }
+
+        async function fetchForecast(id) {
+            const ctxHist = document.getElementById('historyChart');
+            if (!ctxHist) return;
+            if (window.historyChartInstance) window.historyChartInstance.destroy();
+
+            try {
+                const res = await fetch(`/api/forecast/simulate/${id}`);
+                const data = await res.json();
+
+                window.historyChartInstance = new Chart(ctxHist.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: data.labels || ['N', 'N+1', 'N+2', 'N+3', 'N+4'],
+                        datasets:[
+                            { label: 'Projection Tendancielle (MWh)', data: data.dataset_trend, borderColor: '#EF4444', borderDash: [5, 5], tension: 0.4 },
+                            { label: 'Trajectoire Décret Tertiaire (Sobriété)', data: data.dataset_sobriety, borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 3, tension: 0.4, fill: true }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { title: { display: true, text: `Gain Cumulé sur 5 ans : ${data.gain_potential_mwh || 0} MWh`, color: '#fff' } },
+                        scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } }, x: { grid: { display: false } } }
+                    }
+                });
+            } catch(e) { console.error("Erreur Forecast", e); }
+        }
+
+        // --- 6. EXPORT OPERAT (Légal CSRD) ---
+        window.exportOperat = function() {
+            if(SELECTED_IDS.size === 0) return App.toast("Sélectionnez les agences à déclarer sur OPERAT.", "error");
+            App.toast("Génération du CSV OPERAT en cours...", "info");
+            
+            let csvContent = "data:text/csv;charset=utf-8,ID_Etablissement;SIRET;Surface_Declarative;Consommation_Annuelle_kWh;Vecteur\n";
+            FLEET_DATA.forEach(s => {
+                if(SELECTED_IDS.has(s.id)) {
+                    // Mapping normé
+                    csvContent += `EFA_${s.id};${s.id};${s.surface || 150};${Math.round(s.volume * 1000)};${s.energy.toUpperCase()}\n`;
+                }
+            });
+
+            setTimeout(() => {
+                const encodedUri = encodeURI(csvContent);
+                const a = document.createElement("a");
+                a.setAttribute("href", encodedUri);
+                a.setAttribute("download", `Declaration_OPERAT_${new Date().getFullYear()}.csv`);
+                document.body.appendChild(a); a.click(); a.remove();
+                App.toast("Fichier OPERAT prêt pour dépôt sur le site de l'État.", "success");
+            }, 1000);
+        }
+
+        // --- ACTIONS GLOBALES (DQE, Selection, Charts) ---
         window.toggleSelection = function(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
-        window.selectAll = function() { if(SELECTED_IDS.size === FLEET_DATA.length) SELECTED_IDS.clear(); else FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); renderTable(FLEET_DATA); updateActionBar(); }
+        window.selectAll = function() { if(SELECTED_IDS.size === FLEET_DATA.length) SELECTED_IDS.clear(); else FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); window.applyFilters(); updateActionBar(); }
         function updateActionBar() { 
             const count = SELECTED_IDS.size; 
             safeSetText('selected-count', count);
             const bar = document.getElementById('action-bar'); 
             if(bar) { if(count > 0) bar.classList.add('visible'); else bar.classList.remove('visible'); bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; }
         }
-
         window.generateTender = async function() {
-            if(SELECTED_IDS.size === 0) return alert("Veuillez sélectionner au moins un site.");
-            const btn = document.querySelector('#action-bar button');
-            const original = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ...';
+            if(SELECTED_IDS.size === 0) return;
+            App.toast("Compilation de l'Appel d'Offres...", "info");
             try {
                 const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: Array.from(SELECTED_IDS) }) });
                 if(res.ok) {
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a'); a.href = url;
-                    const date = new Date().toISOString().slice(0,10);
-                    a.download = `DCE_Energistrat_${SELECTED_IDS.size}sites_${date}.xlsx`;
-                    document.body.appendChild(a); a.click(); a.remove();
-                    try { selectAll(); } catch(e) {}
-                } else { alert("Erreur serveur"); }
-            } catch(e) { console.error(e); }
-            btn.innerHTML = original;
+                    const blob = await res.blob(); const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = `DCE_Tertiaire_${SELECTED_IDS.size}_agences.xlsx`; document.body.appendChild(a); a.click(); a.remove();
+                    App.toast("Fichier BPU généré.", "success");
+                }
+            } catch(e) {}
         }
-
+        function updateCharts(data) {
+            let budgetElec = 0, budgetGaz = 0;
+            data.forEach(s => { if(s.energy === 'gaz') budgetGaz += s.budget; else budgetElec += s.budget; });
+            const ctxMix = document.getElementById('mixChart');
+            if(ctxMix) { if(mixChartInstance) mixChartInstance.destroy(); mixChartInstance = new Chart(ctxMix.getContext('2d'), { type: 'doughnut', data: { labels: ['Élec', 'Gaz'], datasets: [{ data: [budgetElec, budgetGaz], backgroundColor:['#00E5FF', '#EF4444'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff' } } } } }); }
+            const top5 = [...data].sort((a, b) => b.budget - a.budget).slice(0, 5);
+            const ctxTop = document.getElementById('topChart');
+            if(ctxTop) { if(topChartInstance) topChartInstance.destroy(); topChartInstance = new Chart(ctxTop.getContext('2d'), { type: 'bar', data: { labels: top5.map(s => s.name.substring(0, 10)), datasets:[{ label: 'Budget', data: top5.map(s => s.budget), backgroundColor: '#A855F7', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94A3B8' }, grid: { display: false } }, y: { display: false } } } }); }
+        }
         function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
-        function addPriceLine(c, l, v, cl) { c.innerHTML += `<div class="flex justify-between text-xs border-b border-white/5 pb-2"><span class="text-gray-500">${l}</span><span class="font-mono ${cl}">${v}</span></div>`; }
         
-        async function triggerOfferScan(input) {
-            if(!input.files || input.files.length === 0) return;
-            const file = input.files[0];
-            const name = document.getElementById('offer-name').value || "Offre Inconnue";
-            
-            const formData = new FormData();
-            formData.append("file", file);
-            
-            const parent = input.parentElement;
-            const originalHTML = parent.innerHTML;
-            parent.innerHTML = '<div class="flex flex-col items-center justify-center pt-5 pb-6"><i class="fa-solid fa-spinner fa-spin text-3xl text-cyan mb-2"></i><p class="text-sm text-gray-400">Simulation en cours...</p></div>';
-
-            try {
-                const res = await fetch('/api/ops/simulate_offer', { method: 'POST', body: formData });
-                const data = await res.json();
-                
-                if(data.success && data.summary) {
-                    CURRENT_SIM_DATA = {
-                        name: name,
-                        summary: data.summary,
-                        details: data.details
-                    };
-                    renderSimulation(data, name);
-                } else {
-                    alert("Erreur Simulation : " + (data.error || "Inconnue"));
-                }
-            } catch(e) { console.error(e); alert("Erreur réseau"); }
-            
-            setTimeout(() => { if(input) parent.innerHTML = originalHTML; }, 2000);
-        }
-
-        function renderSimulation(data, offerName) {
-            document.getElementById('sim-results').classList.remove('hidden');
-            safeSetText('lbl-sim-offer-name', offerName);
-            safeSetText('sim-current', formatCurrency(data.summary.total_current));
-            safeSetText('sim-offer', formatCurrency(data.summary.total_simulated));
-            safeSetText('sim-delta', (data.summary.savings_euro > 0 ? "+" : "") + formatCurrency(data.summary.savings_euro));
-            safeSetText('sim-pct', (data.summary.savings_pct > 0 ? "+" : "") + data.summary.savings_pct + " %");
-            const isGain = data.summary.savings_euro > 0;
-            const colorClass = isGain ? 'text-green-500' : 'text-red-500';
-            document.getElementById('sim-delta').className = `text-3xl font-black ${colorClass}`;
-            const tbody = document.getElementById('sim-table-body');
-            tbody.innerHTML = '';
-            data.details.forEach(row => {
-                const rowColor = row.delta_euro < 0 ? 'text-green-400' : 'text-red-400';
-                tbody.innerHTML += `<tr class="border-b border-white/5"><td class="px-4 py-2 font-bold text-white">${row.site_name}</td><td class="px-4 py-2 text-right text-gray-400 font-mono">${Math.round(row.volume)} MWh</td><td class="px-4 py-2 text-right text-gray-300 font-mono">${formatCurrency(row.current_budget)}</td><td class="px-4 py-2 text-right text-cyan font-mono">${formatCurrency(row.simulated_budget)}</td><td class="px-4 py-2 text-right font-bold ${rowColor}">${Math.round(row.delta_euro)} €</td></tr>`;
-            });
-        }
-
-        window.addToPodium = function() {
-            if(!CURRENT_SIM_DATA) return;
-            PODIUM_STACK.push(CURRENT_SIM_DATA);
-            PODIUM_STACK.sort((a, b) => a.summary.total_simulated - b.summary.total_simulated);
-            renderPodium();
-            document.getElementById('podium-section').classList.remove('hidden');
-            window.scrollTo(0, document.body.scrollHeight);
-        }
-
-        window.resetPodium = function() {
-            PODIUM_STACK =[];
-            document.getElementById('podium-section').classList.add('hidden');
-        }
-
-        function renderPodium() {
-            if(PODIUM_STACK.length > 0) {
-                const gold = PODIUM_STACK[0];
-                const el = document.getElementById('podium-gold');
-                el.querySelector('.name').innerText = gold.name;
-                el.querySelector('.score').innerText = formatCurrency(gold.summary.total_simulated);
-                el.querySelector('.savings').innerText = "Gain: " + formatCurrency(gold.summary.savings_euro);
-                el.classList.remove('opacity-50');
-            }
-            if(PODIUM_STACK.length > 1) {
-                const silver = PODIUM_STACK[1];
-                const el = document.getElementById('podium-silver');
-                el.querySelector('.name').innerText = silver.name;
-                el.querySelector('.score').innerText = formatCurrency(silver.summary.total_simulated);
-                el.classList.remove('opacity-50');
-            } else {
-                document.getElementById('podium-silver').classList.add('opacity-50');
-                document.getElementById('podium-silver').querySelector('.name').innerText = "--";
-            }
-            if(PODIUM_STACK.length > 2) {
-                const bronze = PODIUM_STACK[2];
-                const el = document.getElementById('podium-bronze');
-                el.querySelector('.name').innerText = bronze.name;
-                el.querySelector('.score').innerText = formatCurrency(bronze.summary.total_simulated);
-                el.classList.remove('opacity-50');
-            } else {
-                document.getElementById('podium-bronze').classList.add('opacity-50');
-                document.getElementById('podium-bronze').querySelector('.name').innerText = "--";
-            }
-            const tbody = document.getElementById('podium-table-body');
-            tbody.innerHTML = '';
-            const bestBudget = PODIUM_STACK[0].summary.total_simulated;
-            PODIUM_STACK.forEach((offer, index) => {
-                const rank = index + 1;
-                const ecart = offer.summary.total_simulated - bestBudget;
-                const isBest = rank === 1;
-                tbody.innerHTML += `<tr class="border-b border-white/5 ${isBest ? 'bg-white/5' : ''}"><td class="px-4 py-3 text-center font-bold ${rank===1?'text-gold':(rank===2?'text-silver':(rank===3?'text-bronze':'text-gray-500'))}">${rank}</td><td class="px-4 py-3 font-bold text-white">${offer.name}</td><td class="px-4 py-3 text-right font-mono text-cyan">${formatCurrency(offer.summary.total_simulated)}</td><td class="px-4 py-3 text-right font-mono text-green-400 font-bold">${formatCurrency(offer.summary.savings_euro)}</td><td class="px-4 py-3 text-right font-mono text-red-400">${isBest ? '-' : '+' + formatCurrency(ecart)}</td></tr>`;
-            });
-        }
-
-        function renderDetail(data) {
-            const isGaz = data.energy_type === 'gaz';
-            safeSetText('detail-title', data.identity.site_name || "Site");
-            safeSetText('detail-address', data.location.address);
-            const surf = data.location?.surface || 0;
-            safeSetText('detail-surface', surf > 0 ? `${surf} m²` : 'Surface non définie');
-            const badge = document.getElementById('detail-badge');
-            if(badge) {
-                badge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
-                badge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${isGaz ? 'bg-gas/10 text-gas' : 'bg-cyan/10 text-cyan'}`;
-            }
-            const dqeGrid = document.getElementById('dqe-grid');
-            if(dqeGrid) {
-                const c = data.contract || {};
-                const p = c.power_details || {};
-                const safeVal = (v, unit) => v ? `${v} ${unit}` : '-';
-                let html = `<div><span class="text-gray-500 block mb-1">PDL / PCE</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block mb-1">Segment</span><span class="text-white font-bold">${c.segment || '-'}</span></div><div><span class="text-gray-500 block mb-1">Début Contrat</span><span class="text-white">${c.start_date || '-'}</span></div><div><span class="text-gray-500 block mb-1">Fin Contrat</span><span class="text-white">${c.end_date || '-'}</span></div>`;
-                if(isGaz) {
-                    html += `<div><span class="text-gray-500 block mb-1">CAR</span><span class="text-white font-bold text-yellow-500">${safeVal(c.power, 'MWh')}</span></div><div><span class="text-gray-500 block mb-1">CJA</span><span class="text-white font-mono">${safeVal(c.cja, 'MWh/j')}</span></div><div><span class="text-gray-500 block mb-1">Profil</span><span class="text-white font-mono">${c.profil || '-'}</span></div><div><span class="text-gray-500 block mb-1">Tarif Ach.</span><span class="text-white font-mono">${c.tarif_acheminement || '-'}</span></div>`;
-                } else {
-                    html += `<div><span class="text-gray-500 block mb-1">FTA</span><span class="text-white">${c.fta || '-'}</span></div><div><span class="text-gray-500 block mb-1">PS Max</span><span class="text-white font-bold text-yellow-500">${safeVal(c.power, 'kVA')}</span></div><div><span class="text-gray-500 block mb-1">Pointe Max</span><span class="text-white font-mono">${safeVal(c.p_max, 'kW')}</span></div><div><span class="text-gray-500 block mb-1">GRD</span><span class="text-white">${c.grd || 'Enedis'}</span></div><div class="col-span-4 h-px bg-white/5 my-2"></div><div><span class="text-gray-500 block mb-1">PS HPH</span><span class="text-white font-mono">${safeVal(p.hph, 'kVA')}</span></div><div><span class="text-gray-500 block mb-1">PS HCH</span><span class="text-white font-mono">${safeVal(p.hch, 'kVA')}</span></div><div><span class="text-gray-500 block mb-1">PS HPE</span><span class="text-white font-mono">${safeVal(p.hpe, 'kVA')}</span></div><div><span class="text-gray-500 block mb-1">PS HCE</span><span class="text-white font-mono">${safeVal(p.hce, 'kVA')}</span></div>`;
-                }
-                dqeGrid.innerHTML = html;
-            }
-            const coach = data.cortex_insight;
-            const msgEl = document.getElementById('cortex-msg');
-            if(msgEl) msgEl.innerText = coach.message + " " + coach.conseil;
-            const market = data.market_analysis;
-            if(market) {
-                safeSetText('market-badge', market.status);
-                safeSetText('market-advice', market.message + " " + market.action);
-                const color = market.color === 'green' ? '#10B981' : (market.color === 'blue' ? '#3B82F6' : '#EF4444');
-                const mCard = document.getElementById('market-card');
-                if(mCard) mCard.style.borderColor = color;
-                const mBadge = document.getElementById('market-badge');
-                if(mBadge) mBadge.style.backgroundColor = color;
-            }
-            const list = document.getElementById('detail-pricing');
-            if(list) {
-                list.innerHTML = '';
-                if (isGaz) {
-                    addPriceLine(list, "Abo", data.pricing.fix + " €", "text-yellow-500");
-                    addPriceLine(list, "Molécule", data.pricing.hph + " €", "text-gas font-bold");
-                    addPriceLine(list, "Stockage/CPB", data.pricing.storage + " €", "text-purple-400");
-                    addPriceLine(list, "Taxes", data.pricing.tax + " €", "text-gray-500");
-                } else {
-                    addPriceLine(list, "HPH", data.pricing.hph, "text-white");
-                    addPriceLine(list, "HCH", data.pricing.hch, "text-gray-400");
-                    addPriceLine(list, "HPE", data.pricing.hpe, "text-cyan");
-                    addPriceLine(list, "HCE", data.pricing.hce, "text-cyan");
-                }
-            }
-            const pSub = parseFloat(data.contract.power);
-            const pReach = pSub * (isGaz ? 0.9 : 0.7); 
-            safeSetText('detail-sub', `Souscrit: ${pSub} ${isGaz ? 'MWh' : 'kVA'}`);
-            safeSetText('detail-reached', `Max: ${pReach}`);
-            const ratio = (pReach / pSub) * 100;
-            const gauge = document.getElementById('detail-gauge');
-            if(gauge) {
-                gauge.style.width = `${ratio}%`;
-                gauge.className = `h-full rounded-full ${ratio > 95 ? 'bg-red-500' : (ratio < 60 ? 'bg-warning' : 'bg-success')}`;
-            }
-            const gain = (!isGaz && ratio < 60) ? Math.floor((pSub - pReach*1.2) * 18) : 0;
-            safeSetText('detail-gain', gain > 0 ? `+ ${gain} €/an` : "OPTIMISÉ");
-            const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
-            const timeProgress = (dayOfYear / 365) * 100;
-            const budgetProgress = timeProgress * 1.05; 
-            safeSetText('time-progress-txt', Math.round(timeProgress) + "%");
-            const timeBar = document.getElementById('time-progress-bar');
-            if(timeBar) timeBar.style.width = timeProgress + "%";
-            safeSetText('budget-progress-txt', Math.round(budgetProgress) + "%");
-            const budBar = document.getElementById('budget-progress-bar');
-            if(budBar) {
-                budBar.style.width = Math.min(budgetProgress, 100) + "%";
-                if(budgetProgress > timeProgress + 5) { budBar.className = "gauge-fill bg-red-500 rounded-full"; } 
-                else { budBar.className = "gauge-fill bg-primary rounded-full"; }
-            }
-            const sgeAnchor = document.getElementById('sge-badge-anchor');
-            if (sgeAnchor) {
-                const isEligible = data.technical?.cee_eligible === "OUI" || (data.kpis?.volume_mwh < 500); 
-                if (isEligible) {
-                    sgeAnchor.innerHTML = `<div class="flex items-center gap-3 bg-green-900/20 border border-green-500/30 px-4 py-2 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.2)] animate-pulse"><i class="fa-solid fa-certificate text-green-400 text-xl"></i><div><div class="text-[10px] text-green-400 font-bold uppercase tracking-wider">Certifié SGE</div><div class="text-[9px] text-green-600 leading-none">Site à Gestion Efficiente</div></div></div>`;
-                } else {
-                    sgeAnchor.innerHTML = `<div class="opacity-50 grayscale flex items-center gap-2 px-3 py-1 rounded border border-white/5"><i class="fa-solid fa-lock text-gray-500"></i><span class="text-[10px] text-gray-500 font-bold">Non Certifié SGE</span></div>`;
-                }
-            }
-            const ctxHist = document.getElementById('historyChart');
-            if (ctxHist) {
-                if (window.historyChartInstance) window.historyChartInstance.destroy();
-                const currentVol = data.kpis?.volume_mwh || 100;
-                const years =[];
-                const volumes = [];
-                const budgets =[];
-                const currentYear = new Date().getFullYear();
-                for (let i = 4; i >= 0; i--) {
-                    years.push(currentYear - i);
-                    const variation = 1 + (Math.random() * 0.2 - 0.1); 
-                    const efficiencyFactor = 1 - (0.02 * (4-i)); 
-                    let vol = currentVol * variation * efficiencyFactor;
-                    if (i === 0) vol = currentVol; 
-                    volumes.push(vol);
-                    budgets.push(vol * (isGaz ? 45 : 120)); 
-                }
-                window.historyChartInstance = new Chart(ctxHist.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: years,
-                        datasets:[
-                            { label: 'Consommation (MWh)', data: volumes, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', borderWidth: 2, tension: 0.4, fill: true, yAxisID: 'y' },
-                            { label: 'Budget (€)', data: budgets, borderColor: '#A855F7', borderWidth: 2, borderDash: [5, 5], tension: 0.4, pointStyle: 'circle', yAxisID: 'y1' }
-                        ]
-                    },
-                    options: {
-                        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-                        plugins: { legend: { labels: { color: '#94A3B8', font: { size: 10, family: 'Inter' } } } },
-                        scales: {
-                            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } },
-                            y: { type: 'linear', display: true, position: 'left', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } },
-                            y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: function(value) { return value + ' €'; }, color: '#A855F7' } }
-                        }
-                    }
-                });
-            }
-        }
-
-        function calculateLeague() {
-            if (LEAGUE_DATA && LEAGUE_DATA.gold) {
-                updatePodium('1', LEAGUE_DATA.gold, true);
-                if(LEAGUE_DATA.silver) updatePodium('2', LEAGUE_DATA.silver, true);
-                if(LEAGUE_DATA.bronze) updatePodium('3', LEAGUE_DATA.bronze, true);
-                const list = document.getElementById('league-list');
-                if(list && LEAGUE_DATA.cancres) {
-                    list.innerHTML = '';
-                    LEAGUE_DATA.cancres.forEach((site, index) => {
-                        list.innerHTML += `<div class="flex items-center gap-4 p-3 bg-white/5 rounded-lg border border-white/5"><div class="w-6 h-6 rounded-full bg-red-900 text-red-200 text-xs font-bold flex items-center justify-center">!</div><div class="flex-1 font-bold text-sm text-white">${site.nom_site}</div><div class="text-right font-mono text-xs text-red-400">${Math.round(site.pmc)} €/MWh</div></div>`;
-                    });
-                }
-                return;
-            }
-            const ranked = [...FLEET_DATA].sort((a, b) => {
-                const ratioA = a.budget > 0 ? (a.ghost_savings / a.budget) : 0;
-                const ratioB = b.budget > 0 ? (b.ghost_savings / b.budget) : 0;
-                return ratioA - ratioB; 
-            });
-            if(ranked[0]) updatePodium('1', ranked[0], false);
-            if(ranked[1]) updatePodium('2', ranked[1], false);
-            if(ranked[2]) updatePodium('3', ranked[2], false);
-            const list = document.getElementById('league-list');
-            if(list) {
-                list.innerHTML = '';
-                ranked.slice(3).forEach((site, index) => {
-                    const ratio = site.budget > 0 ? Math.round((site.ghost_savings / site.budget) * 100) : 0;
-                    if(ratio > 10) {
-                        list.innerHTML += `<div class="flex items-center gap-4 p-3 bg-white/5 rounded-lg border border-white/5"><div class="w-6 h-6 rounded-full bg-gray-700 text-xs font-bold flex items-center justify-center">${index + 4}</div><div class="flex-1 font-bold text-sm text-white">${site.name}</div><div class="text-right font-mono text-xs text-red-400">${ratio}% Gaspillage</div></div>`;
-                    }
-                });
-            }
-        }
-
-        function updatePodium(pos, site, isReal) {
-            const elName = document.getElementById('podium-' + pos + '-name');
-            const elScore = document.getElementById('podium-' + pos + '-score');
-            if(elName) elName.innerText = isReal ? site.nom_site : site.name;
-            if(elScore) elScore.innerText = isReal ? (Math.round(site.pmc) + " €/MWh") : (Math.round(site.ghost_savings) + " € Gaspillés");
-        }
-
         document.addEventListener('DOMContentLoaded', loadFleet);
     </script>
 </body>
