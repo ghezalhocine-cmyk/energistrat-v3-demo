@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V3 | NEXUS OPS</title>
+    <title>ENERGISTRAT V10.0 | NEXUS OPS (Super-Admin)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -33,11 +33,12 @@
         .bg-grid-pattern { background-image: linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 40px 40px; }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
         .search-bar { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.2s; }
-        .search-bar:focus { border-color: #00E5FF; background: rgba(0,229,255,0.05); outline: none; }
+        .search-bar:focus { border-color: #00E5FF; background: rgba(0,229,255,0.05); outline: none; box-shadow: 0 0 15px rgba(0, 229, 255, 0.2); }
     </style>
 </head>
 <body class="bg-abysse min-h-screen flex flex-col relative bg-grid-pattern">
 
+    <!-- HEADER / NAVIGATION TOP -->
     <header class="h-20 border-b border-white/5 flex items-center justify-between px-10 bg-abysse/90 backdrop-blur z-50 sticky top-0">
         <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan to-blue-900 flex items-center justify-center text-white font-black shadow-[0_0_15px_rgba(0,229,255,0.4)]">
@@ -51,32 +52,52 @@
         
         <div class="flex-1 max-w-2xl mx-8 relative">
             <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
-            <input type="text" id="nexus-search" onkeyup="filterCards()" placeholder="Rechercher un module (ex: CRM, Immo, Sante)..." class="search-bar w-full rounded-full py-3 pl-12 pr-4 text-sm font-medium placeholder-gray-500">
+            <input type="text" id="nexus-search" oninput="filterCards()" placeholder="Rechercher un module (ex: CRM, Immo, Sante)..." class="search-bar w-full rounded-full py-3 pl-12 pr-4 text-sm font-medium placeholder-gray-500">
         </div>
 
         <div class="flex items-center gap-6">
-            <div class="text-right">
-                <div class="text-[10px] text-gray-500 uppercase font-bold">Base de Données</div>
-                <div class="text-lg font-bold text-white font-mono flex items-center gap-2 justify-end">
-                    <div class="w-2 h-2 rounded-full bg-success animate-pulse"></div>
-                    <span id="kpi-count">--</span> <span class="text-xs text-gray-400">PDL actifs</span>
+            <!-- DOUBLE COMPTEUR (PDL + LOCATAIRES) ZÉRO MOCK -->
+            <div class="flex items-center gap-6 border-r border-white/10 pr-6">
+                <div class="text-right">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Entreprises</div>
+                    <div class="text-lg font-bold text-white font-mono flex items-center gap-2 justify-end">
+                        <span id="kpi-tenants"><i class="fa-solid fa-spinner fa-spin text-xs text-gray-500"></i></span> <span class="text-xs text-gray-400">Tenants</span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Data Unity</div>
+                    <div class="text-lg font-bold text-cyan font-mono flex items-center gap-2 justify-end">
+                        <div class="w-2 h-2 rounded-full bg-cyan animate-pulse shadow-[0_0_10px_#00E5FF]"></div>
+                        <span id="kpi-count"><i class="fa-solid fa-spinner fa-spin text-xs text-gray-500"></i></span> <span class="text-xs text-gray-400">PDL</span>
+                    </div>
                 </div>
             </div>
-            <div class="w-px h-8 bg-white/10"></div>
-            <a href="/logout" class="text-gray-400 hover:text-alert transition" title="Déconnexion"><i class="fa-solid fa-power-off text-xl"></i></a>
+            
+            <a href="/logout" class="text-gray-400 hover:text-alert transition flex items-center gap-2" title="Déconnexion Sécurisée">
+                <i class="fa-solid fa-power-off text-xl"></i>
+            </a>
         </div>
     </header>
 
-    <!-- TICKER LIVE -->
+    <!-- TICKER LIVE (API RTE/EPEX) -->
     <div class="h-8 bg-[#020617] border-b border-white/5 flex items-center px-10 text-[10px] font-mono tracking-widest z-40 sticky top-20 shadow-md">
         <div class="flex items-center gap-2 text-red_alert font-bold mr-8"><span class="w-2 h-2 rounded-full bg-red_alert animate-pulse"></span> LIVE EPEX</div>
-        <div class="flex gap-8 items-center w-full" id="market-ticker"><span class="text-gray-500">Connexion à la salle des marchés via Cortex Sniper...</span></div>
+        <div class="flex gap-8 items-center w-full" id="market-ticker"><span class="text-gray-500">Connexion à la salle des marchés (Cortex Sniper) en cours...</span></div>
     </div>
 
+    <!-- MAIN CONTENT GRID -->
     <main class="flex-1 p-10 overflow-y-auto">
         <div class="max-w-7xl mx-auto space-y-12 pb-20">
 
-            <section>
+            <!-- MESSAGE SI RECHERCHE VIDE -->
+            <div id="no-results-msg" class="hidden text-center py-10">
+                <i class="fa-solid fa-magnifying-glass text-4xl text-gray-600 mb-4"></i>
+                <h3 class="text-xl font-bold text-white">Aucun module trouvé</h3>
+                <p class="text-gray-400 text-sm">Vérifiez l'orthographe ou essayez un autre mot-clé.</p>
+            </div>
+
+            <!-- SECTION 1 : PROFILS MÉTIERS -->
+            <section id="section-profils" class="module-section">
                 <div class="flex items-center gap-3 mb-6">
                     <i class="fa-solid fa-users-rectangle text-xl text-gray-400"></i>
                     <h2 class="text-lg font-bold text-white uppercase tracking-widest">Profils Métiers (Front-Office)</h2>
@@ -118,47 +139,48 @@
                         <div class="text-[10px] font-bold text-syn uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
                     </a>
 
-                    <a href="/industry" class="bento-card p-6 block hover:border-ind group module-card" data-tags="industrie usine iso 50001">
+                    <a href="/industry" class="bento-card p-6 block hover:border-ind group module-card" data-tags="industrie usine iso 50001 production">
                         <div class="w-12 h-12 rounded-full bg-ind/10 text-ind flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-industry"></i></div>
                         <h3 class="text-base font-bold text-white mb-1">Industrie 4.0</h3>
-                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Monitoring intensif, Cos Phi, et indicateurs de performance purs.</p>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Monitoring intensif, Cos Phi, et IPE (Indicateur Performance).</p>
                         <div class="text-[10px] font-bold text-ind uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
                     </a>
 
-                    <a href="/pme" class="bento-card p-6 block hover:border-ind group module-card" data-tags="pme pro artisan tertiaire">
-                        <div class="w-12 h-12 rounded-full bg-ind/10 text-ind flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-briefcase"></i></div>
+                    <a href="/pme" class="bento-card p-6 block hover:border-gold group module-card" data-tags="pme pro artisan tertiaire cfo virtuel">
+                        <div class="w-12 h-12 rounded-full bg-gold/10 text-gold flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-briefcase"></i></div>
                         <h3 class="text-base font-bold text-white mb-1">PME & Tertiaire</h3>
-                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Optimisation factures, accompagnement PME, et Ligue NAF.</p>
-                        <div class="text-[10px] font-bold text-ind uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">CFO Virtuel, Chasseur de subventions, et Ligue NAF.</p>
+                        <div class="text-[10px] font-bold text-gold uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
                     </a>
 
-                    <a href="/retail" class="bento-card p-6 block hover:border-ind group module-card" data-tags="retail gsa supermarche magasins">
-                        <div class="w-12 h-12 rounded-full bg-ind/10 text-ind flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-store"></i></div>
-                        <h3 class="text-base font-bold text-white mb-1">Retail & Franchises</h3>
-                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Pilotage multi-sites, froid commercial et optimisation réseau.</p>
-                        <div class="text-[10px] font-bold text-ind uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
+                    <a href="/retail" class="bento-card p-6 block hover:border-purple-500 group module-card" data-tags="retail gsa supermarche magasins banque agences">
+                        <div class="w-12 h-12 rounded-full bg-purple-500/10 text-purple-500 flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-store"></i></div>
+                        <h3 class="text-base font-bold text-white mb-1">Retail & Réseaux</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Pilotage multi-sites, froid commercial, et Décret Tertiaire.</p>
+                        <div class="text-[10px] font-bold text-purple-500 uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
                     </a>
 
-                    <a href="/citoyen" class="bento-card p-6 block hover:border-cyan group module-card" data-tags="citoyen particulier gamification">
+                    <a href="/citoyen" class="bento-card p-6 block hover:border-cyan group module-card" data-tags="citoyen particulier gamification resident">
                         <div class="w-12 h-12 rounded-full bg-cyan/10 text-cyan flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-house-user"></i></div>
                         <h3 class="text-base font-bold text-white mb-1">App Citoyen</h3>
-                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Ligue citoyenne, vote Conseil Syndical, et suivi Linky personnel.</p>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Ligue citoyenne, vote Conseil Syndical, et Pass Mobilité.</p>
                         <div class="text-[10px] font-bold text-cyan uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
                     </a>
 
-                    <a href="/supplier" class="bento-card p-6 block hover:border-sat group module-card border-t-4 border-sat bg-gradient-to-b from-card to-sat/5" data-tags="supplier fournisseur geg edf engie courtier marketplace crm cpq">
+                    <a href="/supplier" class="bento-card p-6 block hover:border-sat group module-card border-t-4 border-sat bg-gradient-to-b from-card to-sat/5" data-tags="supplier fournisseur geg edf engie courtier marketplace crm cpq b2b">
                         <div class="flex justify-between items-start">
                             <div class="w-12 h-12 rounded-full bg-sat/10 text-sat flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition"><i class="fa-solid fa-handshake-simple"></i></div>
                             <span class="text-[9px] bg-sat/20 text-sat px-2 py-1 rounded font-bold">B2B</span>
                         </div>
                         <h3 class="text-base font-bold text-white mb-1">Supplier Hub</h3>
-                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Portail Fournisseur, Marketplace, CRM, et configuration CPQ.</p>
+                        <p class="text-xs text-gray-400 leading-relaxed mb-4">Place de marché, Reverse Auction, et Facturation 1€/MWh.</p>
                         <div class="text-[10px] font-bold text-sat uppercase">Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i></div>
                     </a>
                 </div>
             </section>
 
-            <section>
+            <!-- SECTION 2 : SATELLITES IA -->
+            <section id="section-satellites" class="module-section">
                 <div class="flex items-center gap-3 mb-6">
                     <i class="fa-solid fa-satellite text-xl text-sat"></i>
                     <h2 class="text-lg font-bold text-white uppercase tracking-widest">Le Magasin d'Applications (Satellites IA)</h2>
@@ -168,184 +190,169 @@
                     <a href="/finance" class="bento-card p-6 flex flex-col gap-3 hover:border-gold group module-card border-t-4 border-gold bg-gradient-to-b from-card to-gold/5" data-tags="finance factures audit pdf facturex ocr pmp surfacturation">
                         <div class="flex justify-between items-start">
                             <div class="w-12 h-12 rounded-xl bg-gold/10 text-gold flex items-center justify-center text-2xl group-hover:scale-105 transition shadow-[0_0_15px_rgba(245,158,11,0.3)]"><i class="fa-solid fa-file-invoice-dollar"></i></div>
-                            <span class="text-[9px] bg-gold text-abysse px-2 py-1 rounded font-black animate-pulse">UNIVERSAL</span>
+                            <span class="text-[9px] bg-gold text-abysse px-2 py-1 rounded font-black animate-pulse">MASTER</span>
                         </div>
-                        <div><h3 class="text-sm font-black text-white">Cortex Audit Facture</h3><p class="text-[10px] text-gray-400 mt-1">Traque OCR des erreurs de facturation & PMP.</p></div>
+                        <div><h3 class="text-sm font-black text-white">Financial Twin</h3><p class="text-[10px] text-gray-400 mt-1">Audit Factur-X, OCR, Bon à Payer et Bouclier Fiscal.</p></div>
                     </a>
                     
-                    <a href="/carbon" class="bento-card p-6 flex flex-col gap-3 hover:border-pub group module-card" data-tags="carbone rse decret tertiaire elan">
-                        <div class="w-12 h-12 rounded-xl bg-pub/10 text-pub flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-leaf"></i></div>
-                        <div><h3 class="text-sm font-bold text-white">Bilan Carbone</h3><p class="text-[10px] text-gray-400 mt-1">Audit Décret Tertiaire & CO2.</p></div>
+                    <a href="/carbon" class="bento-card p-6 flex flex-col gap-3 hover:border-csrd group module-card border-t-2 border-csrd bg-gradient-to-b from-card to-csrd/5" data-tags="carbone rse decret tertiaire elan csrd esrs e1 extra financier">
+                        <div class="flex justify-between items-start">
+                            <div class="w-12 h-12 rounded-xl bg-csrd/10 text-csrd flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-leaf"></i></div>
+                            <span class="text-[9px] bg-csrd/20 text-csrd px-2 py-1 rounded font-bold">LÉGAL</span>
+                        </div>
+                        <div><h3 class="text-sm font-bold text-white">Cortex Climate (CSRD)</h3><p class="text-[10px] text-gray-400 mt-1">Audit Décret Tertiaire, Scope 2 et Comparateur NAF.</p></div>
                     </a>
 
-                    <a href="/cortex_grid" class="bento-card p-6 flex flex-col gap-3 hover:border-sat group module-card" data-tags="grid irve bornes production autoconsommation solaire">
+                    <a href="/pulse" class="bento-card p-6 flex flex-col gap-3 hover:border-sat group module-card" data-tags="pulse rte ecowatt pp1 capacite grid">
                         <div class="w-12 h-12 rounded-xl bg-sat/10 text-sat flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-network-wired"></i></div>
-                        <div><h3 class="text-sm font-bold text-white">Cortex GRID</h3><p class="text-[10px] text-gray-400 mt-1">Supervision IRVE & Autoconso SGE.</p></div>
+                        <div><h3 class="text-sm font-bold text-white">Cortex PULSE</h3><p class="text-[10px] text-gray-400 mt-1">API RTE, Alertes Réseau et Tension EcoWatt.</p></div>
                     </a>
 
-                    <!-- LE BOUTON PULSE (RTE) -->
-                    <a href="/pulse" class="bento-card p-6 flex flex-col gap-3 hover:border-sat group module-card border-t-2 border-sat bg-gradient-to-b from-card to-sat/10" data-tags="pulse rte ecowatt pp1 capacite">
+                    <a href="/solar" class="bento-card p-6 flex flex-col gap-3 hover:border-yellow-500 group module-card border-t-2 border-yellow-500 bg-gradient-to-b from-card to-yellow-500/5" data-tags="solar pvgis solaire panneaux roi stockage batterie trading vpp">
                         <div class="flex justify-between items-start">
-                            <div class="w-12 h-12 rounded-xl bg-sat/10 text-sat flex items-center justify-center text-2xl group-hover:scale-105 transition shadow-[0_0_15px_rgba(139,92,246,0.3)]"><i class="fa-solid fa-satellite-dish"></i></div>
-                            <span class="text-[9px] bg-sat text-white px-2 py-1 rounded font-black animate-pulse">LIVE</span>
+                            <div class="w-12 h-12 rounded-xl bg-yellow-500/10 text-yellow-500 flex items-center justify-center text-2xl group-hover:scale-105 transition shadow-[0_0_15px_rgba(234,179,8,0.3)]"><i class="fa-solid fa-solar-panel"></i></div>
+                            <span class="text-[9px] bg-yellow-500 text-abysse px-2 py-1 rounded font-black">VPP</span>
                         </div>
-                        <div><h3 class="text-sm font-bold text-white">Cortex PULSE (RTE)</h3><p class="text-[10px] text-gray-400 mt-1">API RTE, Alertes PP1 et Météo.</p></div>
+                        <div><h3 class="text-sm font-bold text-white">Solar Studio (Trading)</h3><p class="text-[10px] text-gray-400 mt-1">Cadastre PVGIS, Primes d'État et Arbitrage BESS.</p></div>
                     </a>
 
-                    <a href="/reverse" class="bento-card p-6 flex flex-col gap-3 hover:border-yellow-400 group module-card" data-tags="reverse simu inverse budget pmp">
-                        <div class="w-12 h-12 rounded-xl bg-yellow-400/10 text-yellow-400 flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-bullseye"></i></div>
-                        <div><h3 class="text-sm font-bold text-white">Cortex REVERSE</h3><p class="text-[10px] text-gray-400 mt-1">Simulateur Budget ➔ Objectif Conso.</p></div>
-                    </a>
-
-                    <a href="/solar" class="bento-card p-6 flex flex-col gap-3 hover:border-yellow-500 group module-card" data-tags="solar pvgis solaire panneaux roi">
-                        <div class="w-12 h-12 rounded-xl bg-yellow-500/10 text-yellow-500 flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-solar-panel"></i></div>
-                        <div><h3 class="text-sm font-bold text-white">Solar Studio</h3><p class="text-[10px] text-gray-400 mt-1">Calculateur de ROI PVGIS (Solaire).</p></div>
-                    </a>
-
-                    <a href="/optimization" class="bento-card p-6 flex flex-col gap-3 hover:border-cyan group module-card" data-tags="optimization turpe cee travaux roi">
-                        <div class="w-12 h-12 rounded-xl bg-cyan/10 text-cyan flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-sliders"></i></div>
-                        <div><h3 class="text-sm font-bold text-white">Optimisation TURPE</h3><p class="text-[10px] text-gray-400 mt-1">Optimisation tarifaire et Primes CEE.</p></div>
-                    </a>
-
-                    <a href="/trading" class="bento-card p-6 flex flex-col gap-3 hover:border-cyan group module-card" data-tags="trading spot marche epex bloc">
-                        <div class="w-12 h-12 rounded-xl bg-cyan/10 text-cyan flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-chart-line"></i></div>
-                        <div><h3 class="text-sm font-bold text-white">Trading Room</h3><p class="text-[10px] text-gray-400 mt-1">Achat sur marché de gros (Bloc/Spot).</p></div>
-                    </a>
-                    
-                    <a href="/forecast" class="bento-card p-6 flex flex-col gap-3 hover:border-cyan group module-card" data-tags="forecast trajectoire previsions smart twin">
-                        <div class="w-12 h-12 rounded-xl bg-cyan/10 text-cyan flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-crystal-ball"></i></div>
-                        <div><h3 class="text-sm font-bold text-white">Smart Twin Forecast</h3><p class="text-[10px] text-gray-400 mt-1">Projections financières à 3 ans.</p></div>
-                    </a>
-
-                    <a href="/thermic" class="bento-card p-6 flex flex-col gap-3 hover:border-orange group module-card border-t-2 border-orange bg-gradient-to-b from-card to-orange/5" data-tags="thermic chauffage dju signature energetique regression be">
-                        <div class="flex justify-between items-start">
-                            <div class="w-12 h-12 rounded-xl bg-orange/10 text-orange flex items-center justify-center text-2xl group-hover:scale-105 transition shadow-[0_0_15px_rgba(249,115,22,0.3)]"><i class="fa-solid fa-temperature-arrow-up"></i></div>
-                            <span class="text-[9px] bg-orange text-abysse px-2 py-1 rounded font-black animate-pulse">HOT</span>
-                        </div>
-                        <div><h3 class="text-sm font-black text-white">Cortex Thermic</h3><p class="text-[10px] text-gray-400 mt-1">Signature Énergétique & DJU.</p></div>
-                    </a>
-
-                    <a href="/flex" class="bento-card p-6 flex flex-col gap-3 hover:border-flex group module-card border-t-2 border-flex bg-gradient-to-b from-card to-flex/5" data-tags="flex effacement nebef valorisation">
-                        <div class="flex justify-between items-start"><div class="w-12 h-12 rounded-xl bg-flex/10 text-flex flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-bolt-lightning"></i></div><span class="text-[9px] bg-flex/20 text-flex px-2 py-1 rounded font-bold">NEW</span></div>
-                        <div><h3 class="text-sm font-bold text-white">Cortex FLEX</h3><p class="text-[10px] text-gray-400 mt-1">Monétisation de l'effacement (NEBEF).</p></div>
-                    </a>
-                    
-                    <a href="/csrd" class="bento-card p-6 flex flex-col gap-3 hover:border-csrd group module-card border-t-2 border-csrd bg-gradient-to-b from-card to-csrd/5" data-tags="csrd esrs e1 extra financier">
-                        <div class="flex justify-between items-start"><div class="w-12 h-12 rounded-xl bg-csrd/10 text-csrd flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-book-bookmark"></i></div><span class="text-[9px] bg-csrd/20 text-csrd px-2 py-1 rounded font-bold">NEW</span></div>
-                        <div><h3 class="text-sm font-bold text-white">CSRD Compliance</h3><p class="text-[10px] text-gray-400 mt-1">Générateur Rapport Légal Norme E1.</p></div>
-                    </a>
-                    
-                    <a href="/subventions" class="bento-card p-6 flex flex-col gap-3 hover:border-pub group module-card border-t-2 border-pub bg-gradient-to-b from-card to-pub/5" data-tags="subventions aides etat cee region ppa">
-                        <div class="flex justify-between items-start"><div class="w-12 h-12 rounded-xl bg-pub/10 text-pub flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-hand-holding-dollar"></i></div><span class="text-[9px] bg-pub/20 text-pub px-2 py-1 rounded font-bold">NEW</span></div>
-                        <div><h3 class="text-sm font-bold text-white">Subvention Finder</h3><p class="text-[10px] text-gray-400 mt-1">Match automatique des aides d'État.</p></div>
-                    </a>
-
-                    <a href="/deal_desk" class="bento-card p-6 flex flex-col gap-3 hover:border-deal group module-card border-t-4 border-deal bg-gradient-to-b from-card to-deal/10" data-tags="deal desk souscription contrat signature cpq b2b oef">
+                    <a href="/deal_desk" class="bento-card p-6 flex flex-col gap-3 hover:border-deal group module-card border-t-4 border-deal bg-gradient-to-b from-card to-deal/10" data-tags="deal desk souscription contrat signature cpq b2b oef sasp">
                         <div class="flex justify-between items-start">
                             <div class="w-12 h-12 rounded-xl bg-deal/10 text-deal flex items-center justify-center text-2xl group-hover:scale-105 transition shadow-[0_0_15px_rgba(52,211,153,0.3)]"><i class="fa-solid fa-file-signature"></i></div>
                             <span class="text-[9px] bg-deal text-abysse px-2 py-1 rounded font-black animate-pulse">PRO</span>
                         </div>
-                        <div><h3 class="text-sm font-black text-white">Deal Desk (Légal)</h3><p class="text-[10px] text-gray-400 mt-1">Tunnel signature avec qualif INSEE.</p></div>
+                        <div><h3 class="text-sm font-black text-white">Place de Marché (SASP)</h3><p class="text-[10px] text-gray-400 mt-1">Appel d'offres et Hash de signature eIDAS.</p></div>
                     </a>
 
-                    <a href="/immo" class="bento-card p-6 flex flex-col gap-3 hover:border-purple group module-card border-t-4 border-purple bg-gradient-to-b from-card to-purple/10" data-tags="immo dpe tertiaire decote valeur fonciere naf ademe">
-                        <div class="flex justify-between items-start">
-                            <div class="w-12 h-12 rounded-xl bg-purple/10 text-purple flex items-center justify-center text-2xl group-hover:scale-105 transition shadow-[0_0_15px_rgba(168,85,247,0.3)]"><i class="fa-solid fa-city"></i></div>
-                            <span class="text-[9px] bg-purple text-white px-2 py-1 rounded font-black animate-pulse">HOT</span>
-                        </div>
-                        <div><h3 class="text-sm font-black text-white">Cortex IMMO</h3><p class="text-[10px] text-gray-400 mt-1">Prédicteur DPE & Décote Immobilière.</p></div>
+                    <a href="/thermic" class="bento-card p-6 flex flex-col gap-3 hover:border-orange group module-card" data-tags="thermic chauffage dju signature energetique regression be">
+                        <div class="w-12 h-12 rounded-xl bg-orange/10 text-orange flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-temperature-arrow-up"></i></div>
+                        <div><h3 class="text-sm font-bold text-white">Cortex Thermic</h3><p class="text-[10px] text-gray-400 mt-1">Signature Énergétique & Corrélation DJU.</p></div>
+                    </a>
+                    
+                    <a href="/subventions" class="bento-card p-6 flex flex-col gap-3 hover:border-pub group module-card" data-tags="subventions aides etat cee region ppa">
+                        <div class="w-12 h-12 rounded-xl bg-pub/10 text-pub flex items-center justify-center text-2xl group-hover:scale-105 transition"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                        <div><h3 class="text-sm font-bold text-white">Subvention Finder</h3><p class="text-[10px] text-gray-400 mt-1">Match automatique des fiches CEE et Fonds Chaleur.</p></div>
                     </a>
 
-                    <a href="/sniper" class="bento-card p-6 flex flex-col gap-3 hover:border-red_alert group module-card border-t-4 border-red_alert bg-gradient-to-b from-card to-red_alert/10" data-tags="sniper marche bourse trading alerte epex futures">
+                    <a href="/sniper" class="bento-card p-6 flex flex-col gap-3 hover:border-red_alert group module-card border-t-4 border-red_alert bg-gradient-to-b from-card to-red_alert/10" data-tags="sniper marche bourse trading alerte epex futures eex">
                         <div class="flex justify-between items-start">
                             <div class="w-12 h-12 rounded-xl bg-red_alert/10 text-red_alert flex items-center justify-center text-2xl group-hover:scale-105 transition shadow-[0_0_15px_rgba(220,38,38,0.3)]"><i class="fa-solid fa-crosshairs"></i></div>
-                            <span class="text-[9px] bg-red_alert text-white px-2 py-1 rounded font-black animate-pulse">HOT</span>
+                            <span class="text-[9px] bg-red_alert text-white px-2 py-1 rounded font-black animate-pulse">LIVE</span>
                         </div>
-                        <div><h3 class="text-sm font-black text-white">Cortex SNIPER</h3><p class="text-[10px] text-gray-400 mt-1">Alerte Chute de Prix (Bourse Énergie).</p></div>
+                        <div><h3 class="text-sm font-black text-white">Cortex SNIPER</h3><p class="text-[10px] text-gray-400 mt-1">Trading desk et Hedging auto (Marchés de gros).</p></div>
                     </a>
-
-                    <a href="/gridmap" class="bento-card p-6 flex flex-col gap-3 hover:border-pub group module-card border-t-4 border-pub bg-gradient-to-b from-card to-pub/10" data-tags="grid map irve enedis capacite reseau recharge">
-                        <div class="flex justify-between items-start">
-                            <div class="w-12 h-12 rounded-xl bg-pub/10 text-pub flex items-center justify-center text-2xl group-hover:scale-105 transition shadow-[0_0_15px_rgba(16,185,129,0.3)]"><i class="fa-solid fa-map-location-dot"></i></div>
-                            <span class="text-[9px] bg-pub text-abysse px-2 py-1 rounded font-black animate-pulse">HOT</span>
-                        </div>
-                        <div><h3 class="text-sm font-black text-white">Cortex GRID-MAP</h3><p class="text-[10px] text-gray-400 mt-1">Audit Capacité Réseau IRVE (Enedis).</p></div>
-                    </a>
-
                 </div>
             </section>
 
-            <section>
+            <!-- SECTION 3 : ADMINISTRATION (SUPER-ADMIN) -->
+            <section id="section-admin" class="module-section">
                 <div class="flex items-center gap-3 mb-6 border-t border-white/5 pt-8">
                     <i class="fa-solid fa-server text-xl text-ops"></i>
-                    <h2 class="text-lg font-bold text-white uppercase tracking-widest">Salle des Machines (Admin)</h2>
+                    <h2 class="text-lg font-bold text-white uppercase tracking-widest">Salle des Machines (Super-Admin)</h2>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-6" id="grid-admin">
                     
-                    <!-- L'AIGUILLAGE V9 (OPS vs CLIENT) -->
-                    <a href="/settings_ops" class="bento-card p-6 border-t-4 border-cyan hover:bg-white/5 transition module-card shadow-[0_0_20px_rgba(0,229,255,0.1)]" data-tags="settings crm admin tenant client locataire">
-                        <div class="flex items-center gap-3 mb-3"><i class="fa-solid fa-database text-cyan text-2xl"></i><span class="text-[10px] bg-cyan text-abysse px-2 py-1 rounded font-black">ADMIN OPS</span></div>
-                        <h3 class="text-sm font-bold text-white mb-1">CRM & Data Unity</h3>
-                        <p class="text-[10px] text-gray-400">Gérer les locataires, le parc global et les clés API.</p>
+                    <!-- LE VRAI CRM OPS (DATA UNITY) -->
+                    <a href="/settings_ops" class="bento-card p-6 border-t-4 border-cyan hover:bg-white/5 transition module-card shadow-[0_0_20px_rgba(0,229,255,0.1)]" data-tags="settings crm admin tenant client locataire data unity">
+                        <div class="flex items-center gap-3 mb-3">
+                            <i class="fa-solid fa-database text-cyan text-2xl"></i>
+                            <span class="text-[10px] bg-cyan text-abysse px-2 py-1 rounded font-black">SUPER ADMIN</span>
+                        </div>
+                        <h3 class="text-sm font-bold text-white mb-1">Data Unity (Global)</h3>
+                        <p class="text-[10px] text-gray-400">Gérer les locataires (Tenants), le parc global et les orphelins.</p>
                     </a>
 
-                    <a href="/settings" class="bento-card p-6 border-t-2 border-purple-500 hover:bg-white/5 transition module-card" data-tags="settings client apercu">
-                        <div class="flex items-center gap-3 mb-3"><i class="fa-solid fa-desktop text-purple-500 text-2xl"></i><span class="text-[10px] bg-purple-500/20 text-purple-400 px-2 py-1 rounded font-bold">CLIENT</span></div>
-                        <h3 class="text-sm font-bold text-white mb-1">Aperçu Espace Client</h3>
-                        <p class="text-[10px] text-gray-400">Voir la page de réglages telle que vos clients la voient.</p>
+                    <!-- NOUVEAU : LE WORKSPACE COMMERCIAL INTERNE -->
+                    <a href="/supplier" class="bento-card p-6 border-t-4 border-gold hover:bg-white/5 transition module-card shadow-[0_0_20px_rgba(245,158,11,0.1)]" data-tags="sales courtage crm interne commercial commission equipe">
+                        <div class="flex items-center gap-3 mb-3">
+                            <i class="fa-solid fa-headset text-gold text-2xl"></i>
+                            <span class="text-[10px] bg-gold text-abysse px-2 py-1 rounded font-black">ÉQUIPE SALES</span>
+                        </div>
+                        <h3 class="text-sm font-bold text-white mb-1">Sales Workspace (Courtage)</h3>
+                        <p class="text-[10px] text-gray-400">Accès au Dual-CRM pour vos courtiers internes et suivi des commissions.</p>
                     </a>
 
                     <a href="/ops/ingest" class="bento-card p-6 border-t-2 border-ops hover:bg-white/5 transition module-card" data-tags="ops ingest sge grdf zip importation data connect">
                         <i class="fa-solid fa-file-zipper text-ops text-3xl mb-4 block"></i>
                         <h3 class="text-sm font-bold text-white mb-1">Ingestion SGE</h3>
-                        <p class="text-[10px] text-gray-400">Upload de masse des courbes Enedis/GRDF.</p>
+                        <p class="text-[10px] text-gray-400">Upload de masse des courbes Enedis/GRDF et Data Connect.</p>
                     </a>
 
                     <a href="/ops/aggregator" class="bento-card p-6 border-t-2 border-ops hover:bg-white/5 transition module-card" data-tags="ops aggregator fusion sge virtuel macro">
                         <i class="fa-solid fa-object-group text-ops text-3xl mb-4 block"></i>
                         <h3 class="text-sm font-bold text-white mb-1">Aggregator</h3>
-                        <p class="text-[10px] text-gray-400">Générateur de courbes SGE virtuelles (Fusion).</p>
+                        <p class="text-[10px] text-gray-400">Générateur de courbes SGE virtuelles (Fusion de sites).</p>
                     </a>
 
                 </div>
             </section>
+
         </div>
     </main>
 
     <script>
+        // --- 1. MOTEUR DE RECHERCHE FRONT-END ---
         function filterCards() {
-            const term = document.getElementById('nexus-search').value.toLowerCase();
+            const term = document.getElementById('nexus-search').value.toLowerCase().trim();
             const cards = document.querySelectorAll('.module-card');
+            let visibleCount = 0;
+            
             cards.forEach(card => {
-                const tags = card.getAttribute('data-tags') || "";
+                const tags = (card.getAttribute('data-tags') || "").toLowerCase();
                 const text = card.innerText.toLowerCase();
-                card.style.display = (tags.includes(term) || text.includes(term)) ? "" : "none";
+                
+                if (tags.includes(term) || text.includes(term) || term === "") {
+                    card.style.display = ""; // Reset display
+                    visibleCount++;
+                } else {
+                    card.style.display = "none";
+                }
             });
+
+            // Affichage du message si aucun résultat
+            const noResMsg = document.getElementById('no-results-msg');
+            const sections = document.querySelectorAll('.module-section');
+            
+            if (visibleCount === 0) {
+                noResMsg.classList.remove('hidden');
+                sections.forEach(s => s.style.display = "none");
+            } else {
+                noResMsg.classList.add('hidden');
+                sections.forEach(s => s.style.display = "");
+            }
         }
 
+        // --- 2. DOUBLE COMPTEUR (ZÉRO MOCK) ---
         async function fetchSystemHealth() {
+            // A. Fetch des Tenants (Le CRM global)
             try {
-                const res = await fetch('/api/dashboard/fleet');
-                if(!res.ok) throw new Error('API Error');
-                const data = await res.json();
-                if(data && data.fleet) {
-                    const el = document.getElementById('kpi-count');
-                    const end = data.fleet.length;
-                    if(end === 0) { el.innerText = "0"; return; }
-                    let start = 0;
-                    const increment = end / (1000 / 16);
-                    const timer = setInterval(() => {
-                        start += increment;
-                        if(start >= end) { clearInterval(timer); el.innerText = end.toLocaleString(); } 
-                        else { el.innerText = Math.floor(start).toLocaleString(); }
-                    }, 16);
+                const resTenants = await fetch('/api/ops/tenants');
+                if (resTenants.ok) {
+                    const dataT = await resTenants.json();
+                    if(dataT.success && dataT.tenants) {
+                        animateValue('kpi-tenants', 0, dataT.tenants.length, 1000);
+                    } else {
+                        document.getElementById('kpi-tenants').innerText = "0";
+                    }
                 }
+            } catch(e) { document.getElementById('kpi-tenants').innerText = "ERR"; }
+
+            // B. Fetch du Parc PDL Global (Data Unity)
+            try {
+                const resFleet = await fetch('/api/dashboard/fleet');
+                if(!resFleet.ok) throw new Error('API Error');
+                const dataF = await resFleet.json();
+                
+                const count = dataF.count || (dataF.fleet ? dataF.fleet.length : 0);
+                animateValue('kpi-count', 0, count, 1000);
             } catch(e) {
+                console.error("Erreur KPI Fleet:", e);
                 document.getElementById('kpi-count').innerText = "ERR";
                 document.getElementById('kpi-count').classList.add('text-alert');
             }
         }
 
+        // --- 3. TICKER LIVE BOURSE ---
         async function fetchMarketTicker() {
             try {
                 const res = await fetch('/api/tools/sniper/market');
@@ -355,16 +362,37 @@
                     const gaz = data.current_prices.gaz ? parseFloat(data.current_prices.gaz).toFixed(2) : "--";
                     const trendHtml = data.status === 'BEAR' ? '<span class="text-cyan">↘ BAISSIER</span>' : '<span class="text-alert">↗ HAUSSIER</span>';
                     
-                    document.getElementById('market-ticker').innerHTML = 
-                        '<span class="mr-8">ELEC CAL N+1 : <span class="text-white font-bold">' + elec + ' €/MWh</span></span>' +
-                        '<span class="mr-8 text-orange-500">GAZ PEG N+1 : <span class="text-white font-bold">' + gaz + ' €/MWh</span></span>' +
-                        '<span class="mr-8">TENDANCE : ' + trendHtml + '</span>';
+                    const tickerContent = 
+                        `<span class="mr-12">ELEC CAL N+1 : <span class="text-white font-bold">${elec} €/MWh</span></span>` +
+                        `<span class="mr-12 text-orange-500">GAZ PEG N+1 : <span class="text-white font-bold">${gaz} €/MWh</span></span>` +
+                        `<span class="mr-12">TENDANCE : ${trendHtml}</span>`;
+                        
+                    // Duplication pour l'effet CSS Infini
+                    document.getElementById('market-ticker').innerHTML = tickerContent + tickerContent;
                 }
             } catch(e) {
-                document.getElementById('market-ticker').innerHTML = "<span class="text-gray-500">ERREUR CONNEXION BOURSE (RTE)</span>";
+                document.getElementById('market-ticker').innerHTML = "<span class="text-gray-500">ERREUR CONNEXION API BOURSE (Cortex Sniper)</span>";
             }
         }
 
+        // Utilitaire d'animation des chiffres
+        function animateValue(id, start, end, duration) {
+            if (start === end) { document.getElementById(id).innerText = end.toLocaleString(); return; }
+            let range = end - start;
+            let current = start;
+            let increment = end > start ? 1 : -1;
+            let stepTime = Math.abs(Math.floor(duration / range));
+            if(stepTime < 20) stepTime = 20; // limite de fluidité
+            
+            let obj = document.getElementById(id);
+            let timer = setInterval(function() {
+                current += increment;
+                obj.innerText = current.toLocaleString();
+                if (current == end) clearInterval(timer);
+            }, stepTime);
+        }
+
+        // BOOT
         document.addEventListener('DOMContentLoaded', () => {
             fetchSystemHealth();
             fetchMarketTicker();
