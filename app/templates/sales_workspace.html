@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V10.0 | Sales Workspace</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { 
+                        abysse: '#001529', card: '#0F172A', sidebar: '#020617', 
+                        cyan: '#00E5FF', success: '#10B981', alert: '#EF4444', 
+                        gold: '#F59E0B', saas: '#A855F7', broker: '#3B82F6'
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                    borderRadius: { 'bento': '1.5rem' }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
+        .nav-item.active { background: rgba(0, 229, 255, 0.15); border-left: 4px solid #00E5FF; color: white; }
+        
+        .view-section { display: none; } .view-section.active { display: block; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Drag & Drop Kanban Styles */
+        .kanban-col { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 1rem; display: flex; flex-direction: column; height: 100%; transition: background-color 0.2s; }
+        .kanban-col.drag-over { background: rgba(0, 229, 255, 0.1); border-color: #00E5FF; }
+        
+        .kanban-card { background: #0F172A; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.75rem; padding: 1rem; cursor: grab; transition: all 0.2s; }
+        .kanban-card:hover { border-color: #00E5FF; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,229,255,0.1); }
+        .kanban-card:active { cursor: grabbing; transform: scale(0.98); opacity: 0.8; }
+
+        .timeline-line { position: absolute; left: 1.25rem; top: 2rem; bottom: 0; width: 2px; background: rgba(255,255,255,0.1); z-index: 0; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    </style>
+</head>
+<body class="flex h-screen w-screen text-sm">
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
+        <div class="h-20 flex items-center px-6 border-b border-white/5 bg-abysse">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan to-blue-600 flex items-center justify-center text-abysse font-bold shadow-[0_0_15px_rgba(0,229,255,0.4)]">
+                <i class="fa-solid fa-headset text-xl"></i>
+            </div>
+            <div class="ml-3">
+                <div class="font-black text-white tracking-wider">SALES<span class="text-cyan">.CRM</span></div>
+                <div class="text-[9px] text-gray-500 font-mono mt-1">Interne ENERGISTRAT</div>
+            </div>
+        </div>
+        
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            <div class="text-[9px] text-gray-500 uppercase font-bold px-4 mb-2">Workspace</div>
+            <button onclick="switchView('pipeline')" id="nav-pipeline" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
+                <i class="fa-solid fa-bars-staggered w-4 text-center"></i> Kanban & Commissions
+            </button>
+            <button onclick="switchView('contacts')" id="nav-contacts" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
+                <i class="fa-solid fa-address-book w-4 text-center"></i> Fiche Client & Icebreaker
+            </button>
+            <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
+                <i class="fa-solid fa-chart-pie w-4 text-center"></i> Reporting DCO
+            </button>
+        </nav>
+        
+        <div class="p-6 border-t border-white/5 bg-black/20">
+            <a href="/ops_nexus" class="flex items-center gap-2 text-gray-400 hover:text-white transition text-xs font-bold bg-white/5 px-4 py-3 rounded-xl border border-white/10 hover:border-white/30">
+                <i class="fa-solid fa-arrow-left text-gray-500"></i> Quitter le CRM
+            </a>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+        
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-40 sticky top-0">
+            <div>
+                <h2 id="page-title" class="text-2xl font-black text-white tracking-tight">Gestion des Affaires (Kanban)</h2>
+                <p class="text-xs text-gray-400 mt-1">Générez par CORTEX. Déplacez les cartes pour mettre à jour la base.</p>
+            </div>
+            
+            <div class="flex items-center gap-6">
+                <!-- GAMIFICATION : La jauge de commission du commercial -->
+                <div class="bg-cyan/10 border border-cyan/30 px-6 py-2 rounded-xl text-right group hover:bg-cyan/20 transition cursor-pointer">
+                    <span class="text-[10px] text-cyan uppercase font-bold block"><i class="fa-solid fa-sack-dollar"></i> Ma Commission (Est.)</span>
+                    <span class="text-xl font-bold text-white font-mono" id="my-commission">0 €</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-8 pb-32">
+            
+            <!-- ========================================== -->
+            <!-- VUE 1 : PIPELINE KANBAN (DRAG & DROP) -->
+            <!-- ========================================== -->
+            <div id="view-pipeline" class="view-section active h-[calc(100vh-160px)]">
+                
+                <div class="flex gap-4 h-full overflow-x-auto pb-4" id="kanban-board">
+                    
+                    <!-- Colonnes générées en HTML mais remplies en JS -->
+                    <div class="kanban-col min-w-[300px] flex-1" ondrop="drop(event, 'LEAD')" ondragover="allowDrop(event)">
+                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-gray-300 text-xs uppercase tracking-widest">1. À Contacter</h4><span class="text-gray-500 text-xs font-mono" id="count-LEAD">0</span></div>
+                        <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-LEAD"></div>
+                    </div>
+
+                    <div class="kanban-col min-w-[300px] flex-1" ondrop="drop(event, 'RDV')" ondragover="allowDrop(event)">
+                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-blue-400 text-xs uppercase tracking-widest">2. RDV Fixé</h4><span class="text-gray-500 text-xs font-mono" id="count-RDV">0</span></div>
+                        <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-RDV"></div>
+                    </div>
+
+                    <div class="kanban-col min-w-[300px] flex-1" ondrop="drop(event, 'OFFRE')" ondragover="allowDrop(event)">
+                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-gold text-xs uppercase tracking-widest">3. Offre Envoyée</h4><span class="text-gray-500 text-xs font-mono" id="count-OFFRE">0</span></div>
+                        <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-OFFRE"></div>
+                    </div>
+
+                    <div class="kanban-col min-w-[300px] flex-1" ondrop="drop(event, 'NEGOCIATION')" ondragover="allowDrop(event)">
+                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-orange-500 text-xs uppercase tracking-widest">4. Négociation / SASP</h4><span class="text-gray-500 text-xs font-mono" id="count-NEGOCIATION">0</span></div>
+                        <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-NEGOCIATION"></div>
+                    </div>
+
+                    <div class="kanban-col min-w-[300px] flex-1 bg-success/5 border-success/20" ondrop="drop(event, 'WON')" ondragover="allowDrop(event)">
+                        <div class="p-3 border-b border-success/20 bg-success/10 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-success text-xs uppercase tracking-widest">5. Gagné (Closed Won)</h4><span class="text-success text-xs font-mono" id="count-WON">0</span></div>
+                        <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-WON"></div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VUE 2 : FICHE CONTACT & ICEBREAKERS -->
+            <!-- ========================================== -->
+            <div id="view-contacts" class="view-section">
+                <div class="grid grid-cols-12 gap-6 h-[800px]">
+                    
+                    <div class="col-span-3 bento-card p-0 flex flex-col overflow-hidden">
+                        <div class="p-4 border-b border-white/10 bg-white/5 font-bold text-sm">Répertoire Clients</div>
+                        <div class="flex-1 overflow-y-auto divide-y divide-white/5" id="contact-list">
+                            <!-- Injecté par JS -->
+                        </div>
+                    </div>
+
+                    <div class="col-span-6 bento-card p-6 flex flex-col relative overflow-hidden" id="contact-detail-panel">
+                        <div class="flex justify-center items-center h-full text-gray-500 flex-col">
+                            <i class="fa-solid fa-address-book text-6xl mb-4 opacity-30"></i>
+                            <p>Sélectionnez un client dans le Kanban ou le répertoire.</p>
+                        </div>
+                    </div>
+
+                    <div class="col-span-3 space-y-6" id="contact-intel-panel">
+                        <!-- MOTEUR D'INTELLIGENCE CORTEX -->
+                        <div class="bento-card p-6 bg-gradient-to-br from-card to-cyan/10 border-t-4 border-cyan">
+                            <h4 class="font-bold text-white text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-brain text-cyan"></i> Aide à la Vente (IA)</h4>
+                            <div id="intel-content">
+                                <div class="text-[10px] text-gray-400 italic">Veuillez sélectionner un compte pour afficher l'Icebreaker NAF.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VUE 3 : REPORTING DCO -->
+            <!-- ========================================== -->
+            <div id="view-dashboard" class="view-section space-y-6">
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="bento-card p-6 h-80 flex flex-col shadow-2xl">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">Pipeline Ponderé (€)</h3>
+                        <div class="flex-1 relative w-full"><canvas id="funnelChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- TOAST ENGINE -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[300] flex flex-col gap-2 pointer-events-none"></div>
+
+    <script>
+        const App = {
+            toast: function(msg, type='info') {
+                const container = document.getElementById('toast-container');
+                const colors = { success: 'bg-green-600 border-green-500', error: 'bg-alert border-red-500 text-white', info: 'bg-cyan border-cyan text-abysse' };
+                const el = document.createElement('div');
+                el.className = `${colors[type] || colors.info} px-6 py-3 rounded-xl shadow-2xl text-xs font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
+                el.innerHTML = `<span><i class="fa-solid fa-circle-info"></i></span> ${msg}`;
+                container.appendChild(el);
+                requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
+                setTimeout(() => { el.classList.add('opacity-0', 'translate-x-full'); setTimeout(() => el.remove(), 300); }, 3000);
+            }
+        };
+
+        let CRM_DATA = [];
+        let funnelChartInst = null;
+
+        // NAVIGATION
+        window.switchView = function(viewId) {
+            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
+            const btn = document.getElementById('nav-' + viewId);
+            if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById('view-' + viewId).classList.add('active');
+            
+            const titles = {'dashboard': 'Reporting Direction', 'pipeline': 'Gestion des Affaires (Kanban)', 'contacts': 'Fiche Client & Renseignement'};
+            document.getElementById('page-title').innerText = titles[viewId];
+            
+            if(viewId === 'dashboard') renderChart();
+        }
+
+        // --- MOTEUR CRM (FETCH API ZÉRO MOCK) ---
+        async function loadCRMPipeline() {
+            try {
+                // APPEL À LA ROUTE PYTHON QUE NOUS AVONS CODÉE DANS MAIN.PY
+                const res = await fetch('/api/crm/pipeline');
+                const data = await res.json();
+                
+                if(data.success && data.pipeline) {
+                    CRM_DATA = data.pipeline;
+                    renderKanban();
+                    renderContactList();
+                } else {
+                    App.toast("Erreur serveur ou données indisponibles.", "error");
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function renderKanban() {
+            const cols = { 'LEAD': [], 'RDV': [], 'OFFRE': [], 'NEGOCIATION': [], 'WON': [] };
+            let totalCommission = 0;
+
+            // Tri et distribution dans les colonnes
+            CRM_DATA.forEach(deal => {
+                const stage = deal.stage || 'LEAD';
+                if(cols[stage]) cols[stage].push(deal);
+                if(stage === 'WON') totalCommission += (deal.commission_est || 0);
+            });
+
+            document.getElementById('my-commission').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalCommission)) + " €";
+
+            // Rendu HTML
+            for(let stage in cols) {
+                const container = document.getElementById(`col-${stage}`);
+                container.innerHTML = '';
+                document.getElementById(`count-${stage}`).innerText = cols[stage].length;
+
+                cols[stage].forEach(deal => {
+                    let healthBadge = "";
+                    if (deal.health && deal.health.status !== "STABLE") {
+                        healthBadge = `<div class="mt-2 text-[9px] font-bold ${deal.health.color} bg-black/40 px-2 py-1 rounded"><i class="fa-solid fa-triangle-exclamation"></i> ${deal.health.status}</div>`;
+                    }
+
+                    container.innerHTML += `
+                        <div class="kanban-card" draggable="true" ondragstart="drag(event, '${deal.id}')" onclick="openContactDetail('${deal.id}')">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-[9px] font-bold bg-white/10 px-2 py-0.5 rounded text-gray-300 border border-white/20">NAF: ${deal.naf}</span>
+                                <i class="fa-solid fa-grip-lines text-gray-600"></i>
+                            </div>
+                            <h5 class="font-bold text-white text-sm mb-1 truncate">${deal.name}</h5>
+                            <div class="text-[10px] text-gray-400 mb-2">Vol: ${deal.volume} MWh</div>
+                            ${healthBadge}
+                            <div class="flex justify-between items-center text-xs border-t border-white/10 pt-2 mt-3">
+                                <span class="font-mono text-cyan font-bold" title="Commission Estimée">+ ${Math.round(deal.commission_est)} €</span>
+                                <i class="fa-regular fa-comment-dots text-gray-500"></i>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // --- GESTION DU DRAG & DROP (SAUVEGARDE EN BASE) ---
+        let draggedDealId = null;
+
+        window.drag = function(ev, dealId) {
+            draggedDealId = dealId;
+            ev.dataTransfer.setData("text", dealId);
+        }
+
+        window.allowDrop = function(ev) {
+            ev.preventDefault();
+            const col = ev.target.closest('.kanban-col');
+            if(col) col.classList.add('drag-over');
+        }
+
+        window.drop = async function(ev, targetStage) {
+            ev.preventDefault();
+            document.querySelectorAll('.kanban-col').forEach(c => c.classList.remove('drag-over'));
+            
+            if(draggedDealId) {
+                const deal = CRM_DATA.find(d => d.id === draggedDealId);
+                if(deal && deal.stage !== targetStage) {
+                    deal.stage = targetStage;
+                    renderKanban(); // Update visuel instantané
+                    
+                    if(targetStage === 'WON') App.toast("🎉 Deal Signé ! Commission ajoutée.", "success");
+
+                    // Sauvegarde dans Firebase via le backend Python
+                    try {
+                        await fetch('/api/crm/deal/move', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ deal_id: draggedDealId, new_stage: targetStage })
+                        });
+                    } catch(e) { App.toast("Erreur synchronisation Backend.", "error"); }
+                }
+            }
+        }
+
+        // Retire le surlignage quand on quitte la zone
+        document.addEventListener('dragover', (e) => {
+            document.querySelectorAll('.kanban-col').forEach(c => {
+                if(!c.contains(e.target)) c.classList.remove('drag-over');
+            });
+        });
+
+        // --- FICHE CONTACT & MOTEUR INTELLIGENCE ---
+        function renderContactList() {
+            const list = document.getElementById('contact-list');
+            list.innerHTML = '';
+            CRM_DATA.forEach(d => {
+                list.innerHTML += `<div class="p-4 hover:bg-white/5 cursor-pointer transition border-l-4 border-transparent hover:border-cyan" onclick="openContactDetail('${d.id}')"><div class="font-bold text-white text-sm truncate">${d.name}</div><div class="text-[10px] text-gray-400 uppercase mt-1">Étape: ${d.stage}</div></div>`;
+            });
+        }
+
+        window.openContactDetail = function(id) {
+            const deal = CRM_DATA.find(d => d.id === id);
+            if(!deal) return;
+            switchView('contacts');
+
+            // Header Contact
+            const detailHtml = `
+                <div class="flex justify-between items-start mb-6 pb-6 border-b border-white/10">
+                    <div class="flex gap-4 items-center">
+                        <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-cyan to-blue-600 flex items-center justify-center text-abysse font-black text-2xl">${deal.name.charAt(0).toUpperCase()}</div>
+                        <div>
+                            <h3 class="text-2xl font-black text-white">${deal.name}</h3>
+                            <p class="text-sm text-gray-400"><i class="fa-solid fa-bolt mr-1"></i> Volume Actif : <b class="text-white">${deal.volume} MWh</b></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- BOITE D'ACTIONS RAPIDES -->
+                <div class="flex gap-2 mb-8 bg-black/40 p-2 rounded-xl border border-white/5">
+                    <button class="flex-1 bg-white/5 hover:bg-cyan hover:text-black text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2"><i class="fa-solid fa-phone"></i> Appeler</button>
+                    <button class="flex-1 bg-white/5 hover:bg-cyan hover:text-black text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2"><i class="fa-regular fa-envelope"></i> Email (Séquence)</button>
+                    <button class="flex-1 bg-white/5 hover:bg-cyan hover:text-black text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2"><i class="fa-solid fa-file-pdf"></i> Générer Audit Fantôme</button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto relative pl-12 pr-4 space-y-6">
+                    <div class="timeline-line"></div>
+                    <div class="relative">
+                        <div class="absolute -left-12 w-8 h-8 rounded-full bg-gray-800 border-4 border-card flex items-center justify-center text-gray-400 text-xs z-10"><i class="fa-solid fa-robot"></i></div>
+                        <div class="bg-white/5 border border-white/10 rounded-xl p-4">
+                            <div class="flex justify-between text-[10px] text-gray-500 mb-2"><span>Alerte IA CORTEX</span><span>Dernier Scan: ${deal.last_contact}</span></div>
+                            <p class="text-sm font-bold ${deal.health.color}">${deal.health.message}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('contact-detail-panel').innerHTML = detailHtml;
+
+            // Panneau Intelligence Economique (Icebreaker)
+            const intelPanel = document.getElementById('intel-content');
+            if(deal.intelligence) {
+                intelPanel.innerHTML = `
+                    <div class="mb-4">
+                        <span class="text-[10px] text-gray-500 uppercase font-bold">Douleurs Identifiées (Code ${deal.naf})</span>
+                        <p class="text-xs text-alert font-bold mt-1 bg-alert/10 p-2 rounded">${deal.intelligence.pain_points}</p>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-gray-500 uppercase font-bold">Votre Argumentaire Téléphonique (Pitch)</span>
+                        <div class="bg-black/50 p-4 rounded-xl border border-white/5 text-sm text-gray-300 italic leading-relaxed mt-1 border-l-2 border-l-cyan">
+                            "${deal.intelligence.pitch}"
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderChart() {
+            const ctx2 = document.getElementById('funnelChart');
+            if(!ctx2) return;
+            if(funnelChartInst) funnelChartInst.destroy();
+            
+            // Calculer les volumes réels par étape
+            const stageVols = [0, 0, 0, 0]; // Lead/RDV, Offre, Nego, Won
+            CRM_DATA.forEach(d => {
+                if(d.stage === 'LEAD' || d.stage === 'RDV') stageVols[0] += d.volume;
+                else if(d.stage === 'OFFRE') stageVols[1] += d.volume;
+                else if(d.stage === 'NEGOCIATION') stageVols[2] += d.volume;
+                else if(d.stage === 'WON') stageVols[3] += d.volume;
+            });
+
+            funnelChartInst = new Chart(ctx2.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Prospection', 'Offre Emise', 'Négociation', 'Signé'],
+                    datasets: [{ data: stageVols, backgroundColor: ['#64748B', '#F59E0B', '#EF4444', '#10B981'], borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins:{legend:{position:'right', labels:{color:'white'}}} }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            switchView('pipeline');
+            loadCRMPipeline();
+        });
+    </script>
+</body>
+</html>
