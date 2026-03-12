@@ -1,219 +1,87 @@
-import os
-import math
-import io
-import traceback
-import urllib.request
-import urllib.parse
-import base64
-import uuid
-import asyncio
-from typing import List, Optional, Dict, Any
+import json
+import logging
 from datetime import datetime, timedelta
+from typing import Dict, Any, List
 
-from fastapi import FastAPI, Request, UploadFile, File, Form, Header, HTTPException, Response, Depends, status, BackgroundTasks
-from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("CORTEX_CRM_V10")
 
-try:
-    import pandas as pd
-    PANDAS_READY = True
-except ImportError:
-    PANDAS_READY = False
-
-# ==============================================================================
-# LE MOTEUR PDF DE SECOURS (ANTI-CRASH)
-# ==============================================================================
-class FallbackPDFBuilder:
+class CortexCRM:
+    """
+    CORTEX CRM V10.0 (SALES WORKSPACE ENGINE)
+    Moteur d'intelligence commerciale : Analyse NAF, Health Score et Commissions.
+    """
+    
     def __init__(self):
-        self.logo_svg = """<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="30" rx="8" y="5" fill="#00E5FF"/><path d="M10 15L20 15L15 25Z" fill="#001529"/><text x="40" y="27" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#001529">ENERGISTRAT</text></svg>"""
-    def generate_bilan_ag(self, client_id, data, fin, kpis):
-        return "<h1>Générateur PDF de Secours</h1>"
-    def generate_bilan_ag_cluster(self, cluster_name, site_count, vol_total, budget_total, vol_elec, vol_gaz, ghost_total):
-        return "<h1>Générateur PDF Grappe</h1>"
+        # Base de connaissances sectorielles pour l'approche commerciale (Icebreakers)
+        self.NAF_INTELLIGENCE = {
+            "10.71": { # Boulangeries
+                "pain_points": "Talon nocturne (Froid/Pétrin), Hausse prix matières premières.",
+                "pitch": "M. le Gérant, les boulangeries de votre région subissent la hausse de l'énergie. Votre chambre de pousse tourne la nuit. Si je vous montre comment récupérer 3000€ sur ce talon nocturne sans changer vos machines, avez-vous 5 minutes ?"
+            },
+            "47.11": { # Supermarchés
+                "pain_points": "Froid commercial continu, Éclairage, Loi ELAN (Décret Tertiaire).",
+                "pitch": "M. le Directeur, le décret tertiaire vous oblige à baisser vos consos. Au lieu de faire de gros travaux, notre IA détecte les fuites de votre froid commercial à distance et édite votre rapport OPERAT automatiquement."
+            },
+            "86.10": { # Hôpitaux
+                "pain_points": "Budget EPRD tendu, Qualité de l'air, Obligation de service continu.",
+                "pitch": "M. le DAF, votre hôpital a une charge de base incompressible. Notre IA peut transformer ce talon en subventions CEE (Fonds Chaleur) et sécuriser votre budget MCO face à la volatilité du marché."
+            },
+            "84.11": { # Mairies (Générique Public)
+                "pain_points": "Marchés Publics complexes, Passoires thermiques (Écoles), M57.",
+                "pitch": "M. le Maire, l'énergie pèse lourd dans la M57. Notre plateforme génère votre DQE d'appel d'offres en 1 clic, trouve les subventions de vos écoles, et bloque les erreurs de facturation sur Chorus Pro."
+            },
+            "DEFAULT": {
+                "pain_points": "Manque de visibilité budgétaire, fin de contrat opaque, Taxes.",
+                "pitch": "Bonjour, les entreprises de votre taille paient souvent des taxes (CSPE) qu'elles pourraient récupérer. En tant que Tiers de Confiance, nous auditons votre facture en 3 secondes pour sécuriser votre prochain renouvellement."
+            }
+        }
 
-# ==============================================================================
-# BLOC IMPORT CORTEX ROBUSTE (ZÉRO CRASH)
-# ==============================================================================
-try:
-    from app.core.cortex_ingest import ingest
-    from app.core.cortex_engine import cortex
-    from app.core.cortex_physics import physics
-    from app.core.cortex_forecast import forecast
-    from app.core.cortex_router import router
-    from app.core.cortex_market import market
-    from app.core.cortex_aggregator import aggregator
-    from app.core.cortex_finance import finance
-    from app.core.cortex_auth import auth
-    from app.core.cortex_db import db
-    from app.core.cortex_rte import rte
-    from app.core.cortex_crm import crm_engine  # NOUVEAU : MOTEUR CRM
-    try:
-        from app.core.cortex_pdf import pdf_builder
-    except ImportError:
-        pdf_builder = FallbackPDFBuilder()
+    def generate_icebreaker(self, naf_code: str) -> dict:
+        """Fournit les munitions commerciales selon le code NAF du prospect."""
+        naf_base = str(naf_code)[:5] if naf_code else "DEFAULT"
+        intel = self.NAF_INTELLIGENCE.get(naf_base, self.NAF_INTELLIGENCE["DEFAULT"])
+        return {
+            "naf": naf_code,
+            "pain_points": intel["pain_points"],
+            "pitch": intel["pitch"]
+        }
 
-except Exception as e_prod:
-    print(f"⚠️ PROD IMPORT ERROR: {str(e_prod)}")
-    try:
-        import cortex_ingest as ingest
-        import cortex_engine as cortex
-        import cortex_physics as physics
-        import cortex_forecast as forecast
-        from core.cortex_router import router
-        from core.cortex_market import market
-        from core.cortex_aggregator import aggregator
-        from core.cortex_finance import finance
-        from core.cortex_auth import auth
-        from core.cortex_db import db
-        from core.cortex_rte import rte
-        from core.cortex_crm import crm_engine  # NOUVEAU : MOTEUR CRM
-        try:
-            from core.cortex_pdf import pdf_builder
-        except ImportError:
-            pdf_builder = FallbackPDFBuilder()
-    except Exception as e_local:
-        print(f"⚠️ LOCAL IMPORT ERROR: {str(e_local)}")
-        class MockAuth:
-            def verify_token(self, t): return {"uid": "mock", "email": "admin@energistrat.com", "role": "ADMIN", "sub": "admin"}
-        auth = MockAuth()
-        class MockDB:
-            def get_all_sites(self): return[]
-            def get_site(self, sid): return {}
-            def save_site(self, sid, d): return True
-            def delete_site(self, sid): return True
-            def get_setting(self, n): return {}
-            def save_setting(self, n, d): return True
-            def get_sentinel_alerts(self): return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
-            def save_sentinel_alerts(self, d): return True
-            def get_all_users(self): return []
-            def get_user_profile(self, u): return {}
-            def save_user_profile(self, u, d): return True
-        db = MockDB()
-        class MockFinance:
-            def parse_invoice(self, c, f): return {"status": "ERROR"}
-            def audit_invoice(self, i, s): return {}
-            def simulate_landing(self, s): return {}
-        finance = MockFinance()
-        class MockRouter:
-            def get_api_status(self): return {"status": "DEGRADED"}
-            def analyze_file_stream(self, c, f): return {"status": "ERROR"}
-        router = MockRouter()
-        class MockMarket:
-            def valoriser_strategie(self, l, b): return {"error": "Market missing"}
-        market = MockMarket()
-        class MockAggregator:
-            def aggregate_sites(self, s, y): return None
-        aggregator = MockAggregator()
-        class MockCortex:
-            def enrich_site_financials(self, data): return {"volume_mwh": 0, "budget_annual": 0, "meta": {"is_gas": False}, "kpis": {"pmc_eur_mwh": 0, "ghost_savings": 0}}
-            def analyze_portfolio(self, sites): return {"global": {}, "green_league": {}}
-            def generate_dqe_structure(self, s): return pd.DataFrame() if PANDAS_READY else None
-        cortex = MockCortex()
-        class MockRTE:
-            def get_wholesale_market(self): return {"success": False, "error": "RTE Module Offline"}
-            def get_pulse_dashboard_data(self): return {"success": False, "error": "RTE Module Offline"}
-        rte = MockRTE()
-        class MockForecast:
-            def simulate_5_years(self, s): return {"labels": ["N", "N+1", "N+2", "N+3", "N+4"], "dataset_trend": [100, 105, 110, 115, 120], "dataset_sobriety": [100, 90, 80, 70, 60], "gain_potential_mwh": 150}
-        forecast = MockForecast()
-        class MockCRM:
-            def generate_icebreaker(self, naf): return {"naf": naf, "pain_points": "Mode Démo", "pitch": "Argumentaire indisponible."}
-            def analyze_company_health(self, cv, pv, lc): return {"status": "STABLE", "color": "text-success", "message": "Mode Démo", "churn_risk": False}
-            def calculate_commission(self, v, is_s, m): return round(v * 1.0, 2)
-        crm_engine = MockCRM()
-        ingest = None
-        physics = None
-        pdf_builder = FallbackPDFBuilder()
+    def analyze_company_health(self, current_vol: float, previous_vol: float, login_count_30d: int) -> dict:
+        """Croise la donnée SGE et l'usage SaaS pour sortir un Health Score (Risque de Churn / Faillite)."""
+        health_status = "STABLE"
+        health_color = "text-success"
+        health_msg = "Activité SGE et connexion normales."
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V10.0-MASTER")
+        # 1. Alerte Économique (Chute SGE)
+        if previous_vol > 0:
+            drop_pct = ((previous_vol - current_vol) / previous_vol) * 100
+            if drop_pct > 30:
+                health_status = "RISQUE ÉCONOMIQUE"
+                health_color = "text-alert"
+                health_msg = f"Chute brutale de la conso SGE (-{int(drop_pct)}%). Risque de faillite, chômage partiel ou perte de marché."
+            elif drop_pct < -20:
+                health_status = "CROISSANCE"
+                health_color = "text-cyan"
+                health_msg = f"Hausse de conso (+{abs(int(drop_pct))}%). Nouvelles machines ? Vendez de l'optimisation TURPE."
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+        # 2. Alerte Logiciel (Risque de Churn)
+        churn_risk = False
+        if login_count_30d == 0:
+            churn_risk = True
+            if health_status == "STABLE":
+                health_status = "DÉTACHEMENT LOGICIEL"
+                health_color = "text-gold"
+                health_msg = "Le client ne s'est pas connecté au SaaS depuis 30 jours. Risque de non-renouvellement élevé. Appelez-le."
 
-BASE_DIR = os.getcwd()
-DATA_DIR = os.path.join(BASE_DIR, "data")
-if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
-TEMPLATE_DIR = os.path.join(BASE_DIR, "app/templates")
-if not os.path.exists(TEMPLATE_DIR): TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
-templates = Jinja2Templates(directory=TEMPLATE_DIR)
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
-if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+        return {
+            "status": health_status,
+            "color": health_color,
+            "message": health_msg,
+            "churn_risk": churn_risk
+        }
 
-# --- MODELES PYDANTIC ROBUSTES ---
-class SessionRequest(BaseModel): id_token: str
-class MarketUpdateModel(BaseModel): elec: Dict[str, Any]; gaz: Dict[str, Any]; trve: Optional[Dict[str, Any]] = None; targets: Optional[Dict[str, Any]] = None
-class StrategyRequest(BaseModel): site_id: str; bloc_kw: float
-class AggregationRequest(BaseModel): site_ids: List[str]; years: int = 3
-class PropagateRequest(BaseModel): source_client_id: str; target_date: str; filters: Dict[str, str]; pricing_data: Dict[str, Any]
-class AdoptionRequest(BaseModel): target_tenant_id: str; site_ids: List[str]
-class TenantCreateRequest(BaseModel): siret: str; name: str
-class M57SettingsModel(BaseModel): bp_elec: float = 0.0; bp_gaz: float = 0.0; consumed_elec: float = 0.0; consumed_gaz: float = 0.0; bp_irve: float = 0.0; consumed_irve: float = 0.0; bp_enr: float = 0.0; consumed_enr: float = 0.0
-class CarbonSettingsModel(BaseModel): baseline_year: int = 2010; baseline_kwh_sqm: float = 0.0
-class VoteRequestModel(BaseModel): site_id: str; vote: bool
-class LegalSignModel(BaseModel): site_id: str; consent: bool
-class SolarRequest(BaseModel): address: str; surface_roof: float; electricity_price: float
-class DealMoveModel(BaseModel): deal_id: str; new_stage: str # NOUVEAU : Pour le Kanban CRM
-
-def json_compliant(data):
-    if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
-    elif isinstance(data, list): return [json_compliant(v) for v in data]
-    elif isinstance(data, float):
-        if math.isnan(data) or math.isinf(data): return 0.0
-    return data
-
-def get_safe_id(raw_id): return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
-
-def get_market_ref():
-    m = db.get_setting("Market")
-    return m if m else { "updated_at": datetime.now().isoformat(), "elec": { "cal_n1": 85.0 }, "gaz": { "peg_n1": 35.0 }, "trve": { "elec_c5": 230.0 }, "targets": { "c5": 190.0 } }
-
-async def get_current_user(request: Request):
-    t = request.cookies.get("access_token")
-    if not t: return None
-    if t.startswith("Bearer "): t = t.split(" ")[1]
-    return auth.verify_token(t)
-
-# ==========================================
-# AUTHENTIFICATION & ROUTAGE INTELLIGENT
-# ==========================================
-@app.get("/login", response_class=HTMLResponse)
-async def view_login(request: Request, user = Depends(get_current_user)):
-    if user: 
-        if user.get("role") == "ADMIN": return RedirectResponse(url="/ops_nexus")
-        return RedirectResponse(url=f"/{user.get('role', 'settings')}")
-    res = templates.TemplateResponse("login.html", {"request": request})
-    res.delete_cookie("access_token")
-    return res
-
-@app.post("/api/auth/session")
-async def api_session(payload: SessionRequest, response: Response):
-    u = auth.verify_token(payload.id_token)
-    if not u: return JSONResponse({"detail": "Token invalide"}, status_code=401)
-    
-    response.set_cookie(key="access_token", value=f"Bearer {payload.id_token}", httponly=True, max_age=3600*24, samesite="lax", secure=True if "https" in str(response.headers) else False)
-    
-    role = u.get("role", "USER")
-    if role != "ADMIN":
-        profile = db.get_user_profile(u.get("uid"))
-        if profile and profile.get("role"):
-            role = profile.get("role")
-            
-    return {"success": True, "role": role}
-
-@app.get("/logout")
-async def logout(response: Response):
-    response.delete_cookie("access_token")
-    return RedirectResponse(url="/login")
-
+crm_engine = CortexCRM()
 # ==========================================
 # API CORTEX SENTINEL & RTE
 # ==========================================
@@ -290,68 +158,12 @@ async def api_create_tenant(payload: TenantCreateRequest, user = Depends(get_cur
         db.save_user_profile(f"TENANT_{tenant_id}", data)
         return JSONResponse({"success": True, "tenant": data})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
-    # ==========================================
-# API SALES WORKSPACE (CRM INTERNE ZÉRO MOCK)
-# ==========================================
-@app.get("/api/crm/pipeline")
-async def api_get_crm_pipeline(user = Depends(get_current_user)):
-    """
-    Génère le Kanban commercial en lisant la Data Unity et en croisant les données.
-    """
-    if not user or user.get("role") != "ADMIN":
-        return JSONResponse({"error": "Accès réservé aux courtiers internes"}, 401)
-        
-    deals = []
-    
-    for tenant in db.get_all_users():
-        if tenant.get('role') == 'ADMIN': continue
-        
-        vol_total = 0
-        tenant_id = tenant.get('tenant_id')
-        for s in db.get_all_sites():
-            if s.get("identity", {}).get("tenant_id") == tenant_id:
-                vol_total += float(s.get('kpis', {}).get('volume_mwh', 0))
-                
-        naf = tenant.get('naf', 'DEFAULT')
-        intel = crm_engine.generate_icebreaker(naf)
-        health = crm_engine.analyze_company_health(vol_total, vol_total * 1.1, 2)
-        comms = crm_engine.calculate_commission(vol_total, is_saas=True, saas_mrr=150)
-
-        deal = {
-            "id": tenant_id,
-            "name": tenant.get('name', 'Prospect Inconnu'),
-            "naf": naf,
-            "volume": round(vol_total),
-            "stage": tenant.get('crm_stage', 'LEAD'), 
-            "intelligence": intel,
-            "health": health,
-            "commission_est": comms,
-            "last_contact": tenant.get('last_contact', 'Jamais')
-        }
-        deals.append(deal)
-        
-    return JSONResponse({"success": True, "pipeline": deals})
-
-@app.post("/api/crm/deal/move")
-async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_user)):
-    """Met à jour l'étape du client dans le Kanban (Drag & Drop)."""
-    if not user or user.get("role") != "ADMIN":
-        return JSONResponse({"error": "Accès refusé"}, 401)
-        
-    tenant_data = db.get_user_profile(payload.deal_id)
-    if tenant_data:
-        tenant_data['crm_stage'] = payload.new_stage
-        db.save_user_profile(payload.deal_id, tenant_data)
-        return JSONResponse({"success": True})
-        
-    return JSONResponse({"error": "Client introuvable"}, 404)
 
 # ==========================================
 # API MÉTIERS : M57, FORECAST, VOTES & LOM
 # ==========================================
 @app.get("/api/settings/m57")
 async def api_get_m57(user = Depends(get_current_user)):
-    """API pour l'exécution budgétaire Mairie & SDE"""
     tenant_id = db.get_user_profile(user.get("uid")).get("tenant_id", "DEFAULT") if user else "DEFAULT"
     data = db.get_setting(f"M57_{tenant_id}")
     return JSONResponse(data if data else {"bp_elec": 0, "bp_gaz": 0, "consumed_elec": 0, "consumed_gaz": 0})
@@ -364,7 +176,6 @@ async def api_save_m57(payload: M57SettingsModel, user = Depends(get_current_use
 
 @app.get("/api/settings/carbon")
 async def api_get_carbon(user = Depends(get_current_user)):
-    """API Paramétrage RSE / Décret Tertiaire"""
     tenant_id = db.get_user_profile(user.get("uid")).get("tenant_id", "DEFAULT") if user else "DEFAULT"
     data = db.get_setting(f"CARBON_{tenant_id}")
     return JSONResponse(data if data else {"baseline_year": 2010, "baseline_kwh_sqm": 0.0})
@@ -377,14 +188,11 @@ async def api_save_carbon(payload: CarbonSettingsModel, user = Depends(get_curre
 
 @app.get("/api/forecast/simulate/{client_id}")
 async def api_forecast_simulate(client_id: str, user = Depends(get_current_user)):
-    """API Smart Twin : Projection sur 5 ans pour Décret Tertiaire"""
     site_data = db.get_site(client_id)
     if not site_data: return JSONResponse({"error": "Site introuvable"}, status_code=404)
-    
     if forecast:
         try: return JSONResponse(json_compliant(forecast.simulate_5_years(site_data)))
         except: pass
-        
     vol = float(site_data.get('kpis', {}).get('volume_mwh', 100))
     if vol == 0: vol = 100
     return JSONResponse({
@@ -396,15 +204,24 @@ async def api_forecast_simulate(client_id: str, user = Depends(get_current_user)
 
 @app.post("/api/vote")
 async def api_register_vote(payload: VoteRequestModel, user = Depends(get_current_user)):
-    """API Pont B2B2C : Vote AG Citoyen -> Syndic"""
     db.save_setting(f"VOTE_{payload.site_id}_{uuid.uuid4().hex[:6]}", {"vote": payload.vote, "timestamp": datetime.now().isoformat()})
-    return JSONResponse({"success": True, "message": "Vote blockchain enregistré."})
+    return JSONResponse({"success": True})
 
 @app.post("/api/legal/sign")
 async def api_legal_sign(payload: LegalSignModel, user = Depends(get_current_user)):
-    """API Loi LOM : Signature décharge pass mobilité"""
     db.save_setting(f"LOM_{payload.site_id}_{uuid.uuid4().hex[:6]}", {"consent": payload.consent, "timestamp": datetime.now().isoformat()})
-    return JSONResponse({"success": True, "message": "Signature LOM enregistrée."})
+    return JSONResponse({"success": True})
+
+@app.post("/api/physics/solar")
+async def api_physics_solar(payload: SolarRequest, user = Depends(get_current_user)):
+    if not physics: return JSONResponse({"success": False, "error": "Moteur Physique hors ligne"})
+    try:
+        lat, lon = physics.get_coordinates_from_address(payload.address)
+        result = physics.simulate_solar_roi(lat, lon, payload.surface_roof, payload.electricity_price)
+        if "error" in result: return JSONResponse({"success": False, "error": result["error"]})
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
 
 # ==========================================
 # API SUBVENTIONS & CERFA
@@ -462,8 +279,7 @@ async def generate_cerfa_pdf(site_id: str, aide_code: str, user = Depends(get_cu
         
         return HTMLResponse(content=f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>CERFA_{fiche}_{str(c.get('pdl') or c.get('pce') or 'N/A')}</title><style>@page {{ size: A4; margin: 15mm; }} body {{ font-family: Helvetica, Arial, sans-serif; font-size: 12px; }} h2 {{ background: #e0e0e0; padding: 5px; border: 1px solid black; }} .form-row {{ display: flex; border: 1px solid black; border-top: none; }} .form-label {{ width: 40%; padding: 8px; border-right: 1px solid black; font-weight: bold; background: #f9f9f9; }} .form-value {{ width: 60%; padding: 8px; font-family: monospace; }}</style></head><body onload="setTimeout(function(){{ window.print(); }}, 500);"><div style="display:flex; justify-content:space-between; border-bottom:2px solid black; padding-bottom:10px; margin-bottom:20px;"><div style="border:1px solid black; padding:10px; text-align:center; font-weight:bold; font-size:10px;">Liberté<br>Égalité<br>Fraternité<br><br>RÉPUBLIQUE FRANÇAISE</div><div style="text-align:center; flex:1;"><h1>ATTESTATION SUR L'HONNEUR</h1><p>Opérations d'économies d'énergie (CEE)</p></div><div style="border:1px solid black; padding:10px; text-align:center; font-weight:bold;">CERFA<br>N° 15404*01</div></div><h2>A - BÉNÉFICIAIRE</h2><div class="form-row" style="border-top:1px solid black;"><div class="form-label">Raison Sociale</div><div class="form-value">{str(i.get('site_name') or i.get('name') or 'N/A').upper()}</div></div><div class="form-row"><div class="form-label">N° SIRET</div><div class="form-value">{str(i.get('siret') or 'N/A')}</div></div><h2>B - LIEU DES TRAVAUX</h2><div class="form-row" style="border-top:1px solid black;"><div class="form-label">Adresse</div><div class="form-value">{str(l.get('address') or 'N/A')} - {str(l.get('city') or 'N/A').upper()}</div></div><div class="form-row"><div class="form-label">PDL / PCE</div><div class="form-value">{str(c.get('pdl') or c.get('pce') or 'N/A')}</div></div><div class="form-row"><div class="form-label">Surface</div><div class="form-value">{str(l.get('surface') or 'N/A')} m²</div></div><h2>C - OPÉRATION</h2><div class="form-row" style="border-top:1px solid black;"><div class="form-label">Fiche CEE</div><div class="form-value">{fiche}</div></div><div class="form-row"><div class="form-label">Nature</div><div class="form-value">{titre}</div></div><div style="margin-top:30px; border:1px solid black; padding:15px;"><b>Je soussigné(e) atteste sur l'honneur l'exactitude des informations. ENERGISTRAT est mandaté.</b></div><div style="margin-top:20px; display:flex; justify-content:space-between;"><div style="border:1px dashed gray; width:45%; height:100px; padding:10px;">Fait à: {str(l.get('city') or 'N/A').upper()}<br>Le: {datetime.now().strftime('%d/%m/%Y')}<br><b>Signature:</b></div><div style="border:1px dashed gray; width:45%; height:100px; padding:10px;"><b>Cachet:</b></div></div></body></html>""")
     except Exception as e: return HTMLResponse(f"<h1>Erreur Serveur</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>", status_code=500)
-
-@app.get("/api/tools/bilan_ag/{client_id}", response_class=HTMLResponse)
+        @app.get("/api/tools/bilan_ag/{client_id}", response_class=HTMLResponse)
 async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)):
     try:
         if not user: return HTMLResponse("Non autorisé", status_code=401)
@@ -669,6 +485,7 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
         vol_router = float(s.get('kpis', {}).get('volume_mwh', 0))
         final_vol = vol_engine if vol_engine > 0 else vol_router
 
+        # LE BOUCLIER FINANCIER (ANTI-MILLIONS)
         final_budget = fin.get('budget_annual', 0)
         if final_budget == 0 and final_vol > 0:
             avg_price = float(s.get('pricing', {}).get('price_kwh') or s.get('pricing', {}).get('prix_kwh') or s.get('pricing', {}).get('hph') or 0.20)
@@ -847,7 +664,6 @@ async def api_finance_landing(site_id: str, user = Depends(get_current_user)):
 async def api_physics_solar(payload: SolarRequest, user = Depends(get_current_user)):
     """Route Zéro Mock : Interroge l'API PVGIS de l'Union Européenne"""
     if not physics: return JSONResponse({"success": False, "error": "Moteur Physique hors ligne"})
-    
     try:
         lat, lon = physics.get_coordinates_from_address(payload.address)
         result = physics.simulate_solar_roi(lat, lon, payload.surface_roof, payload.electricity_price)
@@ -859,14 +675,13 @@ async def api_physics_solar(payload: SolarRequest, user = Depends(get_current_us
 # ==========================================
 # VUES HTML & ROUTAGE (ANTI-404 V10)
 # ==========================================
-
 # Liste des vues métier autorisées (Sales Workspace Inclus)
 VALID_VIEWS = [
     "settings", "settings_pme", "settings_light", "settings_partner", "settings_ops",
     "ops_nexus", "ops_ingest", "ops_aggregator", "ops_market",
     "pme", "industry", "retail", "mairie", "sde", "oph", "syndic", "sante", "supplier", "citoyen",
     "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance", "dashboard_finance",
-    "sales_workspace" # <- L'AJOUT QUI RÈGLE TOUT
+    "sales_workspace"
 ]
 
 PUBLIC_PAGES = [
@@ -902,4 +717,4 @@ async def catch_all_deep(request: Request, full_path: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)    
+    uvicorn.run(app, host="0.0.0.0", port=8080)
