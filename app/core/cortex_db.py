@@ -59,7 +59,7 @@ class CortexDB:
         if not self.db: return list()
         try:
             docs = self.db.collection("Users").stream()
-            return [doc.to_dict() for doc in docs]
+            return[doc.to_dict() for doc in docs]
         except Exception as e:
             print(f"⚠️ Erreur get_all_users : {e}")
             return list()
@@ -96,6 +96,25 @@ class CortexDB:
             self.db.collection("Settings").document(doc_name).set(data, merge=True)
             return True
         except Exception: return False
+
+    # ==========================================
+    # GESTION DES LEADS CRM (SALES WORKSPACE)
+    # ==========================================
+    def get_all_leads(self) -> list:
+        """Extrait l'ensemble des prospects CRM (Préfixe LEAD_) de la collection Settings"""
+        if not self.db: return list()
+        try:
+            docs = self.db.collection("Settings").stream()
+            leads =[]
+            for doc in docs:
+                if str(doc.id).startswith("LEAD_"):
+                    data = doc.to_dict()
+                    data["id"] = str(doc.id)
+                    leads.append(data)
+            return leads
+        except Exception as e:
+            print(f"⚠️ Erreur get_all_leads : {e}")
+            return list()
 
     # ==========================================
     # GESTION DE CORTEX SENTINEL (ALERTES)
