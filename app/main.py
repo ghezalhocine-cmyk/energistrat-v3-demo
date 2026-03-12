@@ -49,6 +49,7 @@ try:
     from app.core.cortex_auth import auth
     from app.core.cortex_db import db
     from app.core.cortex_rte import rte
+    from app.core.cortex_crm import crm_engine  # NOUVEAU : MOTEUR CRM
     try:
         from app.core.cortex_pdf import pdf_builder
     except ImportError:
@@ -68,6 +69,7 @@ except Exception as e_prod:
         from core.cortex_auth import auth
         from core.cortex_db import db
         from core.cortex_rte import rte
+        from core.cortex_crm import crm_engine  # NOUVEAU : MOTEUR CRM
         try:
             from core.cortex_pdf import pdf_builder
         except ImportError:
@@ -117,6 +119,11 @@ except Exception as e_prod:
         class MockForecast:
             def simulate_5_years(self, s): return {"labels": ["N", "N+1", "N+2", "N+3", "N+4"], "dataset_trend": [100, 105, 110, 115, 120], "dataset_sobriety": [100, 90, 80, 70, 60], "gain_potential_mwh": 150}
         forecast = MockForecast()
+        class MockCRM:
+            def generate_icebreaker(self, naf): return {"naf": naf, "pain_points": "Mode Démo", "pitch": "Argumentaire indisponible."}
+            def analyze_company_health(self, cv, pv, lc): return {"status": "STABLE", "color": "text-success", "message": "Mode Démo", "churn_risk": False}
+            def calculate_commission(self, v, is_s, m): return round(v * 1.0, 2)
+        crm_engine = MockCRM()
         ingest = None
         physics = None
         pdf_builder = FallbackPDFBuilder()
@@ -154,6 +161,7 @@ class CarbonSettingsModel(BaseModel): baseline_year: int = 2010; baseline_kwh_sq
 class VoteRequestModel(BaseModel): site_id: str; vote: bool
 class LegalSignModel(BaseModel): site_id: str; consent: bool
 class SolarRequest(BaseModel): address: str; surface_roof: float; electricity_price: float
+class DealMoveModel(BaseModel): deal_id: str; new_stage: str # NOUVEAU : Pour le Kanban CRM
 
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
@@ -215,7 +223,6 @@ async def api_get_sentinel_alerts():
 
 @app.post("/api/ops/sentinel/run")
 async def api_run_sentinel_scan(user = Depends(get_current_user)):
-    # La tâche tournerait ici en BackgroundTasks
     return JSONResponse({"success": True, "message": "Scan SGE déclenché avec succès."})
 
 @app.get("/api/tools/sniper/market")
@@ -283,7 +290,63 @@ async def api_create_tenant(payload: TenantCreateRequest, user = Depends(get_cur
         db.save_user_profile(f"TENANT_{tenant_id}", data)
         return JSONResponse({"success": True, "tenant": data})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
-        # ==========================================
+    # ==========================================
+# API SALES WORKSPACE (CRM INTERNE ZÉRO MOCK)
+# ==========================================
+@app.get("/api/crm/pipeline")
+async def api_get_crm_pipeline(user = Depends(get_current_user)):
+    """
+    Génère le Kanban commercial en lisant la Data Unity et en croisant les données.
+    """
+    if not user or user.get("role") != "ADMIN":
+        return JSONResponse({"error": "Accès réservé aux courtiers internes"}, 401)
+        
+    deals = []
+    
+    for tenant in db.get_all_users():
+        if tenant.get('role') == 'ADMIN': continue
+        
+        vol_total = 0
+        tenant_id = tenant.get('tenant_id')
+        for s in db.get_all_sites():
+            if s.get("identity", {}).get("tenant_id") == tenant_id:
+                vol_total += float(s.get('kpis', {}).get('volume_mwh', 0))
+                
+        naf = tenant.get('naf', 'DEFAULT')
+        intel = crm_engine.generate_icebreaker(naf)
+        health = crm_engine.analyze_company_health(vol_total, vol_total * 1.1, 2)
+        comms = crm_engine.calculate_commission(vol_total, is_saas=True, saas_mrr=150)
+
+        deal = {
+            "id": tenant_id,
+            "name": tenant.get('name', 'Prospect Inconnu'),
+            "naf": naf,
+            "volume": round(vol_total),
+            "stage": tenant.get('crm_stage', 'LEAD'), 
+            "intelligence": intel,
+            "health": health,
+            "commission_est": comms,
+            "last_contact": tenant.get('last_contact', 'Jamais')
+        }
+        deals.append(deal)
+        
+    return JSONResponse({"success": True, "pipeline": deals})
+
+@app.post("/api/crm/deal/move")
+async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_user)):
+    """Met à jour l'étape du client dans le Kanban (Drag & Drop)."""
+    if not user or user.get("role") != "ADMIN":
+        return JSONResponse({"error": "Accès refusé"}, 401)
+        
+    tenant_data = db.get_user_profile(payload.deal_id)
+    if tenant_data:
+        tenant_data['crm_stage'] = payload.new_stage
+        db.save_user_profile(payload.deal_id, tenant_data)
+        return JSONResponse({"success": True})
+        
+    return JSONResponse({"error": "Client introuvable"}, 404)
+
+# ==========================================
 # API MÉTIERS : M57, FORECAST, VOTES & LOM
 # ==========================================
 @app.get("/api/settings/m57")
@@ -322,7 +385,6 @@ async def api_forecast_simulate(client_id: str, user = Depends(get_current_user)
         try: return JSONResponse(json_compliant(forecast.simulate_5_years(site_data)))
         except: pass
         
-    # Fallback Mathématique Zéro Mock si module absent
     vol = float(site_data.get('kpis', {}).get('volume_mwh', 100))
     if vol == 0: vol = 100
     return JSONResponse({
@@ -335,7 +397,6 @@ async def api_forecast_simulate(client_id: str, user = Depends(get_current_user)
 @app.post("/api/vote")
 async def api_register_vote(payload: VoteRequestModel, user = Depends(get_current_user)):
     """API Pont B2B2C : Vote AG Citoyen -> Syndic"""
-    # Enregistrement du vote dans le Ledger (Firestore)
     db.save_setting(f"VOTE_{payload.site_id}_{uuid.uuid4().hex[:6]}", {"vote": payload.vote, "timestamp": datetime.now().isoformat()})
     return JSONResponse({"success": True, "message": "Vote blockchain enregistré."})
 
@@ -608,7 +669,6 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
         vol_router = float(s.get('kpis', {}).get('volume_mwh', 0))
         final_vol = vol_engine if vol_engine > 0 else vol_router
 
-        # LE BOUCLIER FINANCIER (ANTI-MILLIONS)
         final_budget = fin.get('budget_annual', 0)
         if final_budget == 0 and final_vol > 0:
             avg_price = float(s.get('pricing', {}).get('price_kwh') or s.get('pricing', {}).get('prix_kwh') or s.get('pricing', {}).get('hph') or 0.20)
@@ -636,7 +696,8 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
             "power": contract.get('power', 0), 
             "pdl": contract.get('pdl') or contract.get('pce', '-'), 
             "surface": s.get('location', {}).get('surface', 0),
-            "tenant_id": s.get('identity', {}).get('tenant_id', 'Orphelin')
+            "tenant_id": s.get('identity', {}).get('tenant_id', 'Orphelin'),
+            "naf": s.get('identity', {}).get('naf', 'DEFAULT')
         })
         
     return JSONResponse(json_compliant({"fleet": fleet_list, "count": len(fleet_list), "green_league": analysis.get('green_league'), "global_kpis": analysis.get('global'), "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments": ["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots": ["Lot 1", "Lot 2"] }}))
@@ -799,12 +860,13 @@ async def api_physics_solar(payload: SolarRequest, user = Depends(get_current_us
 # VUES HTML & ROUTAGE (ANTI-404 V10)
 # ==========================================
 
-# Liste des vues métier autorisées
+# Liste des vues métier autorisées (Sales Workspace Inclus)
 VALID_VIEWS = [
     "settings", "settings_pme", "settings_light", "settings_partner", "settings_ops",
     "ops_nexus", "ops_ingest", "ops_aggregator", "ops_market",
     "pme", "industry", "retail", "mairie", "sde", "oph", "syndic", "sante", "supplier", "citoyen",
-    "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance", "dashboard_finance"
+    "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance", "dashboard_finance",
+    "sales_workspace" # <- L'AJOUT QUI RÈGLE TOUT
 ]
 
 PUBLIC_PAGES = [
@@ -840,4 +902,4 @@ async def catch_all_deep(request: Request, full_path: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8080)    
