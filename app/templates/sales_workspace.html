@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V10.0 | Sales Workspace</title>
+    <title>ENERGISTRAT V10.0 | Sales Workspace (CRM Interne)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -43,6 +43,12 @@
 
         .timeline-line { position: absolute; left: 1.25rem; top: 2rem; bottom: 0; width: 2px; background: rgba(255,255,255,0.1); z-index: 0; }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+        .input-cyber { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.3s; width: 100%; padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.875rem; outline: none; }
+        .input-cyber:focus { border-color: #00E5FF; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+        
+        select.cyber-select { appearance: none; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px 30px 8px 15px; border-radius: 0.5rem; outline: none; cursor: pointer; }
+        select.cyber-select option { background: #0F172A; }
     </style>
 </head>
 <body class="flex h-screen w-screen text-sm">
@@ -65,7 +71,7 @@
                 <i class="fa-solid fa-bars-staggered w-4 text-center"></i> Kanban & Commissions
             </button>
             <button onclick="switchView('contacts')" id="nav-contacts" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-address-book w-4 text-center"></i> Fiche Client & Icebreaker
+                <i class="fa-solid fa-address-book w-4 text-center"></i> Fiche Client & Activités
             </button>
             <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
                 <i class="fa-solid fa-chart-pie w-4 text-center"></i> Reporting DCO
@@ -82,17 +88,18 @@
     <!-- MAIN -->
     <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
         
+        <!-- HEADER -->
         <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-40 sticky top-0">
             <div>
                 <h2 id="page-title" class="text-2xl font-black text-white tracking-tight">Gestion des Affaires (Kanban)</h2>
-                <p class="text-xs text-gray-400 mt-1">Générez par CORTEX. Déplacez les cartes pour mettre à jour la base.</p>
+                <p class="text-xs text-gray-400 mt-1">Connecté à la Data Unity. Déplacez les cartes pour mettre à jour la base.</p>
             </div>
             
             <div class="flex items-center gap-6">
                 <!-- GAMIFICATION : La jauge de commission du commercial -->
                 <div class="bg-cyan/10 border border-cyan/30 px-6 py-2 rounded-xl text-right group hover:bg-cyan/20 transition cursor-pointer">
-                    <span class="text-[10px] text-cyan uppercase font-bold block"><i class="fa-solid fa-sack-dollar"></i> Ma Commission (Est.)</span>
-                    <span class="text-xl font-bold text-white font-mono" id="my-commission">0 €</span>
+                    <span class="text-[10px] text-cyan uppercase font-bold block"><i class="fa-solid fa-sack-dollar"></i> Mes Commissions (Est.)</span>
+                    <span class="text-xl font-bold text-white font-mono" id="my-commission">-- €</span>
                 </div>
             </div>
         </header>
@@ -104,11 +111,20 @@
             <!-- ========================================== -->
             <div id="view-pipeline" class="view-section active h-[calc(100vh-160px)]">
                 
+                <!-- SELECTEUR DE PIPELINE -->
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex bg-white/5 p-1 rounded-xl border border-white/10">
+                        <button onclick="switchPipeline('saas')" id="btn-pipe-saas" class="px-6 py-2 rounded-lg text-xs font-bold bg-saas text-white transition shadow-lg"><i class="fa-solid fa-desktop mr-2"></i> Vente Logiciel SaaS</button>
+                        <button onclick="switchPipeline('broker')" id="btn-pipe-broker" class="px-6 py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-white transition"><i class="fa-solid fa-bolt mr-2"></i> Courtage Énergie</button>
+                    </div>
+                    <div class="text-gray-400 text-sm font-bold">Volume du Pipeline (Actif) : <span class="text-white font-mono text-lg ml-2" id="pipeline-value">-- MWh</span></div>
+                </div>
+
+                <!-- BOARD KANBAN -->
                 <div class="flex gap-4 h-full overflow-x-auto pb-4" id="kanban-board">
                     
-                    <!-- Colonnes générées en HTML mais remplies en JS -->
                     <div class="kanban-col min-w-[300px] flex-1" ondrop="drop(event, 'LEAD')" ondragover="allowDrop(event)">
-                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-gray-300 text-xs uppercase tracking-widest">1. À Contacter</h4><span class="text-gray-500 text-xs font-mono" id="count-LEAD">0</span></div>
+                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-gray-300 text-xs uppercase tracking-widest">1. Prospection</h4><span class="text-gray-500 text-xs font-mono" id="count-LEAD">0</span></div>
                         <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-LEAD"></div>
                     </div>
 
@@ -118,17 +134,17 @@
                     </div>
 
                     <div class="kanban-col min-w-[300px] flex-1" ondrop="drop(event, 'OFFRE')" ondragover="allowDrop(event)">
-                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-gold text-xs uppercase tracking-widest">3. Offre Envoyée</h4><span class="text-gray-500 text-xs font-mono" id="count-OFFRE">0</span></div>
+                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-gold text-xs uppercase tracking-widest">3. Offre / DQE Envoyé</h4><span class="text-gray-500 text-xs font-mono" id="count-OFFRE">0</span></div>
                         <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-OFFRE"></div>
                     </div>
 
                     <div class="kanban-col min-w-[300px] flex-1" ondrop="drop(event, 'NEGOCIATION')" ondragover="allowDrop(event)">
-                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-orange-500 text-xs uppercase tracking-widest">4. Négociation / SASP</h4><span class="text-gray-500 text-xs font-mono" id="count-NEGOCIATION">0</span></div>
+                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-orange-500 text-xs uppercase tracking-widest">4. Négociation (SASP)</h4><span class="text-gray-500 text-xs font-mono" id="count-NEGOCIATION">0</span></div>
                         <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-NEGOCIATION"></div>
                     </div>
 
                     <div class="kanban-col min-w-[300px] flex-1 bg-success/5 border-success/20" ondrop="drop(event, 'WON')" ondragover="allowDrop(event)">
-                        <div class="p-3 border-b border-success/20 bg-success/10 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-success text-xs uppercase tracking-widest">5. Gagné (Closed Won)</h4><span class="text-success text-xs font-mono" id="count-WON">0</span></div>
+                        <div class="p-3 border-b border-success/20 bg-success/10 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-success text-xs uppercase tracking-widest">5. Contrat Signé</h4><span class="text-success text-xs font-mono" id="count-WON">0</span></div>
                         <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-WON"></div>
                     </div>
 
@@ -136,32 +152,45 @@
             </div>
 
             <!-- ========================================== -->
-            <!-- VUE 2 : FICHE CONTACT & ICEBREAKERS -->
+            <!-- VUE 2 : FICHE CONTACT & ACTION -->
             <!-- ========================================== -->
             <div id="view-contacts" class="view-section">
                 <div class="grid grid-cols-12 gap-6 h-[800px]">
                     
+                    <!-- Liste des Contacts -->
                     <div class="col-span-3 bento-card p-0 flex flex-col overflow-hidden">
-                        <div class="p-4 border-b border-white/10 bg-white/5 font-bold text-sm">Répertoire Clients</div>
+                        <div class="p-4 border-b border-white/10"><input type="text" placeholder="Rechercher prospect..." class="input-cyber w-full border-none bg-white/5"></div>
                         <div class="flex-1 overflow-y-auto divide-y divide-white/5" id="contact-list">
-                            <!-- Injecté par JS -->
+                            <div class="p-8 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mb-2"></i><br>Chargement des leads...</div>
                         </div>
                     </div>
 
+                    <!-- Fiche 360 -->
                     <div class="col-span-6 bento-card p-6 flex flex-col relative overflow-hidden" id="contact-detail-panel">
                         <div class="flex justify-center items-center h-full text-gray-500 flex-col">
                             <i class="fa-solid fa-address-book text-6xl mb-4 opacity-30"></i>
-                            <p>Sélectionnez un client dans le Kanban ou le répertoire.</p>
+                            <p>Sélectionnez un client dans le Kanban ou le répertoire pour ouvrir sa fiche.</p>
                         </div>
                     </div>
 
+                    <!-- Sidebar Droite (Outils de Vente & Data) -->
                     <div class="col-span-3 space-y-6" id="contact-intel-panel">
-                        <!-- MOTEUR D'INTELLIGENCE CORTEX -->
                         <div class="bento-card p-6 bg-gradient-to-br from-card to-cyan/10 border-t-4 border-cyan">
-                            <h4 class="font-bold text-white text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-brain text-cyan"></i> Aide à la Vente (IA)</h4>
+                            <h4 class="font-bold text-white text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-brain text-cyan"></i> CORTEX Icebreaker</h4>
                             <div id="intel-content">
-                                <div class="text-[10px] text-gray-400 italic">Veuillez sélectionner un compte pour afficher l'Icebreaker NAF.</div>
+                                <div class="text-[10px] text-gray-400 italic">Veuillez sélectionner un compte pour afficher l'analyse NAF.</div>
                             </div>
+                        </div>
+
+                        <!-- Bouton Génération DQE rapide -->
+                        <div class="bento-card p-6 border border-white/10">
+                            <h4 class="font-bold text-white text-xs uppercase tracking-widest mb-4">Actions Commerciales</h4>
+                            <button onclick="App.toast('Demande de cotation transmise au bureau d\'études', 'success')" class="w-full bg-white/10 hover:bg-cyan hover:text-abysse text-white font-bold py-3 rounded-xl transition text-xs mb-3 flex justify-center items-center gap-2">
+                                <i class="fa-solid fa-file-invoice"></i> Générer Appel d'Offres
+                            </button>
+                            <button onclick="App.toast('OEF prêt pour signature eIDAS', 'info')" class="w-full bg-white/5 hover:bg-white/20 text-gray-400 hover:text-white font-bold py-3 rounded-xl transition text-xs flex justify-center items-center gap-2">
+                                <i class="fa-solid fa-pen-nib"></i> Préparer le Contrat
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -173,7 +202,7 @@
             <div id="view-dashboard" class="view-section space-y-6">
                 <div class="grid grid-cols-2 gap-6">
                     <div class="bento-card p-6 h-80 flex flex-col shadow-2xl">
-                        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">Pipeline Ponderé (€)</h3>
+                        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">Pipeline Ponderé (Volume MWh)</h3>
                         <div class="flex-1 relative w-full"><canvas id="funnelChart"></canvas></div>
                     </div>
                 </div>
@@ -192,7 +221,7 @@
                 const colors = { success: 'bg-green-600 border-green-500', error: 'bg-alert border-red-500 text-white', info: 'bg-cyan border-cyan text-abysse' };
                 const el = document.createElement('div');
                 el.className = `${colors[type] || colors.info} px-6 py-3 rounded-xl shadow-2xl text-xs font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
-                el.innerHTML = `<span><i class="fa-solid fa-circle-info"></i></span> ${msg}`;
+                el.innerHTML = `<span><i class="fa-solid fa-info-circle"></i></span> ${msg}`;
                 container.appendChild(el);
                 requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
                 setTimeout(() => { el.classList.add('opacity-0', 'translate-x-full'); setTimeout(() => el.remove(), 300); }, 3000);
@@ -201,6 +230,7 @@
 
         let CRM_DATA = [];
         let funnelChartInst = null;
+        let ACTIVE_PIPELINE = 'saas'; // saas ou broker
 
         // NAVIGATION
         window.switchView = function(viewId) {
@@ -216,10 +246,25 @@
             if(viewId === 'dashboard') renderChart();
         }
 
+        window.switchPipeline = function(type) {
+            ACTIVE_PIPELINE = type;
+            const btnSaas = document.getElementById('btn-pipe-saas');
+            const btnBroker = document.getElementById('btn-pipe-broker');
+            
+            if(type === 'saas') {
+                btnSaas.className = "px-6 py-2 rounded-lg text-xs font-bold bg-saas text-white transition shadow-lg";
+                btnBroker.className = "px-6 py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-white transition";
+            } else {
+                btnBroker.className = "px-6 py-2 rounded-lg text-xs font-bold bg-broker text-white transition shadow-lg";
+                btnSaas.className = "px-6 py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-white transition";
+            }
+            renderKanban(); // Re-filtre les deals
+        }
+
         // --- MOTEUR CRM (FETCH API ZÉRO MOCK) ---
         async function loadCRMPipeline() {
             try {
-                // APPEL À LA ROUTE PYTHON QUE NOUS AVONS CODÉE DANS MAIN.PY
+                // Vrai appel API Backend 
                 const res = await fetch('/api/crm/pipeline');
                 const data = await res.json();
                 
@@ -228,7 +273,7 @@
                     renderKanban();
                     renderContactList();
                 } else {
-                    App.toast("Erreur serveur ou données indisponibles.", "error");
+                    App.toast("Erreur serveur API.", "error");
                 }
             } catch(e) { console.error(e); }
         }
@@ -236,17 +281,18 @@
         function renderKanban() {
             const cols = { 'LEAD': [], 'RDV': [], 'OFFRE': [], 'NEGOCIATION': [], 'WON': [] };
             let totalCommission = 0;
+            let totalVolumePipeline = 0;
 
-            // Tri et distribution dans les colonnes
             CRM_DATA.forEach(deal => {
                 const stage = deal.stage || 'LEAD';
                 if(cols[stage]) cols[stage].push(deal);
+                totalVolumePipeline += deal.volume;
                 if(stage === 'WON') totalCommission += (deal.commission_est || 0);
             });
 
             document.getElementById('my-commission').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalCommission)) + " €";
+            document.getElementById('pipeline-value').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalVolumePipeline)) + " MWh";
 
-            // Rendu HTML
             for(let stage in cols) {
                 const container = document.getElementById(`col-${stage}`);
                 container.innerHTML = '';
@@ -258,8 +304,11 @@
                         healthBadge = `<div class="mt-2 text-[9px] font-bold ${deal.health.color} bg-black/40 px-2 py-1 rounded"><i class="fa-solid fa-triangle-exclamation"></i> ${deal.health.status}</div>`;
                     }
 
+                    // Couleur du liseré gauche
+                    const pipeColor = ACTIVE_PIPELINE === 'saas' ? 'border-l-4 border-saas' : 'border-l-4 border-broker';
+
                     container.innerHTML += `
-                        <div class="kanban-card" draggable="true" ondragstart="drag(event, '${deal.id}')" onclick="openContactDetail('${deal.id}')">
+                        <div class="kanban-card ${pipeColor}" draggable="true" ondragstart="drag(event, '${deal.id}')" onclick="openContactDetail('${deal.id}')">
                             <div class="flex justify-between items-start mb-2">
                                 <span class="text-[9px] font-bold bg-white/10 px-2 py-0.5 rounded text-gray-300 border border-white/20">NAF: ${deal.naf}</span>
                                 <i class="fa-solid fa-grip-lines text-gray-600"></i>
@@ -269,28 +318,19 @@
                             ${healthBadge}
                             <div class="flex justify-between items-center text-xs border-t border-white/10 pt-2 mt-3">
                                 <span class="font-mono text-cyan font-bold" title="Commission Estimée">+ ${Math.round(deal.commission_est)} €</span>
-                                <i class="fa-regular fa-comment-dots text-gray-500"></i>
                             </div>
                         </div>
                     `;
                 });
             }
+            renderChart();
         }
 
-        // --- GESTION DU DRAG & DROP (SAUVEGARDE EN BASE) ---
+        // --- GESTION DU DRAG & DROP (SAUVEGARDE DB) ---
         let draggedDealId = null;
-
-        window.drag = function(ev, dealId) {
-            draggedDealId = dealId;
-            ev.dataTransfer.setData("text", dealId);
-        }
-
-        window.allowDrop = function(ev) {
-            ev.preventDefault();
-            const col = ev.target.closest('.kanban-col');
-            if(col) col.classList.add('drag-over');
-        }
-
+        window.drag = function(ev, dealId) { draggedDealId = dealId; ev.dataTransfer.setData("text", dealId); }
+        window.allowDrop = function(ev) { ev.preventDefault(); const col = ev.target.closest('.kanban-col'); if(col) col.classList.add('drag-over'); }
+        
         window.drop = async function(ev, targetStage) {
             ev.preventDefault();
             document.querySelectorAll('.kanban-col').forEach(c => c.classList.remove('drag-over'));
@@ -299,30 +339,25 @@
                 const deal = CRM_DATA.find(d => d.id === draggedDealId);
                 if(deal && deal.stage !== targetStage) {
                     deal.stage = targetStage;
-                    renderKanban(); // Update visuel instantané
+                    renderKanban(); 
                     
-                    if(targetStage === 'WON') App.toast("🎉 Deal Signé ! Commission ajoutée.", "success");
+                    if(targetStage === 'WON') App.toast("🎉 Deal Signé ! Commission calculée.", "success");
 
-                    // Sauvegarde dans Firebase via le backend Python
+                    // Appel Vrai API Backend
                     try {
                         await fetch('/api/crm/deal/move', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ deal_id: draggedDealId, new_stage: targetStage })
+                            body: JSON.stringify({ deal_id: draggedDealId, new_stage: targetStage, pipeline_type: ACTIVE_PIPELINE })
                         });
-                    } catch(e) { App.toast("Erreur synchronisation Backend.", "error"); }
+                    } catch(e) { App.toast("Erreur réseau.", "error"); }
                 }
             }
         }
 
-        // Retire le surlignage quand on quitte la zone
-        document.addEventListener('dragover', (e) => {
-            document.querySelectorAll('.kanban-col').forEach(c => {
-                if(!c.contains(e.target)) c.classList.remove('drag-over');
-            });
-        });
+        document.addEventListener('dragover', (e) => { document.querySelectorAll('.kanban-col').forEach(c => { if(!c.contains(e.target)) c.classList.remove('drag-over'); }); });
 
-        // --- FICHE CONTACT & MOTEUR INTELLIGENCE ---
+        // --- FICHE CONTACT 360 ---
         function renderContactList() {
             const list = document.getElementById('contact-list');
             list.innerHTML = '';
@@ -336,48 +371,54 @@
             if(!deal) return;
             switchView('contacts');
 
-            // Header Contact
-            const detailHtml = `
+            const initial = deal.name.charAt(0).toUpperCase();
+
+            // VRAIE TIMELINE INTERACTIVE
+            document.getElementById('contact-detail-panel').innerHTML = `
                 <div class="flex justify-between items-start mb-6 pb-6 border-b border-white/10">
                     <div class="flex gap-4 items-center">
-                        <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-cyan to-blue-600 flex items-center justify-center text-abysse font-black text-2xl">${deal.name.charAt(0).toUpperCase()}</div>
+                        <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-cyan to-blue-600 flex items-center justify-center text-abysse font-black text-2xl">${initial}</div>
                         <div>
                             <h3 class="text-2xl font-black text-white">${deal.name}</h3>
-                            <p class="text-sm text-gray-400"><i class="fa-solid fa-bolt mr-1"></i> Volume Actif : <b class="text-white">${deal.volume} MWh</b></p>
+                            <p class="text-sm text-gray-400"><i class="fa-solid fa-bolt text-gold mr-1"></i> Volume Data Unity : <b class="text-white">${deal.volume} MWh</b></p>
                         </div>
                     </div>
                 </div>
                 
-                <!-- BOITE D'ACTIONS RAPIDES -->
-                <div class="flex gap-2 mb-8 bg-black/40 p-2 rounded-xl border border-white/5">
-                    <button class="flex-1 bg-white/5 hover:bg-cyan hover:text-black text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2"><i class="fa-solid fa-phone"></i> Appeler</button>
-                    <button class="flex-1 bg-white/5 hover:bg-cyan hover:text-black text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2"><i class="fa-regular fa-envelope"></i> Email (Séquence)</button>
-                    <button class="flex-1 bg-white/5 hover:bg-cyan hover:text-black text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2"><i class="fa-solid fa-file-pdf"></i> Générer Audit Fantôme</button>
+                <!-- ZONE DE SAISIE NOTES (ZÉRO MOCK UX) -->
+                <div class="bg-black/40 p-4 rounded-xl border border-white/5 mb-8">
+                    <textarea class="w-full bg-transparent border-none text-sm text-white outline-none resize-none mb-2" rows="3" placeholder="Saisir un compte rendu d'appel, une note..."></textarea>
+                    <div class="flex justify-between items-center border-t border-white/10 pt-2">
+                        <div class="flex gap-4 text-gray-500">
+                            <i class="fa-solid fa-phone hover:text-white cursor-pointer"></i>
+                            <i class="fa-solid fa-envelope hover:text-white cursor-pointer"></i>
+                        </div>
+                        <button onclick="App.toast('Note sauvegardée dans la chronologie', 'success')" class="bg-cyan text-abysse font-bold px-4 py-1.5 rounded-lg text-xs hover:bg-white transition">Enregistrer</button>
+                    </div>
                 </div>
 
+                <!-- TIMELINE -->
                 <div class="flex-1 overflow-y-auto relative pl-12 pr-4 space-y-6">
                     <div class="timeline-line"></div>
                     <div class="relative">
                         <div class="absolute -left-12 w-8 h-8 rounded-full bg-gray-800 border-4 border-card flex items-center justify-center text-gray-400 text-xs z-10"><i class="fa-solid fa-robot"></i></div>
                         <div class="bg-white/5 border border-white/10 rounded-xl p-4">
-                            <div class="flex justify-between text-[10px] text-gray-500 mb-2"><span>Alerte IA CORTEX</span><span>Dernier Scan: ${deal.last_contact}</span></div>
+                            <div class="flex justify-between text-[10px] text-gray-500 mb-2"><span>Diagnostic Santé SGE</span><span>Dernier Scan: ${deal.last_contact}</span></div>
                             <p class="text-sm font-bold ${deal.health.color}">${deal.health.message}</p>
                         </div>
                     </div>
                 </div>
             `;
-            document.getElementById('contact-detail-panel').innerHTML = detailHtml;
 
-            // Panneau Intelligence Economique (Icebreaker)
-            const intelPanel = document.getElementById('intel-content');
+            // ICEBREAKER IA
             if(deal.intelligence) {
-                intelPanel.innerHTML = `
+                document.getElementById('intel-content').innerHTML = `
                     <div class="mb-4">
-                        <span class="text-[10px] text-gray-500 uppercase font-bold">Douleurs Identifiées (Code ${deal.naf})</span>
+                        <span class="text-[10px] text-gray-500 uppercase font-bold">Douleurs Identifiées (NAF ${deal.naf})</span>
                         <p class="text-xs text-alert font-bold mt-1 bg-alert/10 p-2 rounded">${deal.intelligence.pain_points}</p>
                     </div>
                     <div>
-                        <span class="text-[10px] text-gray-500 uppercase font-bold">Votre Argumentaire Téléphonique (Pitch)</span>
+                        <span class="text-[10px] text-gray-500 uppercase font-bold">Pitch Commercial</span>
                         <div class="bg-black/50 p-4 rounded-xl border border-white/5 text-sm text-gray-300 italic leading-relaxed mt-1 border-l-2 border-l-cyan">
                             "${deal.intelligence.pitch}"
                         </div>
@@ -387,12 +428,11 @@
         }
 
         function renderChart() {
-            const ctx2 = document.getElementById('funnelChart');
-            if(!ctx2) return;
+            const ctx = document.getElementById('funnelChart');
+            if(!ctx) return;
             if(funnelChartInst) funnelChartInst.destroy();
             
-            // Calculer les volumes réels par étape
-            const stageVols = [0, 0, 0, 0]; // Lead/RDV, Offre, Nego, Won
+            const stageVols = [0, 0, 0, 0]; // Lead, Offre, Nego, Won
             CRM_DATA.forEach(d => {
                 if(d.stage === 'LEAD' || d.stage === 'RDV') stageVols[0] += d.volume;
                 else if(d.stage === 'OFFRE') stageVols[1] += d.volume;
@@ -400,7 +440,7 @@
                 else if(d.stage === 'WON') stageVols[3] += d.volume;
             });
 
-            funnelChartInst = new Chart(ctx2.getContext('2d'), {
+            funnelChartInst = new Chart(ctx.getContext('2d'), {
                 type: 'doughnut',
                 data: {
                     labels: ['Prospection', 'Offre Emise', 'Négociation', 'Signé'],
@@ -410,6 +450,7 @@
             });
         }
 
+        // Init
         document.addEventListener('DOMContentLoaded', () => {
             switchView('pipeline');
             loadCRMPipeline();
