@@ -35,112 +35,134 @@ class FallbackPDFBuilder:
         return "<h1>Générateur PDF Grappe</h1>"
 
 # ==============================================================================
-# BLOC IMPORT CORTEX ROBUSTE (ZÉRO CRASH CLOUD RUN)
+# FALLBACK MOCKS (SÉCURITÉ CLOUD RUN)
 # ==============================================================================
-try:
-    from app.core.cortex_ingest import ingest
-    from app.core.cortex_engine import cortex
-    from app.core.cortex_physics import physics
-    from app.core.cortex_forecast import forecast
-    from app.core.cortex_router import router
-    from app.core.cortex_market import market
-    from app.core.cortex_aggregator import aggregator
-    from app.core.cortex_finance import finance
-    from app.core.cortex_auth import auth
-    from app.core.cortex_db import db
-    from app.core.cortex_rte import rte
-    from app.core.cortex_crm import crm_engine
-    try:
-        from app.core.cortex_pdf import pdf_builder
-    except ImportError:
-        pdf_builder = FallbackPDFBuilder()
+class MockAuth:
+    def verify_token(self, t): return {"uid": "mock", "email": "admin@energistrat.com", "role": "ADMIN", "sub": "admin"}
+class MockDB:
+    def get_all_sites(self): return[]
+    def get_site(self, sid): return {}
+    def save_site(self, sid, d): return True
+    def delete_site(self, sid): return True
+    def get_setting(self, n): return {}
+    def save_setting(self, n, d): return True
+    def get_sentinel_alerts(self): return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
+    def save_sentinel_alerts(self, d): return True
+    def get_all_users(self): return []
+    def get_user_profile(self, u): return {}
+    def save_user_profile(self, u, d): return True
+class MockFinance:
+    def parse_invoice(self, c, f): return {"status": "ERROR"}
+    def audit_invoice(self, i, s): return {}
+    def simulate_landing(self, s): return {}
+class MockRouter:
+    def get_api_status(self): return {"status": "DEGRADED"}
+    def analyze_file_stream(self, c, f): return {"status": "ERROR"}
+class MockMarket:
+    def valoriser_strategie(self, l, b): return {"error": "Market missing"}
+class MockAggregator:
+    def aggregate_sites(self, s, y): return None
+class MockCortex:
+    def enrich_site_financials(self, data): return {"volume_mwh": 0, "budget_annual": 0, "meta": {"is_gas": False}, "kpis": {"pmc_eur_mwh": 0, "ghost_savings": 0}}
+    def analyze_portfolio(self, sites): return {"global": {}, "green_league": {}}
+    def generate_dqe_structure(self, s): return pd.DataFrame() if PANDAS_READY else None
+    def analyze_market_position(self, p, r, is_gas): return {"status": "ANALYSE"}
+    def simulate_budget_from_bpu(self, b, s): return {}
+    def analyze_load_curve(self, f, n): return {}
+class MockRTE:
+    def get_wholesale_market(self): return {"success": False, "error": "RTE Offline"}
+    def get_pulse_dashboard_data(self): return {"success": False, "error": "RTE Offline"}
+class MockForecast:
+    def simulate_5_years(self, s): return {"labels": ["N", "N+1", "N+2", "N+3", "N+4"], "dataset_trend": [100, 105, 110, 115, 120], "dataset_sobriety": [100, 90, 80, 70, 60], "gain_potential_mwh": 150}
+class MockCRM:
+    def generate_icebreaker(self, naf): return {"naf": naf, "pain_points": "Mode Démo", "pitch": "Argumentaire non disponible."}
+    def analyze_customer_health(self, cv, pv, lc): return {"status": "STABLE", "color": "text-success", "action_required": "RAS", "usage_score": 100, "is_churn_risk": False}
+    def calculate_commission(self, v, is_s, saas_mrr=0): return round(v * 1.0, 2)
+    def send_sales_email(self, *args, **kwargs): return True
 
-except Exception as e_prod:
-    print(f"⚠️ PROD IMPORT ERROR: {str(e_prod)}")
-    try:
-        # Fallback si le dossier ne s'appelle pas "app"
-        import cortex_ingest as ingest
-        import cortex_engine as cortex
-        import cortex_physics as physics
-        import cortex_forecast as forecast
-        from core.cortex_router import router
-        from core.cortex_market import market
-        from core.cortex_aggregator import aggregator
-        from core.cortex_finance import finance
-        from core.cortex_auth import auth
-        from core.cortex_db import db
-        from core.cortex_rte import rte
-        from core.cortex_crm import crm_engine
-        try:
-            from core.cortex_pdf import pdf_builder
-        except ImportError:
-            pdf_builder = FallbackPDFBuilder()
-    except Exception as e_local:
-        print(f"⚠️ MOCK ACTIVATED DUE TO MISSING FILES: {str(e_local)}")
-        
-        class MockAuth:
-            def verify_token(self, t): return {"uid": "mock", "email": "admin@energistrat.com", "role": "ADMIN", "sub": "admin"}
-        auth = MockAuth()
-        
-        class MockDB:
-            def get_all_sites(self): return[]
-            def get_site(self, sid): return {}
-            def save_site(self, sid, d): return True
-            def delete_site(self, sid): return True
-            def get_setting(self, n): return {}
-            def save_setting(self, n, d): return True
-            def get_sentinel_alerts(self): return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
-            def save_sentinel_alerts(self, d): return True
-            def get_all_users(self): return []
-            def get_user_profile(self, u): return {}
-            def save_user_profile(self, u, d): return True
-        db = MockDB()
-        
-        class MockFinance:
-            def parse_invoice(self, c, f): return {"status": "ERROR"}
-            def audit_invoice(self, i, s): return {}
-            def simulate_landing(self, s): return {}
-        finance = MockFinance()
-        
-        class MockRouter:
-            def get_api_status(self): return {"status": "DEGRADED"}
-            def analyze_file_stream(self, c, f): return {"status": "ERROR"}
-        router = MockRouter()
-        
-        class MockMarket:
-            def valoriser_strategie(self, l, b): return {"error": "Market missing"}
-        market = MockMarket()
-        
-        class MockAggregator:
-            def aggregate_sites(self, s, y): return None
-        aggregator = MockAggregator()
-        
-        class MockCortex:
-            def enrich_site_financials(self, data): return {"volume_mwh": 0, "budget_annual": 0, "meta": {"is_gas": False}, "kpis": {"pmc_eur_mwh": 0, "ghost_savings": 0}}
-            def analyze_portfolio(self, sites): return {"global": {}, "green_league": {}}
-            def generate_dqe_structure(self, s): return pd.DataFrame() if PANDAS_READY else None
-        cortex = MockCortex()
-        
-        class MockRTE:
-            def get_wholesale_market(self): return {"success": False, "error": "RTE Offline"}
-            def get_pulse_dashboard_data(self): return {"success": False, "error": "RTE Offline"}
-        rte = MockRTE()
-        
-        class MockForecast:
-            def simulate_5_years(self, s): return {"labels": ["N", "N+1", "N+2", "N+3", "N+4"], "dataset_trend": [100, 105, 110, 115, 120], "dataset_sobriety": [100, 90, 80, 70, 60], "gain_potential_mwh": 150}
-        forecast = MockForecast()
-        
-        class MockCRM:
-            def generate_icebreaker(self, naf): return {"naf": naf, "pain_points": "Mode Démo", "pitch": "Argumentaire non disponible."}
-            def analyze_company_health(self, cv, pv, lc): return {"status": "STABLE", "color": "text-success", "message": "Mode Démo", "churn_risk": False}
-            def calculate_commission(self, v, is_s, m): return round(v * 1.0, 2)
-        crm_engine = MockCRM()
-        
-        ingest = None
-        physics = None
-        pdf_builder = FallbackPDFBuilder()
+# ==============================================================================
+# BLOC IMPORT CORTEX ROBUSTE (ISOLATION ANTI-DOMINO)
+# ==============================================================================
+# DB
+try: from app.core.cortex_db import db
+except:
+    try: from core.cortex_db import db
+    except: db = MockDB()
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V10.1-STABLE")
+# Auth
+try: from app.core.cortex_auth import auth
+except:
+    try: from core.cortex_auth import auth
+    except: auth = MockAuth()
+
+# Engine
+try: from app.core.cortex_engine import cortex
+except:
+    try: from core.cortex_engine import cortex
+    except: cortex = MockCortex()
+
+# Ingest
+try: from app.core.cortex_ingest import ingest
+except:
+    try: from core.cortex_ingest import ingest
+    except: ingest = None
+
+# Physics (PVGIS)
+try: from app.core.cortex_physics import physics
+except:
+    try: from core.cortex_physics import physics
+    except: physics = None
+
+# Forecast
+try: from app.core.cortex_forecast import forecast
+except:
+    try: from core.cortex_forecast import forecast
+    except: forecast = MockForecast()
+
+# Router
+try: from app.core.cortex_router import router
+except:
+    try: from core.cortex_router import router
+    except: router = MockRouter()
+
+# Market
+try: from app.core.cortex_market import market
+except:
+    try: from core.cortex_market import market
+    except: market = MockMarket()
+
+# Aggregator
+try: from app.core.cortex_aggregator import aggregator
+except:
+    try: from core.cortex_aggregator import aggregator
+    except: aggregator = MockAggregator()
+
+# Finance
+try: from app.core.cortex_finance import finance
+except:
+    try: from core.cortex_finance import finance
+    except: finance = MockFinance()
+
+# RTE
+try: from app.core.cortex_rte import rte
+except:
+    try: from core.cortex_rte import rte
+    except: rte = MockRTE()
+
+# CRM
+try: from app.core.cortex_crm import crm_engine
+except:
+    try: from core.cortex_crm import crm_engine
+    except: crm_engine = MockCRM()
+
+# PDF
+try: from app.core.cortex_pdf import pdf_builder
+except:
+    try: from core.cortex_pdf import pdf_builder
+    except: pdf_builder = FallbackPDFBuilder()
+
+
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V11.0-STABLE")
 
 app.add_middleware(
     CORSMiddleware,
@@ -244,7 +266,7 @@ class CRMLeadModel(BaseModel):
     contact_email: str
     contact_phone: str
     source: str
-    pipeline: str # 'saas', 'broker', 'supplier'
+    pipeline: str 
     stage: str = "LEAD"
     volume_est: float = 0.0
 
@@ -255,7 +277,7 @@ class EmailRequestModel(BaseModel):
 
 @app.post("/api/crm/lead")
 async def api_create_crm_lead(payload: CRMLeadModel, user = Depends(get_current_user)):
-    """Création stricte d'un Prospect dans une base séparée (CRM_Leads)"""
+    """Création stricte d'un Prospect dans la base Firestore Settings"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     
     lead_id = f"LEAD_{uuid.uuid4().hex[:8]}"
@@ -265,52 +287,61 @@ async def api_create_crm_lead(payload: CRMLeadModel, user = Depends(get_current_
     data["last_contact"] = "Jamais"
     data["tracking_opens"] = 0
     
-    db.save_setting(lead_id, data) # Sauvegarde dans la DB
+    db.save_setting(lead_id, data)
     return JSONResponse({"success": True, "lead_id": lead_id})
 
 @app.get("/api/crm/pipeline/{pipe_type}")
 async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user)):
     """
-    Récupère les leads du CRM en fonction du Pipeline sélectionné 
-    (saas, broker, supplier).
+    Récupération réelle des leads depuis Firestore (Zéro Mock).
+    Mappe les données brutes avec l'intelligence CORTEX.
     """
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès réservé"}, 401)
     
-    deals = []
-    # (Note: Dans un Firestore de prod, on ferait un where("pipeline", "==", pipe_type))
-    # Ici on simule le retour de la DB pour l'interface V11
-    
-    # Fake DB Fetch (À remplacer par db.get_collection("CRM_Leads") plus tard)
-    db_leads = [
-        {"id": "L1", "pipeline": "saas", "company_name": "Mairie de Voiron", "naf": "84.11Z", "city": "Voiron", "stage": "RDV", "volume_est": 0, "contact_firstname": "Jean", "contact_lastname": "Maire", "contact_role": "Maire", "contact_phone": "04XX", "contact_email": "maire@voiron.fr"},
-        {"id": "L2", "pipeline": "broker", "company_name": "Usine Acier XYZ", "naf": "24.10Z", "city": "Dunkerque", "stage": "NEGOCIATION", "volume_est": 12500, "contact_firstname": "Marc", "contact_lastname": "DAF", "contact_role": "DAF", "contact_phone": "06XX", "contact_email": "daf@acier.fr"},
-        {"id": "L3", "pipeline": "supplier", "company_name": "Électricité de Savoie", "naf": "35.14Z", "city": "Chambéry", "stage": "LEAD", "volume_est": 0, "contact_firstname": "Sophie", "contact_lastname": "DirCo", "contact_role": "Dir. Commerciale", "contact_phone": "06XX", "contact_email": "dir@eds.fr"}
-    ]
+    db_leads = []
+    try:
+        # Extraction native via le client Firestore depuis l'objet db si disponible
+        if hasattr(db, 'db'):
+            docs = db.db.collection('Settings').stream()
+            for doc in docs:
+                if doc.id.startswith("LEAD_"):
+                    data = doc.to_dict()
+                    data["id"] = doc.id
+                    db_leads.append(data)
+    except Exception as e:
+        print(f"Erreur d'extraction CRM Firestore: {e}")
 
+    deals = []
     for l in db_leads:
-        if l["pipeline"] != pipe_type: continue
+        # Filtrage par pipeline
+        if l.get("pipeline", "saas") != pipe_type: 
+            continue
         
-        intel = crm_engine.generate_icebreaker(l["naf"])
-        health = crm_engine.analyze_customer_health(l["volume_est"], l["volume_est"], [])
-        comms = crm_engine.calculate_commission(l["volume_est"], pipe_type, saas_mrr=299)
+        vol = float(l.get("volume_est", 0.0))
+        naf = l.get("naf", "DEFAULT")
+        
+        # Mapping et Génération par l'IA CRM
+        intel = crm_engine.generate_icebreaker(naf)
+        health = crm_engine.analyze_customer_health(vol, vol, [])
+        comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
 
         deal = {
-            "id": l["id"],
-            "name": l["company_name"],
-            "city": l["city"],
-            "naf": l["naf"],
-            "volume": l["volume_est"],
-            "stage": l["stage"],
+            "id": l.get("id"),
+            "name": l.get("company_name", "Inconnu"),
+            "city": l.get("city", ""),
+            "naf": naf,
+            "volume": vol,
+            "stage": l.get("stage", "LEAD"),
             "contact": {
-                "name": f'{l["contact_firstname"]} {l["contact_lastname"]}',
-                "role": l["contact_role"],
-                "phone": l["contact_phone"],
-                "email": l["contact_email"]
+                "name": f'{l.get("contact_firstname", "")} {l.get("contact_lastname", "")}'.strip(),
+                "role": l.get("contact_role", "Contact"),
+                "phone": l.get("contact_phone", ""),
+                "email": l.get("contact_email", "")
             },
             "intelligence": intel,
             "health": health,
             "commission_est": comms,
-            "last_contact": "Il y a 2 jours"
+            "last_contact": l.get("last_contact", "Jamais")
         }
         deals.append(deal)
         
@@ -318,14 +349,15 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
 
 @app.post("/api/crm/deal/move")
 async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_user)):
-    """Drag & Drop Kanban + Déclencheur de Conversion Client"""
+    """Drag & Drop Kanban (Mise à jour en Base)"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès refusé"}, 401)
     
-    # Si le deal est glissé dans WON, on le convertit en VRAI CLIENT (Data Unity)
-    if payload.new_stage == "WON":
-        # Logique de création de Tenant (Copie depuis CRM_Leads vers Users)
-        pass 
+    lead_data = db.get_setting(payload.deal_id)
+    if lead_data:
+        lead_data["stage"] = payload.new_stage
+        db.save_setting(payload.deal_id, lead_data)
 
+    # Si signé, trigger d'onboarding (Copie vers espace client - TODO futur)
     return JSONResponse({"success": True})
 
 @app.post("/api/crm/email/send")
@@ -333,10 +365,12 @@ async def api_send_crm_email(payload: EmailRequestModel, background_tasks: Backg
     """Envoi d'un email de prospection via le SMTP du CRM (Tâche de fond)"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     
-    # On délègue l'envoi à une tâche asynchrone pour ne pas bloquer l'interface
+    lead_data = db.get_setting(payload.lead_id)
+    to_email = lead_data.get("contact_email") if lead_data else "test@energistrat.com"
+
     background_tasks.add_task(
         crm_engine.send_sales_email, 
-        to_email="prospect@client.com", # Récupéré via payload.lead_id en vrai
+        to_email=to_email,
         subject=payload.subject, 
         html_content=payload.body, 
         lead_id=payload.lead_id
@@ -347,11 +381,15 @@ async def api_send_crm_email(payload: EmailRequestModel, background_tasks: Backg
 @app.get("/api/crm/track/open/{lead_id}")
 async def api_track_email_open(lead_id: str):
     """Pixel espion : Le prospect a ouvert l'email"""
-    # Mise à jour de la DB: tracking_opens += 1
-    # Génération d'une image transparente 1x1
+    lead_data = db.get_setting(lead_id)
+    if lead_data:
+        lead_data["tracking_opens"] = lead_data.get("tracking_opens", 0) + 1
+        db.save_setting(lead_id, lead_data)
+
     pixel = base64.b64decode("R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
     return Response(content=pixel, media_type="image/gif")
-    # ==========================================
+
+# ==========================================
 # API CORTEX SENTINEL & RTE
 # ==========================================
 @app.get("/api/ops/sentinel/alerts")
@@ -930,7 +968,7 @@ async def api_finance_landing(site_id: str, user = Depends(get_current_user)):
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
 # ==========================================
-# VUES HTML & ROUTAGE (ANTI-404 V10)
+# VUES HTML & ROUTAGE (ANTI-404 V11)
 # ==========================================
 
 # Liste des vues métier autorisées (Sales Workspace Inclus)
