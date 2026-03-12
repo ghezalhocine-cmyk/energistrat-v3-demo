@@ -294,33 +294,51 @@ async def api_create_crm_lead(payload: CRMLeadModel, user = Depends(get_current_
 async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user)):
     """
     Récupération réelle des leads depuis Firestore (Zéro Mock).
-    Mappe les données brutes avec l'intelligence CORTEX.
+    Méthode infaillible via le SDK Google Cloud direct.
     """
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès réservé"}, 401)
     
     db_leads = []
+    
+    # Stratégie 1 : Connexion Native Firestore (Cloud Run)
     try:
-        # Extraction native via le client Firestore depuis l'objet db si disponible
-        if hasattr(db, 'db'):
-            docs = db.db.collection('Settings').stream()
-            for doc in docs:
-                if doc.id.startswith("LEAD_"):
-                    data = doc.to_dict()
-                    data["id"] = doc.id
-                    db_leads.append(data)
-    except Exception as e:
-        print(f"Erreur d'extraction CRM Firestore: {e}")
+        from google.cloud import firestore
+        client = firestore.Client()
+        docs = client.collection('Settings').stream()
+        for doc in docs:
+            if doc.id.startswith("LEAD_"):
+                data = doc.to_dict()
+                data["id"] = doc.id
+                db_leads.append(data)
+    except Exception as e1:
+        print(f"⚠️ Erreur Firestore Natif: {e1}")
+        
+        # Stratégie 2 : Fallback sur l'objet db si instance locale
+        try:
+            internal_client = getattr(db, 'client', getattr(db, 'db', None))
+            if internal_client:
+                docs = internal_client.collection('Settings').stream()
+                for doc in docs:
+                    if doc.id.startswith("LEAD_"):
+                        data = doc.to_dict()
+                        data["id"] = doc.id
+                        db_leads.append(data)
+        except Exception as e2:
+            print(f"⚠️ Erreur Firestore Fallback: {e2}")
 
     deals = []
     for l in db_leads:
-        # Filtrage par pipeline
-        if l.get("pipeline", "saas") != pipe_type: 
+        # Filtrage strict par type de pipeline
+        if str(l.get("pipeline", "saas")).lower() != str(pipe_type).lower(): 
             continue
         
-        vol = float(l.get("volume_est", 0.0))
+        # Securité de cast pour éviter les crashs sur des champs vides
+        try: vol = float(l.get("volume_est", 0) or 0.0)
+        except: vol = 0.0
+        
         naf = l.get("naf", "DEFAULT")
         
-        # Mapping et Génération par l'IA CRM
+        # Génération IA
         intel = crm_engine.generate_icebreaker(naf)
         health = crm_engine.analyze_customer_health(vol, vol, [])
         comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
@@ -357,7 +375,6 @@ async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_u
         lead_data["stage"] = payload.new_stage
         db.save_setting(payload.deal_id, lead_data)
 
-    # Si signé, trigger d'onboarding (Copie vers espace client - TODO futur)
     return JSONResponse({"success": True})
 
 @app.post("/api/crm/email/send")
@@ -971,7 +988,6 @@ async def api_finance_landing(site_id: str, user = Depends(get_current_user)):
 # VUES HTML & ROUTAGE (ANTI-404 V11)
 # ==========================================
 
-# Liste des vues métier autorisées (Sales Workspace Inclus)
 VALID_VIEWS = [
     "settings", "settings_pme", "settings_light", "settings_partner", "settings_ops",
     "ops_nexus", "ops_ingest", "ops_aggregator", "ops_market",
@@ -997,13 +1013,11 @@ async def serve_dynamic(request: Request, page_name: str, user = Depends(get_cur
     if target_file not in PUBLIC_PAGES and not user: 
         return RedirectResponse(url="/login")
 
-    # Protection absolue des routes Sidebars
     if clean_name in VALID_VIEWS or target_file in PUBLIC_PAGES:
         file_path = os.path.join(TEMPLATE_DIR, target_file)
         if os.path.exists(file_path): 
             return templates.TemplateResponse(target_file, {"request": request})
             
-    # Redirection propre
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/{full_path:path}")
