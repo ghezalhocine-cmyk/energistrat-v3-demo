@@ -79,7 +79,7 @@
         </div>
     </header>
 
-    <!-- TICKER LIVE (API RTE/EPEX) -->
+    <!-- TICKER LIVE BOURSE (API RTE/EPEX) -->
     <div class="h-8 bg-[#020617] border-b border-white/5 flex items-center px-10 text-[10px] font-mono tracking-widest z-40 sticky top-20 shadow-md">
         <div class="flex items-center gap-2 text-red_alert font-bold mr-8"><span class="w-2 h-2 rounded-full bg-red_alert animate-pulse"></span> LIVE EPEX</div>
         <div class="flex gap-8 items-center w-full" id="market-ticker"><span class="text-gray-500">Connexion à la salle des marchés (Cortex Sniper) en cours...</span></div>
@@ -262,14 +262,14 @@
                         <p class="text-[10px] text-gray-400">Gérer les locataires (Tenants), le parc global et les orphelins.</p>
                     </a>
 
-                    <!-- NOUVEAU : LE WORKSPACE COMMERCIAL INTERNE -->
-                    <a href="/supplier" class="bento-card p-6 border-t-4 border-gold hover:bg-white/5 transition module-card shadow-[0_0_20px_rgba(245,158,11,0.1)]" data-tags="sales courtage crm interne commercial commission equipe">
+                    <!-- LE NOUVEAU SALES WORKSPACE (LA SOLUTION) -->
+                    <a href="/sales_workspace" class="bento-card p-6 border-t-4 border-gold hover:bg-white/5 transition module-card shadow-[0_0_20px_rgba(245,158,11,0.1)]" data-tags="sales courtage crm interne commercial commission equipe workspace">
                         <div class="flex items-center gap-3 mb-3">
                             <i class="fa-solid fa-headset text-gold text-2xl"></i>
                             <span class="text-[10px] bg-gold text-abysse px-2 py-1 rounded font-black">ÉQUIPE SALES</span>
                         </div>
-                        <h3 class="text-sm font-bold text-white mb-1">Sales Workspace (Courtage)</h3>
-                        <p class="text-[10px] text-gray-400">Accès au Dual-CRM pour vos courtiers internes et suivi des commissions.</p>
+                        <h3 class="text-sm font-bold text-white mb-1">Sales Workspace (CRM)</h3>
+                        <p class="text-[10px] text-gray-400">Pipelines Kanban, fiches clients, prospection et suivi des commissions.</p>
                     </a>
 
                     <a href="/ops/ingest" class="bento-card p-6 border-t-2 border-ops hover:bg-white/5 transition module-card" data-tags="ops ingest sge grdf zip importation data connect">
@@ -309,7 +309,6 @@
                 }
             });
 
-            // Affichage du message si aucun résultat
             const noResMsg = document.getElementById('no-results-msg');
             const sections = document.querySelectorAll('.module-section');
             
@@ -324,29 +323,25 @@
 
         // --- 2. DOUBLE COMPTEUR (ZÉRO MOCK) ---
         async function fetchSystemHealth() {
-            // A. Fetch des Tenants (Le CRM global)
+            // Fetch des Tenants
             try {
                 const resTenants = await fetch('/api/ops/tenants');
                 if (resTenants.ok) {
                     const dataT = await resTenants.json();
                     if(dataT.success && dataT.tenants) {
                         animateValue('kpi-tenants', 0, dataT.tenants.length, 1000);
-                    } else {
-                        document.getElementById('kpi-tenants').innerText = "0";
-                    }
+                    } else { document.getElementById('kpi-tenants').innerText = "0"; }
                 }
             } catch(e) { document.getElementById('kpi-tenants').innerText = "ERR"; }
 
-            // B. Fetch du Parc PDL Global (Data Unity)
+            // Fetch du Parc PDL Global
             try {
                 const resFleet = await fetch('/api/dashboard/fleet');
                 if(!resFleet.ok) throw new Error('API Error');
                 const dataF = await resFleet.json();
-                
                 const count = dataF.count || (dataF.fleet ? dataF.fleet.length : 0);
                 animateValue('kpi-count', 0, count, 1000);
             } catch(e) {
-                console.error("Erreur KPI Fleet:", e);
                 document.getElementById('kpi-count').innerText = "ERR";
                 document.getElementById('kpi-count').classList.add('text-alert');
             }
@@ -367,7 +362,6 @@
                         `<span class="mr-12 text-orange-500">GAZ PEG N+1 : <span class="text-white font-bold">${gaz} €/MWh</span></span>` +
                         `<span class="mr-12">TENDANCE : ${trendHtml}</span>`;
                         
-                    // Duplication pour l'effet CSS Infini
                     document.getElementById('market-ticker').innerHTML = tickerContent + tickerContent;
                 }
             } catch(e) {
@@ -375,14 +369,14 @@
             }
         }
 
-        // Utilitaire d'animation des chiffres
+        // Animation Chiffres
         function animateValue(id, start, end, duration) {
             if (start === end) { document.getElementById(id).innerText = end.toLocaleString(); return; }
             let range = end - start;
             let current = start;
             let increment = end > start ? 1 : -1;
             let stepTime = Math.abs(Math.floor(duration / range));
-            if(stepTime < 20) stepTime = 20; // limite de fluidité
+            if(stepTime < 20) stepTime = 20; 
             
             let obj = document.getElementById(id);
             let timer = setInterval(function() {
@@ -392,7 +386,6 @@
             }, stepTime);
         }
 
-        // BOOT
         document.addEventListener('DOMContentLoaded', () => {
             fetchSystemHealth();
             fetchMarketTicker();
