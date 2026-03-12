@@ -2,19 +2,21 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT | Solar Studio V10</title>
+    <title>ENERGISTRAT V10.0 | Solar Studio & Virtual Trading</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: { 
-                        abysse: '#050505', card: '#0F172A', 
+                        abysse: '#001529', card: '#0F172A', 
                         sun: '#F59E0B', sun_light: '#FCD34D',
-                        success: '#10B981', alert: '#EF4444'
+                        success: '#10B981', alert: '#EF4444',
+                        battery: '#8B5CF6' // Couleur pour l'arbitrage batterie
                     },
                     fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
                 }
@@ -22,13 +24,19 @@
         }
     </script>
     <style>
-        body { background-color: #050505; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
+        body { background-color: #001529; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
         .bento-card { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; backdrop-filter: blur(10px); transition: all 0.3s ease; }
         .bento-card:hover { border-color: rgba(245, 158, 11, 0.3); }
+        
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: #F59E0B; cursor: pointer; margin-top: -8px; box-shadow: 0 0 15px rgba(245, 158, 11, 0.5); }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #F59E0B; cursor: pointer; margin-top: -6px; box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+        input[type=range].slider-batt::-webkit-slider-thumb { background: #8B5CF6; box-shadow: 0 0 10px rgba(139, 92, 246, 0.5); }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #334155; border-radius: 2px; }
-        .loader { border-top-color: #F59E0B; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
+        
+        select.cyber-select { appearance: none; background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 8px 30px 8px 15px; border-radius: 0.5rem; cursor: pointer; outline: none; }
+        select.cyber-select option { background-color: #0F172A; color: white; }
+        
+        .loader { border-top-color: #F59E0B; animation: spinner 1.5s linear infinite; }
         @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
@@ -36,142 +44,170 @@
 <body class="flex h-screen w-screen overflow-hidden">
 
     <!-- SIDEBAR -->
-    <aside class="w-20 bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 z-50">
-        <a href="#" onclick="goBack()" id="btn-back" class="w-10 h-10 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8" title="Retour">
+    <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 z-50 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
+        <a href="#" onclick="goBack()" id="btn-back" class="w-12 h-12 rounded-xl bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white flex items-center justify-center transition mb-8 border border-white/10" title="Retour Dashboard">
             <i class="fa-solid fa-arrow-left"></i>
         </a>
-        <div class="w-10 h-10 rounded-xl bg-sun/20 text-sun flex items-center justify-center font-bold mb-4 shadow-[0_0_15px_rgba(245,158,11,0.2)]" title="Solar Studio">
-            <i class="fa-solid fa-solar-panel"></i>
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-sun to-yellow-600 flex items-center justify-center text-abysse font-bold mb-2 shadow-[0_0_15px_rgba(245,158,11,0.4)]" title="Solar Studio">
+            <i class="fa-solid fa-solar-panel text-xl"></i>
         </div>
+        <div class="text-[8px] font-bold text-sun uppercase tracking-widest mt-1 text-center">SOLAR<br>STUDIO</div>
     </aside>
 
-    <main class="flex-1 flex flex-col relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sun/10 via-abysse to-abysse">
+    <main class="flex-1 flex flex-col relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sun/5 via-abysse to-abysse">
         
         <!-- HEADER -->
         <header class="h-20 flex items-center justify-between px-10 border-b border-white/5 bg-abysse/80 backdrop-blur z-20">
             <div>
-                <h1 class="text-2xl font-black text-white tracking-tight">SOLAR <span class="text-sun">STUDIO</span></h1>
-                <p class="text-xs text-gray-400 flex items-center gap-2">
-                    <i class="fa-solid fa-satellite text-sun"></i> Connecté à l'API PVGIS (Union Européenne)
+                <h1 class="text-2xl font-black text-white tracking-tight">Virtual Power Plant <span class="text-sun">(Solaire & Trading)</span></h1>
+                <p class="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                    <i class="fa-solid fa-satellite text-sun"></i> Connecté à PVGIS (Europe) et Cortex Sniper (Bourse)
                 </p>
             </div>
             <div class="flex items-center gap-4">
-                <span class="text-[10px] text-gray-500 uppercase font-bold">Sélectionner un actif :</span>
-                <select id="site-selector" onchange="loadSiteContext()" class="bg-card border border-white/10 text-sm rounded-xl px-4 py-2 text-white outline-none focus:border-sun min-w-[300px] cursor-pointer">
+                <span class="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Actif à modéliser :</span>
+                <select id="site-selector" onchange="loadSiteContext()" class="cyber-select text-sm font-bold min-w-[300px] shadow-lg">
                     <option value="">Chargement de la Data Unity...</option>
                 </select>
             </div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-10 pb-20">
-            <div class="grid grid-cols-12 gap-8 h-full">
+            <div class="grid grid-cols-12 gap-8 h-full max-w-7xl mx-auto">
                 
-                <!-- PANNEAU CONFIGURATION -->
+                <!-- PANNEAU DE CALIBRAGE (HARDWARE) -->
                 <div class="col-span-4 space-y-6">
-                    <div class="bento-card p-8 border-t-4 border-sun">
-                        <h3 class="text-sm font-bold text-white uppercase mb-6 flex items-center gap-2"><i class="fa-solid fa-sliders text-sun"></i> Calibrage Toiture / Ombrière</h3>
+                    <div class="bento-card p-8 border-t-4 border-sun bg-card/80">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-sun"></i> Calibrage des Infrastructures
+                        </h3>
                         
+                        <!-- Parnneaux Solaires -->
                         <div class="mb-8">
                             <div class="flex justify-between mb-2">
-                                <label class="text-xs font-bold text-gray-400 uppercase">Surface Exploitable</label>
-                                <span class="text-sm font-mono font-bold text-sun" id="lbl-surface">500 m²</span>
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Surface Toiture / Ombrière</label>
+                                <span class="text-xs font-mono font-bold text-sun" id="lbl-surface">500 m²</span>
                             </div>
                             <input type="range" id="rng-surface" min="50" max="5000" step="10" value="500" oninput="updateCalculs()">
-                            <div class="mt-3 bg-white/5 p-3 rounded-lg border border-white/10 flex justify-between items-center">
-                                <span class="text-[10px] text-gray-400">Puissance estimée :</span>
-                                <span id="val-kwc" class="text-white font-mono font-bold text-lg">83 kWc</span>
+                            <div class="mt-2 bg-white/5 p-3 rounded-lg border border-white/10 flex justify-between items-center">
+                                <span class="text-[10px] text-gray-400">Puissance Crête (Solaire)</span>
+                                <span id="val-kwc" class="text-white font-mono font-bold text-sm">83 kWc</span>
                             </div>
                         </div>
 
                         <div class="mb-8">
                             <div class="flex justify-between mb-2">
-                                <label class="text-xs font-bold text-gray-400 uppercase">Orientation (Azimuth)</label>
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Orientation Azimuth</label>
                                 <span class="text-xs font-mono font-bold text-white" id="lbl-azimuth">SUD (0°)</span>
                             </div>
                             <input type="range" id="rng-azimuth" min="-90" max="90" step="45" value="0" oninput="updateCalculs()">
-                            <div class="flex justify-between text-[9px] text-gray-600 font-bold mt-2"><span>EST</span><span>SUD</span><span>OUEST</span></div>
+                            <div class="flex justify-between text-[9px] text-gray-600 font-bold mt-1"><span>EST</span><span>SUD</span><span>OUEST</span></div>
                         </div>
 
-                        <button onclick="runSimulation()" id="btn-sim" class="w-full bg-gradient-to-r from-sun to-yellow-600 text-black font-black py-4 rounded-xl hover:scale-[1.02] transition shadow-[0_0_30px_rgba(245,158,11,0.3)] flex items-center justify-center gap-2">
+                        <!-- Batterie de Stockage -->
+                        <div class="mb-8 pt-6 border-t border-white/10">
+                            <div class="flex justify-between mb-2">
+                                <label class="text-[10px] font-bold text-battery uppercase flex items-center gap-2"><i class="fa-solid fa-car-battery"></i> Stockage (Batterie BESS)</label>
+                                <span class="text-xs font-mono font-bold text-battery" id="lbl-battery">0 kWh</span>
+                            </div>
+                            <input type="range" id="rng-battery" class="slider-batt" min="0" max="1000" step="50" value="0" oninput="updateCalculs()">
+                            <p class="text-[9px] text-gray-500 mt-2 leading-relaxed">Active l'algorithme d'arbitrage boursier. Stockez l'énergie solaire gratuite de midi pour la revendre au pic de 19h00.</p>
+                        </div>
+
+                        <button onclick="runSimulation()" id="btn-sim" class="w-full bg-gradient-to-r from-sun to-yellow-600 text-abysse font-black py-4 rounded-xl hover:scale-[1.02] transition shadow-[0_0_20px_rgba(245,158,11,0.4)] flex items-center justify-center gap-2">
                             <i class="fa-solid fa-satellite-dish"></i> LANCER L'AUDIT SATELLITE
                         </button>
                     </div>
 
-                    <!-- RECAP FINANCIER BASE -->
-                    <div class="grid grid-cols-2 gap-4 opacity-50 transition duration-500" id="pre-kpis">
-                        <div class="bento-card p-4 text-center">
-                            <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">CAPEX Brut (Moyen)</div>
-                            <div class="text-xl font-bold text-white font-mono" id="kpi-capex">-- €</div>
+                    <!-- RECAP CAPEX BASE -->
+                    <div class="bento-card p-6 bg-abysse border border-white/5 opacity-50 transition duration-500" id="pre-kpis">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-[10px] text-gray-500 uppercase font-bold">Investissement Brut (CAPEX)</span>
+                            <span class="text-lg font-bold text-white font-mono" id="kpi-capex">-- €</span>
                         </div>
-                        <div class="bento-card p-4 text-center">
-                            <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Prix Achat SGE</div>
-                            <div class="text-xl font-bold text-cyan font-mono" id="kpi-price">-- €/MWh</div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-[10px] text-gray-500 uppercase font-bold">Prix d'Achat Énergie (SGE)</span>
+                            <span class="text-lg font-bold text-cyan font-mono" id="kpi-price">-- €/MWh</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- PANNEAU RÉSULTATS -->
+                <!-- PANNEAU RÉSULTATS (TRADING & AUTOCONSO) -->
                 <div class="col-span-8 flex flex-col gap-6 relative">
                     
-                    <div id="loader" class="hidden absolute inset-0 bg-abysse/80 z-50 flex flex-col items-center justify-center backdrop-blur-md rounded-3xl border border-white/10">
+                    <div id="loader" class="hidden absolute inset-0 bg-abysse/90 z-50 flex flex-col items-center justify-center backdrop-blur-md rounded-3xl border border-white/10">
                         <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-700 h-16 w-16 mb-4"></div>
-                        <p class="text-sun font-bold text-lg animate-pulse tracking-wide">Calcul thermodynamique en cours...</p>
-                        <p class="text-xs text-gray-400 mt-2 font-mono">Connexion API PVGIS - Commission Européenne</p>
+                        <p class="text-sun font-bold text-lg animate-pulse tracking-wide">Algorithmes d'Arbitrage en cours...</p>
+                        <p class="text-xs text-gray-400 mt-2 font-mono">Croisement des données PVGIS, de la bourse EPEX et du profil SGE.</p>
                     </div>
 
                     <div id="blank-state" class="h-full flex flex-col items-center justify-center text-gray-600 border-2 border-dashed border-white/10 rounded-[2rem] bg-card/30">
-                        <i class="fa-solid fa-solar-panel text-7xl mb-6 opacity-20"></i>
-                        <h3 class="text-xl font-bold text-white mb-2">Simulateur en attente</h3>
-                        <p class="text-sm">Sélectionnez un actif immobilier et lancez l'audit.</p>
+                        <i class="fa-solid fa-car-battery text-7xl mb-6 opacity-20"></i>
+                        <h3 class="text-xl font-bold text-white mb-2">Virtual Power Plant en attente</h3>
+                        <p class="text-sm">Sélectionnez une toiture, une batterie, et lancez la simulation.</p>
                     </div>
 
                     <div id="results-dashboard" class="hidden h-full flex flex-col gap-6">
                         
-                        <!-- LIGNE DES KPIS -->
+                        <!-- LIGNE DES KPIS FINANCIERS -->
                         <div class="grid grid-cols-3 gap-6">
-                            <div class="bento-card p-6 border-l-4 border-sun bg-gradient-to-r from-sun/10 to-card">
-                                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Production Annuelle PVGIS</h3>
-                                <div class="text-4xl font-black text-white font-mono" id="res-prod">-- <span class="text-lg text-sun font-normal">MWh</span></div>
-                                <div class="text-[10px] text-gray-400 mt-2">Baisse de <span id="res-carbon" class="text-green-500 font-bold">-- tCO2e</span> (Scope 2)</div>
+                            <div class="bento-card p-6 border-t-4 border-success bg-success/5">
+                                <h3 class="text-[10px] font-bold text-success uppercase tracking-widest mb-1">Gain Annuel Brut</h3>
+                                <div class="text-3xl font-black text-white font-mono" id="res-gain">-- €</div>
+                                <div class="text-[10px] text-gray-400 mt-2 font-bold flex justify-between">
+                                    <span>Autoconso (Évitement) :</span> <span class="text-white" id="gain-autoconso">--</span>
+                                </div>
                             </div>
-                            <div class="bento-card p-6 border-l-4 border-success bg-success/5 relative overflow-hidden">
-                                <h3 class="text-[10px] font-bold text-success uppercase tracking-widest mb-2">Aide d'État (Prime Autoconso)</h3>
-                                <div class="text-4xl font-black text-white font-mono" id="res-prime">-- €</div>
-                                <div class="text-[10px] text-gray-400 mt-2 font-bold">Déduit du CAPEX d'installation</div>
+                            
+                            <div class="bento-card p-6 border-t-4 border-battery bg-gradient-to-r from-card to-battery/10 relative overflow-hidden group">
+                                <i class="fa-solid fa-coins absolute -right-4 -bottom-4 text-6xl text-battery opacity-10 group-hover:scale-110 transition"></i>
+                                <h3 class="text-[10px] font-bold text-battery uppercase tracking-widest mb-1 flex items-center gap-1"><i class="fa-solid fa-arrow-trend-up"></i> Trading Batterie (Arbitrage)</h3>
+                                <div class="text-3xl font-black text-white font-mono" id="res-arbitrage">-- €</div>
+                                <div class="text-[10px] text-gray-400 mt-2 leading-tight">Revente du surplus stocké lors des pics tarifaires Spot (19h00).</div>
                             </div>
-                            <div class="bento-card p-6 border-l-4 border-cyan">
-                                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Retour sur Invest. (Net)</h3>
-                                <div class="text-4xl font-black text-white font-mono" id="res-roi">-- <span class="text-lg text-cyan font-normal">Ans</span></div>
-                                <div class="text-[10px] text-gray-400 mt-2 font-bold">Gain de <span id="res-gain" class="text-success">-- €/an</span></div>
+
+                            <div class="bento-card p-6 border-t-4 border-cyan">
+                                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Retour sur Invest. (Net)</h3>
+                                <div class="text-3xl font-black text-white font-mono" id="res-roi">-- <span class="text-sm text-cyan font-normal">Ans</span></div>
+                                <div class="text-[10px] text-gray-400 mt-2 font-bold text-success">Prime État déduite : <span id="res-prime">-- €</span></div>
                             </div>
                         </div>
 
                         <!-- GRAPHIQUE AUTOCONSOMMATION -->
                         <div class="bento-card p-6 flex-1 flex flex-col shadow-2xl">
-                            <div class="flex justify-between items-center mb-6">
+                            <div class="flex justify-between items-start mb-6">
                                 <div>
-                                    <h3 class="font-bold text-white text-sm uppercase tracking-wider"><i class="fa-solid fa-chart-line text-sun mr-2"></i> Couverture des Besoins</h3>
-                                    <p class="text-[10px] text-gray-500 mt-1">Comparaison de la production solaire avec la consommation SGE de votre bâtiment.</p>
+                                    <h3 class="font-bold text-white text-sm uppercase tracking-wider flex items-center gap-2"><i class="fa-solid fa-chart-line text-sun"></i> Bilan Énergétique (Solaire vs SGE)</h3>
+                                    <p class="text-[10px] text-gray-500 mt-1">Comparaison de la production PVGIS avec l'historique Linky.</p>
                                 </div>
-                                <div class="flex gap-4 text-[10px] font-bold uppercase tracking-widest bg-black/40 p-2 rounded-lg border border-white/5">
-                                    <span class="flex items-center gap-2 text-sun"><span class="w-3 h-3 rounded-full bg-sun"></span> Production Solaire</span>
-                                    <span class="flex items-center gap-2 text-cyan"><span class="w-3 h-3 rounded-full bg-cyan"></span> Consommation Linky</span>
+                                <div class="flex gap-4 text-[9px] font-bold uppercase tracking-widest bg-black/40 p-2 rounded-lg border border-white/5">
+                                    <span class="flex items-center gap-1 text-sun"><span class="w-2 h-2 rounded-full bg-sun"></span> Production Solaire</span>
+                                    <span class="flex items-center gap-1 text-cyan"><span class="w-2 h-2 rounded-full bg-cyan"></span> Conso Bâtiment</span>
                                 </div>
                             </div>
                             <div class="flex-1 relative w-full h-full"><canvas id="solarChart"></canvas></div>
                         </div>
 
-                        <!-- LÉGAL & SOUS-TRAITANCE -->
-                        <div class="bento-card p-6 border border-white/10 bg-gradient-to-br from-card to-gray-900/50 flex justify-between items-center group">
-                            <div class="max-w-2xl">
-                                <h3 class="text-sm font-bold text-white mb-2 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-success"></i> Accompagnement Administratif & Sous-traitance</h3>
-                                <p class="text-xs text-gray-400 leading-relaxed">
-                                    ENERGISTRAT agit en tant qu'Assistant à Maîtrise d'Ouvrage (AMO). Le montage du dossier (Prime OA, Déclaration Mairie) et la pose sont sous-traités à notre réseau national d'installateurs certifiés <b>RGE QualiPV</b> (Garantie Décennale incluse).
-                                </p>
+                        <!-- PLAN DE TRADING IA (VIRTUAL TRADER) -->
+                        <div class="grid grid-cols-12 gap-6">
+                            <div class="col-span-7 bento-card p-6 border-l-4 border-battery bg-abysse/50">
+                                <h3 class="text-xs font-bold text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <i class="fa-solid fa-robot text-battery"></i> Plan de Trading J+1 (Conseil IA)
+                                </h3>
+                                <div class="space-y-3" id="trading-plan">
+                                    <!-- Injection JS -->
+                                </div>
                             </div>
-                            <button onclick="window.location.href='/deal_desk'" class="bg-white/10 border border-white/20 text-white font-bold px-6 py-3 rounded-xl hover:bg-white hover:text-abysse transition shadow-lg whitespace-nowrap">
-                                Mandater le Bureau d'Études
-                            </button>
+                            
+                            <div class="col-span-5 bento-card p-6 border border-success/30 bg-gradient-to-br from-success/5 to-card flex flex-col justify-center items-center text-center">
+                                <h3 class="text-sm font-bold text-white mb-2 flex items-center justify-center gap-2"><i class="fa-solid fa-shield-halved text-success"></i> Guichet Unique (AMO)</h3>
+                                <p class="text-[10px] text-gray-400 leading-relaxed mb-4">
+                                    ENERGISTRAT s'occupe de la déclaration Mairie, du raccordement Enedis et de la contractualisation. La pose est assurée par un réseau <b>RGE QualiPV</b> certifié.
+                                </p>
+                                <button onclick="window.location.href='/deal_desk'" class="bg-success text-abysse font-bold px-6 py-3 rounded-xl hover:bg-white transition shadow-lg w-full text-xs">
+                                    <i class="fa-solid fa-file-contract"></i> Mandater le Bureau d'Études
+                                </button>
+                            </div>
                         </div>
 
                     </div>
@@ -181,9 +217,26 @@
         </div>
     </main>
 
+    <!-- TOAST ENGINE -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
+
     <script>
+        const App = {
+            toast: function(msg, type='info') {
+                const container = document.getElementById('toast-container');
+                const colors = { success: 'bg-green-600 border-green-500', error: 'bg-alert border-red-500 text-white', info: 'bg-sun border-sun text-abysse' };
+                const el = document.createElement('div');
+                el.className = `${colors[type] || colors.info} px-6 py-3 rounded-xl shadow-2xl text-xs font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
+                el.innerHTML = `<span><i class="fa-solid ${type==='error'?'fa-triangle-exclamation':'fa-check-circle'}"></i></span> ${msg}`;
+                container.appendChild(el);
+                requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
+                setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
+            }
+        };
+
         let FLEET_DATA = [];
         let CURRENT_SITE = null;
+        let MARKET_DATA = null;
         let chartInstance = null;
 
         // Navigation dynamique du bouton Retour
@@ -194,29 +247,34 @@
             else window.history.back();
         }
 
-        async function loadSites() {
+        async function initModule() {
             try {
+                // Fetch de la flotte
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
+                
+                // Fetch de la bourse pour l'IA d'Arbitrage (Zéro Mock)
+                fetch('/api/tools/sniper/market').then(r=>r.json()).then(m => {
+                    if(m.success) MARKET_DATA = m;
+                }).catch(e=>{});
+
                 if(data.fleet) {
-                    // On ne garde que les sites élec pour le solaire
                     FLEET_DATA = data.fleet.filter(s => s.energy === 'elec');
                     const sel = document.getElementById('site-selector');
                     
                     if(FLEET_DATA.length === 0) {
-                        sel.innerHTML = '<option value="">Aucun compteur électrique disponible</option>';
+                        sel.innerHTML = '<option value="">Aucun compteur électrique en base</option>';
                         return;
                     }
 
                     sel.innerHTML = '<option value="">-- Sélectionner un actif pour audit --</option>';
                     FLEET_DATA.sort((a,b) => a.name.localeCompare(b.name)).forEach(site => {
                         const opt = document.createElement('option');
-                        opt.value = site.id;
-                        opt.innerText = `${site.name} (${site.city || 'Ville Inconnue'})`;
+                        opt.value = site.id; opt.innerText = `${site.name} (${site.city || 'Ville Inconnue'})`;
                         sel.appendChild(opt);
                     });
 
-                    // Auto-select si passé dans l'URL
+                    // Auto-select
                     const params = new URLSearchParams(window.location.search);
                     const targetId = params.get('id');
                     if(targetId && FLEET_DATA.find(s => s.id === targetId)) {
@@ -238,14 +296,13 @@
 
                 CURRENT_SITE = data;
                 
-                // Extraction Prix Actuel
                 let priceKwh = data.electricity_price || 0.20;
                 if(priceKwh > 10) priceKwh /= 1000;
                 
                 document.getElementById('kpi-price').innerText = `${(priceKwh * 1000).toFixed(1)} €/MWh`;
                 document.getElementById('pre-kpis').classList.remove('opacity-50');
                 
-                // Pre-remplissage surface toiture (Hypothèse : 60% de la surface au sol est toitable)
+                // On pré-remplit la surface de toit (hypothèse 60% du sol)
                 const groundSurface = data.location?.surface || 0;
                 if(groundSurface > 50) {
                     let roofEst = Math.round(groundSurface * 0.6);
@@ -257,17 +314,21 @@
             } catch(e) { console.error(e); }
         }
 
-        function updateCalculs() {
+        window.updateCalculs = function() {
             const surface = document.getElementById('rng-surface').value;
             document.getElementById('lbl-surface').innerText = `${surface} m²`;
             
-            // 1 kWc = environ 6 m² de panneaux
+            // Panneaux (kWc)
             const kwc = Math.round(surface / 6);
             document.getElementById('val-kwc').innerText = `${kwc} kWc`;
             
-            // Capex Industriel moyen : ~1000 à 1200€ / kWc
-            const capex = kwc * 1100;
-            document.getElementById('kpi-capex').innerText = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(capex);
+            // Batterie (kWh)
+            const batt = document.getElementById('rng-battery').value;
+            document.getElementById('lbl-battery').innerText = `${batt} kWh`;
+
+            // Capex Industriel (Panneaux ~1100€/kWc + Batterie ~500€/kWh)
+            const capex = (kwc * 1100) + (batt * 500);
+            document.getElementById('kpi-capex').innerText = new Intl.NumberFormat('fr-FR').format(capex) + " €";
             
             const az = document.getElementById('rng-azimuth').value;
             let azText = "SUD (0°)";
@@ -278,17 +339,17 @@
             document.getElementById('lbl-azimuth').innerText = azText;
         }
 
-        // CALCUL DE LA PRIME À L'AUTOCONSOMMATION (ÉTAT FRANÇAIS)
+        // CALCUL BARÈME OFFICIEL PRIME AUTOCONSOMMATION (ÉTAT FRANÇAIS)
         function calculatePrime(kwc) {
             if (kwc <= 3) return kwc * 300;
             if (kwc <= 9) return kwc * 230;
             if (kwc <= 36) return kwc * 200;
             if (kwc <= 100) return kwc * 100;
-            return 0; // Au delà de 100kWc, appel d'offre CRE complexe (on simule 0 de prime immédiate)
+            return 0; // Au-delà de 100kWc, appel d'offres CRE (pas de prime d'investissement directe)
         }
 
-        async function runSimulation() {
-            if(!CURRENT_SITE) return alert("Veuillez sélectionner un actif immobilier.");
+        window.runSimulation = async function() {
+            if(!CURRENT_SITE) return App.toast("Sélectionnez un site pour auditer.", "error");
             
             document.getElementById('loader').classList.remove('hidden');
             document.getElementById('blank-state').classList.add('hidden');
@@ -305,7 +366,7 @@
             };
 
             try {
-                // APPEL À LA VRAIE ROUTE PVGIS QUE JE VIENS DE TE CODER
+                // Vrai appel API Backend vers PVGIS
                 const res = await fetch('/api/physics/solar', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -316,12 +377,11 @@
                 if(data.success) {
                     renderResults(data, priceKwh);
                 } else {
-                    alert("Erreur API Solaire : " + (data.error || "Inconnue"));
+                    App.toast("Erreur Satellite PVGIS : " + (data.error || "Inconnue"), "error");
                     document.getElementById('blank-state').classList.remove('hidden');
                 }
             } catch(e) {
-                console.error(e);
-                alert("Erreur réseau");
+                App.toast("Erreur de connexion au serveur Cortex.", "error");
                 document.getElementById('blank-state').classList.remove('hidden');
             }
             
@@ -332,42 +392,89 @@
             document.getElementById('results-dashboard').classList.remove('hidden');
             
             const kwc = data.power_kwc;
+            const battKwh = parseFloat(document.getElementById('rng-battery').value);
             const prodMwh = data.production_annual_mwh;
-            const capexBrut = data.financials.capex;
             
-            // Calcul de la prime d'Etat
+            // Financier Base
+            const capexBrut = (kwc * 1100) + (battKwh * 500);
             const primeEtat = calculatePrime(kwc);
             const capexNet = capexBrut - primeEtat;
 
-            // Mise à jour de l'UI
-            document.getElementById('res-prod').innerHTML = `${Math.round(prodMwh)} <span class="text-lg text-sun font-normal">MWh</span>`;
-            document.getElementById('res-prime').innerText = `+ ${new Intl.NumberFormat('fr-FR').format(Math.round(primeEtat))} €`;
-            
-            // Impact RSE CSRD (0.052 tCO2e par MWh effacé du réseau France)
-            const co2Saved = prodMwh * 0.052;
-            document.getElementById('res-carbon').innerText = `${co2Saved.toFixed(1)} tCO2e`;
-
-            // Extraction Conso Réelle (SGE) pour le croisement
+            // Algorithme Zéro Mock d'Autoconsommation vs SGE
             const consoAnnuelleSGE = CURRENT_SITE.kpis?.volume_mwh || 100;
-            // Profil de consommation typique (plus élevé en hiver)
             const profilConso = [0.12, 0.11, 0.10, 0.08, 0.06, 0.05, 0.05, 0.05, 0.07, 0.09, 0.10, 0.12];
-            const monthlyConso = profilConso.map(f => consoAnnuelleSGE * f * 1000); // en kWh
+            const monthlyConso = profilConso.map(f => consoAnnuelleSGE * f * 1000); // kWh
             
-            // Calcul Autoconsommation brute mensuelle
             let totalAutoconsoKwh = 0;
+            let surplusKwh = 0;
+
             data.monthly_chart.forEach((prodMonth, i) => {
-                totalAutoconsoKwh += Math.min(prodMonth, monthlyConso[i]);
+                if (prodMonth <= monthlyConso[i]) {
+                    totalAutoconsoKwh += prodMonth;
+                } else {
+                    totalAutoconsoKwh += monthlyConso[i];
+                    surplusKwh += (prodMonth - monthlyConso[i]);
+                }
             });
 
-            // Gain Financier = (Ce qu'on ne paye pas à Enedis)
-            const gainAnnuel = totalAutoconsoKwh * priceKwh;
-            document.getElementById('res-gain').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(gainAnnuel)) + " €/an";
+            // Gain Autoconsommation pure
+            const gainAutoconso = totalAutoconsoKwh * priceKwh;
+            
+            // L'ALGORITHME D'ARBITRAGE BOURSIER (Le Cerveau de la Batterie)
+            let gainArbitrage = 0;
+            let tradingText = "";
 
-            // ROI (Net de prime)
-            const roiNet = capexNet / gainAnnuel;
+            if (battKwh > 0) {
+                // Le marché de gros dicte les règles.
+                // En moyenne, on revend le surplus stocké lors de la pointe du soir (19h).
+                // Estimation Conservatrice : Si on cycle la batterie 250 jours/an au prix Spot de pointe.
+                const epexPeakPrice = MARKET_DATA?.current_prices?.elec ? (MARKET_DATA.current_prices.elec * 1.5) : 150; // Prix pointe estimé €/MWh
+                const epexPeakKwh = epexPeakPrice / 1000;
+                
+                // Volume arbitré = Volume de la batterie cyclé X fois, ou le surplus solaire dispo
+                const volumeArbitreAnnuel = Math.min(surplusKwh, battKwh * 250); 
+                gainArbitrage = volumeArbitreAnnuel * epexPeakKwh;
+
+                document.getElementById('res-arbitrage').innerText = "+ " + new Intl.NumberFormat('fr-FR').format(Math.round(gainArbitrage)) + " €";
+                
+                const trend = MARKET_DATA?.status === 'BEAR' ? 'Baissier' : 'Tendu';
+                tradingText = `
+                    <div class="bg-black/30 p-3 rounded-lg border border-white/5 flex justify-between items-center text-xs">
+                        <span class="text-gray-400">10h00 - 15h00 (Solaire max)</span>
+                        <span class="text-sun font-bold">Charge Batterie (Gratuit)</span>
+                    </div>
+                    <div class="bg-black/30 p-3 rounded-lg border border-white/5 flex justify-between items-center text-xs">
+                        <span class="text-gray-400">18h00 - 21h00 (Pic Réseau)</span>
+                        <span class="text-battery font-bold">Décharge & Vente Bourse (${Math.round(epexPeakPrice)} €/MWh)</span>
+                    </div>
+                    <div class="text-[10px] text-gray-500 mt-2 italic">Analyse Cortex : Le marché Spot actuel est <b class="text-cyan">${trend}</b>. L'IA optimisera la revente en priorisant l'écrêtement de votre abonnement (TURPE) si le prix de l'énergie Spot est trop faible.</div>
+                `;
+            } else {
+                document.getElementById('res-arbitrage').innerText = "0 €";
+                tradingText = `
+                    <div class="bg-white/5 p-4 rounded-lg border border-white/10 text-center">
+                        <i class="fa-solid fa-car-battery text-3xl text-gray-600 mb-2"></i>
+                        <p class="text-xs text-gray-400">Pas de stockage détecté. Le surplus solaire sera injecté sur le réseau (Obligation d'Achat) ou perdu.</p>
+                    </div>
+                `;
+                // Obligation d'achat classique (ex: 8 c€/kWh)
+                gainArbitrage = surplusKwh * 0.08; 
+            }
+
+            document.getElementById('trading-plan').innerHTML = tradingText;
+
+            // Mise à jour de l'UI
+            const gainTotal = gainAutoconso + gainArbitrage;
+            const roiNet = capexNet / gainTotal;
+
+            document.getElementById('res-prod').innerHTML = `${Math.round(prodMwh)} <span class="text-lg text-sun font-normal">MWh</span>`;
+            document.getElementById('res-gain').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(gainTotal)) + " €";
+            document.getElementById('gain-autoconso').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(gainAutoconso)) + " €";
+            
+            document.getElementById('res-prime').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(primeEtat));
             document.getElementById('res-roi').innerHTML = `${roiNet.toFixed(1)} <span class="text-lg text-cyan font-normal">Ans</span>`;
 
-            // CHART JS (Croisement Solaire vs SGE)
+            // CHART JS (Croisement Production vs SGE)
             const ctx = document.getElementById('solarChart').getContext('2d');
             if(chartInstance) chartInstance.destroy();
             
@@ -377,7 +484,7 @@
                     labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Jui', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
                     datasets: [
                         { label: 'Production PVGIS (kWh)', data: data.monthly_chart, backgroundColor: '#F59E0B', borderRadius: 4, order: 2 },
-                        { type: 'line', label: 'Consommation SGE (kWh)', data: monthlyConso, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', borderWidth: 3, pointRadius: 0, fill: true, tension: 0.4, order: 1 }
+                        { type: 'line', label: 'Consommation Historique Linky (kWh)', data: monthlyConso, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.05)', borderWidth: 3, pointRadius: 0, fill: true, tension: 0.4, order: 1 }
                     ]
                 },
                 options: { 
@@ -393,7 +500,7 @@
         }
 
         // Init
-        loadSites();
+        document.addEventListener('DOMContentLoaded', initModule);
     </script>
 </body>
 </html>
