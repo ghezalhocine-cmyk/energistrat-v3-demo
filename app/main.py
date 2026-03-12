@@ -2,6 +2,7 @@ import os
 import math
 import io
 import traceback
+import importlib
 import urllib.request
 import urllib.parse
 import base64
@@ -82,85 +83,36 @@ class MockCRM:
     def send_sales_email(self, *args, **kwargs): return True
 
 # ==============================================================================
-# BLOC IMPORT CORTEX ROBUSTE (ISOLATION ANTI-DOMINO)
+# AUTO-LOADER CORTEX ROBUSTE (ISOLATION ABSOLUE & MULTI-PATH)
 # ==============================================================================
-# DB
-try: from app.core.cortex_db import db
-except:
-    try: from core.cortex_db import db
-    except: db = MockDB()
+def load_module(mod_name, obj_name, mock_instance=None):
+    """Cherche le module dans app.core, puis dans core, puis à la racine."""
+    paths =[f"app.core.{mod_name}", f"core.{mod_name}", mod_name]
+    for path in paths:
+        try:
+            mod = importlib.import_module(path)
+            return getattr(mod, obj_name)
+        except ModuleNotFoundError:
+            continue
+        except Exception as e:
+            print(f"⚠️ Erreur critique dans {path} : {e}")
+            continue
+    print(f"🔴 Auto-Loader: Impossible de trouver {mod_name}. Fallback Mock activé.")
+    return mock_instance
 
-# Auth
-try: from app.core.cortex_auth import auth
-except:
-    try: from core.cortex_auth import auth
-    except: auth = MockAuth()
-
-# Engine
-try: from app.core.cortex_engine import cortex
-except:
-    try: from core.cortex_engine import cortex
-    except: cortex = MockCortex()
-
-# Ingest
-try: from app.core.cortex_ingest import ingest
-except:
-    try: from core.cortex_ingest import ingest
-    except: ingest = None
-
-# Physics (PVGIS)
-try: from app.core.cortex_physics import physics
-except:
-    try: from core.cortex_physics import physics
-    except: physics = None
-
-# Forecast
-try: from app.core.cortex_forecast import forecast
-except:
-    try: from core.cortex_forecast import forecast
-    except: forecast = MockForecast()
-
-# Router
-try: from app.core.cortex_router import router
-except:
-    try: from core.cortex_router import router
-    except: router = MockRouter()
-
-# Market
-try: from app.core.cortex_market import market
-except:
-    try: from core.cortex_market import market
-    except: market = MockMarket()
-
-# Aggregator
-try: from app.core.cortex_aggregator import aggregator
-except:
-    try: from core.cortex_aggregator import aggregator
-    except: aggregator = MockAggregator()
-
-# Finance
-try: from app.core.cortex_finance import finance
-except:
-    try: from core.cortex_finance import finance
-    except: finance = MockFinance()
-
-# RTE
-try: from app.core.cortex_rte import rte
-except:
-    try: from core.cortex_rte import rte
-    except: rte = MockRTE()
-
-# CRM
-try: from app.core.cortex_crm import crm_engine
-except:
-    try: from core.cortex_crm import crm_engine
-    except: crm_engine = MockCRM()
-
-# PDF
-try: from app.core.cortex_pdf import pdf_builder
-except:
-    try: from core.cortex_pdf import pdf_builder
-    except: pdf_builder = FallbackPDFBuilder()
+db = load_module("cortex_db", "db", MockDB())
+auth = load_module("cortex_auth", "auth", MockAuth())
+cortex = load_module("cortex_engine", "cortex", MockCortex())
+ingest = load_module("cortex_ingest", "ingest", None)
+physics = load_module("cortex_physics", "physics", None)
+forecast = load_module("cortex_forecast", "forecast", MockForecast())
+router = load_module("cortex_router", "router", MockRouter())
+market = load_module("cortex_market", "market", MockMarket())
+aggregator = load_module("cortex_aggregator", "aggregator", MockAggregator())
+finance = load_module("cortex_finance", "finance", MockFinance())
+rte = load_module("cortex_rte", "rte", MockRTE())
+crm_engine = load_module("cortex_crm", "crm_engine", MockCRM())
+pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 
 
 app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V11.0-STABLE")
@@ -292,53 +244,57 @@ async def api_create_crm_lead(payload: CRMLeadModel, user = Depends(get_current_
 
 @app.get("/api/crm/pipeline/{pipe_type}")
 async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user)):
-    """Extraction NATIVE depuis CortexDB (Garanti 100% Fonctionnel)"""
+    """Lecture Absolute depuis Firestore - Contourne les erreurs de classes"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès réservé"}, 401)
     
     db_leads =[]
     
-    # Appel de la nouvelle méthode injectée dans cortex_db.py
+    # 1. Tentative d'utilisation de la méthode db si le fichier cortex_db a été mis à jour
     if hasattr(db, 'get_all_leads'):
-        db_leads = db.get_all_leads()
-    else:
-        # Fallback de dernière chance si CortexDB n'est pas à jour
+        try: db_leads = db.get_all_leads()
+        except: pass
+        
+    # 2. FORCE BRUTE ABSOLUE (Le God Mode)
+    if not db_leads:
         try:
             from google.cloud import firestore
-            cl = firestore.Client()
-            for doc in cl.collection("Settings").stream():
+            # Connexion directe forcée sur le projet
+            client = firestore.Client(project="energistrat-saas")
+            for doc in client.collection("Settings").stream():
                 if doc.id.startswith("LEAD_"):
-                    db_leads.append({"id": doc.id, **doc.to_dict()})
-        except: pass
+                    data = doc.to_dict()
+                    data["id"] = doc.id
+                    db_leads.append(data)
+        except Exception as e:
+            print(f"🔴 ERREUR CRITIQUE CRM FETCH : {e}")
 
     deals =[]
     for l in db_leads:
         try:
-            # Sécurité 1: Filtrage par pipeline (Saas, Broker, Supplier)
-            db_pipe = str(l.get("pipeline", "saas")).strip().lower()
-            req_pipe = str(pipe_type).strip().lower()
-            if db_pipe != req_pipe: 
+            # Filtrage du pipeline 
+            if str(l.get("pipeline", "saas")).strip().lower() != str(pipe_type).strip().lower(): 
                 continue
             
-            # Sécurité 2: Cast des valeurs (Evite le crash si la valeur est vide ou nulle)
+            # Cast protégé pour volume
             try: vol = float(l.get("volume_est") or 0.0)
             except: vol = 0.0
             
             naf = str(l.get("naf", "DEFAULT")).strip()
             
-            # Sécurité 3: CORTEX IA Mapping
+            # Injection IA CORTEX
             intel = crm_engine.generate_icebreaker(naf)
             health = crm_engine.analyze_customer_health(vol, vol,[])
-            comms = crm_engine.calculate_commission(vol, req_pipe, saas_mrr=299)
+            comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
 
             deals.append({
-                "id": l.get("id"),
+                "id": l.get("id", ""),
                 "name": l.get("company_name", "Inconnu"),
                 "city": l.get("city", ""),
                 "naf": naf,
                 "volume": vol,
                 "stage": l.get("stage", "LEAD"),
                 "contact": {
-                    "name": f'{l.get("contact_firstname", "")} {l.get("contact_lastname", "")}'.strip(),
+                    "name": f"{l.get('contact_firstname', '')} {l.get('contact_lastname', '')}".strip(),
                     "role": l.get("contact_role", "Contact"),
                     "phone": l.get("contact_phone", ""),
                     "email": l.get("contact_email", "")
@@ -349,7 +305,7 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
                 "last_contact": l.get("last_contact", "Jamais")
             })
         except Exception as e:
-            print(f"⚠️ Erreur mapping lead {l.get('id')} : {e}")
+            print(f"⚠️ Erreur Data Unity sur {l.get('id')} : {e}")
             
     return JSONResponse(json_compliant({"success": True, "pipeline": deals}))
 
@@ -635,7 +591,7 @@ async def get_thermic_signature(client_id: str):
     fin = cortex.enrich_site_financials(data)
     vol = float(fin.get('volume_mwh') or data.get('kpis', {}).get('volume_mwh', 0))
     city = str(data.get('location', {}).get('city', 'Paris')).upper()
-    dju_profile =[x * 1.2 if any(v in city for v in ['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
+    dju_profile =[x * 1.2 if any(v in city for v in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
     total_dju = sum(dju_profile) or 1
     talon_monthly = (vol * (0.15 if fin.get('meta', {}).get('is_gas', False) else 0.30)) / 12
     chauf_ann = vol - (talon_monthly * 12)
@@ -989,7 +945,7 @@ PUBLIC_PAGES =[
 
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
-    if any(x in page_name for x in [".js", ".css", ".png", ".jpg", ".ico", ".svg"]): 
+    if any(x in page_name for x in[".js", ".css", ".png", ".jpg", ".ico", ".svg"]): 
         return JSONResponse({}, 404)
         
     target_file = page_name if page_name.endswith(".html") else f"{page_name}.html"
