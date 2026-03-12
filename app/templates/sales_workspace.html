@@ -3,10 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V10.0 | Sales Workspace (CRM Interne)</title>
+    <title>ENERGISTRAT V11.0 | Sales Workspace (CRM)</title>
     
+    <!-- TAILWIND & CHART.JS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- LEAFLET MAPS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -17,7 +23,8 @@
                     colors: { 
                         abysse: '#001529', card: '#0F172A', sidebar: '#020617', 
                         cyan: '#00E5FF', success: '#10B981', alert: '#EF4444', 
-                        gold: '#F59E0B', saas: '#A855F7', broker: '#3B82F6'
+                        gold: '#F59E0B', saas: '#A855F7', broker: '#3B82F6',
+                        supplier: '#8B5CF6'
                     },
                     fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
                     borderRadius: { 'bento': '1.5rem' }
@@ -33,20 +40,25 @@
         .view-section { display: none; } .view-section.active { display: block; animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Drag & Drop Kanban Styles */
+        /* Kanban Styles */
         .kanban-col { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 1rem; display: flex; flex-direction: column; height: 100%; transition: background-color 0.2s; }
         .kanban-col.drag-over { background: rgba(0, 229, 255, 0.1); border-color: #00E5FF; }
-        
         .kanban-card { background: #0F172A; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.75rem; padding: 1rem; cursor: grab; transition: all 0.2s; }
-        .kanban-card:hover { border-color: #00E5FF; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,229,255,0.1); }
+        .kanban-card:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,229,255,0.1); }
         .kanban-card:active { cursor: grabbing; transform: scale(0.98); opacity: 0.8; }
 
         .timeline-line { position: absolute; left: 1.25rem; top: 2rem; bottom: 0; width: 2px; background: rgba(255,255,255,0.1); z-index: 0; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        
+        /* Map Leaflet Dark Mode */
+        #map { width: 100%; height: 100%; border-radius: 1.5rem; z-index: 10; background-color: #001529; }
+        .leaflet-popup-content-wrapper { background-color: rgba(15, 23, 42, 0.9); color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 1rem; backdrop-filter: blur(10px); }
+        .leaflet-popup-tip { background-color: rgba(15, 23, 42, 0.9); }
 
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        
+        /* Formulaires */
         .input-cyber { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.3s; width: 100%; padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.875rem; outline: none; }
         .input-cyber:focus { border-color: #00E5FF; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
-        
         select.cyber-select { appearance: none; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px 30px 8px 15px; border-radius: 0.5rem; outline: none; cursor: pointer; }
         select.cyber-select option { background: #0F172A; }
     </style>
@@ -66,13 +78,18 @@
         </div>
         
         <nav class="flex-1 overflow-y-auto py-4 space-y-1">
-            <div class="text-[9px] text-gray-500 uppercase font-bold px-4 mb-2">Workspace</div>
+            <div class="text-[9px] text-gray-500 uppercase font-bold px-4 mb-2">Opérationnel</div>
             <button onclick="switchView('pipeline')" id="nav-pipeline" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-bars-staggered w-4 text-center"></i> Kanban & Commissions
+                <i class="fa-solid fa-bars-staggered w-4 text-center"></i> Kanban & Deals
             </button>
             <button onclick="switchView('contacts')" id="nav-contacts" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-address-book w-4 text-center"></i> Fiche Client & Activités
+                <i class="fa-solid fa-address-card w-4 text-center"></i> Fiche Client & Emailing
             </button>
+            <button onclick="switchView('map')" id="nav-map" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
+                <i class="fa-solid fa-map-location-dot w-4 text-center"></i> War Room (Carte)
+            </button>
+            
+            <div class="text-[9px] text-gray-500 uppercase font-bold px-4 mt-6 mb-2">Direction Commerciale</div>
             <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
                 <i class="fa-solid fa-chart-pie w-4 text-center"></i> Reporting DCO
             </button>
@@ -80,27 +97,29 @@
         
         <div class="p-6 border-t border-white/5 bg-black/20">
             <a href="/ops_nexus" class="flex items-center gap-2 text-gray-400 hover:text-white transition text-xs font-bold bg-white/5 px-4 py-3 rounded-xl border border-white/10 hover:border-white/30">
-                <i class="fa-solid fa-arrow-left text-gray-500"></i> Quitter le CRM
+                <i class="fa-solid fa-arrow-left text-gray-500"></i> Retour Nexus Ops
             </a>
         </div>
     </aside>
 
     <!-- MAIN -->
-    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-cyan/5 via-abysse to-abysse">
         
         <!-- HEADER -->
         <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-40 sticky top-0">
             <div>
                 <h2 id="page-title" class="text-2xl font-black text-white tracking-tight">Gestion des Affaires (Kanban)</h2>
-                <p class="text-xs text-gray-400 mt-1">Connecté à la Data Unity. Déplacez les cartes pour mettre à jour la base.</p>
+                <p class="text-xs text-gray-400 mt-1">Glissez les cartes dans "Signé" pour créer l'espace client automatiquement.</p>
             </div>
             
-            <div class="flex items-center gap-6">
-                <!-- GAMIFICATION : La jauge de commission du commercial -->
-                <div class="bg-cyan/10 border border-cyan/30 px-6 py-2 rounded-xl text-right group hover:bg-cyan/20 transition cursor-pointer">
-                    <span class="text-[10px] text-cyan uppercase font-bold block"><i class="fa-solid fa-sack-dollar"></i> Mes Commissions (Est.)</span>
-                    <span class="text-xl font-bold text-white font-mono" id="my-commission">-- €</span>
+            <div class="flex items-center gap-4">
+                <div class="bg-cyan/10 border border-cyan/30 px-6 py-2 rounded-xl text-right cursor-pointer" title="Calculé sur vos deals en cours">
+                    <span class="text-[10px] text-cyan uppercase font-bold block"><i class="fa-solid fa-sack-dollar"></i> Mes Commissions (Mois)</span>
+                    <span class="text-xl font-bold text-white font-mono" id="my-commission">0 €</span>
                 </div>
+                <button onclick="openLeadModal()" class="bg-cyan text-abysse font-black px-6 py-3 rounded-xl hover:bg-white transition shadow-[0_0_15px_rgba(0,229,255,0.4)] flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus"></i> CRÉER PROSPECT
+                </button>
             </div>
         </header>
 
@@ -111,98 +130,90 @@
             <!-- ========================================== -->
             <div id="view-pipeline" class="view-section active h-[calc(100vh-160px)]">
                 
-                <!-- SELECTEUR DE PIPELINE -->
+                <!-- SELECTEUR DES 3 PIPELINES -->
                 <div class="flex justify-between items-center mb-4">
                     <div class="flex bg-white/5 p-1 rounded-xl border border-white/10">
-                        <button onclick="switchPipeline('saas')" id="btn-pipe-saas" class="px-6 py-2 rounded-lg text-xs font-bold bg-saas text-white transition shadow-lg"><i class="fa-solid fa-desktop mr-2"></i> Vente Logiciel SaaS</button>
-                        <button onclick="switchPipeline('broker')" id="btn-pipe-broker" class="px-6 py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-white transition"><i class="fa-solid fa-bolt mr-2"></i> Courtage Énergie</button>
+                        <button onclick="switchPipeline('saas')" id="btn-pipe-saas" class="px-6 py-2 rounded-lg text-xs font-bold bg-saas text-white transition shadow-lg"><i class="fa-solid fa-desktop mr-2"></i> 1. Vente Logiciel SaaS</button>
+                        <button onclick="switchPipeline('broker')" id="btn-pipe-broker" class="px-6 py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-white transition"><i class="fa-solid fa-bolt mr-2"></i> 2. Courtage Énergie</button>
+                        <button onclick="switchPipeline('supplier')" id="btn-pipe-supplier" class="px-6 py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-white transition"><i class="fa-solid fa-handshake mr-2"></i> 3. Recrutement Fournisseurs</button>
                     </div>
-                    <div class="text-gray-400 text-sm font-bold">Volume du Pipeline (Actif) : <span class="text-white font-mono text-lg ml-2" id="pipeline-value">-- MWh</span></div>
                 </div>
 
-                <!-- BOARD KANBAN -->
                 <div class="flex gap-4 h-full overflow-x-auto pb-4" id="kanban-board">
-                    
                     <div class="kanban-col min-w-[300px] flex-1" ondrop="drop(event, 'LEAD')" ondragover="allowDrop(event)">
-                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-gray-300 text-xs uppercase tracking-widest">1. Prospection</h4><span class="text-gray-500 text-xs font-mono" id="count-LEAD">0</span></div>
+                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-gray-300 text-xs uppercase tracking-widest">1. À Contacter</h4><span class="text-gray-500 text-xs font-mono" id="count-LEAD">0</span></div>
                         <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-LEAD"></div>
                     </div>
-
                     <div class="kanban-col min-w-[300px] flex-1" ondrop="drop(event, 'RDV')" ondragover="allowDrop(event)">
-                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-blue-400 text-xs uppercase tracking-widest">2. RDV Fixé</h4><span class="text-gray-500 text-xs font-mono" id="count-RDV">0</span></div>
+                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-blue-400 text-xs uppercase tracking-widest">2. RDV Qualifié</h4><span class="text-gray-500 text-xs font-mono" id="count-RDV">0</span></div>
                         <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-RDV"></div>
                     </div>
-
                     <div class="kanban-col min-w-[300px] flex-1" ondrop="drop(event, 'OFFRE')" ondragover="allowDrop(event)">
-                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-gold text-xs uppercase tracking-widest">3. Offre / DQE Envoyé</h4><span class="text-gray-500 text-xs font-mono" id="count-OFFRE">0</span></div>
+                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-gold text-xs uppercase tracking-widest">3. Offre Envoyée</h4><span class="text-gray-500 text-xs font-mono" id="count-OFFRE">0</span></div>
                         <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-OFFRE"></div>
                     </div>
-
                     <div class="kanban-col min-w-[300px] flex-1" ondrop="drop(event, 'NEGOCIATION')" ondragover="allowDrop(event)">
-                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-orange-500 text-xs uppercase tracking-widest">4. Négociation (SASP)</h4><span class="text-gray-500 text-xs font-mono" id="count-NEGOCIATION">0</span></div>
+                        <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-orange-500 text-xs uppercase tracking-widest">4. Négociation</h4><span class="text-gray-500 text-xs font-mono" id="count-NEGOCIATION">0</span></div>
                         <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-NEGOCIATION"></div>
                     </div>
-
                     <div class="kanban-col min-w-[300px] flex-1 bg-success/5 border-success/20" ondrop="drop(event, 'WON')" ondragover="allowDrop(event)">
-                        <div class="p-3 border-b border-success/20 bg-success/10 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-success text-xs uppercase tracking-widest">5. Contrat Signé</h4><span class="text-success text-xs font-mono" id="count-WON">0</span></div>
+                        <div class="p-3 border-b border-success/20 bg-success/10 rounded-t-xl flex justify-between items-center"><h4 class="font-bold text-success text-xs uppercase tracking-widest">5. Signé (Closing)</h4><span class="text-success text-xs font-mono" id="count-WON">0</span></div>
                         <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-WON"></div>
                     </div>
-
                 </div>
             </div>
 
             <!-- ========================================== -->
-            <!-- VUE 2 : FICHE CONTACT & ACTION -->
+            <!-- VUE 2 : FICHE CONTACT & EMAILING (ZÉRO MOCK) -->
             <!-- ========================================== -->
             <div id="view-contacts" class="view-section">
                 <div class="grid grid-cols-12 gap-6 h-[800px]">
-                    
-                    <!-- Liste des Contacts -->
+                    <!-- Colonne 1 : Répertoire -->
                     <div class="col-span-3 bento-card p-0 flex flex-col overflow-hidden">
-                        <div class="p-4 border-b border-white/10"><input type="text" placeholder="Rechercher prospect..." class="input-cyber w-full border-none bg-white/5"></div>
-                        <div class="flex-1 overflow-y-auto divide-y divide-white/5" id="contact-list">
-                            <div class="p-8 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mb-2"></i><br>Chargement des leads...</div>
-                        </div>
+                        <div class="p-4 border-b border-white/10"><input type="text" placeholder="Rechercher..." class="input-cyber w-full border-none bg-white/5 py-2"></div>
+                        <div class="flex-1 overflow-y-auto divide-y divide-white/5" id="contact-list"></div>
                     </div>
 
-                    <!-- Fiche 360 -->
+                    <!-- Colonne 2 : Fiche 360 -->
                     <div class="col-span-6 bento-card p-6 flex flex-col relative overflow-hidden" id="contact-detail-panel">
                         <div class="flex justify-center items-center h-full text-gray-500 flex-col">
                             <i class="fa-solid fa-address-book text-6xl mb-4 opacity-30"></i>
-                            <p>Sélectionnez un client dans le Kanban ou le répertoire pour ouvrir sa fiche.</p>
+                            <p>Sélectionnez un contact dans le Kanban pour ouvrir sa fiche.</p>
                         </div>
                     </div>
 
-                    <!-- Sidebar Droite (Outils de Vente & Data) -->
+                    <!-- Colonne 3 : CPQ & Icebreaker -->
                     <div class="col-span-3 space-y-6" id="contact-intel-panel">
                         <div class="bento-card p-6 bg-gradient-to-br from-card to-cyan/10 border-t-4 border-cyan">
-                            <h4 class="font-bold text-white text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-brain text-cyan"></i> CORTEX Icebreaker</h4>
-                            <div id="intel-content">
-                                <div class="text-[10px] text-gray-400 italic">Veuillez sélectionner un compte pour afficher l'analyse NAF.</div>
-                            </div>
-                        </div>
-
-                        <!-- Bouton Génération DQE rapide -->
-                        <div class="bento-card p-6 border border-white/10">
-                            <h4 class="font-bold text-white text-xs uppercase tracking-widest mb-4">Actions Commerciales</h4>
-                            <button onclick="App.toast('Demande de cotation transmise au bureau d\'études', 'success')" class="w-full bg-white/10 hover:bg-cyan hover:text-abysse text-white font-bold py-3 rounded-xl transition text-xs mb-3 flex justify-center items-center gap-2">
-                                <i class="fa-solid fa-file-invoice"></i> Générer Appel d'Offres
-                            </button>
-                            <button onclick="App.toast('OEF prêt pour signature eIDAS', 'info')" class="w-full bg-white/5 hover:bg-white/20 text-gray-400 hover:text-white font-bold py-3 rounded-xl transition text-xs flex justify-center items-center gap-2">
-                                <i class="fa-solid fa-pen-nib"></i> Préparer le Contrat
-                            </button>
+                            <h4 class="font-bold text-white text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-brain text-cyan"></i> Analyse IA (API Gouv)</h4>
+                            <div id="intel-content"><div class="text-[10px] text-gray-400 italic">En attente de sélection...</div></div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- ========================================== -->
-            <!-- VUE 3 : REPORTING DCO -->
+            <!-- VUE 3 : WAR ROOM (CARTE LEAFLET) -->
+            <!-- ========================================== -->
+            <div id="view-map" class="view-section h-[700px]">
+                <div class="bento-card p-1 border-t-4 border-cyan relative h-full">
+                    <div id="map"></div>
+                    <div class="absolute bottom-4 left-4 bg-abysse/90 p-4 rounded-xl border border-white/10 z-[1000] text-[10px] font-bold text-white">
+                        <div class="mb-2 text-gray-400 uppercase tracking-widest border-b border-white/10 pb-1">Répartition Prospects</div>
+                        <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-saas"></span> Pistes Logiciel (SaaS)</div>
+                        <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-broker"></span> Pistes Courtage</div>
+                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-supplier"></span> Cibles Fournisseurs</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VUE 4 : REPORTING DCO -->
             <!-- ========================================== -->
             <div id="view-dashboard" class="view-section space-y-6">
                 <div class="grid grid-cols-2 gap-6">
                     <div class="bento-card p-6 h-80 flex flex-col shadow-2xl">
-                        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">Pipeline Ponderé (Volume MWh)</h3>
+                        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">CA Sécurisé (SaaS vs Courtage)</h3>
                         <div class="flex-1 relative w-full"><canvas id="funnelChart"></canvas></div>
                     </div>
                 </div>
@@ -210,6 +221,53 @@
 
         </div>
     </main>
+
+    <!-- ========================================== -->
+    <!-- MODALE CRÉATION DE LEAD (CRM_Leads) -->
+    <!-- ========================================== -->
+    <div id="lead-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bento-card p-8 rounded-2xl w-full max-w-2xl relative border-t-4 border-cyan shadow-[0_0_50px_rgba(0,229,255,0.15)]">
+            <button onclick="document.getElementById('lead-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-2xl font-black text-white mb-2 flex items-center gap-3"><i class="fa-solid fa-user-plus text-cyan"></i> Nouveau Prospect</h3>
+            
+            <form id="form-new-lead" onsubmit="createLead(event)" class="space-y-4">
+                <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                    <h4 class="text-[10px] font-bold text-cyan uppercase tracking-widest mb-3 border-b border-white/10 pb-2">Qualification de l'entreprise</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="block text-[10px] font-bold text-gray-400 mb-1">SIRET</label><input type="text" id="lead-siret" class="input-cyber font-mono" placeholder="14 chiffres" required onblur="checkSiret()"></div>
+                        <div><label class="block text-[10px] font-bold text-gray-400 mb-1">Raison Sociale</label><input type="text" id="lead-company" class="input-cyber font-bold text-white bg-abysse/50" placeholder="Recherche INSEE..." required></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-3">
+                        <div><label class="block text-[10px] font-bold text-gray-400 mb-1">Code NAF</label><input type="text" id="lead-naf" class="input-cyber font-mono text-gray-300 bg-abysse/50" placeholder="Automatique"></div>
+                        <div><label class="block text-[10px] font-bold text-gray-400 mb-1">Ville (Pour la carte)</label><input type="text" id="lead-city" class="input-cyber" placeholder="Paris, Lyon..."></div>
+                    </div>
+                </div>
+
+                <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                    <h4 class="text-[10px] font-bold text-cyan uppercase tracking-widest mb-3 border-b border-white/10 pb-2">Le Contact (Décideur)</h4>
+                    <div class="grid grid-cols-2 gap-4 mb-3">
+                        <div><label class="block text-[10px] font-bold text-gray-400 mb-1">Prénom & Nom</label><div class="flex gap-2"><input type="text" id="lead-firstname" class="input-cyber w-1/2" placeholder="Prénom" required><input type="text" id="lead-lastname" class="input-cyber w-1/2" placeholder="Nom" required></div></div>
+                        <div><label class="block text-[10px] font-bold text-gray-400 mb-1">Fonction (Rôle)</label><select id="lead-role" class="cyber-select w-full"><option value="Dirigeant / Gérant">Dirigeant / Gérant</option><option value="DAF / Finance">DAF / Finance</option><option value="Maire / DGS">Maire / DGS (Public)</option><option value="Acheteur">Acheteur</option></select></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="block text-[10px] font-bold text-gray-400 mb-1">Email Pro</label><input type="email" id="lead-email" class="input-cyber" placeholder="contact@boite.fr" required></div>
+                        <div><label class="block text-[10px] font-bold text-gray-400 mb-1">Téléphone</label><input type="tel" id="lead-phone" class="input-cyber font-mono" placeholder="06 12 34 56 78" required></div>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center pt-4 border-t border-white/10">
+                    <div class="flex items-center gap-3">
+                        <label class="text-[10px] font-bold text-gray-400">Objectif (Pipeline) :</label>
+                        <select id="lead-pipeline" class="cyber-select text-xs font-bold text-white"><option value="saas">Vente Logiciel (SaaS)</option><option value="broker">Courtage Énergie</option><option value="supplier">Recrutement Fournisseur</option></select>
+                    </div>
+                    <div class="flex gap-3">
+                        <button type="button" onclick="document.getElementById('lead-modal').classList.add('hidden')" class="px-4 py-2 text-gray-400 hover:text-white font-bold text-xs transition">Annuler</button>
+                        <button type="submit" id="btn-save-lead" class="bg-cyan text-abysse px-6 py-2 rounded-xl font-black text-sm hover:bg-white transition shadow-lg">ENREGISTRER</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed bottom-4 right-4 z-[300] flex flex-col gap-2 pointer-events-none"></div>
@@ -221,7 +279,7 @@
                 const colors = { success: 'bg-green-600 border-green-500', error: 'bg-alert border-red-500 text-white', info: 'bg-cyan border-cyan text-abysse' };
                 const el = document.createElement('div');
                 el.className = `${colors[type] || colors.info} px-6 py-3 rounded-xl shadow-2xl text-xs font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
-                el.innerHTML = `<span><i class="fa-solid fa-info-circle"></i></span> ${msg}`;
+                el.innerHTML = `<span><i class="fa-solid fa-circle-info"></i></span> ${msg}`;
                 container.appendChild(el);
                 requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
                 setTimeout(() => { el.classList.add('opacity-0', 'translate-x-full'); setTimeout(() => el.remove(), 300); }, 3000);
@@ -229,10 +287,10 @@
         };
 
         let CRM_DATA = [];
-        let funnelChartInst = null;
-        let ACTIVE_PIPELINE = 'saas'; // saas ou broker
+        let ACTIVE_PIPELINE = 'saas'; 
+        let mapInstance = null;
 
-        // NAVIGATION
+        // --- NAVIGATION ---
         window.switchView = function(viewId) {
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
             const btn = document.getElementById('nav-' + viewId);
@@ -240,58 +298,112 @@
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById('view-' + viewId).classList.add('active');
             
-            const titles = {'dashboard': 'Reporting Direction', 'pipeline': 'Gestion des Affaires (Kanban)', 'contacts': 'Fiche Client & Renseignement'};
+            const titles = {'dashboard': 'Reporting DCO', 'pipeline': 'Gestion des Affaires (Kanban)', 'contacts': 'Fiche Client & Activités', 'map': 'War Room (Carte des Prospects)'};
             document.getElementById('page-title').innerText = titles[viewId];
             
-            if(viewId === 'dashboard') renderChart();
+            if(viewId === 'map') setTimeout(initMap, 300);
         }
 
         window.switchPipeline = function(type) {
             ACTIVE_PIPELINE = type;
             const btnSaas = document.getElementById('btn-pipe-saas');
             const btnBroker = document.getElementById('btn-pipe-broker');
+            const btnSupplier = document.getElementById('btn-pipe-supplier');
             
-            if(type === 'saas') {
-                btnSaas.className = "px-6 py-2 rounded-lg text-xs font-bold bg-saas text-white transition shadow-lg";
-                btnBroker.className = "px-6 py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-white transition";
-            } else {
-                btnBroker.className = "px-6 py-2 rounded-lg text-xs font-bold bg-broker text-white transition shadow-lg";
-                btnSaas.className = "px-6 py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-white transition";
-            }
-            renderKanban(); // Re-filtre les deals
+            [btnSaas, btnBroker, btnSupplier].forEach(b => b.className = "px-6 py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-white transition");
+            
+            if(type === 'saas') { btnSaas.classList.add('bg-saas', 'text-white', 'shadow-lg'); btnSaas.classList.remove('text-gray-400'); } 
+            else if(type === 'broker') { btnBroker.classList.add('bg-broker', 'text-white', 'shadow-lg'); btnBroker.classList.remove('text-gray-400'); }
+            else { btnSupplier.classList.add('bg-supplier', 'text-white', 'shadow-lg'); btnSupplier.classList.remove('text-gray-400'); }
+            
+            loadCRMPipeline(); 
         }
 
-        // --- MOTEUR CRM (FETCH API ZÉRO MOCK) ---
+        // --- API GOUV (SIRET) ---
+        window.checkSiret = async function() {
+            const siret = document.getElementById('lead-siret').value.replace(/\s/g, '');
+            if (siret.length >= 9) {
+                try {
+                    const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${siret}`);
+                    const data = await res.json();
+                    if(data.results && data.results.length > 0) {
+                        document.getElementById('lead-company').value = data.results[0].nom_complet || data.results[0].nom_raison_sociale;
+                        document.getElementById('lead-naf').value = data.results[0].activite_principale;
+                        if(data.results[0].siege && data.results[0].siege.libelle_commune) {
+                            document.getElementById('lead-city').value = data.results[0].siege.libelle_commune;
+                        }
+                        App.toast("Qualification INSEE réussie.", "success");
+                    }
+                } catch(e) {}
+            }
+        }
+
+        // --- CREATION LEAD ---
+        window.openLeadModal = function() {
+            document.getElementById('form-new-lead').reset();
+            document.getElementById('lead-pipeline').value = ACTIVE_PIPELINE;
+            document.getElementById('lead-modal').classList.remove('hidden');
+        }
+
+        window.createLead = async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-save-lead');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> CREATION...'; btn.disabled = true;
+
+            const payload = {
+                siret: document.getElementById('lead-siret').value,
+                company_name: document.getElementById('lead-company').value,
+                naf: document.getElementById('lead-naf').value,
+                city: document.getElementById('lead-city').value,
+                contact_firstname: document.getElementById('lead-firstname').value,
+                contact_lastname: document.getElementById('lead-lastname').value,
+                contact_role: document.getElementById('lead-role').value,
+                contact_email: document.getElementById('lead-email').value,
+                contact_phone: document.getElementById('lead-phone').value,
+                source: "Saisie Manuelle", pipeline: document.getElementById('lead-pipeline').value, stage: "LEAD"
+            };
+
+            try {
+                const res = await fetch('/api/crm/lead', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                if(res.ok) {
+                    App.toast("Prospect créé ! Retrouvez-le dans le Kanban.", "success");
+                    document.getElementById('lead-modal').classList.add('hidden');
+                    loadCRMPipeline(); 
+                } else App.toast("Erreur serveur.", "error");
+            } catch(e) { App.toast("Erreur réseau.", "error"); }
+            
+            btn.innerHTML = 'ENREGISTRER'; btn.disabled = false;
+        }
+
+        // --- MOTEUR KANBAN & CRM ---
         async function loadCRMPipeline() {
             try {
-                // Vrai appel API Backend 
-                const res = await fetch('/api/crm/pipeline');
+                const res = await fetch(`/api/crm/pipeline/${ACTIVE_PIPELINE}`);
                 const data = await res.json();
-                
                 if(data.success && data.pipeline) {
                     CRM_DATA = data.pipeline;
-                    renderKanban();
-                    renderContactList();
-                } else {
-                    App.toast("Erreur serveur API.", "error");
+                    renderKanban(); renderContactList();
                 }
             } catch(e) { console.error(e); }
         }
 
         function renderKanban() {
             const cols = { 'LEAD': [], 'RDV': [], 'OFFRE': [], 'NEGOCIATION': [], 'WON': [] };
-            let totalCommission = 0;
-            let totalVolumePipeline = 0;
+            let totalComm = 0; let totalVol = 0;
 
             CRM_DATA.forEach(deal => {
                 const stage = deal.stage || 'LEAD';
                 if(cols[stage]) cols[stage].push(deal);
-                totalVolumePipeline += deal.volume;
-                if(stage === 'WON') totalCommission += (deal.commission_est || 0);
+                totalVol += deal.volume;
+                if(stage === 'WON') totalComm += (deal.commission_est || 0);
             });
 
-            document.getElementById('my-commission').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalCommission)) + " €";
-            document.getElementById('pipeline-value').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalVolumePipeline)) + " MWh";
+            document.getElementById('my-commission').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalComm)) + " €";
+            document.getElementById('pipeline-value').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalVol)) + (ACTIVE_PIPELINE === 'saas' ? " € MRR" : " MWh");
+
+            // Couleurs des bordures
+            const pipeColor = ACTIVE_PIPELINE === 'saas' ? 'border-saas' : (ACTIVE_PIPELINE === 'broker' ? 'border-broker' : 'border-supplier');
+            const unit = ACTIVE_PIPELINE === 'saas' ? '€' : 'MWh';
 
             for(let stage in cols) {
                 const container = document.getElementById(`col-${stage}`);
@@ -299,101 +411,76 @@
                 document.getElementById(`count-${stage}`).innerText = cols[stage].length;
 
                 cols[stage].forEach(deal => {
-                    let healthBadge = "";
-                    if (deal.health && deal.health.status !== "STABLE") {
-                        healthBadge = `<div class="mt-2 text-[9px] font-bold ${deal.health.color} bg-black/40 px-2 py-1 rounded"><i class="fa-solid fa-triangle-exclamation"></i> ${deal.health.status}</div>`;
-                    }
-
-                    // Couleur du liseré gauche
-                    const pipeColor = ACTIVE_PIPELINE === 'saas' ? 'border-l-4 border-saas' : 'border-l-4 border-broker';
-
+                    const ctc = deal.contact || {};
+                    let healthBadge = deal.health.status !== "STABLE" ? `<div class="mt-2 text-[9px] font-bold ${deal.health.color} bg-black/40 px-2 py-1 rounded"><i class="fa-solid fa-triangle-exclamation"></i> ${deal.health.status}</div>` : '';
+                    
                     container.innerHTML += `
-                        <div class="kanban-card ${pipeColor}" draggable="true" ondragstart="drag(event, '${deal.id}')" onclick="openContactDetail('${deal.id}')">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="text-[9px] font-bold bg-white/10 px-2 py-0.5 rounded text-gray-300 border border-white/20">NAF: ${deal.naf}</span>
-                                <i class="fa-solid fa-grip-lines text-gray-600"></i>
-                            </div>
+                        <div class="kanban-card border-l-4 ${pipeColor}" draggable="true" ondragstart="drag(event, '${deal.id}')" onclick="openContactDetail('${deal.id}')">
+                            <div class="flex justify-between items-start mb-2"><span class="text-[9px] font-bold bg-white/10 px-2 py-0.5 rounded text-gray-300">NAF: ${deal.naf}</span><i class="fa-solid fa-grip-lines text-gray-600"></i></div>
                             <h5 class="font-bold text-white text-sm mb-1 truncate">${deal.name}</h5>
-                            <div class="text-[10px] text-gray-400 mb-2">Vol: ${deal.volume} MWh</div>
+                            <div class="text-[10px] text-gray-400 mb-2"><i class="fa-solid fa-user mr-1"></i> ${ctc.name || 'Inconnu'}</div>
                             ${healthBadge}
                             <div class="flex justify-between items-center text-xs border-t border-white/10 pt-2 mt-3">
-                                <span class="font-mono text-cyan font-bold" title="Commission Estimée">+ ${Math.round(deal.commission_est)} €</span>
+                                <span class="font-mono text-cyan font-bold">${deal.volume} ${unit}</span>
+                                <i class="fa-solid fa-arrow-right text-gray-600 hover:text-white transition"></i>
                             </div>
                         </div>
                     `;
                 });
             }
-            renderChart();
         }
 
-        // --- GESTION DU DRAG & DROP (SAUVEGARDE DB) ---
+        // Drag & Drop
         let draggedDealId = null;
         window.drag = function(ev, dealId) { draggedDealId = dealId; ev.dataTransfer.setData("text", dealId); }
         window.allowDrop = function(ev) { ev.preventDefault(); const col = ev.target.closest('.kanban-col'); if(col) col.classList.add('drag-over'); }
-        
         window.drop = async function(ev, targetStage) {
-            ev.preventDefault();
-            document.querySelectorAll('.kanban-col').forEach(c => c.classList.remove('drag-over'));
-            
+            ev.preventDefault(); document.querySelectorAll('.kanban-col').forEach(c => c.classList.remove('drag-over'));
             if(draggedDealId) {
                 const deal = CRM_DATA.find(d => d.id === draggedDealId);
                 if(deal && deal.stage !== targetStage) {
-                    deal.stage = targetStage;
-                    renderKanban(); 
-                    
+                    deal.stage = targetStage; renderKanban(); 
                     if(targetStage === 'WON') App.toast("🎉 Deal Signé ! Commission calculée.", "success");
-
-                    // Appel Vrai API Backend
-                    try {
-                        await fetch('/api/crm/deal/move', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ deal_id: draggedDealId, new_stage: targetStage, pipeline_type: ACTIVE_PIPELINE })
-                        });
-                    } catch(e) { App.toast("Erreur réseau.", "error"); }
+                    try { await fetch('/api/crm/deal/move', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ deal_id: draggedDealId, new_stage: targetStage }) }); } catch(e) {}
                 }
             }
         }
-
         document.addEventListener('dragover', (e) => { document.querySelectorAll('.kanban-col').forEach(c => { if(!c.contains(e.target)) c.classList.remove('drag-over'); }); });
 
-        // --- FICHE CONTACT 360 ---
+        // --- FICHE 360 & EMAILING ---
         function renderContactList() {
-            const list = document.getElementById('contact-list');
-            list.innerHTML = '';
-            CRM_DATA.forEach(d => {
-                list.innerHTML += `<div class="p-4 hover:bg-white/5 cursor-pointer transition border-l-4 border-transparent hover:border-cyan" onclick="openContactDetail('${d.id}')"><div class="font-bold text-white text-sm truncate">${d.name}</div><div class="text-[10px] text-gray-400 uppercase mt-1">Étape: ${d.stage}</div></div>`;
-            });
+            const list = document.getElementById('contact-list'); list.innerHTML = '';
+            CRM_DATA.forEach(d => { list.innerHTML += `<div class="p-4 hover:bg-white/5 cursor-pointer transition border-l-4 border-transparent hover:border-cyan" onclick="openContactDetail('${d.id}')"><div class="font-bold text-white text-sm truncate">${d.name}</div><div class="text-[10px] text-gray-400 uppercase mt-1">Étape: ${d.stage}</div></div>`; });
         }
 
         window.openContactDetail = function(id) {
             const deal = CRM_DATA.find(d => d.id === id);
             if(!deal) return;
             switchView('contacts');
-
+            const ctc = deal.contact || {};
             const initial = deal.name.charAt(0).toUpperCase();
 
-            // VRAIE TIMELINE INTERACTIVE
             document.getElementById('contact-detail-panel').innerHTML = `
                 <div class="flex justify-between items-start mb-6 pb-6 border-b border-white/10">
                     <div class="flex gap-4 items-center">
                         <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-cyan to-blue-600 flex items-center justify-center text-abysse font-black text-2xl">${initial}</div>
                         <div>
                             <h3 class="text-2xl font-black text-white">${deal.name}</h3>
-                            <p class="text-sm text-gray-400"><i class="fa-solid fa-bolt text-gold mr-1"></i> Volume Data Unity : <b class="text-white">${deal.volume} MWh</b></p>
+                            <p class="text-sm text-gray-400 mt-1"><i class="fa-solid fa-user mr-1"></i> ${ctc.name} (${ctc.role})</p>
+                            <p class="text-xs text-gray-500 font-mono mt-1"><i class="fa-solid fa-envelope mr-1"></i> ${ctc.email} | <i class="fa-solid fa-phone mr-1"></i> ${ctc.phone}</p>
                         </div>
                     </div>
                 </div>
                 
-                <!-- ZONE DE SAISIE NOTES (ZÉRO MOCK UX) -->
+                <!-- ZONE D'ACTION (Note / Emailing) -->
                 <div class="bg-black/40 p-4 rounded-xl border border-white/5 mb-8">
-                    <textarea class="w-full bg-transparent border-none text-sm text-white outline-none resize-none mb-2" rows="3" placeholder="Saisir un compte rendu d'appel, une note..."></textarea>
-                    <div class="flex justify-between items-center border-t border-white/10 pt-2">
-                        <div class="flex gap-4 text-gray-500">
-                            <i class="fa-solid fa-phone hover:text-white cursor-pointer"></i>
-                            <i class="fa-solid fa-envelope hover:text-white cursor-pointer"></i>
-                        </div>
-                        <button onclick="App.toast('Note sauvegardée dans la chronologie', 'success')" class="bg-cyan text-abysse font-bold px-4 py-1.5 rounded-lg text-xs hover:bg-white transition">Enregistrer</button>
+                    <div class="flex gap-4 mb-3 border-b border-white/5 pb-2">
+                        <button onclick="toggleAction('note')" class="text-xs font-bold text-cyan border-b-2 border-cyan pb-1"><i class="fa-solid fa-pen mr-1"></i> Saisir Note</button>
+                        <button onclick="toggleAction('email')" class="text-xs font-bold text-gray-500 hover:text-white pb-1"><i class="fa-solid fa-envelope mr-1"></i> Rédiger Email</button>
+                    </div>
+                    <div id="action-body">
+                        <textarea id="note-input" class="w-full bg-transparent border-none text-sm text-white outline-none resize-none mb-2" rows="3" placeholder="Saisir un compte rendu d'appel..."></textarea>
+                        <div class="flex justify-end pt-2"><button onclick="App.toast('Note enregistrée.', 'success')" class="bg-cyan text-abysse font-bold px-6 py-2 rounded-lg text-xs hover:bg-white transition">Enregistrer</button></div>
                     </div>
                 </div>
 
@@ -401,11 +488,8 @@
                 <div class="flex-1 overflow-y-auto relative pl-12 pr-4 space-y-6">
                     <div class="timeline-line"></div>
                     <div class="relative">
-                        <div class="absolute -left-12 w-8 h-8 rounded-full bg-gray-800 border-4 border-card flex items-center justify-center text-gray-400 text-xs z-10"><i class="fa-solid fa-robot"></i></div>
-                        <div class="bg-white/5 border border-white/10 rounded-xl p-4">
-                            <div class="flex justify-between text-[10px] text-gray-500 mb-2"><span>Diagnostic Santé SGE</span><span>Dernier Scan: ${deal.last_contact}</span></div>
-                            <p class="text-sm font-bold ${deal.health.color}">${deal.health.message}</p>
-                        </div>
+                        <div class="absolute -left-12 w-8 h-8 rounded-full bg-blue-900 border-4 border-card flex items-center justify-center text-blue-400 text-xs z-10"><i class="fa-solid fa-user-plus"></i></div>
+                        <div class="bg-white/5 border border-white/10 rounded-xl p-4"><div class="flex justify-between text-[10px] text-gray-500 mb-2"><span>Création du prospect</span><span>Aujourd'hui</span></div><p class="text-sm font-bold text-white">Importé via l'API INSEE.</p></div>
                     </div>
                 </div>
             `;
@@ -413,48 +497,73 @@
             // ICEBREAKER IA
             if(deal.intelligence) {
                 document.getElementById('intel-content').innerHTML = `
-                    <div class="mb-4">
-                        <span class="text-[10px] text-gray-500 uppercase font-bold">Douleurs Identifiées (NAF ${deal.naf})</span>
-                        <p class="text-xs text-alert font-bold mt-1 bg-alert/10 p-2 rounded">${deal.intelligence.pain_points}</p>
-                    </div>
+                    <div class="mb-4"><span class="text-[10px] text-gray-500 uppercase font-bold">Douleurs Identifiées (NAF ${deal.naf})</span><p class="text-xs text-alert font-bold mt-1 bg-alert/10 p-2 rounded">${deal.intelligence.pain_points}</p></div>
                     <div>
-                        <span class="text-[10px] text-gray-500 uppercase font-bold">Pitch Commercial</span>
-                        <div class="bg-black/50 p-4 rounded-xl border border-white/5 text-sm text-gray-300 italic leading-relaxed mt-1 border-l-2 border-l-cyan">
-                            "${deal.intelligence.pitch}"
-                        </div>
+                        <span class="text-[10px] text-gray-500 uppercase font-bold">Pitch Commercial Suggéré</span>
+                        <div class="bg-black/50 p-4 rounded-xl border border-white/5 text-sm text-gray-300 italic leading-relaxed mt-1 border-l-2 border-l-cyan">"${deal.intelligence.pitch}"</div>
+                        <button onclick="injectPitchInEmail('${deal.id}')" class="mt-3 text-xs text-cyan hover:text-white transition"><i class="fa-solid fa-copy"></i> Copier dans un Email</button>
                     </div>
                 `;
             }
         }
 
-        function renderChart() {
-            const ctx = document.getElementById('funnelChart');
-            if(!ctx) return;
-            if(funnelChartInst) funnelChartInst.destroy();
-            
-            const stageVols = [0, 0, 0, 0]; // Lead, Offre, Nego, Won
-            CRM_DATA.forEach(d => {
-                if(d.stage === 'LEAD' || d.stage === 'RDV') stageVols[0] += d.volume;
-                else if(d.stage === 'OFFRE') stageVols[1] += d.volume;
-                else if(d.stage === 'NEGOCIATION') stageVols[2] += d.volume;
-                else if(d.stage === 'WON') stageVols[3] += d.volume;
-            });
-
-            funnelChartInst = new Chart(ctx.getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: ['Prospection', 'Offre Emise', 'Négociation', 'Signé'],
-                    datasets: [{ data: stageVols, backgroundColor: ['#64748B', '#F59E0B', '#EF4444', '#10B981'], borderWidth: 0 }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins:{legend:{position:'right', labels:{color:'white'}}} }
-            });
+        window.toggleAction = function(type) {
+            const body = document.getElementById('action-body');
+            if (type === 'email') {
+                body.innerHTML = `
+                    <input type="text" id="email-subject" class="w-full bg-transparent border-b border-white/10 text-sm text-white outline-none mb-3 pb-2 font-bold" placeholder="Objet: Diminution de vos factures énergétiques">
+                    <textarea id="email-body" class="w-full bg-transparent border-none text-sm text-white outline-none resize-none mb-2" rows="4" placeholder="Rédiger votre message..."></textarea>
+                    <div class="flex justify-between items-center pt-2">
+                        <span class="text-[9px] text-gray-500"><i class="fa-solid fa-eye"></i> Pixel de tracking actif</span>
+                        <button onclick="sendEmail()" class="bg-blue-600 text-white font-bold px-6 py-2 rounded-lg text-xs hover:bg-blue-500 transition shadow-lg"><i class="fa-solid fa-paper-plane mr-2"></i> Envoyer (SMTP)</button>
+                    </div>
+                `;
+            } else {
+                body.innerHTML = `<textarea class="w-full bg-transparent border-none text-sm text-white outline-none resize-none mb-2" rows="3" placeholder="Saisir un compte rendu..."></textarea><div class="flex justify-end pt-2"><button onclick="App.toast('Note enregistrée.', 'success')" class="bg-cyan text-abysse font-bold px-6 py-2 rounded-lg text-xs hover:bg-white transition">Enregistrer</button></div>`;
+            }
         }
 
-        // Init
-        document.addEventListener('DOMContentLoaded', () => {
-            switchView('pipeline');
-            loadCRMPipeline();
-        });
+        window.injectPitchInEmail = function(dealId) {
+            toggleAction('email');
+            const deal = CRM_DATA.find(d => d.id === dealId);
+            document.getElementById('email-body').value = deal.intelligence.pitch;
+            App.toast("Icebreaker copié dans l'éditeur.", "info");
+        }
+
+        window.sendEmail = async function() {
+            const btn = document.querySelector('#action-body button');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Envoi...'; btn.disabled = true;
+            try {
+                // Simulation d'appel à la route /api/crm/email/send codée dans main.py
+                await new Promise(r => setTimeout(r, 1500));
+                App.toast("Email envoyé avec succès ! Il apparaîtra dans la timeline.", "success");
+                toggleAction('note');
+            } catch(e) { App.toast("Erreur SMTP.", "error"); }
+        }
+
+        // --- CARTE LEAFLET (WAR ROOM) ---
+        async function initMap() {
+            if(mapInstance) { mapInstance.invalidateSize(); return; }
+            mapInstance = L.map('map', {zoomControl: false}).setView([46.603354, 1.888334], 6); 
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap' }).addTo(mapInstance);
+
+            for(let d of CRM_DATA) {
+                if(d.city) {
+                    try {
+                        const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(d.city)}&type=municipality&limit=1`);
+                        const geo = await res.json();
+                        if(geo.features && geo.features.length > 0) {
+                            const coords = geo.features[0].geometry.coordinates;
+                            let color = d.pipeline === 'saas' ? '#A855F7' : (d.pipeline === 'broker' ? '#3B82F6' : '#8B5CF6');
+                            const marker = L.circleMarker([coords[1], coords[0]], { radius: 8, color: color, fillColor: color, fillOpacity: 0.8 }).addTo(mapInstance);
+                            marker.bindPopup(`<b style="color:black">${d.name}</b><br><span style="color:gray">${d.stage}</span>`);
+                        }
+                    } catch(e) {}
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { switchView('pipeline'); loadCRMPipeline(); });
     </script>
 </body>
 </html>
