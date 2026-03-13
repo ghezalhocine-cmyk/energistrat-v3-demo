@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ENERGISTRAT V12 | CORTEX Playbook</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { 
+                        abysse: '#001529', card: '#0F172A', sidebar: '#020617', 
+                        cyan: '#00E5FF', success: '#10B981', alert: '#EF4444', 
+                        gold: '#F59E0B', saas: '#A855F7', broker: '#3B82F6',
+                        supplier: '#8B5CF6'
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
+                    borderRadius: { 'bento': '1.5rem' }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
+        .nav-item.active { background: rgba(0, 229, 255, 0.15); border-left: 4px solid #00E5FF; color: white; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        .hidden-scrollbar::-webkit-scrollbar { display: none; }
+        
+        .script-section { display: none; animation: fadeIn 0.4s ease-out forwards; }
+        .script-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Animation pulsation micro */
+        .pulse-ring { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.7); animation: pulsing 2s infinite cubic-bezier(0.66, 0, 0, 1); }
+        @keyframes pulsing { to { box-shadow: 0 0 0 15px rgba(0, 229, 255, 0); } }
+    </style>
+</head>
+<body class="flex h-screen w-screen text-sm relative">
+
+    <div id="mobile-overlay" class="fixed inset-0 bg-black/80 z-[45] hidden md:hidden backdrop-blur-sm transition-opacity" onclick="toggleSidebar()"></div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="fixed md:relative w-64 h-full bg-sidebar border-r border-white/5 flex flex-col justify-between z-50 transition-transform duration-300 -translate-x-full md:translate-x-0 shadow-[5px_0_20px_rgba(0,0,0,0.8)] md:shadow-none flex-shrink-0">
+        <div class="h-20 flex items-center justify-between px-6 border-b border-white/5 bg-abysse">
+            <div class="flex items-center">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan to-blue-600 flex items-center justify-center text-abysse font-bold shadow-[0_0_15px_rgba(0,229,255,0.4)]">
+                    <i class="fa-solid fa-wand-magic-sparkles text-xl"></i>
+                </div>
+                <div class="ml-3">
+                    <div class="font-black text-white tracking-wider">GROWTH<span class="text-cyan">.SUITE</span></div>
+                    <div class="text-[9px] text-cyan font-mono mt-1 border border-cyan/30 px-2 py-0.5 rounded bg-cyan/10 w-max">SATELLITES</div>
+                </div>
+            </div>
+            <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            <div class="text-[9px] text-gray-500 uppercase font-bold px-4 mb-2 mt-2">Outils de Vente</div>
+            <a href="/sales_workspace" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
+                <i class="fa-solid fa-bars-staggered w-4 text-center"></i> Retour au CRM (Kanban)
+            </a>
+            
+            <div class="text-[9px] text-cyan uppercase font-bold px-4 mt-8 mb-2"><i class="fa-solid fa-rocket mr-1"></i> Satellites Growth</div>
+            <a href="/sales_playbook" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
+                <i class="fa-solid fa-book-open w-4 text-center"></i> Playbook (Script)
+            </a>
+            <a href="/sales_outreach" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
+                <i class="fa-solid fa-paper-plane w-4 text-center"></i> Outreach (Mailing)
+            </a>
+        </nav>
+        
+        <div class="p-6 border-t border-white/5 bg-black/20">
+            <a href="/ops_nexus" class="flex items-center justify-center gap-2 text-gray-400 hover:text-white transition text-xs font-bold bg-white/5 px-4 py-3 rounded-xl border border-white/10 hover:border-white/30">
+                <i class="fa-solid fa-arrow-left text-gray-500"></i> <span class="hidden md:inline">Retour Nexus Ops</span><span class="md:hidden">Nexus</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-cyan/5 via-abysse to-abysse w-full">
+        
+        <!-- HEADER -->
+        <header class="h-auto md:h-20 border-b border-white/5 flex flex-col md:flex-row items-start md:items-center justify-between px-4 md:px-8 py-4 md:py-0 bg-abysse/95 backdrop-blur z-40 sticky top-0 gap-4 md:gap-0">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleSidebar()" class="md:hidden text-cyan text-xl p-2 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10"><i class="fa-solid fa-bars"></i></button>
+                <div>
+                    <h2 class="text-lg md:text-2xl font-black text-white tracking-tight">CORTEX Playbook <span class="text-xs font-normal text-cyan bg-cyan/10 px-2 py-1 rounded ml-2 border border-cyan/30">Live Call</span></h2>
+                    <p class="text-[10px] md:text-xs text-gray-400 mt-1 hidden md:block">Sélectionnez le profil du prospect pour adapter le discours commercial en temps réel.</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="bg-black/50 border border-white/10 px-4 py-2 rounded-xl flex items-center gap-3">
+                    <div class="w-2 h-2 rounded-full bg-success pulse-ring"></div>
+                    <span class="text-xs font-bold text-gray-300">Prêt pour l'appel</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col md:flex-row gap-6 pb-32">
+            
+            <!-- COLONNE GAUCHE : SELECTEUR DE PERSONA -->
+            <div class="w-full md:w-1/4 flex flex-col gap-4">
+                <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 px-2">Cible au téléphone</h3>
+                
+                <button onclick="selectPersona('industrie')" id="btn-industrie" class="persona-btn bento-card p-4 text-left border-l-4 border-transparent hover:border-cyan transition focus:border-cyan bg-black/40 hover:bg-black/60">
+                    <div class="flex items-center gap-3 mb-1"><i class="fa-solid fa-industry text-lg text-cyan"></i><span class="font-bold text-white text-sm">Industrie / PME</span></div>
+                    <p class="text-[10px] text-gray-400">Dirigeant, DAF, Resp. Maintenance</p>
+                </button>
+                
+                <button onclick="selectPersona('mairie')" id="btn-mairie" class="persona-btn bento-card p-4 text-left border-l-4 border-transparent hover:border-cyan transition focus:border-cyan bg-black/40 hover:bg-black/60">
+                    <div class="flex items-center gap-3 mb-1"><i class="fa-solid fa-landmark-flag text-lg text-blue-400"></i><span class="font-bold text-white text-sm">Secteur Public</span></div>
+                    <p class="text-[10px] text-gray-400">Maire, DGS, Acheteur public</p>
+                </button>
+
+                <button onclick="selectPersona('syndic')" id="btn-syndic" class="persona-btn bento-card p-4 text-left border-l-4 border-transparent hover:border-cyan transition focus:border-cyan bg-black/40 hover:bg-black/60">
+                    <div class="flex items-center gap-3 mb-1"><i class="fa-solid fa-building-user text-lg text-gold"></i><span class="font-bold text-white text-sm">Syndic & OPH</span></div>
+                    <p class="text-[10px] text-gray-400">Directeur de copro, Président CS</p>
+                </button>
+
+                <button onclick="selectPersona('fournisseur')" id="btn-fournisseur" class="persona-btn bento-card p-4 text-left border-l-4 border-transparent hover:border-cyan transition focus:border-cyan bg-black/40 hover:bg-black/60">
+                    <div class="flex items-center gap-3 mb-1"><i class="fa-solid fa-handshake text-lg text-saas"></i><span class="font-bold text-white text-sm">Fournisseur (Partenaire)</span></div>
+                    <p class="text-[10px] text-gray-400">Directeur Commercial, Partenariats</p>
+                </button>
+            </div>
+
+            <!-- COLONNE DROITE : LE SCRIPT DYNAMIQUE -->
+            <div class="w-full md:w-3/4 bento-card flex flex-col shadow-2xl relative overflow-hidden">
+                
+                <!-- ÉTAT VIDE -->
+                <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-center p-10 opacity-50">
+                    <i class="fa-solid fa-headset text-6xl mb-4 text-gray-500"></i>
+                    <h3 class="text-xl font-bold text-white mb-2">Sélectionnez une cible à gauche</h3>
+                    <p class="text-sm text-gray-400 max-w-md">Le téléprompteur se chargera avec la méthode SPIN Selling adaptée au secteur d'activité de votre prospect.</p>
+                </div>
+
+                <!-- LE SCRIPT (Injecté via JS) -->
+                <div id="script-content" class="hidden flex-1 overflow-y-auto hidden-scrollbar relative">
+                    <!-- En-tête du script -->
+                    <div class="sticky top-0 bg-abysse/95 backdrop-blur border-b border-white/10 p-6 z-20 flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div id="script-icon" class="w-10 h-10 rounded-lg flex items-center justify-center text-xl font-bold"></div>
+                            <div>
+                                <h3 id="script-title" class="text-lg font-black text-white">Titre</h3>
+                                <p class="text-[10px] text-cyan font-mono tracking-widest">MÉTHODE SPIN SELLING ACTIVÉE</p>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-500 hidden md:block">Lisez les encadrés <span class="text-cyan font-bold border-b border-cyan">Cyan</span>.</div>
+                    </div>
+
+                    <div class="p-6 md:p-8 space-y-8">
+                        
+                        <!-- 1. S - SITUATION (Icebreaker) -->
+                        <div>
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-gray-800 text-white flex items-center justify-center mr-2 text-[9px]">1</span> Situation & Icebreaker (20s)</h4>
+                            <div class="bg-cyan/5 border border-cyan/30 rounded-xl p-5 border-l-4 border-l-cyan">
+                                <p class="text-sm text-gray-200 leading-relaxed font-medium italic" id="txt-icebreaker">...</p>
+                            </div>
+                            <div class="mt-3 pl-4 border-l border-white/10">
+                                <p class="text-xs text-gray-400 mb-1"><i class="fa-solid fa-lightbulb text-gold mr-1"></i> <b>Objectif :</b> Capter l'attention avec un fait précis sur son secteur.</p>
+                            </div>
+                        </div>
+
+                        <!-- 2. P - PROBLEME (Découverte) -->
+                        <div>
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-gray-800 text-white flex items-center justify-center mr-2 text-[9px]">2</span> Découverte du Problème (Questions Ouvertes)</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="txt-problems">
+                                <!-- Cards injectées -->
+                            </div>
+                        </div>
+
+                        <!-- 3. I - IMPLICATION (Appuyer là où ça fait mal) -->
+                        <div>
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-gray-800 text-white flex items-center justify-center mr-2 text-[9px]">3</span> Implication (Faire réaliser le coût)</h4>
+                            <div class="bg-alert/10 border border-alert/30 rounded-xl p-5 border-l-4 border-l-alert">
+                                <p class="text-sm text-white leading-relaxed" id="txt-implication">...</p>
+                            </div>
+                        </div>
+
+                        <!-- 4. N - NEED-PAYOFF (La Solution / Le Pitch) -->
+                        <div>
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-gray-800 text-white flex items-center justify-center mr-2 text-[9px]">4</span> Le Remède (Présentation Energistrat)</h4>
+                            <div class="bg-success/10 border border-success/30 rounded-xl p-5 border-l-4 border-l-success">
+                                <p class="text-sm text-white leading-relaxed font-bold" id="txt-solution">...</p>
+                            </div>
+                        </div>
+
+                        <!-- LIGNE DE SÉPARATION -->
+                        <div class="border-t border-white/10 pt-8 mt-8"></div>
+
+                        <!-- BOUCLIER : GESTION DES OBJECTIONS -->
+                        <div>
+                            <h4 class="text-sm font-black text-white mb-4 flex items-center"><i class="fa-solid fa-shield-halved text-gray-400 mr-2"></i> Le Bouclier (Gestion des Objections)</h4>
+                            <div class="space-y-2" id="objections-container">
+                                <!-- Accordéons injectés -->
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            sidebar.classList.toggle('-translate-x-full');
+            overlay.classList.toggle('hidden');
+        }
+
+        // --- BASE DE DONNÉES DES SCRIPTS (PLAYBOOK) ---
+        const SCRIPTS = {
+            'industrie': {
+                icon: '<i class="fa-solid fa-industry text-cyan"></i>', color: 'bg-cyan/10 text-cyan', title: 'Industrie & PME',
+                icebreaker: "Bonjour [Prénom], en analysant votre code NAF, j'ai remarqué que les usines de votre secteur subissent souvent des taxes cachées (CSPE/TICFE) ou des pénalités de dépassement de puissance. Si je vous montre comment récupérer jusqu'à 30% de ces montants rétroactivement sans changer vos machines, avez-vous 2 minutes ?",
+                problems:[
+                    "<b>Le Tarif d'acheminement :</b> Avez-vous vérifié récemment si votre TURPE est toujours optimisé par rapport à votre courbe de charge réelle ?",
+                    "<b>Fin de contrat :</b> Comment gérez-vous l'anticipation du renouvellement de votre contrat actuel pour éviter la volatilité du marché ?",
+                ],
+                implication: "Si votre profil de consommation n'a pas été audité depuis 2 ans, vous payez probablement l'énergie de vos machines au prix fort, ou vous ne bénéficiez pas de l'abattement fiscal auquel votre activité industrielle vous donne droit. Cela représente une perte sèche sur votre marge nette.",
+                solution: "En tant que Tiers de Confiance indépendant, nous branchons vos PDL sur notre plateforme SaaS. Notre IA détecte instantanément les anomalies de facturation, optimise votre TURPE et génère les dossiers de remboursement fiscal à votre place. Vous ne payez que si nous vous faisons gagner de l'argent.",
+                objections:[
+                    { q: "Je suis déjà sous contrat jusqu'en 2026.", a: "C'est une excellente nouvelle, vous êtes protégé. Cependant, l'énergie s'achète à terme. Mettre sous surveillance votre compteur dès aujourd'hui nous permet de capter un 'creux de marché' pour sécuriser 2027 à bas prix, sans attendre la dernière minute." },
+                    { q: "Nous avons déjà un courtier.", a: "Parfait, nous ne sommes pas des courtiers classiques, nous sommes une plateforme SaaS d'audit. Beaucoup de nos clients utilisent Energistrat pour faire un 'double-check' des offres de leur courtier actuel et s'assurer de l'absence de marges cachées." },
+                    { q: "Pas le temps / Pas le budget.", a: "L'audit est 100% digital et automatisé. Il nous faut juste votre numéro de PDL. L'analyse est gratuite, notre modèle économique repose uniquement sur un partage des économies générées ou via une licence SaaS rentabilisée dès le premier mois." }
+                ]
+            },
+            'mairie': {
+                icon: '<i class="fa-solid fa-landmark-flag text-blue-400"></i>', color: 'bg-blue-400/10 text-blue-400', title: 'Secteur Public (Mairie)',
+                icebreaker: "Bonjour Monsieur le Maire / DGS. Le budget énergie est devenu le premier poste de dépense de votre commune (M57). La difficulté pour les communes est souvent de compiler toutes les factures des écoles et gymnases. Si je vous donne un outil pour cartographier vos compteurs en 1 clic, avez-vous 2 minutes ?",
+                problems:[
+                    "<b>Appel d'offres :</b> Combien de temps passez-vous à construire le DQE (Détail Quantitatif Estimatif) pour vos marchés publics d'énergie ?",
+                    "<b>Passoires thermiques :</b> Avez-vous pu identifier facilement quels bâtiments municipaux sont éligibles aux subventions (Fonds chaleur, CEE) ?"
+                ],
+                implication: "Sans outil de pilotage centralisé, faire un appel d'offres est un cauchemar administratif. De plus, le Décret Tertiaire vous oblige à déclarer vos consommations sur OPERAT sous peine d'amendes ou de publication 'Name & Shame' pour la commune.",
+                solution: "Notre plateforme SaaS est conçue pour la comptabilité publique (M57). Elle agrège automatiquement toutes les factures de la ville, génère votre DQE d'appel d'offres en 1 clic, et automatise vos déclarations OPERAT. Vous reprenez le contrôle total de vos deniers publics.",
+                objections:[
+                    { q: "Nous sommes au SDE (Syndicat d'Énergie).", a: "C'est très sécurisant. Cependant, le groupement du SDE ne fait pas le pilotage bâtiment par bâtiment. Notre logiciel vient en complément du SDE pour vous aider à traquer le 'talon nocturne' (l'énergie gaspillée la nuit dans vos écoles fermées) et vous aider à investir." },
+                    { q: "Il faut passer par un marché public pour vous prendre.", a: "Le coût de notre licence SaaS est pensé pour rester sous le seuil de dispense de procédure (Gré à gré). Nous pouvons l'activer dès demain." }
+                ]
+            },
+            'syndic': {
+                icon: '<i class="fa-solid fa-building-user text-gold"></i>', color: 'bg-gold/10 text-gold', title: 'Syndics & Copropriétés',
+                icebreaker: "Bonjour. En tant que Syndic, la pression des copropriétaires sur les charges de chauffage et d'électricité des parties communes est énorme. Si je vous montre un moyen de leur présenter un Bilan Énergétique ultra-clair à la prochaine AG tout en récupérant de la marge, avez-vous 2 minutes ?",
+                problems:[
+                    "<b>Lourdeur des AG :</b> Comment justifiez-vous facilement la hausse des contrats de gaz auprès des conseils syndicaux ?",
+                    "<b>Bouclier tarifaire :</b> Êtes-vous certain que toutes vos copropriétés éligibles ont bien reçu leurs attestations d'aide d'État ?"
+                ],
+                implication: "Un contrat mal négocié ou une aide de l'État loupée, c'est la certitude d'une Assemblée Générale explosive et d'un risque de perte de mandat pour votre cabinet de syndic.",
+                solution: "Energistrat audite tout votre parc de copropriétés. Nous générons automatiquement un 'Bilan AG' PDF vulgarisé pour rassurer vos copropriétaires, et nous vous aidons à renégocier les contrats de gaz/élec en toute transparence.",
+                objections:[
+                    { q: "Nous gérons ça en interne avec notre service compta.", a: "Votre service compta saisit les factures, mais analyse-t-il les courbes de charge (DJU) pour vérifier si la puissance souscrite de la chaufferie est optimale ? C'est là que notre IA intervient, sans alourdir le travail de votre équipe." },
+                    { q: "Le Conseil Syndical valide lui-même les contrats.", a: "C'est pour cela que nous avons créé le 'Bilan AG'. Nous vous fournissons l'argumentaire et les graphiques pédagogiques pour que vous soyez perçu comme le héros par le conseil syndical lors du vote." }
+                ]
+            },
+            'fournisseur': {
+                icon: '<i class="fa-solid fa-handshake text-saas"></i>', color: 'bg-saas/10 text-saas', title: 'Partenariat Fournisseur',
+                icebreaker: "Bonjour. En tant que fournisseur alternatif, votre coût d'acquisition client (CAC) est votre enjeu majeur. Chez Energistrat, nous avons digitalisé l'audit de milliers de PDL B2B. Si je vous propose de vous injecter des dizaines de GWh qualifiés directement dans votre CRM sans effort de vos commerciaux, est-ce un sujet pour vous ?",
+                problems:[
+                    "<b>Acquisition :</b> Quel est votre coût d'acquisition actuel pour signer une belle PME ou un site industriel ?",
+                    "<b>Canal de distribution :</b> Quelle part de vos ventes est générée par du courtage digital vs votre force de vente interne ?"
+                ],
+                implication: "Le démarchage téléphonique classique à froid s'essouffle. Si vous n'êtes pas présent sur les plateformes de Tiers de Confiance digitalisées, vous perdez l'accès à une clientèle Premium (Acteurs publics, Multi-sites) qui exige des appels d'offres dématérialisés.",
+                solution: "Nous vous intégrons à notre module CPQ (Pricing). Lorsqu'une industrie ou une Mairie lance un appel d'offres sur notre plateforme, votre grille tarifaire est calculée en temps réel. Vous signez des contrats en un clic, nous gérons la relation client.",
+                objections:[
+                    { q: "Nous travaillons déjà avec trop de courtiers.", a: "Nous ne sommes pas un courtier classique qui vous envoie des PDF mal scannés. Nous sommes une entreprise Tech. Nos flux de données (Data Unity) sont propres, structurés, et se branchent directement par API. Vous divisez votre temps de traitement par 10." },
+                    { q: "Vos frais de commission sont trop élevés.", a: "Notre modèle est transparent. Contrairement aux courtiers opaques, nos commissions sont fixées en accord avec vous et visibles. Cela garantit un 'Win-Win-Win' (Client, Vous, Nous) et fidélise le client sur le long terme." }
+                ]
+            }
+        };
+
+        function selectPersona(type) {
+            // UI Reset
+            document.querySelectorAll('.persona-btn').forEach(btn => {
+                btn.classList.remove('border-cyan', 'bg-black/60');
+                btn.classList.add('border-transparent', 'bg-black/40');
+            });
+            const activeBtn = document.getElementById(`btn-${type}`);
+            activeBtn.classList.remove('border-transparent', 'bg-black/40');
+            activeBtn.classList.add('border-cyan', 'bg-black/60');
+
+            document.getElementById('empty-state').style.display = 'none';
+            const content = document.getElementById('script-content');
+            content.classList.remove('active'); // reset animation
+            
+            // Load Data
+            const data = SCRIPTS[type];
+            document.getElementById('script-icon').innerHTML = data.icon;
+            document.getElementById('script-icon').className = `w-10 h-10 rounded-lg flex items-center justify-center text-xl font-bold ${data.color}`;
+            document.getElementById('script-title').innerText = data.title;
+            
+            document.getElementById('txt-icebreaker').innerHTML = `"${data.icebreaker}"`;
+            document.getElementById('txt-implication').innerHTML = `"${data.implication}"`;
+            document.getElementById('txt-solution').innerHTML = `"${data.solution}"`;
+
+            // Problems
+            const probContainer = document.getElementById('txt-problems');
+            probContainer.innerHTML = '';
+            data.problems.forEach(p => {
+                probContainer.innerHTML += `
+                    <div class="bg-black/40 border border-white/5 p-4 rounded-xl hover:border-cyan/30 transition cursor-pointer">
+                        <i class="fa-regular fa-comment-dots text-cyan mb-2 text-lg"></i>
+                        <p class="text-xs text-gray-300">${p}</p>
+                    </div>`;
+            });
+
+            // Objections (Accordions)
+            const objContainer = document.getElementById('objections-container');
+            objContainer.innerHTML = '';
+            data.objections.forEach((obj, idx) => {
+                objContainer.innerHTML += `
+                    <div class="bg-black/40 border border-white/10 rounded-xl overflow-hidden">
+                        <button class="w-full px-4 py-3 text-left font-bold text-xs text-white flex justify-between items-center hover:bg-white/5 transition" onclick="toggleObjection(${idx})">
+                            <span><i class="fa-solid fa-xmark text-alert mr-2"></i> "${obj.q}"</span>
+                            <i class="fa-solid fa-chevron-down text-gray-500 transition-transform" id="icon-obj-${idx}"></i>
+                        </button>
+                        <div class="px-4 py-3 bg-black/60 text-xs text-gray-300 border-t border-white/5 hidden border-l-2 border-l-cyan" id="body-obj-${idx}">
+                            <i class="fa-solid fa-reply text-cyan mr-2"></i> ${obj.a}
+                        </div>
+                    </div>`;
+            });
+
+            // Trigger animation
+            setTimeout(() => { content.classList.add('active'); }, 50);
+        }
+
+        window.toggleObjection = function(idx) {
+            const body = document.getElementById(`body-obj-${idx}`);
+            const icon = document.getElementById(`icon-obj-${idx}`);
+            if(body.classList.contains('hidden')) {
+                body.classList.remove('hidden');
+                icon.style.transform = "rotate(180deg)";
+            } else {
+                body.classList.add('hidden');
+                icon.style.transform = "rotate(0deg)";
+            }
+        }
+    </script>
+</body>
+</html>
