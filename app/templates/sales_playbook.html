@@ -30,15 +30,15 @@
         .bento-card { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
         .nav-item.active { background: rgba(0, 229, 255, 0.15); border-left: 4px solid #00E5FF; color: white; }
         ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-        .hidden-scrollbar::-webkit-scrollbar { display: none; }
         
-        .script-section { display: none; animation: fadeIn 0.4s ease-out forwards; }
-        .script-section.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Animation pulsation micro */
         .pulse-ring { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.7); animation: pulsing 2s infinite cubic-bezier(0.66, 0, 0, 1); }
         @keyframes pulsing { to { box-shadow: 0 0 0 15px rgba(0, 229, 255, 0); } }
+
+        .input-cyber { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.3s; width: 100%; padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.875rem; outline: none; }
+        .input-cyber:focus { border-color: #00E5FF; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="flex h-screen w-screen text-sm relative">
@@ -50,11 +50,10 @@
         <div class="h-20 flex items-center justify-between px-6 border-b border-white/5 bg-abysse">
             <div class="flex items-center">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan to-blue-600 flex items-center justify-center text-abysse font-bold shadow-[0_0_15px_rgba(0,229,255,0.4)]">
-                    <i class="fa-solid fa-wand-magic-sparkles text-xl"></i>
+                    <i class="fa-solid fa-book-open-reader text-xl"></i>
                 </div>
                 <div class="ml-3">
-                    <div class="font-black text-white tracking-wider">GROWTH<span class="text-cyan">.SUITE</span></div>
-                    <div class="text-[9px] text-cyan font-mono mt-1 border border-cyan/30 px-2 py-0.5 rounded bg-cyan/10 w-max">SATELLITES</div>
+                    <div class="font-black text-white tracking-wider">SALES<span class="text-cyan">.PLAYBOOK</span></div>
                 </div>
             </div>
             <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
@@ -63,7 +62,7 @@
         <nav class="flex-1 overflow-y-auto py-4 space-y-1">
             <div class="text-[9px] text-gray-500 uppercase font-bold px-4 mb-2 mt-2">Outils de Vente</div>
             <a href="/sales_workspace" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-bars-staggered w-4 text-center"></i> Retour au CRM (Kanban)
+                <i class="fa-solid fa-bars-staggered w-4 text-center"></i> Retour au CRM
             </a>
             
             <div class="text-[9px] text-cyan uppercase font-bold px-4 mt-8 mb-2"><i class="fa-solid fa-rocket mr-1"></i> Satellites Growth</div>
@@ -91,114 +90,125 @@
                 <button onclick="toggleSidebar()" class="md:hidden text-cyan text-xl p-2 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10"><i class="fa-solid fa-bars"></i></button>
                 <div>
                     <h2 class="text-lg md:text-2xl font-black text-white tracking-tight">CORTEX Playbook <span class="text-xs font-normal text-cyan bg-cyan/10 px-2 py-1 rounded ml-2 border border-cyan/30">Live Call</span></h2>
-                    <p class="text-[10px] md:text-xs text-gray-400 mt-1 hidden md:block">Sélectionnez le profil du prospect pour adapter le discours commercial en temps réel.</p>
+                    <p class="text-[10px] md:text-xs text-gray-400 mt-1 hidden md:block">Scripts de vente B2B dynamiques (Méthodologie SPIN).</p>
                 </div>
             </div>
             
-            <div class="flex items-center gap-3">
-                <div class="bg-black/50 border border-white/10 px-4 py-2 rounded-xl flex items-center gap-3">
-                    <div class="w-2 h-2 rounded-full bg-success pulse-ring"></div>
-                    <span class="text-xs font-bold text-gray-300">Prêt pour l'appel</span>
+            <div class="flex items-center gap-3 w-full md:w-auto">
+                <!-- INJECTEUR DE CONTEXTE (La Magie) -->
+                <div class="flex gap-2 w-full md:w-auto bg-black/30 p-1 rounded-xl border border-white/10">
+                    <input type="text" id="ctx-name" class="input-cyber py-2 text-xs w-full md:w-40" placeholder="Prénom..." oninput="updateScript()">
+                    <input type="text" id="ctx-region" class="input-cyber py-2 text-xs w-full md:w-40" placeholder="Région/Ville..." oninput="updateScript()">
                 </div>
             </div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col md:flex-row gap-6 pb-32">
             
-            <!-- COLONNE GAUCHE : SELECTEUR DE PERSONA -->
-            <div class="w-full md:w-1/4 flex flex-col gap-4">
-                <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 px-2">Cible au téléphone</h3>
+            <!-- COLONNE GAUCHE : LES 9 PERSONAS -->
+            <div class="w-full md:w-1/4 flex flex-col gap-3 overflow-y-auto pr-2" style="max-height: calc(100vh - 160px);">
+                <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1 px-2 sticky top-0 bg-abysse/90 py-2 z-10 backdrop-blur">Profils Privés</h3>
                 
-                <button onclick="selectPersona('industrie')" id="btn-industrie" class="persona-btn bento-card p-4 text-left border-l-4 border-transparent hover:border-cyan transition focus:border-cyan bg-black/40 hover:bg-black/60">
-                    <div class="flex items-center gap-3 mb-1"><i class="fa-solid fa-industry text-lg text-cyan"></i><span class="font-bold text-white text-sm">Industrie / PME</span></div>
-                    <p class="text-[10px] text-gray-400">Dirigeant, DAF, Resp. Maintenance</p>
+                <button onclick="selectPersona('pme')" id="btn-pme" class="persona-btn bento-card p-3 text-left border-l-4 border-transparent hover:border-cyan transition bg-black/40">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-store text-lg text-gray-300 w-6 text-center"></i><span class="font-bold text-white text-xs">PME & Tertiaire</span></div>
                 </button>
-                
-                <button onclick="selectPersona('mairie')" id="btn-mairie" class="persona-btn bento-card p-4 text-left border-l-4 border-transparent hover:border-cyan transition focus:border-cyan bg-black/40 hover:bg-black/60">
-                    <div class="flex items-center gap-3 mb-1"><i class="fa-solid fa-landmark-flag text-lg text-blue-400"></i><span class="font-bold text-white text-sm">Secteur Public</span></div>
-                    <p class="text-[10px] text-gray-400">Maire, DGS, Acheteur public</p>
+                <button onclick="selectPersona('industrie')" id="btn-industrie" class="persona-btn bento-card p-3 text-left border-l-4 border-transparent hover:border-cyan transition bg-black/40">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-industry text-lg text-cyan w-6 text-center"></i><span class="font-bold text-white text-xs">Industrie Lourde</span></div>
+                </button>
+                <button onclick="selectPersona('retail')" id="btn-retail" class="persona-btn bento-card p-3 text-left border-l-4 border-transparent hover:border-cyan transition bg-black/40">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-shop text-lg text-purple-400 w-6 text-center"></i><span class="font-bold text-white text-xs">Retail & Franchises</span></div>
+                </button>
+                <button onclick="selectPersona('syndic')" id="btn-syndic" class="persona-btn bento-card p-3 text-left border-l-4 border-transparent hover:border-cyan transition bg-black/40">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-building-user text-lg text-gold w-6 text-center"></i><span class="font-bold text-white text-xs">Syndics (Copro)</span></div>
                 </button>
 
-                <button onclick="selectPersona('syndic')" id="btn-syndic" class="persona-btn bento-card p-4 text-left border-l-4 border-transparent hover:border-cyan transition focus:border-cyan bg-black/40 hover:bg-black/60">
-                    <div class="flex items-center gap-3 mb-1"><i class="fa-solid fa-building-user text-lg text-gold"></i><span class="font-bold text-white text-sm">Syndic & OPH</span></div>
-                    <p class="text-[10px] text-gray-400">Directeur de copro, Président CS</p>
+                <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-4 mb-1 px-2 sticky top-0 bg-abysse/90 py-2 z-10 backdrop-blur">Acteurs Publics</h3>
+                
+                <button onclick="selectPersona('mairie')" id="btn-mairie" class="persona-btn bento-card p-3 text-left border-l-4 border-transparent hover:border-cyan transition bg-black/40">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-landmark-flag text-lg text-blue-400 w-6 text-center"></i><span class="font-bold text-white text-xs">Mairie & Collectivité</span></div>
+                </button>
+                <button onclick="selectPersona('sde')" id="btn-sde" class="persona-btn bento-card p-3 text-left border-l-4 border-transparent hover:border-cyan transition bg-black/40">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-plug-circle-bolt text-lg text-blue-500 w-6 text-center"></i><span class="font-bold text-white text-xs">Syndicat (SDE)</span></div>
+                </button>
+                <button onclick="selectPersona('oph')" id="btn-oph" class="persona-btn bento-card p-3 text-left border-l-4 border-transparent hover:border-cyan transition bg-black/40">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-house-chimney-window text-lg text-orange-400 w-6 text-center"></i><span class="font-bold text-white text-xs">Bailleurs Sociaux (OPH)</span></div>
+                </button>
+                <button onclick="selectPersona('sante')" id="btn-sante" class="persona-btn bento-card p-3 text-left border-l-4 border-transparent hover:border-cyan transition bg-black/40">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-truck-medical text-lg text-red-400 w-6 text-center"></i><span class="font-bold text-white text-xs">Santé (Cliniques/EHPAD)</span></div>
                 </button>
 
-                <button onclick="selectPersona('fournisseur')" id="btn-fournisseur" class="persona-btn bento-card p-4 text-left border-l-4 border-transparent hover:border-cyan transition focus:border-cyan bg-black/40 hover:bg-black/60">
-                    <div class="flex items-center gap-3 mb-1"><i class="fa-solid fa-handshake text-lg text-saas"></i><span class="font-bold text-white text-sm">Fournisseur (Partenaire)</span></div>
-                    <p class="text-[10px] text-gray-400">Directeur Commercial, Partenariats</p>
+                <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-4 mb-1 px-2 sticky top-0 bg-abysse/90 py-2 z-10 backdrop-blur">Partenaires</h3>
+                <button onclick="selectPersona('fournisseur')" id="btn-fournisseur" class="persona-btn bento-card p-3 text-left border-l-4 border-transparent hover:border-cyan transition bg-black/40">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-handshake text-lg text-saas w-6 text-center"></i><span class="font-bold text-white text-xs">Fournisseur d'Énergie</span></div>
                 </button>
             </div>
 
-            <!-- COLONNE DROITE : LE SCRIPT DYNAMIQUE -->
-            <div class="w-full md:w-3/4 bento-card flex flex-col shadow-2xl relative overflow-hidden">
+            <!-- COLONNE DROITE : LE TELEPROMPTEUR -->
+            <div class="w-full md:w-3/4 bento-card flex flex-col shadow-2xl relative overflow-hidden h-[calc(100vh-160px)]">
                 
                 <!-- ÉTAT VIDE -->
                 <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-center p-10 opacity-50">
-                    <i class="fa-solid fa-headset text-6xl mb-4 text-gray-500"></i>
-                    <h3 class="text-xl font-bold text-white mb-2">Sélectionnez une cible à gauche</h3>
-                    <p class="text-sm text-gray-400 max-w-md">Le téléprompteur se chargera avec la méthode SPIN Selling adaptée au secteur d'activité de votre prospect.</p>
+                    <i class="fa-solid fa-headset text-6xl mb-4 text-gray-500 pulse-ring rounded-full"></i>
+                    <h3 class="text-xl font-bold text-white mb-2 mt-4">En attente de connexion...</h3>
+                    <p class="text-sm text-gray-400 max-w-md">Sélectionnez le profil de la personne que vous appelez dans la liste de gauche pour générer son script personnalisé.</p>
                 </div>
 
-                <!-- LE SCRIPT (Injecté via JS) -->
-                <div id="script-content" class="hidden flex-1 overflow-y-auto hidden-scrollbar relative">
+                <!-- LE SCRIPT -->
+                <div id="script-content" class="hidden flex-col h-full fade-in relative">
                     <!-- En-tête du script -->
-                    <div class="sticky top-0 bg-abysse/95 backdrop-blur border-b border-white/10 p-6 z-20 flex justify-between items-center">
-                        <div class="flex items-center gap-3">
-                            <div id="script-icon" class="w-10 h-10 rounded-lg flex items-center justify-center text-xl font-bold"></div>
+                    <div class="bg-abysse/95 backdrop-blur border-b border-white/10 p-6 flex justify-between items-center z-10 shadow-lg shrink-0">
+                        <div class="flex items-center gap-4">
+                            <div id="script-icon" class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold shadow-inner"></div>
                             <div>
-                                <h3 id="script-title" class="text-lg font-black text-white">Titre</h3>
-                                <p class="text-[10px] text-cyan font-mono tracking-widest">MÉTHODE SPIN SELLING ACTIVÉE</p>
+                                <h3 id="script-title" class="text-xl font-black text-white">Titre</h3>
+                                <p id="script-subtitle" class="text-[10px] text-gray-400 font-mono tracking-widest mt-1">Directeur, DAF</p>
                             </div>
                         </div>
-                        <div class="text-xs text-gray-500 hidden md:block">Lisez les encadrés <span class="text-cyan font-bold border-b border-cyan">Cyan</span>.</div>
+                        <div class="text-xs text-gray-500 hidden md:block bg-white/5 px-4 py-2 rounded-lg border border-white/10">Lisez les encadrés <span class="text-cyan font-bold border-b border-cyan">Cyan</span>.</div>
                     </div>
 
-                    <div class="p-6 md:p-8 space-y-8">
+                    <!-- Scrollable Content -->
+                    <div class="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 relative">
                         
                         <!-- 1. S - SITUATION (Icebreaker) -->
                         <div>
-                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-gray-800 text-white flex items-center justify-center mr-2 text-[9px]">1</span> Situation & Icebreaker (20s)</h4>
-                            <div class="bg-cyan/5 border border-cyan/30 rounded-xl p-5 border-l-4 border-l-cyan">
-                                <p class="text-sm text-gray-200 leading-relaxed font-medium italic" id="txt-icebreaker">...</p>
-                            </div>
-                            <div class="mt-3 pl-4 border-l border-white/10">
-                                <p class="text-xs text-gray-400 mb-1"><i class="fa-solid fa-lightbulb text-gold mr-1"></i> <b>Objectif :</b> Capter l'attention avec un fait précis sur son secteur.</p>
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-gray-800 text-white flex items-center justify-center mr-2 text-[9px] shadow">1</span> L'Accroche (Les 20 premières secondes)</h4>
+                            <div class="bg-cyan/5 border border-cyan/30 rounded-xl p-5 border-l-4 border-l-cyan shadow-[0_0_15px_rgba(0,229,255,0.05)] relative overflow-hidden">
+                                <i class="fa-solid fa-quote-left absolute top-3 right-4 text-4xl text-cyan opacity-10"></i>
+                                <p class="text-sm text-gray-200 leading-relaxed font-medium" id="txt-icebreaker">...</p>
                             </div>
                         </div>
 
                         <!-- 2. P - PROBLEME (Découverte) -->
                         <div>
-                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-gray-800 text-white flex items-center justify-center mr-2 text-[9px]">2</span> Découverte du Problème (Questions Ouvertes)</h4>
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-gray-800 text-white flex items-center justify-center mr-2 text-[9px] shadow">2</span> Découverte & Douleurs (SPIN)</h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="txt-problems">
-                                <!-- Cards injectées -->
+                                <!-- Injecté -->
                             </div>
                         </div>
 
-                        <!-- 3. I - IMPLICATION (Appuyer là où ça fait mal) -->
+                        <!-- 3. I - IMPLICATION -->
                         <div>
-                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-gray-800 text-white flex items-center justify-center mr-2 text-[9px]">3</span> Implication (Faire réaliser le coût)</h4>
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-gray-800 text-white flex items-center justify-center mr-2 text-[9px] shadow">3</span> L'Implication (Retourner le couteau)</h4>
                             <div class="bg-alert/10 border border-alert/30 rounded-xl p-5 border-l-4 border-l-alert">
                                 <p class="text-sm text-white leading-relaxed" id="txt-implication">...</p>
                             </div>
                         </div>
 
-                        <!-- 4. N - NEED-PAYOFF (La Solution / Le Pitch) -->
+                        <!-- 4. N - NEED-PAYOFF (Le Pitch) -->
                         <div>
-                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-gray-800 text-white flex items-center justify-center mr-2 text-[9px]">4</span> Le Remède (Présentation Energistrat)</h4>
-                            <div class="bg-success/10 border border-success/30 rounded-xl p-5 border-l-4 border-l-success">
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center"><span class="w-5 h-5 rounded-full bg-success text-abysse font-black flex items-center justify-center mr-2 text-[9px] shadow-[0_0_10px_rgba(16,185,129,0.5)]">4</span> Le Remède (Pitch Energistrat)</h4>
+                            <div class="bg-success/10 border border-success/30 rounded-xl p-5 border-l-4 border-l-success relative overflow-hidden">
+                                <i class="fa-solid fa-check-double absolute top-3 right-4 text-4xl text-success opacity-10"></i>
                                 <p class="text-sm text-white leading-relaxed font-bold" id="txt-solution">...</p>
                             </div>
                         </div>
 
-                        <!-- LIGNE DE SÉPARATION -->
-                        <div class="border-t border-white/10 pt-8 mt-8"></div>
-
-                        <!-- BOUCLIER : GESTION DES OBJECTIONS -->
-                        <div>
-                            <h4 class="text-sm font-black text-white mb-4 flex items-center"><i class="fa-solid fa-shield-halved text-gray-400 mr-2"></i> Le Bouclier (Gestion des Objections)</h4>
-                            <div class="space-y-2" id="objections-container">
-                                <!-- Accordéons injectés -->
+                        <!-- BOUCLIER : OBJECTIONS -->
+                        <div class="pt-6 mt-6 border-t border-white/10">
+                            <h4 class="text-sm font-black text-white mb-4 flex items-center"><i class="fa-solid fa-shield-halved text-gold mr-2 text-lg"></i> Traitement des Objections</h4>
+                            <div class="space-y-3" id="objections-container">
+                                <!-- Injecté -->
                             </div>
                         </div>
 
@@ -210,76 +220,158 @@
     </main>
 
     <script>
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('mobile-overlay');
-            sidebar.classList.toggle('-translate-x-full');
-            overlay.classList.toggle('hidden');
-        }
-
-        // --- BASE DE DONNÉES DES SCRIPTS (PLAYBOOK) ---
-        const SCRIPTS = {
-            'industrie': {
-                icon: '<i class="fa-solid fa-industry text-cyan"></i>', color: 'bg-cyan/10 text-cyan', title: 'Industrie & PME',
-                icebreaker: "Bonjour [Prénom], en analysant votre code NAF, j'ai remarqué que les usines de votre secteur subissent souvent des taxes cachées (CSPE/TICFE) ou des pénalités de dépassement de puissance. Si je vous montre comment récupérer jusqu'à 30% de ces montants rétroactivement sans changer vos machines, avez-vous 2 minutes ?",
+        // LA BASE DE DONNÉES DU COPYWRITING B2B
+        const SCRIPT_DB = {
+            'pme': {
+                icon: '<i class="fa-solid fa-store"></i>', color: 'bg-gray-700 text-white', 
+                title: 'PME & Tertiaire', subtitle: 'Dirigeant, Gérant, DAF',
+                icebreaker: "Bonjour {PRENOM}. Je suis expert chez Energistrat. J'accompagne actuellement plusieurs PME sur {REGION} qui subissent la hausse de l'ARENH et des taxes cachées. J'ai un modèle mathématique qui permet aux structures de votre taille de récupérer jusqu'à 20% sur leurs factures sans rien changer à leur activité. Avez-vous 2 minutes ?",
                 problems:[
-                    "<b>Le Tarif d'acheminement :</b> Avez-vous vérifié récemment si votre TURPE est toujours optimisé par rapport à votre courbe de charge réelle ?",
-                    "<b>Fin de contrat :</b> Comment gérez-vous l'anticipation du renouvellement de votre contrat actuel pour éviter la volatilité du marché ?",
+                    "<b>Le manque de temps :</b> Gérer les factures d'énergie est une corvée. Êtes-vous sûr à 100% que votre puissance souscrite correspond exactement à votre utilisation actuelle ?",
+                    "<b>Le Renouvellement :</b> Comment allez-vous gérer la fin de votre contrat actuel face à la volatilité énorme des marchés d'aujourd'hui ?"
                 ],
-                implication: "Si votre profil de consommation n'a pas été audité depuis 2 ans, vous payez probablement l'énergie de vos machines au prix fort, ou vous ne bénéficiez pas de l'abattement fiscal auquel votre activité industrielle vous donne droit. Cela représente une perte sèche sur votre marge nette.",
-                solution: "En tant que Tiers de Confiance indépendant, nous branchons vos PDL sur notre plateforme SaaS. Notre IA détecte instantanément les anomalies de facturation, optimise votre TURPE et génère les dossiers de remboursement fiscal à votre place. Vous ne payez que si nous vous faisons gagner de l'argent.",
+                implication: "Le problème des PME, c'est qu'elles paient souvent des taxes et des acheminements (TURPE) calibrés pour de plus grandes entreprises. Sans audit régulier, c'est une perte sèche de plusieurs milliers d'euros chaque année sur votre trésorerie.",
+                solution: "C'est exactement pour ça qu'on a créé Energistrat. Vous nous donnez juste votre numéro de PDL. Notre logiciel SaaS aspire et audite votre contrat. Si vous payez trop de taxes, on s'occupe des démarches de remboursement. Et on sécurise votre futur contrat avec une mise en concurrence automatisée.",
                 objections:[
-                    { q: "Je suis déjà sous contrat jusqu'en 2026.", a: "C'est une excellente nouvelle, vous êtes protégé. Cependant, l'énergie s'achète à terme. Mettre sous surveillance votre compteur dès aujourd'hui nous permet de capter un 'creux de marché' pour sécuriser 2027 à bas prix, sans attendre la dernière minute." },
-                    { q: "Nous avons déjà un courtier.", a: "Parfait, nous ne sommes pas des courtiers classiques, nous sommes une plateforme SaaS d'audit. Beaucoup de nos clients utilisent Energistrat pour faire un 'double-check' des offres de leur courtier actuel et s'assurer de l'absence de marges cachées." },
-                    { q: "Pas le temps / Pas le budget.", a: "L'audit est 100% digital et automatisé. Il nous faut juste votre numéro de PDL. L'analyse est gratuite, notre modèle économique repose uniquement sur un partage des économies générées ou via une licence SaaS rentabilisée dès le premier mois." }
+                    { q: "Je suis chez EDF, tout va bien.", a: "EDF est un excellent fournisseur, mais ils ne vous préviendront pas si vous payez trop de CSPE ou si votre TURPE est mal calibré. Notre audit est indépendant de votre fournisseur." },
+                    { q: "Je n'ai pas le temps pour ça.", a: "Je comprends parfaitement. C'est l'avantage de notre technologie : l'audit est 100% automatisé à distance. Ça vous prendra littéralement 3 minutes pour signer le mandat électronique." }
+                ]
+            },
+            'industrie': {
+                icon: '<i class="fa-solid fa-industry"></i>', color: 'bg-cyan/20 text-cyan', 
+                title: 'Industrie Lourde', subtitle: 'Directeur d\'Usine, Achat, Maintenance',
+                icebreaker: "Bonjour {PRENOM}. Je suis analyste chez Energistrat. Nous aidons les industriels de {REGION} à protéger leurs marges de production face à la crise énergétique. Notre IA a détecté que de nombreuses usines de votre code NAF passent à côté d'optimisations fiscales massives sur la CSPE. Est-ce que ce sujet est géré chez vous ?",
+                problems:[
+                    "<b>Intensité Énergétique :</b> Votre outil de production crée un 'talon' de consommation incompressible. Avez-vous déjà valorisé ce talon via des mécanismes d'effacement ou de flexibilité ?",
+                    "<b>Taxes :</b> Bénéficiez-vous bien du taux réduit de CSPE et de l'exonération de TICFE liés à votre activité industrielle ?"
+                ],
+                implication: "En industrie, un TURPE mal calibré (dépassements de puissance) ou une CSPE à taux plein, c'est des dizaines de milliers d'euros évaporés. C'est de la marge nette qui disparaît de votre bilan.",
+                solution: "Energistrat agit comme votre 'Financial Twin'. Notre plateforme se connecte à vos compteurs, détecte les anomalies tarifaires, monte les dossiers de remboursement fiscal à votre place, et vous aide à acheter votre énergie à terme (CAL N+1) au meilleur moment du marché.",
+                objections:[
+                    { q: "Nous avons déjà un courtier.", a: "Très bien. Nous sommes justement l'outil qui permet de 'challenger' votre courtier. Nous sommes une plateforme d'audit, pas de simples courtiers. Nous vérifions si ses offres sont réellement les meilleures et s'il n'a pas laissé de marges cachées." },
+                    { q: "Nous achetons notre énergie au niveau du Groupe.", a: "C'est souvent le cas. Mais le groupe négocie la molécule. L'optimisation des taxes locales, du TURPE usine par usine, et la chasse aux gaspillages nocturnes se font au niveau du site. C'est là qu'on intervient." }
+                ]
+            },
+            'retail': {
+                icon: '<i class="fa-solid fa-shop"></i>', color: 'bg-purple-500/20 text-purple-400', 
+                title: 'Retail & Franchises', subtitle: 'Dir. Réseau, CFO, Property Manager',
+                icebreaker: "Bonjour {PRENOM}. Je vois que vous gérez plusieurs points de vente sur {REGION}. La gestion multi-sites est un cauchemar administratif pour la comptabilité. Si je vous montre un logiciel qui centralise toutes vos factures et détecte instantanément quel magasin surconsomme la nuit, seriez-vous curieux de voir comment ça marche ?",
+                problems:[
+                    "<b>Multi-sites :</b> Combien de temps votre équipe compta perd-elle chaque mois pour saisir, ventiler et payer les factures de chaque point de vente ?",
+                    "<b>Décret Tertiaire :</b> Où en êtes-vous sur vos déclarations OPERAT pour vos surfaces commerciales de plus de 1000m2 ?"
+                ],
+                implication: "Sans outil centralisé, c'est impossible de détecter si un manager a laissé la climatisation ou les vitrines allumées tout le week-end. Et côté légal, rater le coche du Décret Tertiaire vous expose à des amendes publiques.",
+                solution: "Notre plateforme Energistrat agrège la donnée de tous vos PDL. Vous avez un tableau de bord unique. Mieux : on automatise vos déclarations OPERAT et on consolide vos achats d'énergie en 'Grappe' pour peser beaucoup plus lourd face aux fournisseurs.",
+                objections:[
+                    { q: "Chaque franchisé paie sa propre facture.", a: "C'est un modèle courant. Mais en tant que tête de réseau, si vous leur proposez un achat groupé via notre plateforme, vous leur faites faire 20% d'économies. C'est un argument de fidélisation énorme pour votre franchise." }
                 ]
             },
             'mairie': {
-                icon: '<i class="fa-solid fa-landmark-flag text-blue-400"></i>', color: 'bg-blue-400/10 text-blue-400', title: 'Secteur Public (Mairie)',
-                icebreaker: "Bonjour Monsieur le Maire / DGS. Le budget énergie est devenu le premier poste de dépense de votre commune (M57). La difficulté pour les communes est souvent de compiler toutes les factures des écoles et gymnases. Si je vous donne un outil pour cartographier vos compteurs en 1 clic, avez-vous 2 minutes ?",
+                icon: '<i class="fa-solid fa-landmark-flag"></i>', color: 'bg-blue-400/20 text-blue-400', 
+                title: 'Mairie & Collectivité', subtitle: 'Maire, DGS, Élus aux finances',
+                icebreaker: "Bonjour Monsieur/Madame le Maire. En cette période de préparation budgétaire M57, l'énergie pèse lourd sur les finances de {REGION}. Si je vous donne l'outil pour cartographier vos compteurs municipaux et générer votre DQE d'appel d'offres en 1 clic, avez-vous 2 minutes ?",
                 problems:[
-                    "<b>Appel d'offres :</b> Combien de temps passez-vous à construire le DQE (Détail Quantitatif Estimatif) pour vos marchés publics d'énergie ?",
-                    "<b>Passoires thermiques :</b> Avez-vous pu identifier facilement quels bâtiments municipaux sont éligibles aux subventions (Fonds chaleur, CEE) ?"
+                    "<b>Appel d'offres :</b> Combien de temps vos agents passent-ils à construire les cahiers des charges (CCTP) pour les marchés publics d'énergie ?",
+                    "<b>Subventions :</b> Avez-vous pu identifier facilement quelles écoles sont éligibles aux aides de l'État (Fonds Chaleur, CEE) pour la rénovation ?"
                 ],
-                implication: "Sans outil de pilotage centralisé, faire un appel d'offres est un cauchemar administratif. De plus, le Décret Tertiaire vous oblige à déclarer vos consommations sur OPERAT sous peine d'amendes ou de publication 'Name & Shame' pour la commune.",
-                solution: "Notre plateforme SaaS est conçue pour la comptabilité publique (M57). Elle agrège automatiquement toutes les factures de la ville, génère votre DQE d'appel d'offres en 1 clic, et automatise vos déclarations OPERAT. Vous reprenez le contrôle total de vos deniers publics.",
+                implication: "Faire un marché public manuellement, c'est s'exposer à des erreurs de calcul qui faussent le budget. Et ne pas piloter les écoles, c'est payer du chauffage la nuit, avec l'argent du contribuable.",
+                solution: "Notre solution logicielle est conçue pour les communes. Elle agrège vos factures, prépare vos marchés publics automatiquement (mise en concurrence propre) et détecte vos passoires thermiques pour aller chercher les subventions CEE. Vous maîtrisez vos deniers publics.",
                 objections:[
-                    { q: "Nous sommes au SDE (Syndicat d'Énergie).", a: "C'est très sécurisant. Cependant, le groupement du SDE ne fait pas le pilotage bâtiment par bâtiment. Notre logiciel vient en complément du SDE pour vous aider à traquer le 'talon nocturne' (l'énergie gaspillée la nuit dans vos écoles fermées) et vous aider à investir." },
-                    { q: "Il faut passer par un marché public pour vous prendre.", a: "Le coût de notre licence SaaS est pensé pour rester sous le seuil de dispense de procédure (Gré à gré). Nous pouvons l'activer dès demain." }
+                    { q: "Nous sommes au Syndicat d'Énergie (SDE).", a: "C'est très bien pour l'achat. Mais le SDE ne vient pas dans votre mairie pour éteindre la lumière ou optimiser le TURPE du stade municipal. Notre logiciel vient en complément du SDE pour le pilotage actif." },
+                    { q: "Il faut passer un marché public pour vous prendre.", a: "Le coût de notre licence SaaS est pensé pour rester sous le seuil de dispense de procédure (Gré à gré). On l'active demain sans lourdeur administrative." }
+                ]
+            },
+            'sde': {
+                icon: '<i class="fa-solid fa-plug-circle-bolt"></i>', color: 'bg-blue-500/20 text-blue-500', 
+                title: 'Syndicat d\'Énergie (SDE)', subtitle: 'Président SDE, Directeur Général',
+                icebreaker: "Bonjour {PRENOM}. En tant que Syndicat Départemental, vous gérez les achats de centaines de communes sur {REGION}. Les Maires vous réclament de plus en plus de visibilité. Si je vous montre notre plateforme en marque blanche pour leur offrir un Espace Citoyen interactif, êtes-vous ouvert à une démo ?",
+                problems:[
+                    "<b>Massification :</b> Comment gérez-vous l'agrégation de milliers de PDL pour vos groupements d'achat sans que ce soit une usine à gaz sur Excel ?",
+                    "<b>Pédagogie :</b> Comment prouvez-vous aux communes adhérentes les économies réelles que le Syndicat leur fait réaliser ?"
+                ],
+                implication: "Sans un outil digital moderne, la valeur ajoutée du Syndicat est invisible pour le citoyen, et la compilation des données avant un appel d'offres prend des mois à vos équipes techniques.",
+                solution: "Nous fournissons au SDE la technologie Energistrat V12. Un moteur d'agrégation capable d'avaler 5000 compteurs en quelques secondes, de simuler vos appels d'offres en direct, et de restituer aux Maires des tableaux de bord clairs sur leurs consommations.",
+                objections:[
+                    { q: "Nous avons déjà développé un outil interne.", a: "C'est audacieux. Cependant, la réglementation (M57, Décret Tertiaire) évolue tous les 6 mois. Maintenir un logiciel interne coûte une fortune. Notre SaaS évolue automatiquement avec la loi." }
+                ]
+            },
+            'oph': {
+                icon: '<i class="fa-solid fa-house-chimney-window"></i>', color: 'bg-orange-500/20 text-orange-400', 
+                title: 'Bailleurs Sociaux (OPH)', subtitle: 'Directeur Patrimoine, Achat, DG',
+                icebreaker: "Bonjour {PRENOM}. Le sujet des charges locatives dans les logements sociaux de {REGION} est explosif. Avez-vous la garantie absolue que tous vos immeubles éligibles ont bien perçu l'intégralité du Bouclier Tarifaire de l'État pour protéger le pouvoir d'achat de vos locataires ?",
+                problems:[
+                    "<b>Charges récupérables :</b> La répartition des factures de gaz et de chaufferie collective est-elle automatisée ou manuelle ?",
+                    "<b>Rénovation :</b> Comment priorisez-vous les immeubles à rénover avec les aides CEE sans y passer des semaines d'études ?"
+                ],
+                implication: "Un loupé sur le bouclier tarifaire ou un mauvais contrat de gaz, c'est une explosion des provisions pour charges, une précarité énergétique pour les locataires, et un risque d'impayés massif pour l'Office.",
+                solution: "Energistrat centralise vos chaufferies et compteurs communs. Notre algorithme audite les factures pour s'assurer que l'État vous a bien reversé le bouclier tarifaire, et nous générons un diagnostic pour identifier immédiatement quels bâtiments isoler grâce aux primes CEE.",
+                objections:[
+                    { q: "C'est notre exploitant chauffage (Dalkia/Engie) qui gère.", a: "L'exploitant (P1/P2) achète souvent le gaz pour vous, mais il prend une marge dessus. Avec Energistrat, vous reprenez la main sur l'achat d'énergie (P1 direct) pour annuler ces marges intermédiaires." }
                 ]
             },
             'syndic': {
-                icon: '<i class="fa-solid fa-building-user text-gold"></i>', color: 'bg-gold/10 text-gold', title: 'Syndics & Copropriétés',
-                icebreaker: "Bonjour. En tant que Syndic, la pression des copropriétaires sur les charges de chauffage et d'électricité des parties communes est énorme. Si je vous montre un moyen de leur présenter un Bilan Énergétique ultra-clair à la prochaine AG tout en récupérant de la marge, avez-vous 2 minutes ?",
+                icon: '<i class="fa-solid fa-building-user"></i>', color: 'bg-gold/20 text-gold', 
+                title: 'Syndics & Copropriétés', subtitle: 'Dir. de Cabinet, Gestionnaire',
+                icebreaker: "Bonjour {PRENOM}. Je connais la difficulté des Syndics sur {REGION} lors des Assemblées Générales : justifier l'explosion des charges d'électricité et de gaz des parties communes. Si je vous donne un outil pour présenter un 'Bilan Énergie' rassurant et pédagogique à vos copropriétaires en 1 clic, ça vous intéresse ?",
                 problems:[
-                    "<b>Lourdeur des AG :</b> Comment justifiez-vous facilement la hausse des contrats de gaz auprès des conseils syndicaux ?",
-                    "<b>Bouclier tarifaire :</b> Êtes-vous certain que toutes vos copropriétés éligibles ont bien reçu leurs attestations d'aide d'État ?"
+                    "<b>Le Conseil Syndical :</b> Passez-vous trop de temps à répondre aux questions techniques des copropriétaires sur les contrats d'énergie ?",
+                    "<b>Rénovation :</b> Comment gérez-vous le DPE collectif et les plans pluriannuels de travaux (PPT) rendus obligatoires ?"
                 ],
-                implication: "Un contrat mal négocié ou une aide de l'État loupée, c'est la certitude d'une Assemblée Générale explosive et d'un risque de perte de mandat pour votre cabinet de syndic.",
-                solution: "Energistrat audite tout votre parc de copropriétés. Nous générons automatiquement un 'Bilan AG' PDF vulgarisé pour rassurer vos copropriétaires, et nous vous aidons à renégocier les contrats de gaz/élec en toute transparence.",
+                implication: "Un copropriétaire qui ne comprend pas sa facture est un copropriétaire méfiant. L'énergie est la première cause de tensions en AG et de perte de mandat pour un Syndic.",
+                solution: "Energistrat vous offre une vue globale sur toutes vos copros. Avant chaque AG, vous imprimez notre 'Bilan PDF'. Il vulgarise les consos, prouve que vous avez mis en concurrence les fournisseurs (gain de pouvoir d'achat), et renforce votre position de bon gestionnaire.",
                 objections:[
-                    { q: "Nous gérons ça en interne avec notre service compta.", a: "Votre service compta saisit les factures, mais analyse-t-il les courbes de charge (DJU) pour vérifier si la puissance souscrite de la chaufferie est optimale ? C'est là que notre IA intervient, sans alourdir le travail de votre équipe." },
-                    { q: "Le Conseil Syndical valide lui-même les contrats.", a: "C'est pour cela que nous avons créé le 'Bilan AG'. Nous vous fournissons l'argumentaire et les graphiques pédagogiques pour que vous soyez perçu comme le héros par le conseil syndical lors du vote." }
+                    { q: "On utilise déjà un courtier classique.", a: "Un courtier vous envoie un PDF technique incompréhensible pour un non-initié. Notre plateforme SaaS vous donne de la donnée vivante et pédagogique, pensée spécifiquement pour être projetée lors du vote en AG." }
+                ]
+            },
+            'sante': {
+                icon: '<i class="fa-solid fa-truck-medical"></i>', color: 'bg-red-500/20 text-red-400', 
+                title: 'Santé (Hôpitaux / Cliniques)', subtitle: 'DAF, Dir. Établissement, Dir. Technique',
+                icebreaker: "Bonjour {PRENOM}. La charge énergétique des cliniques et EHPAD sur {REGION} est incompressible à cause du maintien en conditions opérationnelles (24/7). Cependant, vos groupes électrogènes de secours ont une valeur financière que peu d'hôpitaux exploitent. Avez-vous 2 minutes ?",
+                problems:[
+                    "<b>Talon de base :</b> Un hôpital ne s'éteint jamais. Comment financez-vous cette hausse continue dans vos budgets EPRD très contraints ?",
+                    "<b>Continuité de service :</b> Vous avez des groupes de secours imposés par l'ARS. Les avez-vous valorisés sur le marché de la capacité ?"
+                ],
+                implication: "Si vous ne transformez pas votre contrainte (les groupes de secours) en opportunité (les revendre à RTE lors des pics d'hiver), vous laissez passer un financement gratuit pour vos soins.",
+                solution: "Energistrat se connecte à vos données. Nous optimisons votre talon de base (TURPE), nous débloquons des aides massives (Fonds Chaleur Ademe pour la stérilisation/blanchisserie) et nous valorisons votre flexibilité. C'est du budget récupéré pour le médical.",
+                objections:[
+                    { q: "L'énergie est bloquée par l'ARS.", a: "L'ARS valide vos budgets, mais elle encourage toutes les initiatives qui diminuent les coûts de fonctionnement pour les réallouer aux soins. Notre audit ne modifie pas votre infrastructure, il optimise les flux financiers." }
                 ]
             },
             'fournisseur': {
-                icon: '<i class="fa-solid fa-handshake text-saas"></i>', color: 'bg-saas/10 text-saas', title: 'Partenariat Fournisseur',
-                icebreaker: "Bonjour. En tant que fournisseur alternatif, votre coût d'acquisition client (CAC) est votre enjeu majeur. Chez Energistrat, nous avons digitalisé l'audit de milliers de PDL B2B. Si je vous propose de vous injecter des dizaines de GWh qualifiés directement dans votre CRM sans effort de vos commerciaux, est-ce un sujet pour vous ?",
+                icon: '<i class="fa-solid fa-handshake"></i>', color: 'bg-saas/20 text-saas', 
+                title: 'Fournisseurs d\'Énergie', subtitle: 'Dir. Commercial, Partenariats, Pricing',
+                icebreaker: "Bonjour {PRENOM}. Votre enjeu majeur chez [Nom Fournisseur], c'est le Coût d'Acquisition Client (CAC). La force de vente en interne coûte cher. Chez Energistrat, nous avons digitalisé l'audit de milliers de compteurs B2B. Si je vous propose de vous injecter des GWh hyper qualifiés directement via notre plateforme sans effort de vos commerciaux, ça s'étudie ?",
                 problems:[
-                    "<b>Acquisition :</b> Quel est votre coût d'acquisition actuel pour signer une belle PME ou un site industriel ?",
-                    "<b>Canal de distribution :</b> Quelle part de vos ventes est générée par du courtage digital vs votre force de vente interne ?"
+                    "<b>Distribution :</b> Le démarchage à froid s'essouffle. Quelle part de votre CA B2B provient de plateformes digitales ?",
+                    "<b>Qualité de la donnée :</b> Combien de temps vos équipes 'Pricing' perdent-elles à déchiffrer les factures mal scannées envoyées par des courtiers amateurs ?"
                 ],
-                implication: "Le démarchage téléphonique classique à froid s'essouffle. Si vous n'êtes pas présent sur les plateformes de Tiers de Confiance digitalisées, vous perdez l'accès à une clientèle Premium (Acteurs publics, Multi-sites) qui exige des appels d'offres dématérialisés.",
-                solution: "Nous vous intégrons à notre module CPQ (Pricing). Lorsqu'une industrie ou une Mairie lance un appel d'offres sur notre plateforme, votre grille tarifaire est calculée en temps réel. Vous signez des contrats en un clic, nous gérons la relation client.",
+                implication: "Si vous restez sur des canaux d'acquisition traditionnels, vous passez à côté des grands appels d'offres publics et multi-sites qui exigent aujourd'hui de la donnée structurée (EDI/API).",
+                solution: "Nous vous intégrons à notre module CPQ (Configure Price Quote). C'est nous qui gérons la relation client. Quand une industrie demande un prix, la donnée arrive propre chez vous. Vous cotez, vous gagnez le deal, tout le monde est gagnant.",
                 objections:[
-                    { q: "Nous travaillons déjà avec trop de courtiers.", a: "Nous ne sommes pas un courtier classique qui vous envoie des PDF mal scannés. Nous sommes une entreprise Tech. Nos flux de données (Data Unity) sont propres, structurés, et se branchent directement par API. Vous divisez votre temps de traitement par 10." },
-                    { q: "Vos frais de commission sont trop élevés.", a: "Notre modèle est transparent. Contrairement aux courtiers opaques, nos commissions sont fixées en accord avec vous et visibles. Cela garantit un 'Win-Win-Win' (Client, Vous, Nous) et fidélise le client sur le long terme." }
+                    { q: "Vos frais de courtage sont trop élevés.", a: "Notre modèle Energistrat est 100% transparent. Contrairement aux anciens réseaux, nos commissions sont co-construites avec vous et affichées au client. C'est ce qui garantit la confiance et le closing final." },
+                    { q: "On a déjà trop de partenaires courtiers.", a: "Nous ne sommes pas un courtier, nous sommes une plateforme SaaS Tiers de Confiance. La donnée que nous vous envoyons est de la Data Unity parfaite (Code NAF, Consos horodatées). Vous traitez 10 dossiers chez nous dans le temps qu'il vous faut pour traiter 1 dossier d'un courtier classique." }
                 ]
             }
         };
 
+        // --- MOTEUR D'AFFICHAGE ET D'INJECTION DE CONTEXTE ---
+        let currentPersona = null;
+
+        function updateScript() {
+            if(!currentPersona) return;
+            const nameInput = document.getElementById('ctx-name').value || "[Prénom]";
+            const regionInput = document.getElementById('ctx-region').value || "votre région";
+            const data = SCRIPT_DB[currentPersona];
+
+            // Remplacement dynamique
+            let iceText = data.icebreaker.replace(/{PRENOM}/g, nameInput).replace(/{REGION}/g, regionInput);
+            document.getElementById('txt-icebreaker').innerHTML = `"${iceText}"`;
+        }
+
         function selectPersona(type) {
-            // UI Reset
+            currentPersona = type;
+
+            // UI Buttons Reset
             document.querySelectorAll('.persona-btn').forEach(btn => {
                 btn.classList.remove('border-cyan', 'bg-black/60');
                 btn.classList.add('border-transparent', 'bg-black/40');
@@ -288,49 +380,52 @@
             activeBtn.classList.remove('border-transparent', 'bg-black/40');
             activeBtn.classList.add('border-cyan', 'bg-black/60');
 
+            // Hide Empty State, Show Content
             document.getElementById('empty-state').style.display = 'none';
             const content = document.getElementById('script-content');
-            content.classList.remove('active'); // reset animation
+            content.classList.remove('hidden'); 
+            content.classList.add('flex'); // FIX DU BUG D'AFFICHAGE !
             
-            // Load Data
-            const data = SCRIPTS[type];
+            // Inject Data
+            const data = SCRIPT_DB[type];
             document.getElementById('script-icon').innerHTML = data.icon;
-            document.getElementById('script-icon').className = `w-10 h-10 rounded-lg flex items-center justify-center text-xl font-bold ${data.color}`;
+            document.getElementById('script-icon').className = `w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold shadow-inner ${data.color}`;
             document.getElementById('script-title').innerText = data.title;
-            
-            document.getElementById('txt-icebreaker').innerHTML = `"${data.icebreaker}"`;
+            document.getElementById('script-subtitle').innerText = data.subtitle;
+
             document.getElementById('txt-implication').innerHTML = `"${data.implication}"`;
             document.getElementById('txt-solution').innerHTML = `"${data.solution}"`;
 
-            // Problems
+            // Problems (SPIN)
             const probContainer = document.getElementById('txt-problems');
             probContainer.innerHTML = '';
             data.problems.forEach(p => {
                 probContainer.innerHTML += `
-                    <div class="bg-black/40 border border-white/5 p-4 rounded-xl hover:border-cyan/30 transition cursor-pointer">
-                        <i class="fa-regular fa-comment-dots text-cyan mb-2 text-lg"></i>
-                        <p class="text-xs text-gray-300">${p}</p>
+                    <div class="bg-black/40 border border-white/5 p-4 rounded-xl hover:border-cyan/30 transition cursor-pointer relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-cyan/5 opacity-0 group-hover:opacity-100 transition"></div>
+                        <i class="fa-regular fa-comment-dots text-cyan mb-2 text-lg relative z-10"></i>
+                        <p class="text-xs text-gray-300 relative z-10">${p}</p>
                     </div>`;
             });
 
-            // Objections (Accordions)
+            // Objections (Accordéons)
             const objContainer = document.getElementById('objections-container');
             objContainer.innerHTML = '';
             data.objections.forEach((obj, idx) => {
                 objContainer.innerHTML += `
-                    <div class="bg-black/40 border border-white/10 rounded-xl overflow-hidden">
+                    <div class="bg-black/40 border border-white/10 rounded-xl overflow-hidden hover:border-gold/50 transition">
                         <button class="w-full px-4 py-3 text-left font-bold text-xs text-white flex justify-between items-center hover:bg-white/5 transition" onclick="toggleObjection(${idx})">
                             <span><i class="fa-solid fa-xmark text-alert mr-2"></i> "${obj.q}"</span>
                             <i class="fa-solid fa-chevron-down text-gray-500 transition-transform" id="icon-obj-${idx}"></i>
                         </button>
-                        <div class="px-4 py-3 bg-black/60 text-xs text-gray-300 border-t border-white/5 hidden border-l-2 border-l-cyan" id="body-obj-${idx}">
-                            <i class="fa-solid fa-reply text-cyan mr-2"></i> ${obj.a}
+                        <div class="px-4 py-3 bg-black/60 text-xs text-gray-300 border-t border-white/5 hidden border-l-2 border-l-gold" id="body-obj-${idx}">
+                            <i class="fa-solid fa-reply text-gold mr-2"></i> ${obj.a}
                         </div>
                     </div>`;
             });
 
-            // Trigger animation
-            setTimeout(() => { content.classList.add('active'); }, 50);
+            // Mettre à jour avec le contexte tapé en haut
+            updateScript();
         }
 
         window.toggleObjection = function(idx) {
