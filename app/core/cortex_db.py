@@ -7,7 +7,6 @@ class CortexDB:
     
     def __init__(self):
         try:
-            # Initialisation Infaillible sur Google Cloud Run
             if not firebase_admin._apps:
                 firebase_admin.initialize_app()
             self.db = firestore.client()
@@ -55,7 +54,7 @@ class CortexDB:
         except Exception: return False
 
     # ==========================================
-    # GESTION DES PROFILS UTILISATEURS (MULTI-TENANT)
+    # GESTION DES PROFILS UTILISATEURS
     # ==========================================
     def get_all_users(self) -> list:
         if not self.db: return list()
@@ -100,11 +99,10 @@ class CortexDB:
         except Exception: return False
 
     # ==========================================
-    # NOUVEAU MOTEUR CRM V12 (RELATIONNEL)
+    # MOTEUR CRM V12 (RELATIONNEL & CPQ)
     # ==========================================
     
     def _get_crm_docs(self, collection_name: str) -> list:
-        """Méthode interne générique pour extraire une collection CRM"""
         if not self.db: return list()
         try:
             docs = self.db.collection(collection_name).stream()
@@ -119,7 +117,6 @@ class CortexDB:
             return list()
 
     def _save_crm_doc(self, collection_name: str, doc_id: str, data: dict) -> bool:
-        """Méthode interne générique pour sauver un doc CRM"""
         if not self.db: return False
         try:
             self.db.collection(collection_name).document(doc_id).set(data, merge=True)
@@ -129,7 +126,6 @@ class CortexDB:
             return False
 
     def _get_crm_doc(self, collection_name: str, doc_id: str) -> dict:
-        """Méthode interne générique pour lire un doc CRM"""
         if not self.db: return dict()
         try:
             doc = self.db.collection(collection_name).document(doc_id).get()
@@ -140,9 +136,8 @@ class CortexDB:
             return dict()
         except Exception: return dict()
 
-    # --- LEADS (Vivier brut Retro-Compatible) ---
+    # --- LEADS ---
     def get_all_leads(self) -> list: 
-        """Récupère les anciens prospects de la collection Settings"""
         if not self.db: return list()
         try:
             docs = self.db.collection("Settings").stream()
@@ -161,17 +156,17 @@ class CortexDB:
         try: self.db.collection("CRM_Leads").document(lead_id).delete(); return True
         except: return False
 
-    # --- COMPANIES (Comptes Clients/Groupes) ---
+    # --- COMPANIES ---
     def get_all_companies(self) -> list: return self._get_crm_docs("CRM_Companies")
     def get_company(self, comp_id: str) -> dict: return self._get_crm_doc("CRM_Companies", comp_id)
     def save_company(self, comp_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Companies", comp_id, data)
 
-    # --- CONTACTS (Annuaire Humain) ---
+    # --- CONTACTS ---
     def get_all_contacts(self) -> list: return self._get_crm_docs("CRM_Contacts")
     def get_contact(self, contact_id: str) -> dict: return self._get_crm_doc("CRM_Contacts", contact_id)
     def save_contact(self, contact_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Contacts", contact_id, data)
 
-    # --- DEALS (Opportunités / Kanban) ---
+    # --- DEALS ---
     def get_all_deals(self) -> list: return self._get_crm_docs("CRM_Deals")
     def get_deal(self, deal_id: str) -> dict: return self._get_crm_doc("CRM_Deals", deal_id)
     def save_deal(self, deal_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Deals", deal_id, data)
@@ -179,8 +174,12 @@ class CortexDB:
     # --- PRODUCTS (Catalogue CPQ) ---
     def get_all_products(self) -> list: return self._get_crm_docs("CRM_Products")
     def save_product(self, prod_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Products", prod_id, data)
+    def delete_product(self, prod_id: str) -> bool:
+        if not self.db: return False
+        try: self.db.collection("CRM_Products").document(prod_id).delete(); return True
+        except: return False
 
-    # --- ACTIVITIES (Timeline: Emails, Appels, Notes) ---
+    # --- ACTIVITIES ---
     def get_deal_activities(self, deal_id: str) -> list:
         if not self.db: return list()
         try:
@@ -189,7 +188,7 @@ class CortexDB:
         except: return list()
     def save_activity(self, act_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Activities", act_id, data)
 
-    # --- TASKS (Agenda) ---
+    # --- TASKS ---
     def get_user_tasks(self, owner_id: str) -> list:
         if not self.db: return list()
         try:
@@ -199,7 +198,7 @@ class CortexDB:
     def save_task(self, task_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Tasks", task_id, data)
 
     # ==========================================
-    # GESTION DE CORTEX SENTINEL (ALERTES)
+    # GESTION DE CORTEX SENTINEL
     # ==========================================
     def get_sentinel_alerts(self) -> dict:
         default_resp = {"last_scan": "Jamais", "alert_count": 0, "alerts": list()}
