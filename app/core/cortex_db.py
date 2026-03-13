@@ -55,11 +55,10 @@ class CortexDB:
     # GESTION DES PROFILS UTILISATEURS / CRM (MULTI-TENANT)
     # ==========================================
     def get_all_users(self) -> list:
-        """Récupère l'intégralité des profils locataires (Le CRM Ops)"""
         if not self.db: return list()
         try:
             docs = self.db.collection("Users").stream()
-            return[doc.to_dict() for doc in docs]
+            return [doc.to_dict() for doc in docs]
         except Exception as e:
             print(f"⚠️ Erreur get_all_users : {e}")
             return list()
