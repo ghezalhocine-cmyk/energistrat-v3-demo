@@ -26,7 +26,7 @@
                         gold: '#F59E0B', saas: '#A855F7', broker: '#3B82F6',
                         supplier: '#8B5CF6'
                     },
-                    fontFamily: { sans: ['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
                     borderRadius: { 'bento': '1.5rem' }
                 }
             }
@@ -40,7 +40,6 @@
         .view-section { display: none; } .view-section.active { display: block; animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Kanban Styles */
         .kanban-container { scroll-snap-type: x mandatory; }
         .kanban-col { scroll-snap-align: start; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 1rem; display: flex; flex-direction: column; height: 100%; transition: background-color 0.2s; min-width: 300px; flex: 1; }
         .kanban-col.drag-over { background: rgba(0, 229, 255, 0.1); border-color: #00E5FF; }
@@ -48,7 +47,6 @@
         .kanban-card:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,229,255,0.1); }
         .kanban-card:active { cursor: grabbing; transform: scale(0.98); opacity: 0.8; }
 
-        /* Map Leaflet */
         #map { width: 100%; height: 100%; border-radius: 1.5rem; z-index: 10; background-color: #001529; }
         .leaflet-popup-content-wrapper { background-color: rgba(15, 23, 42, 0.9); color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 1rem; backdrop-filter: blur(10px); }
         .leaflet-popup-tip { background-color: rgba(15, 23, 42, 0.9); }
@@ -56,7 +54,6 @@
         ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
         .hidden-scrollbar::-webkit-scrollbar { display: none; }
         
-        /* Formulaires */
         .input-cyber { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.3s; width: 100%; padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.875rem; outline: none; }
         .input-cyber:focus { border-color: #00E5FF; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
         select.cyber-select { appearance: none; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px 30px 8px 15px; border-radius: 0.5rem; outline: none; cursor: pointer; }
@@ -65,7 +62,6 @@
 </head>
 <body class="flex h-screen w-screen text-sm relative">
 
-    <!-- OVERLAY MOBILE -->
     <div id="mobile-overlay" class="fixed inset-0 bg-black/80 z-[45] hidden md:hidden backdrop-blur-sm transition-opacity" onclick="toggleSidebar()"></div>
 
     <!-- SIDEBAR -->
@@ -77,7 +73,7 @@
                 </div>
                 <div class="ml-3">
                     <div class="font-black text-white tracking-wider">SALES<span class="text-cyan">.CRM</span></div>
-                    <div class="text-[9px] text-cyan font-mono mt-1 border border-cyan/30 px-2 py-0.5 rounded bg-cyan/10 w-max">V12.0 COCKPIT</div>
+                    <div class="text-[9px] text-cyan font-mono mt-1 border border-cyan/30 px-2 py-0.5 rounded bg-cyan/10 w-max">V12.1 CPQ</div>
                 </div>
             </div>
             <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
@@ -88,7 +84,7 @@
             <button onclick="switchView('pipeline')" id="nav-pipeline" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
                 <i class="fa-solid fa-bars-staggered w-4 text-center"></i> Kanban & Deals
             </button>
-            <button onclick="switchView('contacts')" id="nav-contacts" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
+            <button onclick="switchView('contacts')" id="nav-contacts" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3 hidden">
                 <i class="fa-solid fa-address-card w-4 text-center"></i> Fiche Client
             </button>
             <button onclick="switchView('map')" id="nav-map" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
@@ -98,6 +94,11 @@
             <div class="text-[9px] text-gray-500 uppercase font-bold px-4 mt-8 mb-2">Direction Commerciale</div>
             <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
                 <i class="fa-solid fa-chart-pie w-4 text-center"></i> Reporting DCO
+            </button>
+
+            <div class="text-[9px] text-gold uppercase font-bold px-4 mt-8 mb-2"><i class="fa-solid fa-lock mr-1"></i> Administration</div>
+            <button onclick="switchView('products'); loadCatalog();" id="nav-products" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
+                <i class="fa-solid fa-tags w-4 text-center"></i> Catalogue CPQ
             </button>
         </nav>
         
@@ -118,7 +119,7 @@
                     <button onclick="toggleSidebar()" class="md:hidden text-cyan text-xl p-2 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10"><i class="fa-solid fa-bars"></i></button>
                     <div>
                         <h2 id="page-title" class="text-lg md:text-2xl font-black text-white tracking-tight">Gestion des Affaires</h2>
-                        <p class="text-[10px] md:text-xs text-gray-400 mt-1 hidden md:block">Glissez les cartes dans "Signé" pour créer l'espace client.</p>
+                        <p class="text-[10px] md:text-xs text-gray-400 mt-1 hidden md:block" id="page-subtitle">Glissez les cartes dans "Signé" pour valider.</p>
                     </div>
                 </div>
                 <!-- Mini Create btn for mobile -->
@@ -144,16 +145,12 @@
             <!-- VUE 1 : PIPELINE KANBAN -->
             <!-- ========================================== -->
             <div id="view-pipeline" class="view-section active h-[calc(100vh-140px)] md:h-[calc(100vh-160px)] flex flex-col">
-                
-                <!-- BARRE D'OUTILS KANBAN -->
                 <div class="mb-4 overflow-x-auto pb-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div class="flex flex-row bg-white/5 p-1 rounded-xl border border-white/10 gap-1 min-w-max">
                         <button onclick="switchPipeline('saas')" id="btn-pipe-saas" class="px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold bg-saas text-white shadow-lg whitespace-nowrap"><i class="fa-solid fa-desktop mr-2"></i> 1. Vente SaaS</button>
                         <button onclick="switchPipeline('broker')" id="btn-pipe-broker" class="px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold text-gray-400 hover:text-white transition whitespace-nowrap"><i class="fa-solid fa-bolt mr-2"></i> 2. Courtage</button>
                         <button onclick="switchPipeline('supplier')" id="btn-pipe-supplier" class="px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold text-gray-400 hover:text-white transition whitespace-nowrap"><i class="fa-solid fa-handshake mr-2"></i> 3. Fournisseurs</button>
                     </div>
-
-                    <!-- SEARCH BAR LIVE -->
                     <div class="relative w-full md:w-64">
                         <i class="fa-solid fa-search absolute left-3 top-3 text-gray-500 text-xs"></i>
                         <input type="text" id="kanban-search" onkeyup="filterKanban()" class="input-cyber pl-9 py-2 text-xs w-full" placeholder="Rechercher (Nom, NAF)...">
@@ -161,7 +158,6 @@
                 </div>
 
                 <div class="flex gap-4 flex-1 overflow-x-auto pb-4 kanban-container" id="kanban-board">
-                    <!-- Colonnes générées en JS -->
                     <div class="kanban-col" ondrop="drop(event, 'LEAD')" ondragover="allowDrop(event)">
                         <div class="p-3 border-b border-white/10 bg-white/5 rounded-t-xl flex justify-between items-center sticky top-0"><h4 class="font-bold text-gray-300 text-xs uppercase tracking-widest">1. À Contacter</h4><span class="text-gray-500 text-xs font-mono" id="count-LEAD">0</span></div>
                         <div class="p-3 space-y-3 overflow-y-auto flex-1" id="col-LEAD"></div>
@@ -189,7 +185,6 @@
             <!-- VUE 2 : FICHE HUBSPOT (3 COLONNES)         -->
             <!-- ========================================== -->
             <div id="view-contacts" class="view-section h-full flex flex-col">
-                <!-- Panneau Vide si aucun Deal n'est sélectionné -->
                 <div id="contact-empty-state" class="flex justify-center items-center h-full text-gray-500 flex-col text-center">
                     <i class="fa-solid fa-address-book text-6xl mb-4 opacity-30"></i>
                     <p class="px-4 text-lg">Sélectionnez une affaire dans le Kanban pour ouvrir le cockpit.</p>
@@ -197,7 +192,6 @@
                 </div>
 
                 <div id="contact-full-state" class="hidden flex-col h-full">
-                    <!-- Navigation Rapide Deal -->
                     <div class="flex justify-between items-center mb-6">
                         <button onclick="switchView('pipeline')" class="text-cyan hover:text-white font-bold text-xs bg-white/5 px-4 py-2 rounded-lg border border-white/10 transition shadow-lg"><i class="fa-solid fa-arrow-left mr-2"></i> Retour au Kanban</button>
                         <div class="text-[10px] text-gray-500">ID: <span id="cd-deal-id" class="font-mono text-white"></span></div>
@@ -205,30 +199,21 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-6 flex-1 overflow-hidden min-h-[800px] md:min-h-0">
                         
-                        <!-- ==================================== -->
-                        <!-- COLONNE GAUCHE (CONTEXTE)            -->
-                        <!-- ==================================== -->
+                        <!-- COLONNE GAUCHE (CONTEXTE) -->
                         <div class="col-span-1 md:col-span-3 space-y-4 overflow-y-auto hidden-scrollbar pb-10">
-                            <!-- En-tête Société -->
                             <div class="bento-card p-6 text-center relative border-t-4 border-cyan">
                                 <div id="cd-logo" class="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-cyan to-blue-600 flex items-center justify-center text-abysse font-black text-3xl mb-4 shadow-[0_0_20px_rgba(0,229,255,0.2)] overflow-hidden"></div>
                                 <h3 class="text-xl font-black text-white truncate" id="cd-company-name">Société</h3>
                                 <p class="text-xs text-gray-400 mt-1 flex justify-center items-center gap-2" id="cd-website"></p>
                                 
-                                <!-- Barre d'Actions Rapides -->
                                 <div class="flex justify-center gap-3 mt-6">
                                     <button onclick="setTimelineAction('note')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-cyan hover:text-abysse hover:border-cyan flex items-center justify-center transition shadow-lg tooltip" title="Note manuelle"><i class="fa-solid fa-pen"></i></button>
                                     <button onclick="setTimelineAction('email')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-blue-500 hover:text-white flex items-center justify-center transition shadow-lg tooltip" title="Envoyer Email"><i class="fa-solid fa-envelope"></i></button>
-                                    <button onclick="App.toast('Module VoIP en cours d\'intégration.', 'info')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-green-500 hover:text-white flex items-center justify-center transition shadow-lg tooltip" title="Appeler (VoIP)"><i class="fa-solid fa-phone"></i></button>
-                                    <button onclick="App.toast('Module Agenda en Phase 4.', 'info')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-purple-500 hover:text-white flex items-center justify-center transition shadow-lg tooltip" title="Planifier RDV"><i class="fa-solid fa-calendar"></i></button>
-                                    <button class="w-10 h-10 rounded-full bg-cyan/10 border border-cyan/30 text-cyan hover:bg-cyan hover:text-abysse flex items-center justify-center transition shadow-[0_0_10px_rgba(0,229,255,0.4)] tooltip relative" title="Dictaphone IA (Bientôt)">
-                                        <i class="fa-solid fa-microphone"></i>
-                                        <span class="absolute -top-1 -right-1 w-3 h-3 bg-alert rounded-full animate-pulse"></span>
-                                    </button>
+                                    <button onclick="App.toast('VoIP en cours d\'intégration.', 'info')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-green-500 hover:text-white flex items-center justify-center transition shadow-lg tooltip" title="Appeler (VoIP)"><i class="fa-solid fa-phone"></i></button>
+                                    <button onclick="App.toast('Agenda en Phase 4.', 'info')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-purple-500 hover:text-white flex items-center justify-center transition shadow-lg tooltip" title="Planifier RDV"><i class="fa-solid fa-calendar"></i></button>
                                 </div>
                             </div>
 
-                            <!-- A Propos du Contact -->
                             <div class="bento-card p-6">
                                 <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
                                     <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Le Contact</h4>
@@ -238,9 +223,7 @@
                             </div>
                         </div>
 
-                        <!-- ==================================== -->
-                        <!-- COLONNE CENTRALE (TIMELINE)          -->
-                        <!-- ==================================== -->
+                        <!-- COLONNE CENTRALE (TIMELINE) -->
                         <div class="col-span-1 md:col-span-6 bento-card flex flex-col overflow-hidden relative shadow-2xl">
                             <div class="flex gap-6 border-b border-white/10 px-6 pt-4 bg-black/20">
                                 <button id="tab-btn-activity" onclick="setTimelineAction('activity')" class="pb-3 text-xs font-bold text-cyan border-b-2 border-cyan"><i class="fa-solid fa-list-ul mr-1"></i> Activité</button>
@@ -258,9 +241,7 @@
                             </div>
                         </div>
 
-                        <!-- ==================================== -->
-                        <!-- COLONNE DROITE (BUSINESS & IA)       -->
-                        <!-- ==================================== -->
+                        <!-- COLONNE DROITE (BUSINESS & CPQ) -->
                         <div class="col-span-1 md:col-span-3 space-y-4 overflow-y-auto hidden-scrollbar pb-10">
                             
                             <div class="bento-card p-6 border-t-4 border-gold bg-gradient-to-br from-card to-gold/5">
@@ -280,13 +261,25 @@
                                 </div>
                                 <div class="flex justify-between items-end">
                                     <div>
-                                        <div class="text-[10px] text-gray-500">Valeur / Volume</div>
-                                        <div class="text-xl font-black text-white font-mono" id="cd-deal-volume">0</div>
+                                        <div class="text-[10px] text-gray-500">Volume Total</div>
+                                        <div class="text-lg font-black text-white font-mono" id="cd-deal-volume">0</div>
                                     </div>
                                     <div class="text-right">
-                                        <div class="text-[10px] text-gray-500">Comm. Est.</div>
-                                        <div class="text-sm font-bold text-success font-mono" id="cd-deal-comm">0 €</div>
+                                        <div class="text-[10px] text-gray-500">Comm. Totale</div>
+                                        <div class="text-lg font-bold text-success font-mono" id="cd-deal-comm">0 €</div>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- MODULE CPQ (PRODUITS DE L'AFFAIRE) -->
+                            <div class="bento-card p-4 border border-white/10 bg-black/20">
+                                <div class="flex justify-between items-center mb-3 border-b border-white/10 pb-2">
+                                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><i class="fa-solid fa-box-open mr-1"></i> Produits (Devis)</h4>
+                                    <button onclick="openAddProductModal()" class="text-[10px] text-cyan hover:text-white transition bg-cyan/10 px-2 py-1 rounded border border-cyan/20"><i class="fa-solid fa-plus"></i> Ajouter</button>
+                                </div>
+                                
+                                <div id="cd-deal-products-list" class="space-y-2 max-h-48 overflow-y-auto hidden-scrollbar">
+                                    <div class="text-center text-[10px] text-gray-500 italic py-4">Aucun produit associé.</div>
                                 </div>
                             </div>
 
@@ -294,46 +287,73 @@
                                 <h4 class="font-bold text-white text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-brain text-cyan"></i> IA CORTEX</h4>
                                 <div id="intel-content"><div class="text-[10px] text-gray-400 italic">Analyse en cours...</div></div>
                             </div>
-
-                            <div class="bento-card p-6 border border-dashed border-white/10 bg-black/20 opacity-70">
-                                <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2"><i class="fa-solid fa-box-open mr-1"></i> Produits / Devis</h4>
-                                <p class="text-[11px] text-gray-400 italic text-center py-4">Module CPQ en attente Phase 3.2</p>
-                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- ========================================== -->
-            <!-- VUE 3 : WAR ROOM -->
+            <!-- VUE 3 : CATALOGUE CPQ (ADMIN) -->
             <!-- ========================================== -->
-            <div id="view-map" class="view-section h-[500px] md:h-[700px]">
-                <div class="bento-card p-1 border-t-4 border-cyan relative h-full">
-                    <div id="map"></div>
-                </div>
-            </div>
-            
-            <!-- ========================================== -->
-            <!-- VUE 4 : DASHBOARD -->
-            <!-- ========================================== -->
-            <div id="view-dashboard" class="view-section space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bento-card p-6 h-80 flex flex-col shadow-2xl">
-                        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">Pipeline Actif</h3>
-                        <div class="flex justify-center items-center h-full text-gray-500"><i class="fa-solid fa-chart-bar text-4xl opacity-30"></i></div>
+            <div id="view-products" class="view-section">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Créer un produit -->
+                    <div class="col-span-1">
+                        <div class="bento-card p-6 border-t-4 border-cyan shadow-2xl">
+                            <h3 class="text-lg font-black text-white mb-4"><i class="fa-solid fa-plus-circle text-cyan mr-2"></i> Nouveau Produit</h3>
+                            <form onsubmit="createProduct(event)" class="space-y-4">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-400 mb-1">Nom de l'offre</label>
+                                    <input type="text" id="prod-name" class="input-cyber" placeholder="Ex: Licence SaaS V3" required>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-400 mb-1">Catégorie</label>
+                                    <select id="prod-category" class="cyber-select w-full">
+                                        <option value="SAAS">Abonnement SaaS (Au Mois)</option>
+                                        <option value="COURTAGE">Courtage Énergie (Au MWh)</option>
+                                        <option value="SERVICE">Service Fixe / Audit (Unité)</option>
+                                    </select>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-gray-400 mb-1">Prix Unitaire (€)</label>
+                                        <input type="number" id="prod-price" class="input-cyber" placeholder="299.00" step="0.01" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-gray-400 mb-1">Commission (%)</label>
+                                        <input type="number" id="prod-rate" class="input-cyber" placeholder="100" value="100" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="w-full bg-cyan text-abysse font-bold py-3 rounded-xl hover:bg-white transition mt-2">Enregistrer au catalogue</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Liste des produits -->
+                    <div class="col-span-1 lg:col-span-2">
+                        <div class="bento-card p-6 h-[600px] flex flex-col">
+                            <h3 class="text-lg font-black text-white mb-4 border-b border-white/10 pb-4"><i class="fa-solid fa-list text-gray-400 mr-2"></i> Catalogue Actif</h3>
+                            <div class="flex-1 overflow-y-auto hidden-scrollbar space-y-3" id="admin-catalog-list">
+                                <div class="text-center text-gray-500 py-10"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
+            <!-- VUE 4 & 5 : WAR ROOM & DASHBOARD -->
+            <div id="view-map" class="view-section h-[500px] md:h-[700px]"><div class="bento-card p-1 border-t-4 border-cyan relative h-full"><div id="map"></div></div></div>
+            <div id="view-dashboard" class="view-section space-y-6"><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div class="bento-card p-6 h-80 flex flex-col shadow-2xl"><h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">Pipeline Actif</h3><div class="flex justify-center items-center h-full text-gray-500"><i class="fa-solid fa-chart-bar text-4xl opacity-30"></i></div></div></div></div>
+
         </div>
     </main>
 
-    <!-- MODALE CRÉATION -->
+    <!-- MODALE CRÉATION LEAD -->
     <div id="lead-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-start md:items-center justify-center p-0 md:p-4 backdrop-blur-sm overflow-y-auto pt-10 md:pt-4">
         <div class="bento-card p-6 md:p-8 rounded-t-3xl md:rounded-2xl w-full max-w-2xl relative border-t-4 border-cyan shadow-[0_0_50px_rgba(0,229,255,0.15)] min-h-[90vh] md:min-h-0 mt-auto md:mt-0">
             <button onclick="document.getElementById('lead-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-500 hover:text-white bg-white/5 p-2 rounded-lg"><i class="fa-solid fa-xmark text-xl"></i></button>
             <h3 class="text-xl md:text-2xl font-black text-white mb-4 flex items-center gap-3"><i class="fa-solid fa-bolt text-cyan"></i> Nouvel Objectif</h3>
-            
             <form id="form-new-lead" onsubmit="createLead(event)" class="space-y-4">
                 <div class="bg-white/5 p-4 rounded-xl border border-white/10">
                     <h4 class="text-[10px] font-bold text-cyan uppercase tracking-widest mb-3 border-b border-white/10 pb-2">Qualification de l'entreprise</h4>
@@ -346,7 +366,6 @@
                         <div><label class="block text-[10px] font-bold text-gray-400 mb-1">Ville (Pour la carte)</label><input type="text" id="lead-city" class="input-cyber" placeholder="Paris, Lyon..."></div>
                     </div>
                 </div>
-
                 <div class="bg-white/5 p-4 rounded-xl border border-white/10">
                     <h4 class="text-[10px] font-bold text-cyan uppercase tracking-widest mb-3 border-b border-white/10 pb-2">Le Contact (Décideur)</h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
@@ -358,7 +377,6 @@
                         <div><label class="block text-[10px] font-bold text-gray-400 mb-1">Téléphone</label><input type="tel" id="lead-phone" class="input-cyber font-mono" placeholder="06 12 34 56 78" required></div>
                     </div>
                 </div>
-
                 <div class="flex flex-col md:flex-row justify-between items-center pt-4 border-t border-white/10 gap-4 md:gap-0 pb-10 md:pb-0">
                     <div class="flex items-center justify-between md:justify-start w-full md:w-auto gap-3">
                         <label class="text-[10px] font-bold text-gray-400">Pipeline Cible :</label>
@@ -370,6 +388,25 @@
                     </div>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODALE AJOUT PRODUIT CPQ -->
+    <div id="cpq-modal" class="fixed inset-0 bg-black/90 z-[200] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bento-card p-6 md:p-8 rounded-2xl w-full max-w-md relative border-t-4 border-gold shadow-[0_0_30px_rgba(245,158,11,0.2)]">
+            <button onclick="document.getElementById('cpq-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-xl font-black text-white mb-4"><i class="fa-solid fa-box-open text-gold mr-2"></i> Ajouter au Devis</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 mb-1">Sélectionner un produit</label>
+                    <select id="cpq-product-select" class="cyber-select w-full"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 mb-1">Quantité (Mois, Unités, ou Volume MWh)</label>
+                    <input type="number" id="cpq-quantity" class="input-cyber" placeholder="Ex: 12" value="1" step="0.1" required>
+                </div>
+                <button onclick="addProductToDeal()" class="w-full bg-gold text-abysse font-bold py-3 rounded-xl hover:bg-white transition mt-2">Valider la ligne</button>
+            </div>
         </div>
     </div>
 
@@ -391,6 +428,8 @@
         };
 
         let CRM_DATA =[];
+        let CATALOG =[];
+        let CURRENT_DEAL_PRODUCTS =[];
         let ACTIVE_PIPELINE = 'saas';
         let CURRENT_DEAL_ID = null;
         let mapInstance = null;
@@ -410,8 +449,9 @@
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById('view-' + viewId).classList.add('active');
             
-            const titles = {'dashboard': 'Reporting DCO', 'pipeline': 'Gestion des Affaires', 'contacts': 'Fiche Client', 'map': 'War Room (Carte)'};
+            const titles = {'dashboard': 'Reporting DCO', 'pipeline': 'Gestion des Affaires', 'contacts': 'Fiche Client', 'map': 'War Room (Carte)', 'products': 'Catalogue CPQ'};
             document.getElementById('page-title').innerText = titles[viewId] || 'CRM';
+            document.getElementById('page-subtitle').style.display = viewId === 'pipeline' ? 'block' : 'none';
 
             if(viewId === 'contacts') {
                 if(!CURRENT_DEAL_ID) {
@@ -434,22 +474,17 @@
             const btnSaas = document.getElementById('btn-pipe-saas');
             const btnBroker = document.getElementById('btn-pipe-broker');
             const btnSupplier = document.getElementById('btn-pipe-supplier');
-            
             [btnSaas, btnBroker, btnSupplier].forEach(b => b.className = "px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold text-gray-400 hover:text-white transition whitespace-nowrap");
-            
             if(type === 'saas') { btnSaas.classList.add('bg-saas', 'text-white', 'shadow-lg'); btnSaas.classList.remove('text-gray-400'); } 
             else if(type === 'broker') { btnBroker.classList.add('bg-broker', 'text-white', 'shadow-lg'); btnBroker.classList.remove('text-gray-400'); }
             else { btnSupplier.classList.add('bg-supplier', 'text-white', 'shadow-lg'); btnSupplier.classList.remove('text-gray-400'); }
-            
             loadCRMPipeline(); 
         }
 
-        // --- FILTRE LIVE KANBAN ---
         window.filterKanban = function() {
             const query = document.getElementById('kanban-search').value.toLowerCase();
             document.querySelectorAll('.kanban-card').forEach(card => {
-                const text = card.innerText.toLowerCase();
-                card.style.display = text.includes(query) ? 'block' : 'none';
+                card.style.display = card.innerText.toLowerCase().includes(query) ? 'block' : 'none';
             });
         }
 
@@ -462,9 +497,7 @@
                     if(data.results && data.results.length > 0) {
                         document.getElementById('lead-company').value = data.results[0].nom_complet || data.results[0].nom_raison_sociale;
                         document.getElementById('lead-naf').value = data.results[0].activite_principale;
-                        if(data.results[0].siege && data.results[0].siege.libelle_commune) {
-                            document.getElementById('lead-city').value = data.results[0].siege.libelle_commune;
-                        }
+                        if(data.results[0].siege && data.results[0].siege.libelle_commune) document.getElementById('lead-city').value = data.results[0].siege.libelle_commune;
                         App.toast("INSEE: Données récupérées.", "success");
                     }
                 } catch(e) {}
@@ -504,13 +537,7 @@
             try {
                 const res = await fetch(`/api/crm/pipeline/${ACTIVE_PIPELINE}`);
                 const data = await res.json();
-                if(data.success && data.pipeline) { 
-                    CRM_DATA = data.pipeline; 
-                    renderKanban(); 
-                    
-                    // Ré-appliquer le filtre si une recherche est en cours
-                    filterKanban(); 
-                }
+                if(data.success && data.pipeline) { CRM_DATA = data.pipeline; renderKanban(); filterKanban(); }
             } catch(e) {}
         }
 
@@ -524,7 +551,6 @@
             });
             document.getElementById('my-commission').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalComm)) + " €";
             const pipeColor = ACTIVE_PIPELINE === 'saas' ? 'border-saas' : (ACTIVE_PIPELINE === 'broker' ? 'border-broker' : 'border-supplier');
-            const unit = ACTIVE_PIPELINE === 'saas' ? '€' : 'MWh';
 
             for(let stage in cols) {
                 const container = document.getElementById(`col-${stage}`);
@@ -533,6 +559,8 @@
                 cols[stage].forEach(deal => {
                     const ctc = deal.contact || {};
                     let healthBadge = deal.health && deal.health.status !== "STABLE" ? `<div class="mt-2 text-[9px] font-bold ${deal.health.color} bg-black/40 px-2 py-1 rounded border border-white/5"><i class="fa-solid fa-triangle-exclamation"></i> ${deal.health.status}</div>` : '';
+                    let volumeDisplay = deal.volume > 0 ? `<span class="font-mono text-cyan font-bold">${deal.volume} Vol.</span>` : `<span class="font-mono text-gray-500 font-bold">CPQ...</span>`;
+                    
                     container.innerHTML += `
                         <div class="kanban-card border-l-4 ${pipeColor}" draggable="true" ondragstart="drag(event, '${deal.id}')" onclick="openContactDetail('${deal.id}')">
                             <div class="flex justify-between items-start mb-2"><span class="text-[9px] font-bold bg-white/10 px-2 py-0.5 rounded text-gray-300">NAF: ${deal.naf}</span><i class="fa-solid fa-grip-lines text-gray-600 hidden md:block"></i></div>
@@ -540,8 +568,8 @@
                             <div class="text-[10px] text-gray-400 mb-2 truncate"><i class="fa-solid fa-user mr-1 text-cyan/50"></i> ${ctc.name || 'Inconnu'}</div>
                             ${healthBadge}
                             <div class="flex justify-between items-center text-xs border-t border-white/10 pt-2 mt-3">
-                                <span class="font-mono text-cyan font-bold">${deal.volume} ${unit}</span>
-                                <i class="fa-solid fa-arrow-right text-gray-600"></i>
+                                ${volumeDisplay}
+                                <span class="font-bold text-success text-[10px]">${deal.commission_est > 0 ? deal.commission_est+'€' : ''}</span>
                             </div>
                         </div>
                     `;
@@ -564,12 +592,14 @@
             }
         }
 
-        // --- FICHE CLIENT & EDITIONS MANUELLES ---
+        // --- FICHE CLIENT & CPQ ---
         window.openContactDetail = function(id) {
             const deal = CRM_DATA.find(d => d.id === id);
             if(!deal) return;
             
             CURRENT_DEAL_ID = id;
+            CURRENT_DEAL_PRODUCTS = deal.products ||[]; // Charge l'existant
+            
             switchView('contacts');
             setTimelineAction('activity');
 
@@ -580,13 +610,11 @@
             document.getElementById('cd-logo').innerHTML = logoHtml;
             document.getElementById('cd-company-name').innerText = deal.name;
             
-            // Edit Website (Bouton Crayon / Ajouter)
             let websiteHtml = deal.website 
                 ? `<a href="${deal.website.startsWith('http') ? deal.website : 'https://'+deal.website}" target="_blank" class="hover:text-cyan transition truncate"><i class="fa-solid fa-link"></i> ${deal.website}</a> <button onclick="editField('website', '${deal.company_id}')" class="text-gray-500 hover:text-white ml-2 tooltip" title="Modifier"><i class="fa-solid fa-pen"></i></button>`
                 : `<span class="italic opacity-50 cursor-pointer hover:text-cyan transition" onclick="editField('website', '${deal.company_id}')"><i class="fa-solid fa-plus"></i> Ajouter site web</span>`;
             document.getElementById('cd-website').innerHTML = websiteHtml;
 
-            // Edit LinkedIn (Bouton Crayon / Ajouter)
             let linkedInHtml = ctc.linkedin 
                 ? `<a href="${ctc.linkedin.startsWith('http') ? ctc.linkedin : 'https://'+ctc.linkedin}" target="_blank" class="text-blue-400 hover:text-white"><i class="fa-brands fa-linkedin text-lg"></i> Profil</a> <button onclick="editField('linkedin', '${deal.contact_id}')" class="text-gray-500 hover:text-white ml-2 tooltip" title="Modifier"><i class="fa-solid fa-pen"></i></button>` 
                 : `<button onclick="editField('linkedin', '${deal.contact_id}')" class="text-gray-500 hover:text-cyan text-[10px] transition"><i class="fa-solid fa-plus"></i> Ajouter LinkedIn</button>`;
@@ -607,14 +635,13 @@
                 </div>
             `;
 
-            const unit = ACTIVE_PIPELINE === 'saas' ? '€' : 'MWh';
             document.getElementById('deal-stage-select').value = deal.stage;
-            document.getElementById('cd-deal-volume').innerText = `${deal.volume} ${unit}`;
+            document.getElementById('cd-deal-volume').innerText = deal.volume;
             document.getElementById('cd-deal-comm').innerText = `${deal.commission_est} €`;
 
             if(deal.intelligence) {
                 document.getElementById('intel-content').innerHTML = `
-                    <div class="mb-4"><span class="text-[10px] text-gray-500 uppercase font-bold block mb-1">Stratégie (NAF ${deal.naf})</span><p class="text-[11px] md:text-xs text-alert font-bold bg-alert/10 p-2 rounded border border-alert/20">${deal.intelligence.pain_points}</p></div>
+                    <div class="mb-4"><span class="text-[10px] text-gray-500 uppercase font-bold block mb-1">Stratégie IA</span><p class="text-[11px] md:text-xs text-alert font-bold bg-alert/10 p-2 rounded border border-alert/20">${deal.intelligence.pain_points}</p></div>
                     <div>
                         <span class="text-[10px] text-gray-500 uppercase font-bold block mb-1">Pitch IA Suggéré</span>
                         <div class="bg-black/50 p-3 md:p-4 rounded-xl border border-white/5 text-[11px] md:text-xs text-gray-300 italic leading-relaxed border-l-2 border-l-cyan">"${deal.intelligence.pitch}"</div>
@@ -622,22 +649,18 @@
                     </div>
                 `;
             }
+            renderDealProducts();
             loadTimeline(deal.id);
         }
 
-        // --- EDITION API ---
         window.editField = async function(type, id) {
             const val = prompt(`Saisir la nouvelle URL pour ${type}:`);
             if (val !== null && val.trim() !== '') { 
                 try {
                     const url = type === 'linkedin' ? `/api/crm/contact/${id}/linkedin` : `/api/crm/company/${id}/website`;
                     const res = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({value: val}) });
-                    if(res.ok) {
-                        App.toast("Mis à jour avec succès !", "success");
-                        await loadCRMPipeline(); 
-                        setTimeout(() => openContactDetail(CURRENT_DEAL_ID), 200);
-                    } else App.toast("Erreur mise à jour.", "error");
-                } catch(e) { App.toast("Erreur réseau.", "error"); }
+                    if(res.ok) { App.toast("Mis à jour avec succès !", "success"); await loadCRMPipeline(); setTimeout(() => openContactDetail(CURRENT_DEAL_ID), 200); }
+                } catch(e) {}
             }
         }
 
@@ -650,9 +673,7 @@
         }
 
         window.setTimelineAction = function(type) {
-            // FIX SYNTAXE DU RESET
-            const tabs =['activity', 'note', 'email'];
-            tabs.forEach(t => {
+            ['activity', 'note', 'email'].forEach(t => {
                 const btn = document.getElementById(`tab-btn-${t}`);
                 if(btn) btn.className = "pb-3 text-xs font-bold text-gray-500 hover:text-white transition";
             });
@@ -728,6 +749,125 @@
                     });
                 } else { container.innerHTML = `<div class="text-center text-gray-500 py-10 text-xs italic">Aucune activité enregistrée.</div>`; }
             } catch(e) { container.innerHTML = `<div class="text-center text-alert py-10 text-xs">Erreur de chargement.</div>`; }
+        }
+
+        // --- MODULE CPQ ---
+        async function loadCatalog() {
+            try {
+                const res = await fetch('/api/crm/products');
+                const data = await res.json();
+                if(data.success) {
+                    CATALOG = data.products;
+                    renderAdminCatalog();
+                }
+            } catch(e) {}
+        }
+
+        function renderAdminCatalog() {
+            const list = document.getElementById('admin-catalog-list');
+            list.innerHTML = '';
+            if(CATALOG.length === 0) return list.innerHTML = `<div class="text-center text-gray-500 py-10 text-xs italic">Le catalogue est vide.</div>`;
+            
+            CATALOG.forEach(p => {
+                list.innerHTML += `
+                    <div class="flex justify-between items-center p-3 border border-white/5 bg-black/30 rounded-xl hover:bg-black/50 transition">
+                        <div>
+                            <div class="font-bold text-white text-sm">${p.name} <span class="text-[9px] bg-white/10 px-2 py-0.5 rounded text-cyan ml-2">${p.category}</span></div>
+                            <div class="text-[10px] text-gray-400 mt-1">Base: ${p.unit_price}€ | Comm: ${p.comm_rate}%</div>
+                        </div>
+                        <button onclick="deleteProduct('${p.id}')" class="text-gray-600 hover:text-alert transition"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+            });
+        }
+
+        window.createProduct = async function(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button'); btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...'; btn.disabled = true;
+            
+            const payload = {
+                name: document.getElementById('prod-name').value,
+                category: document.getElementById('prod-category').value,
+                unit_price: parseFloat(document.getElementById('prod-price').value),
+                comm_rate: parseFloat(document.getElementById('prod-rate').value) / 100.0 // Convertir % en décimal
+            };
+
+            try {
+                await fetch('/api/crm/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                App.toast("Produit ajouté !", "success");
+                e.target.reset();
+                loadCatalog();
+            } catch(err) { App.toast("Erreur.", "error"); }
+            btn.innerHTML = 'Enregistrer au catalogue'; btn.disabled = false;
+        }
+
+        window.deleteProduct = async function(id) {
+            if(confirm("Supprimer ce produit du catalogue ?")) {
+                await fetch(`/api/crm/products/${id}`, { method: 'DELETE' });
+                loadCatalog();
+                App.toast("Produit supprimé.", "info");
+            }
+        }
+
+        window.openAddProductModal = async function() {
+            if(CATALOG.length === 0) await loadCatalog();
+            const select = document.getElementById('cpq-product-select');
+            select.innerHTML = CATALOG.map(p => `<option value="${p.id}">${p.name} (${p.unit_price}€)</option>`).join('');
+            document.getElementById('cpq-quantity').value = '1';
+            document.getElementById('cpq-modal').classList.remove('hidden');
+        }
+
+        window.addProductToDeal = async function() {
+            const prodId = document.getElementById('cpq-product-select').value;
+            const qty = parseFloat(document.getElementById('cpq-quantity').value);
+            if(!prodId || isNaN(qty)) return;
+
+            // Ajout à la liste mémoire
+            CURRENT_DEAL_PRODUCTS.push({ product_id: prodId, quantity: qty });
+            document.getElementById('cpq-modal').classList.add('hidden');
+
+            try {
+                await fetch(`/api/crm/deal/${CURRENT_DEAL_ID}/products`, { 
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ items: CURRENT_DEAL_PRODUCTS }) 
+                });
+                App.toast("Devis mis à jour !", "success");
+                await loadCRMPipeline();
+                openContactDetail(CURRENT_DEAL_ID); // Refresh total
+            } catch(e) { App.toast("Erreur de calcul.", "error"); }
+        }
+
+        window.removeProductFromDeal = async function(index) {
+            CURRENT_DEAL_PRODUCTS.splice(index, 1);
+            try {
+                await fetch(`/api/crm/deal/${CURRENT_DEAL_ID}/products`, { 
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ items: CURRENT_DEAL_PRODUCTS }) 
+                });
+                App.toast("Ligne supprimée.", "info");
+                await loadCRMPipeline();
+                openContactDetail(CURRENT_DEAL_ID);
+            } catch(e) {}
+        }
+
+        function renderDealProducts() {
+            const list = document.getElementById('cd-deal-products-list');
+            list.innerHTML = '';
+            if(!CURRENT_DEAL_PRODUCTS || CURRENT_DEAL_PRODUCTS.length === 0) {
+                list.innerHTML = `<div class="text-center text-[10px] text-gray-500 italic py-4">Aucun produit associé.</div>`;
+                return;
+            }
+            CURRENT_DEAL_PRODUCTS.forEach((prod, index) => {
+                list.innerHTML += `
+                    <div class="flex justify-between items-center bg-black/40 border border-white/5 p-2 rounded hover:border-white/20 transition">
+                        <div>
+                            <div class="text-xs font-bold text-white">${prod.name}</div>
+                            <div class="text-[9px] text-gray-400">Qté: ${prod.quantity} | Val: ${prod.line_comm.toFixed(2)}€</div>
+                        </div>
+                        <button onclick="removeProductFromDeal(${index})" class="text-gray-600 hover:text-alert"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                `;
+            });
         }
 
         async function initMap() {
