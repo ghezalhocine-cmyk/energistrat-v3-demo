@@ -45,18 +45,20 @@ class MockDB:
     def delete_site(self, sid): return True
     def get_setting(self, n): return {}
     def save_setting(self, n, d): return True
-    def get_all_leads(self): return[]
+    def get_all_leads(self): return []
     def get_all_companies(self): return[]
-    def get_all_contacts(self): return[]
+    def get_all_contacts(self): return []
     def get_all_deals(self): return[]
     def save_lead(self, i, d): return True
     def save_company(self, i, d): return True
     def save_contact(self, i, d): return True
     def save_deal(self, i, d): return True
     def save_activity(self, i, d): return True
+    def get_deal_activities(self, i): return[]
     def delete_lead(self, i): return True
     def get_company(self, i): return {}
     def get_contact(self, i): return {}
+    def get_deal(self, i): return {}
     def get_sentinel_alerts(self): return {"last_scan": "Jamais", "alert_count": 0, "alerts":[]}
     def save_sentinel_alerts(self, d): return True
     def get_all_users(self): return[]
@@ -121,7 +123,7 @@ rte = load_module("cortex_rte", "rte", MockRTE())
 crm_engine = load_module("cortex_crm", "crm_engine", MockCRM())
 pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12-CRM")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12-CRM-PHASE2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -200,7 +202,7 @@ async def logout(response: Response):
     return RedirectResponse(url="/login")
 
 # ==========================================
-# MOTEUR CRM V12 (HUBSPOT KILLER - PHASE 1)
+# MOTEUR CRM V12 (HUBSPOT KILLER - PHASE 1 & 2)
 # ==========================================
 
 class CRMLeadModel(BaseModel):
@@ -221,9 +223,14 @@ class DealMoveModel(BaseModel):
     new_stage: str
 
 class EmailRequestModel(BaseModel):
-    deal_id: str # Changed from lead_id to deal_id for relational model
+    deal_id: str
     subject: str
     body: str
+
+class CRMActivityModel(BaseModel):
+    deal_id: str
+    type: str
+    description: str
 
 @app.post("/api/crm/lead")
 async def api_create_crm_lead_and_convert(payload: CRMLeadModel, user = Depends(get_current_user)):
@@ -310,7 +317,7 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
     """
     Routage Rétro-compatible : Interroge la nouvelle base relationnelle,
     assemble les objets, et renvoie l'ancien format JSON pour ne pas 
-    crasher l'interface de la Phase 1.
+    crasher l'interface de la Phase 1 & 2.
     """
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès réservé"}, 401)
     
@@ -384,6 +391,8 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
                 "id": old.get("id"),
                 "name": old.get("company_name", "Inconnu"),
                 "city": old.get("city", ""),
+                "website": "",
+                "logo": "",
                 "naf": naf,
                 "volume": vol,
                 "stage": old.get("stage", "LEAD"),
@@ -391,7 +400,8 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
                     "name": f"{old.get('contact_firstname', '')} {old.get('contact_lastname', '')}".strip(),
                     "role": old.get("contact_role", "Contact"),
                     "phone": old.get("contact_phone", ""),
-                    "email": old.get("contact_email", "")
+                    "email": old.get("contact_email", ""),
+                    "linkedin": ""
                 },
                 "intelligence": intel,
                 "health": crm_engine.analyze_customer_health(vol, vol,[]),
@@ -403,7 +413,7 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
 
 @app.post("/api/crm/deal/move")
 async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_user)):
-    """Drag & Drop Kanban (V12 & Legacy)"""
+    """Drag & Drop Kanban (V12 & Legacy) + Création Activité"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès refusé"}, 401)
     
     # Tente d'abord sur la table Deals V12
@@ -415,8 +425,11 @@ async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_u
         # Enregistre le mouvement dans la Timeline
         act_id = f"ACT_{uuid.uuid4().hex[:12]}"
         db.save_activity(act_id, {
-            "deal_id": payload.deal_id, "type": "STAGE_CHANGE", "title": f"Passage à l'étape {payload.new_stage}",
-            "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")
+            "deal_id": payload.deal_id, 
+            "type": "STAGE_CHANGE", 
+            "title": f"Passage à l'étape {payload.new_stage}",
+            "timestamp": datetime.now().isoformat(), 
+            "owner_id": user.get("uid")
         })
     else:
         # Fallback sur l'ancien système Settings
@@ -429,6 +442,7 @@ async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_u
 
 @app.post("/api/crm/email/send")
 async def api_send_crm_email(payload: EmailRequestModel, background_tasks: BackgroundTasks, user = Depends(get_current_user)):
+    """Envoi Email + Création Activité"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     
     # Logique V12
@@ -449,22 +463,54 @@ async def api_send_crm_email(payload: EmailRequestModel, background_tasks: Backg
     # Trace l'email dans la Timeline
     act_id = f"ACT_{uuid.uuid4().hex[:12]}"
     db.save_activity(act_id, {
-        "deal_id": payload.deal_id, "type": "EMAIL", "title": f"Email: {payload.subject}",
-        "description": payload.body, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")
+        "deal_id": payload.deal_id, 
+        "type": "EMAIL", 
+        "title": f"Email: {payload.subject}",
+        "description": payload.body, 
+        "timestamp": datetime.now().isoformat(), 
+        "owner_id": user.get("uid")
     })
     
     return JSONResponse({"success": True, "message": "Email placé en file d'attente."})
 
 @app.get("/api/crm/track/open/{deal_id}")
 async def api_track_email_open(deal_id: str):
+    """Pixel de Tracking + Création Activité"""
     # Trace l'ouverture
     act_id = f"ACT_{uuid.uuid4().hex[:12]}"
     db.save_activity(act_id, {
-        "deal_id": deal_id, "type": "TRACKING", "title": "Le client a ouvert un email",
-        "timestamp": datetime.now().isoformat(), "owner_id": "SYSTEM"
+        "deal_id": deal_id, 
+        "type": "TRACKING", 
+        "title": "Le client a ouvert un email",
+        "timestamp": datetime.now().isoformat(), 
+        "owner_id": "SYSTEM"
     })
     pixel = base64.b64decode("R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
     return Response(content=pixel, media_type="image/gif")
+
+@app.post("/api/crm/activity")
+async def api_create_crm_activity(payload: CRMActivityModel, user = Depends(get_current_user)):
+    """Création d'une Note Manuelle dans la Timeline V12"""
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    
+    act_id = f"ACT_{uuid.uuid4().hex[:12]}"
+    db.save_activity(act_id, {
+        "deal_id": payload.deal_id,
+        "type": payload.type, # "NOTE"
+        "title": "Note manuelle" if payload.type == "NOTE" else payload.type,
+        "description": payload.description,
+        "timestamp": datetime.now().isoformat(),
+        "owner_id": user.get("uid")
+    })
+    return JSONResponse({"success": True})
+
+@app.get("/api/crm/deal/{deal_id}/activities")
+async def api_get_crm_activities(deal_id: str, user = Depends(get_current_user)):
+    """Récupération de tout l'historique d'un Deal (Timeline)"""
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès réservé"}, 401)
+    
+    activities = db.get_deal_activities(deal_id)
+    return JSONResponse({"success": True, "activities": activities})
 
 # ==========================================
 # API CORTEX SENTINEL & RTE
@@ -686,7 +732,7 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
         else:
             cluster_files = [base_data]
             
-        if not cluster_files: cluster_files =[base_data]
+        if not cluster_files: cluster_files = [base_data]
             
         if len(cluster_files) > 1:
             v_tot = b_tot = v_el = v_gz = g_tot = 0
@@ -710,12 +756,12 @@ async def get_thermic_signature(client_id: str):
     fin = cortex.enrich_site_financials(data)
     vol = float(fin.get('volume_mwh') or data.get('kpis', {}).get('volume_mwh', 0))
     city = str(data.get('location', {}).get('city', 'Paris')).upper()
-    dju_profile =[x * 1.2 if any(v in city for v in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
+    dju_profile = [x * 1.2 if any(v in city for v in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in ['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
     total_dju = sum(dju_profile) or 1
     talon_monthly = (vol * (0.15 if fin.get('meta', {}).get('is_gas', False) else 0.30)) / 12
     chauf_ann = vol - (talon_monthly * 12)
     
-    points = [{"x": round(dju_profile[m]), "y": round(((dju_profile[m]/total_dju)*chauf_ann) + talon_monthly, 2), "month": m+1} for m in range(12)]
+    points =[{"x": round(dju_profile[m]), "y": round(((dju_profile[m]/total_dju)*chauf_ann) + talon_monthly, 2), "month": m+1} for m in range(12)]
     xm = sum(p['x'] for p in points) / 12; ym = sum(p['y'] for p in points) / 12
     den = sum((p['x'] - xm)**2 for p in points)
     a = sum((p['x'] - xm) * (p['y'] - ym) for p in points) / den if den != 0 else 0
