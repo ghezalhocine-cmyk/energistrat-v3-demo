@@ -7,19 +7,18 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_CRM_V11")
+logger = logging.getLogger("CORTEX_CRM_V12")
 
 class CortexCRM:
     """
-    CORTEX CRM V11.0 (SALES WORKSPACE MASTER ENGINE)
-    Gère l'intelligence commerciale, le Customer Success (NPS/Usage) 
-    et le moteur d'Emailing (Cold Email & Tracking).
+    CORTEX CRM V12.0 (HUBSPOT KILLER ENGINE)
+    Gère l'intelligence commerciale NAF, le calcul de commission,
+    le Customer Success et le Moteur d'Emailing SMTP.
     """
     
     def __init__(self):
-        self.version = "11.0"
-        # Configuration SMTP (À renseigner dans les variables d'environnement Cloud Run)
-        # Ex: Brevo (Sendinblue), Mailjet ou SendGrid (Gratuit jusqu'à 300 mails/jour)
+        self.version = "12.0"
+        # Configuration SMTP 
         self.smtp_server = os.getenv("SMTP_SERVER", "smtp-relay.brevo.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", 587))
         self.smtp_user = os.getenv("SMTP_USER", "")
@@ -35,7 +34,18 @@ class CortexCRM:
         }
 
     # --- 1. INTELLIGENCE COMMERCIALE ---
-    def generate_icebreaker(self, naf_code: str) -> dict:
+    def generate_icebreaker(self, naf_code: str, pipeline_type: str = "saas") -> dict:
+        """Génère un argumentaire dynamique selon le code NAF et le Pipeline visé."""
+        
+        # Override IA si on démarche un Fournisseur (Pipeline 3)
+        if pipeline_type.lower() == "supplier":
+            return {
+                "naf": naf_code,
+                "pain_points": "Coût d'acquisition client élevé, Manque de canaux de distribution digitaux, Processus de closing chronophage.",
+                "pitch": "Bonjour, en tant que Tiers de Confiance B2B, ENERGISTRAT centralise un volume de consommation massif sur sa plateforme. Nous digitalisons l'acquisition client. Si je vous montre comment notre IA peut injecter des dizaines de GWh qualifiés directement dans votre pipeline de vente avec zéro effort commercial de votre part, seriez-vous ouvert à un échange de 10 min sur un accord de distribution ?"
+            }
+
+        # Pitch classique B2B (SaaS / Broker)
         naf_base = str(naf_code)[:5] if naf_code else "DEFAULT"
         intel = self.NAF_INTELLIGENCE.get(naf_base, self.NAF_INTELLIGENCE["DEFAULT"])
         return { "naf": naf_code, "pain_points": intel["pain"], "pitch": intel["pitch"] }
@@ -46,58 +56,38 @@ class CortexCRM:
         elif pipeline_type == "saas": return round(saas_mrr * 1.0, 2) # 1 mois de MRR
         return 0.0
 
-    # --- 2. CUSTOMER SUCCESS & CHURN (L'Engagement) ---
+    # --- 2. CUSTOMER SUCCESS & CHURN ---
     def analyze_customer_health(self, current_vol: float, previous_vol: float, login_dates: List[str]) -> dict:
         """Calcule le taux d'utilisation de la plateforme et le risque de faillite."""
         now = datetime.now()
         logins_last_30d = len([d for d in login_dates if (now - datetime.fromisoformat(d)).days <= 30])
-        
-        # Taux d'utilisation (Engagement Score)
-        usage_score = min(100, logins_last_30d * 20) # 5 logins = 100%
+        usage_score = min(100, logins_last_30d * 20)
         
         status = "SAIN"
         color = "text-success"
         action = "Maintenir la relation."
 
-        # Risque d'impayé / Faillite (Baisse SGE)
         if previous_vol > 0:
             drop_pct = ((previous_vol - current_vol) / previous_vol) * 100
             if drop_pct > 30:
-                status = "RISQUE DE DÉFAUT (FAILLITE)"
+                status = "RISQUE DE DÉFAUT"
                 color = "text-alert"
-                action = f"Chute brutale SGE (-{int(drop_pct)}%). Arrêt de production probable. Demandez des garanties au fournisseur."
+                action = f"Chute brutale SGE (-{int(drop_pct)}%). Demandez des garanties au fournisseur."
 
-        # Risque de Churn SaaS (N'utilise plus l'app)
         if usage_score == 0 and status == "SAIN":
             status = "DÉTACHEMENT LOGICIEL"
             color = "text-gold"
-            action = "0 connexion en 30 jours. Risque de résiliation. Programmez un appel de Customer Success."
+            action = "0 connexion en 30 jours. Risque de résiliation."
 
-        return {
-            "status": status, "color": color, "action_required": action,
-            "usage_score": usage_score, "is_churn_risk": usage_score < 20
-        }
-
-    def check_nps_eligibility(self, client_created_at: str, last_nps_date: str) -> bool:
-        """Vérifie si le client doit recevoir la campagne automatique de satisfaction (NPS - 6 mois)."""
-        now = datetime.now()
-        created = datetime.fromisoformat(client_created_at)
-        if (now - created).days < 180: return False # Trop récent
-        if not last_nps_date: return True
-        last_nps = datetime.fromisoformat(last_nps_date)
-        return (now - last_nps).days >= 180 # Tous les 6 mois
+        return { "status": status, "color": color, "action_required": action, "usage_score": usage_score, "is_churn_risk": usage_score < 20 }
 
     # --- 3. MOTEUR D'EMAILING (ZÉRO MOCK) ---
     def send_sales_email(self, to_email: str, subject: str, html_content: str, lead_id: str) -> bool:
-        """
-        Envoie un email réel via SMTP.
-        Injecte un Tracking Pixel invisible pour savoir si le client ouvre l'email.
-        """
+        """Envoie un email réel via SMTP avec un pixel de tracking injecté."""
         if not self.smtp_user or not self.smtp_password:
             logger.warning("SMTP non configuré. Email simulé dans les logs.")
             return True
 
-        # Génération du Pixel de Tracking
         tracking_url = f"https://energistrat.com/api/crm/track/open/{lead_id}"
         tracking_pixel = f'<img src="{tracking_url}" width="1" height="1" style="display:none;" />'
         final_html = html_content + tracking_pixel
