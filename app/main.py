@@ -45,9 +45,9 @@ class MockDB:
     def delete_site(self, sid): return True
     def get_setting(self, n): return {}
     def save_setting(self, n, d): return True
-    def get_all_leads(self): return []
+    def get_all_leads(self): return[]
     def get_all_companies(self): return[]
-    def get_all_contacts(self): return []
+    def get_all_contacts(self): return[]
     def get_all_deals(self): return[]
     def save_lead(self, i, d): return True
     def save_company(self, i, d): return True
@@ -88,7 +88,7 @@ class MockRTE:
 class MockForecast:
     def simulate_5_years(self, s): return {"labels":["N", "N+1", "N+2", "N+3", "N+4"], "dataset_trend":[100, 105, 110, 115, 120], "dataset_sobriety":[100, 90, 80, 70, 60], "gain_potential_mwh": 150}
 class MockCRM:
-    def generate_icebreaker(self, naf): return {"naf": naf, "pain_points": "Mode Démo", "pitch": "Argumentaire non disponible."}
+    def generate_icebreaker(self, naf, pipe_type="saas"): return {"naf": naf, "pain_points": "Mode Démo", "pitch": "Argumentaire non disponible."}
     def analyze_customer_health(self, cv, pv, lc): return {"status": "STABLE", "color": "text-success", "action_required": "RAS", "usage_score": 100, "is_churn_risk": False}
     def calculate_commission(self, v, is_s, saas_mrr=0): return round(v * 1.0, 2)
     def send_sales_email(self, *args, **kwargs): return True
@@ -123,7 +123,7 @@ rte = load_module("cortex_rte", "rte", MockRTE())
 crm_engine = load_module("cortex_crm", "crm_engine", MockCRM())
 pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12-CRM-PHASE2")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12-CRM-PHASE3")
 
 app.add_middleware(
     CORSMiddleware,
@@ -159,7 +159,7 @@ class SolarRequest(BaseModel): address: str; surface_roof: float; electricity_pr
 
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
-    elif isinstance(data, list): return [json_compliant(v) for v in data]
+    elif isinstance(data, list): return[json_compliant(v) for v in data]
     elif isinstance(data, float):
         if math.isnan(data) or math.isinf(data): return 0.0
     return data
@@ -202,7 +202,7 @@ async def logout(response: Response):
     return RedirectResponse(url="/login")
 
 # ==========================================
-# MOTEUR CRM V12 (HUBSPOT KILLER - PHASE 1 & 2)
+# MOTEUR CRM V12 (HUBSPOT KILLER - PHASE 3.1)
 # ==========================================
 
 class CRMLeadModel(BaseModel):
@@ -232,123 +232,74 @@ class CRMActivityModel(BaseModel):
     type: str
     description: str
 
+class UpdateFieldModel(BaseModel):
+    value: str
+
 @app.post("/api/crm/lead")
 async def api_create_crm_lead_and_convert(payload: CRMLeadModel, user = Depends(get_current_user)):
-    """
-    CRÉATION MAGIQUE : Quand on valide le formulaire, on convertit DIRECTEMENT 
-    le Lead en Company, Contact et Deal (Architecture V12).
-    """
+    """Convertit DIRECTEMENT le Lead en Company, Contact et Deal"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     
     owner_id = user.get("uid")
     now = datetime.now().isoformat()
 
-    # 1. ENRICHISSEMENT AUTO (Scraping du site web depuis l'email)
     domain = ""
     logo_url = ""
     try:
         if "@" in payload.contact_email:
             parts = payload.contact_email.split("@")
             domain = parts[1].lower()
-            # Ignorer les webmails génériques
             if domain not in["gmail.com", "yahoo.fr", "hotmail.fr", "orange.fr", "wanadoo.fr"]:
                 logo_url = f"https://logo.clearbit.com/{domain}"
     except: pass
 
-    # 2. CREATION COMPANY (Compte)
     company_id = f"COMP_{payload.siret or uuid.uuid4().hex[:8]}"
     company_data = {
-        "siret": payload.siret,
-        "name": payload.company_name,
-        "naf": payload.naf,
-        "city": payload.city,
-        "website": domain,
-        "logo": logo_url,
-        "created_at": now,
-        "owner_id": owner_id
+        "siret": payload.siret, "name": payload.company_name, "naf": payload.naf,
+        "city": payload.city, "website": domain, "logo": logo_url, "created_at": now, "owner_id": owner_id
     }
     db.save_company(company_id, company_data)
 
-    # 3. CREATION CONTACT (Humain)
     contact_id = f"CONT_{uuid.uuid4().hex[:12]}"
     contact_data = {
-        "company_id": company_id,
-        "firstname": payload.contact_firstname,
-        "lastname": payload.contact_lastname,
-        "role": payload.contact_role,
-        "email": payload.contact_email,
-        "phone": payload.contact_phone,
-        "linkedin": "", # Sera rempli dans l'UI Phase 2
-        "created_at": now,
-        "owner_id": owner_id
+        "company_id": company_id, "firstname": payload.contact_firstname, "lastname": payload.contact_lastname,
+        "role": payload.contact_role, "email": payload.contact_email, "phone": payload.contact_phone,
+        "linkedin": "", "created_at": now, "owner_id": owner_id
     }
     db.save_contact(contact_id, contact_data)
 
-    # 4. CREATION DEAL (L'Affaire pour le Kanban)
     deal_id = f"DEAL_{uuid.uuid4().hex[:12]}"
     deal_data = {
-        "company_id": company_id,
-        "primary_contact_id": contact_id,
-        "name": f"{payload.company_name} - {payload.pipeline.upper()}",
-        "pipeline": payload.pipeline,
-        "stage": "LEAD",
-        "volume_est": 0.0, # Ligne de produit par defaut
-        "products":[],
-        "created_at": now,
-        "owner_id": owner_id
+        "company_id": company_id, "primary_contact_id": contact_id, "name": f"{payload.company_name} - {payload.pipeline.upper()}",
+        "pipeline": payload.pipeline, "stage": "LEAD", "volume_est": 0.0, "products":[], "created_at": now, "owner_id": owner_id
     }
     db.save_deal(deal_id, deal_data)
 
-    # 5. CREATION ACTIVITY (Historique)
     act_id = f"ACT_{uuid.uuid4().hex[:12]}"
-    db.save_activity(act_id, {
-        "deal_id": deal_id,
-        "type": "SYSTEM",
-        "title": "Création du compte",
-        "description": f"Import initial via {payload.source}.",
-        "timestamp": now,
-        "owner_id": owner_id
-    })
+    db.save_activity(act_id, {"deal_id": deal_id, "type": "SYSTEM", "title": "Création du compte", "description": f"Import initial.", "timestamp": now, "owner_id": owner_id})
 
     return JSONResponse({"success": True, "deal_id": deal_id})
 
 @app.get("/api/crm/pipeline/{pipe_type}")
 async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user)):
-    """
-    Routage Rétro-compatible : Interroge la nouvelle base relationnelle,
-    assemble les objets, et renvoie l'ancien format JSON pour ne pas 
-    crasher l'interface de la Phase 1 & 2.
-    """
+    """Assemble les Deals V12 et passe le type de pipeline à l'IA."""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès réservé"}, 401)
     
-    # Récupération depuis les nouvelles collections
     all_deals = db.get_all_deals()
     all_comps = {c.get("id"): c for c in db.get_all_companies()}
     all_conts = {c.get("id"): c for c in db.get_all_contacts()}
 
-    # Migration à la volée des anciens "Leads" qui traînent dans Settings
     try:
         old_leads = db.get_all_leads()
         for old in old_leads:
             if str(old.get("pipeline", "")).lower() == pipe_type.lower():
-                all_deals.append({
-                    "id": old.get("id"),
-                    "legacy": True, # Drapeau pour savoir que c'est un ancien
-                    "name": old.get("company_name", "Ancien Lead"),
-                    "stage": old.get("stage", "LEAD"),
-                    "volume_est": float(old.get("volume_est") or 0.0),
-                    "pipeline": old.get("pipeline"),
-                    "_old_data": old
-                })
+                all_deals.append({"id": old.get("id"), "legacy": True, "name": old.get("company_name", "Ancien Lead"), "stage": old.get("stage", "LEAD"), "volume_est": float(old.get("volume_est") or 0.0), "pipeline": old.get("pipeline"), "_old_data": old})
     except: pass
 
     formatted_deals =[]
-    
     for deal in all_deals:
-        if str(deal.get("pipeline", "")).lower() != pipe_type.lower(): 
-            continue
+        if str(deal.get("pipeline", "")).lower() != pipe_type.lower(): continue
             
-        # Si c'est un deal V12 (Relationnel)
         if not deal.get("legacy"):
             comp = all_comps.get(deal.get("company_id"), {})
             cont = all_conts.get(deal.get("primary_contact_id"), {})
@@ -356,159 +307,107 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             vol = float(deal.get("volume_est", 0.0))
             naf = comp.get("naf", "DEFAULT")
             
-            intel = crm_engine.generate_icebreaker(naf)
+            intel = crm_engine.generate_icebreaker(naf, pipe_type) # IA Dynamique
             health = crm_engine.analyze_customer_health(vol, vol,[])
             comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
 
             formatted_deals.append({
-                "id": deal.get("id"),
-                "name": comp.get("name", deal.get("name")),
-                "city": comp.get("city", ""),
-                "website": comp.get("website", ""),
-                "logo": comp.get("logo", ""),
-                "naf": naf,
-                "volume": vol,
-                "stage": deal.get("stage", "LEAD"),
-                "contact": {
-                    "name": f"{cont.get('firstname', '')} {cont.get('lastname', '')}".strip() or "Contact",
-                    "role": cont.get("role", "Décideur"),
-                    "phone": cont.get("phone", ""),
-                    "email": cont.get("email", ""),
-                    "linkedin": cont.get("linkedin", "")
-                },
-                "intelligence": intel,
-                "health": health,
-                "commission_est": comms,
-                "last_contact": "Aujourd'hui"
+                "id": deal.get("id"), "company_id": comp.get("id"), "contact_id": cont.get("id"),
+                "name": comp.get("name", deal.get("name")), "city": comp.get("city", ""),
+                "website": comp.get("website", ""), "logo": comp.get("logo", ""), "naf": naf,
+                "volume": vol, "stage": deal.get("stage", "LEAD"),
+                "contact": {"name": f"{cont.get('firstname', '')} {cont.get('lastname', '')}".strip() or "Contact", "role": cont.get("role", "Décideur"), "phone": cont.get("phone", ""), "email": cont.get("email", ""), "linkedin": cont.get("linkedin", "")},
+                "intelligence": intel, "health": health, "commission_est": comms, "last_contact": "Aujourd'hui"
             })
         else:
-            # Si c'est un ancien Lead de la collection Settings (Rétro-compatibilité)
             old = deal.get("_old_data", {})
             vol = float(old.get("volume_est") or 0.0)
             naf = old.get("naf", "DEFAULT")
-            intel = crm_engine.generate_icebreaker(naf)
+            intel = crm_engine.generate_icebreaker(naf, pipe_type) # IA Dynamique
             formatted_deals.append({
-                "id": old.get("id"),
-                "name": old.get("company_name", "Inconnu"),
-                "city": old.get("city", ""),
-                "website": "",
-                "logo": "",
-                "naf": naf,
-                "volume": vol,
-                "stage": old.get("stage", "LEAD"),
-                "contact": {
-                    "name": f"{old.get('contact_firstname', '')} {old.get('contact_lastname', '')}".strip(),
-                    "role": old.get("contact_role", "Contact"),
-                    "phone": old.get("contact_phone", ""),
-                    "email": old.get("contact_email", ""),
-                    "linkedin": ""
-                },
-                "intelligence": intel,
-                "health": crm_engine.analyze_customer_health(vol, vol,[]),
-                "commission_est": crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299),
-                "last_contact": old.get("last_contact", "Jamais")
+                "id": old.get("id"), "company_id": old.get("id"), "contact_id": old.get("id"),
+                "name": old.get("company_name", "Inconnu"), "city": old.get("city", ""),
+                "website": "", "logo": "", "naf": naf, "volume": vol, "stage": old.get("stage", "LEAD"),
+                "contact": {"name": f"{old.get('contact_firstname', '')} {old.get('contact_lastname', '')}".strip(), "role": old.get("contact_role", "Contact"), "phone": old.get("contact_phone", ""), "email": old.get("contact_email", ""), "linkedin": ""},
+                "intelligence": intel, "health": crm_engine.analyze_customer_health(vol, vol,[]), "commission_est": crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299), "last_contact": old.get("last_contact", "Jamais")
             })
 
     return JSONResponse(json_compliant({"success": True, "pipeline": formatted_deals}))
 
+@app.post("/api/crm/contact/{contact_id}/linkedin")
+async def update_contact_linkedin(contact_id: str, payload: UpdateFieldModel, user = Depends(get_current_user)):
+    """Met à jour l'URL LinkedIn d'un contact"""
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    
+    contact = db.get_contact(contact_id)
+    if contact:
+        contact["linkedin"] = payload.value
+        db.save_contact(contact_id, contact)
+        return JSONResponse({"success": True})
+        
+    legacy = db.get_setting(contact_id)
+    if legacy: return JSONResponse({"success": True}) 
+    
+    return JSONResponse({"success": False, "error": "Contact introuvable"})
+
+@app.post("/api/crm/company/{company_id}/website")
+async def update_company_website(company_id: str, payload: UpdateFieldModel, user = Depends(get_current_user)):
+    """Met à jour l'URL du site web d'une société"""
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    
+    company = db.get_company(company_id)
+    if company:
+        company["website"] = payload.value
+        db.save_company(company_id, company)
+        return JSONResponse({"success": True})
+    return JSONResponse({"success": False, "error": "Société introuvable"})
+
 @app.post("/api/crm/deal/move")
 async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_user)):
-    """Drag & Drop Kanban (V12 & Legacy) + Création Activité"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès refusé"}, 401)
-    
-    # Tente d'abord sur la table Deals V12
     deal_data = db.get_deal(payload.deal_id)
     if deal_data:
         deal_data["stage"] = payload.new_stage
         db.save_deal(payload.deal_id, deal_data)
-        
-        # Enregistre le mouvement dans la Timeline
         act_id = f"ACT_{uuid.uuid4().hex[:12]}"
-        db.save_activity(act_id, {
-            "deal_id": payload.deal_id, 
-            "type": "STAGE_CHANGE", 
-            "title": f"Passage à l'étape {payload.new_stage}",
-            "timestamp": datetime.now().isoformat(), 
-            "owner_id": user.get("uid")
-        })
+        db.save_activity(act_id, {"deal_id": payload.deal_id, "type": "STAGE_CHANGE", "title": f"Passage à l'étape {payload.new_stage}", "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     else:
-        # Fallback sur l'ancien système Settings
         lead_data = db.get_setting(payload.deal_id)
         if lead_data:
             lead_data["stage"] = payload.new_stage
             db.save_setting(payload.deal_id, lead_data)
-
     return JSONResponse({"success": True})
 
 @app.post("/api/crm/email/send")
 async def api_send_crm_email(payload: EmailRequestModel, background_tasks: BackgroundTasks, user = Depends(get_current_user)):
-    """Envoi Email + Création Activité"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
-    
-    # Logique V12
     deal_data = db.get_deal(payload.deal_id)
     to_email = "test@energistrat.com"
     if deal_data and deal_data.get("primary_contact_id"):
         cont = db.get_contact(deal_data["primary_contact_id"])
         if cont: to_email = cont.get("email", to_email)
-    
-    background_tasks.add_task(
-        crm_engine.send_sales_email, 
-        to_email=to_email,
-        subject=payload.subject, 
-        html_content=payload.body, 
-        lead_id=payload.deal_id
-    )
-
-    # Trace l'email dans la Timeline
+    background_tasks.add_task(crm_engine.send_sales_email, to_email=to_email, subject=payload.subject, html_content=payload.body, lead_id=payload.deal_id)
     act_id = f"ACT_{uuid.uuid4().hex[:12]}"
-    db.save_activity(act_id, {
-        "deal_id": payload.deal_id, 
-        "type": "EMAIL", 
-        "title": f"Email: {payload.subject}",
-        "description": payload.body, 
-        "timestamp": datetime.now().isoformat(), 
-        "owner_id": user.get("uid")
-    })
-    
+    db.save_activity(act_id, {"deal_id": payload.deal_id, "type": "EMAIL", "title": f"Email: {payload.subject}", "description": payload.body, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True, "message": "Email placé en file d'attente."})
 
 @app.get("/api/crm/track/open/{deal_id}")
 async def api_track_email_open(deal_id: str):
-    """Pixel de Tracking + Création Activité"""
-    # Trace l'ouverture
     act_id = f"ACT_{uuid.uuid4().hex[:12]}"
-    db.save_activity(act_id, {
-        "deal_id": deal_id, 
-        "type": "TRACKING", 
-        "title": "Le client a ouvert un email",
-        "timestamp": datetime.now().isoformat(), 
-        "owner_id": "SYSTEM"
-    })
+    db.save_activity(act_id, {"deal_id": deal_id, "type": "TRACKING", "title": "Le client a ouvert un email", "timestamp": datetime.now().isoformat(), "owner_id": "SYSTEM"})
     pixel = base64.b64decode("R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
     return Response(content=pixel, media_type="image/gif")
 
 @app.post("/api/crm/activity")
 async def api_create_crm_activity(payload: CRMActivityModel, user = Depends(get_current_user)):
-    """Création d'une Note Manuelle dans la Timeline V12"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
-    
     act_id = f"ACT_{uuid.uuid4().hex[:12]}"
-    db.save_activity(act_id, {
-        "deal_id": payload.deal_id,
-        "type": payload.type, # "NOTE"
-        "title": "Note manuelle" if payload.type == "NOTE" else payload.type,
-        "description": payload.description,
-        "timestamp": datetime.now().isoformat(),
-        "owner_id": user.get("uid")
-    })
+    db.save_activity(act_id, {"deal_id": payload.deal_id, "type": payload.type, "title": "Note manuelle" if payload.type == "NOTE" else payload.type, "description": payload.description, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True})
 
 @app.get("/api/crm/deal/{deal_id}/activities")
 async def api_get_crm_activities(deal_id: str, user = Depends(get_current_user)):
-    """Récupération de tout l'historique d'un Deal (Timeline)"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès réservé"}, 401)
-    
     activities = db.get_deal_activities(deal_id)
     return JSONResponse({"success": True, "activities": activities})
 
@@ -732,7 +631,7 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
         else:
             cluster_files = [base_data]
             
-        if not cluster_files: cluster_files = [base_data]
+        if not cluster_files: cluster_files =[base_data]
             
         if len(cluster_files) > 1:
             v_tot = b_tot = v_el = v_gz = g_tot = 0
@@ -756,7 +655,7 @@ async def get_thermic_signature(client_id: str):
     fin = cortex.enrich_site_financials(data)
     vol = float(fin.get('volume_mwh') or data.get('kpis', {}).get('volume_mwh', 0))
     city = str(data.get('location', {}).get('city', 'Paris')).upper()
-    dju_profile = [x * 1.2 if any(v in city for v in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in ['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
+    dju_profile =[x * 1.2 if any(v in city for v in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
     total_dju = sum(dju_profile) or 1
     talon_monthly = (vol * (0.15 if fin.get('meta', {}).get('is_gas', False) else 0.30)) / 12
     chauf_ann = vol - (talon_monthly * 12)
@@ -806,7 +705,7 @@ def normalize_full_data(data, tenant_id=None):
                 if k in s and s[k]: data['contract']['power_details'][t] = s[k]; data['contract'][f"ps_{t}"] = s[k]; break
 
     for t, v in {'hph':['price_hph', 'prix_hph', 'P_HPH', 'tarif_hph'], 'hch':['price_hch', 'prix_hch', 'P_HCH', 'tarif_hch'], 'hpe':['price_hpe', 'prix_hpe', 'P_HPE', 'tarif_hpe'], 'hce':['price_hce', 'prix_hce', 'P_HCE', 'tarif_hce']}.items():
-        for s in [data, data['contract'], data.get('technical', {}), data['pricing']]:
+        for s in[data, data['contract'], data.get('technical', {}), data['pricing']]:
             if not s: continue
             for k in v:
                 if k in s and s[k]: data['pricing'][t] = s[k]; break
@@ -946,7 +845,7 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
             "naf": s.get('identity', {}).get('naf', 'DEFAULT')
         })
         
-    return JSONResponse(json_compliant({"fleet": fleet_list, "count": len(fleet_list), "green_league": analysis.get('green_league'), "global_kpis": analysis.get('global'), "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments":["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots": ["Lot 1", "Lot 2"] }}))
+    return JSONResponse(json_compliant({"fleet": fleet_list, "count": len(fleet_list), "green_league": analysis.get('green_league'), "global_kpis": analysis.get('global'), "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments":["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots":["Lot 1", "Lot 2"] }}))
 
 @app.post("/api/settings/propagate_tariff")
 async def api_propagate_tariff(payload: PropagateRequest, user = Depends(get_current_user)):
