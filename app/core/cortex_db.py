@@ -1,4 +1,5 @@
-from google.cloud import firestore
+import firebase_admin
+from firebase_admin import credentials, firestore
 import traceback
 
 class CortexDB:
@@ -6,9 +7,11 @@ class CortexDB:
     
     def __init__(self):
         try:
-            # Utilisation du SDK Natif GCP (Infaillible et prioritaire sur Cloud Run)
-            self.db = firestore.Client(project="energistrat-saas")
-            print("🟢 CORTEX DB : Connexion native google.cloud.firestore RÉUSSIE.")
+            # Initialisation Infaillible sur Google Cloud Run
+            if not firebase_admin._apps:
+                firebase_admin.initialize_app()
+            self.db = firestore.client()
+            print("🟢 CORTEX DB : Connexion firebase_admin.firestore RÉUSSIE.")
         except Exception as e:
             print(f"🔴 ERREUR CRITIQUE CORTEX DB (FIRESTORE) : {e}")
             self.db = None
@@ -137,9 +140,9 @@ class CortexDB:
             return dict()
         except Exception: return dict()
 
-    # --- LEADS (Vivier brut) ---
+    # --- LEADS (Vivier brut Retro-Compatible) ---
     def get_all_leads(self) -> list: 
-        """Récupère les anciens prospects de la collection Settings (Rétro-compatibilité)"""
+        """Récupère les anciens prospects de la collection Settings"""
         if not self.db: return list()
         try:
             docs = self.db.collection("Settings").stream()
