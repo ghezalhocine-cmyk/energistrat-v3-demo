@@ -26,7 +26,7 @@
                         gold: '#F59E0B', saas: '#A855F7', broker: '#3B82F6',
                         supplier: '#8B5CF6'
                     },
-                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
                     borderRadius: { 'bento': '1.5rem' }
                 }
             }
@@ -88,7 +88,7 @@
             <button onclick="switchView('pipeline')" id="nav-pipeline" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
                 <i class="fa-solid fa-bars-staggered w-4 text-center"></i> Kanban & Deals
             </button>
-            <button onclick="switchView('contacts')" id="nav-contacts" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3 hidden">
+            <button onclick="switchView('contacts')" id="nav-contacts" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
                 <i class="fa-solid fa-address-card w-4 text-center"></i> Fiche Client
             </button>
             <button onclick="switchView('map')" id="nav-map" class="nav-item w-full text-left px-4 py-3 rounded-r-xl text-xs font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
@@ -144,11 +144,19 @@
             <!-- VUE 1 : PIPELINE KANBAN -->
             <!-- ========================================== -->
             <div id="view-pipeline" class="view-section active h-[calc(100vh-140px)] md:h-[calc(100vh-160px)] flex flex-col">
-                <div class="mb-4 overflow-x-auto pb-2">
-                    <div class="flex flex-row md:flex-row bg-white/5 p-1 rounded-xl border border-white/10 gap-1 min-w-max">
+                
+                <!-- BARRE D'OUTILS KANBAN -->
+                <div class="mb-4 overflow-x-auto pb-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div class="flex flex-row bg-white/5 p-1 rounded-xl border border-white/10 gap-1 min-w-max">
                         <button onclick="switchPipeline('saas')" id="btn-pipe-saas" class="px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold bg-saas text-white shadow-lg whitespace-nowrap"><i class="fa-solid fa-desktop mr-2"></i> 1. Vente SaaS</button>
                         <button onclick="switchPipeline('broker')" id="btn-pipe-broker" class="px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold text-gray-400 hover:text-white transition whitespace-nowrap"><i class="fa-solid fa-bolt mr-2"></i> 2. Courtage</button>
                         <button onclick="switchPipeline('supplier')" id="btn-pipe-supplier" class="px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold text-gray-400 hover:text-white transition whitespace-nowrap"><i class="fa-solid fa-handshake mr-2"></i> 3. Fournisseurs</button>
+                    </div>
+
+                    <!-- SEARCH BAR LIVE -->
+                    <div class="relative w-full md:w-64">
+                        <i class="fa-solid fa-search absolute left-3 top-3 text-gray-500 text-xs"></i>
+                        <input type="text" id="kanban-search" onkeyup="filterKanban()" class="input-cyber pl-9 py-2 text-xs w-full" placeholder="Rechercher (Nom, NAF)...">
                     </div>
                 </div>
 
@@ -178,147 +186,135 @@
             </div>
 
             <!-- ========================================== -->
-            <!-- VUE 2 : FICHE HUBSPOT (3 COLONNES) V12     -->
+            <!-- VUE 2 : FICHE HUBSPOT (3 COLONNES)         -->
             <!-- ========================================== -->
             <div id="view-contacts" class="view-section h-full flex flex-col">
-                <!-- Navigation Rapide Deal -->
-                <div class="flex justify-between items-center mb-6">
-                    <button onclick="switchView('pipeline')" class="text-cyan hover:text-white font-bold text-xs bg-white/5 px-4 py-2 rounded-lg border border-white/10 transition"><i class="fa-solid fa-arrow-left mr-2"></i> Retour au Kanban</button>
-                    <div class="text-[10px] text-gray-500">ID: <span id="cd-deal-id" class="font-mono text-white"></span></div>
+                <!-- Panneau Vide si aucun Deal n'est sélectionné -->
+                <div id="contact-empty-state" class="flex justify-center items-center h-full text-gray-500 flex-col text-center">
+                    <i class="fa-solid fa-address-book text-6xl mb-4 opacity-30"></i>
+                    <p class="px-4 text-lg">Sélectionnez une affaire dans le Kanban pour ouvrir le cockpit.</p>
+                    <button onclick="switchView('pipeline')" class="mt-6 text-cyan hover:text-white bg-white/5 px-6 py-2 rounded-xl border border-white/10 transition">Retourner au Kanban</button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-6 flex-1 overflow-hidden min-h-[800px] md:min-h-0">
-                    
-                    <!-- ==================================== -->
-                    <!-- COLONNE GAUCHE (CONTEXTE)            -->
-                    <!-- ==================================== -->
-                    <div class="col-span-1 md:col-span-3 space-y-4 overflow-y-auto hidden-scrollbar pb-10">
-                        <!-- En-tête Société -->
-                        <div class="bento-card p-6 text-center relative border-t-4 border-cyan">
-                            <div id="cd-logo" class="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-cyan to-blue-600 flex items-center justify-center text-abysse font-black text-3xl mb-4 shadow-[0_0_20px_rgba(0,229,255,0.2)] overflow-hidden">
-                                <!-- Injecté par JS -->
-                            </div>
-                            <h3 class="text-xl font-black text-white truncate" id="cd-company-name">Société</h3>
-                            <p class="text-xs text-gray-400 mt-1" id="cd-website"></p>
-                            
-                            <!-- Barre d'Actions Rapides -->
-                            <div class="flex justify-center gap-3 mt-6">
-                                <button onclick="setTimelineAction('note')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-cyan hover:text-abysse hover:border-cyan flex items-center justify-center transition shadow-lg tooltip" title="Note manuelle"><i class="fa-solid fa-pen"></i></button>
-                                <button onclick="setTimelineAction('email')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-blue-500 hover:text-white flex items-center justify-center transition shadow-lg tooltip" title="Envoyer Email"><i class="fa-solid fa-envelope"></i></button>
-                                <button onclick="App.toast('Module VoIP Aircall en cours d\'intégration.', 'info')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-green-500 hover:text-white flex items-center justify-center transition shadow-lg tooltip" title="Appeler (VoIP)"><i class="fa-solid fa-phone"></i></button>
-                                <button onclick="App.toast('Synchronisation Calendrier en cours.', 'info')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-purple-500 hover:text-white flex items-center justify-center transition shadow-lg tooltip" title="Planifier RDV"><i class="fa-solid fa-calendar"></i></button>
-                                <button onclick="App.toast('Dictaphone IA CORTEX : Disponible en V12.2', 'info')" class="w-10 h-10 rounded-full bg-cyan/10 border border-cyan/30 text-cyan hover:bg-cyan hover:text-abysse flex items-center justify-center transition shadow-[0_0_10px_rgba(0,229,255,0.4)] tooltip relative" title="Dictaphone IA (Bientôt)">
-                                    <i class="fa-solid fa-microphone"></i>
-                                    <span class="absolute -top-1 -right-1 w-3 h-3 bg-alert rounded-full animate-pulse"></span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- A Propos du Contact -->
-                        <div class="bento-card p-6">
-                            <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
-                                <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Le Contact</h4>
-                                <i class="fa-solid fa-user-tie text-cyan opacity-50"></i>
-                            </div>
-                            <div class="space-y-4 text-sm" id="cd-contact-info">
-                                <!-- Injecté par JS -->
-                            </div>
-                        </div>
+                <div id="contact-full-state" class="hidden flex-col h-full">
+                    <!-- Navigation Rapide Deal -->
+                    <div class="flex justify-between items-center mb-6">
+                        <button onclick="switchView('pipeline')" class="text-cyan hover:text-white font-bold text-xs bg-white/5 px-4 py-2 rounded-lg border border-white/10 transition shadow-lg"><i class="fa-solid fa-arrow-left mr-2"></i> Retour au Kanban</button>
+                        <div class="text-[10px] text-gray-500">ID: <span id="cd-deal-id" class="font-mono text-white"></span></div>
                     </div>
 
-                    <!-- ==================================== -->
-                    <!-- COLONNE CENTRALE (TIMELINE)          -->
-                    <!-- ==================================== -->
-                    <div class="col-span-1 md:col-span-6 bento-card flex flex-col overflow-hidden relative shadow-2xl">
-                        <!-- Onglets d'action -->
-                        <div class="flex gap-6 border-b border-white/10 px-6 pt-4 bg-black/20">
-                            <button id="tab-btn-activity" onclick="setTimelineAction('activity')" class="pb-3 text-xs font-bold text-cyan border-b-2 border-cyan"><i class="fa-solid fa-list-ul mr-1"></i> Activité</button>
-                            <button id="tab-btn-note" onclick="setTimelineAction('note')" class="pb-3 text-xs font-bold text-gray-500 hover:text-white transition"><i class="fa-solid fa-pen mr-1"></i> Note</button>
-                            <button id="tab-btn-email" onclick="setTimelineAction('email')" class="pb-3 text-xs font-bold text-gray-500 hover:text-white transition"><i class="fa-solid fa-envelope mr-1"></i> Email</button>
-                        </div>
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 flex-1 overflow-hidden min-h-[800px] md:min-h-0">
                         
-                        <!-- Zone de saisie (Dynamique) -->
-                        <div id="cd-action-box" class="p-6 bg-black/40 border-b border-white/5 hidden">
-                            <!-- Injecté JS -->
-                        </div>
-
-                        <!-- Flux de la Timeline -->
-                        <div class="flex-1 overflow-y-auto p-6 relative hidden-scrollbar bg-abysse/30">
-                            <!-- Ligne verticale -->
-                            <div class="absolute left-[39px] top-6 bottom-0 w-0.5 bg-white/10 z-0"></div>
-                            
-                            <div id="cd-timeline" class="space-y-6 relative z-10">
-                                <!-- Injecté JS -->
-                                <div class="text-center text-gray-500 py-10"><i class="fa-solid fa-spinner fa-spin text-2xl"></i><br>Chargement historique...</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ==================================== -->
-                    <!-- COLONNE DROITE (BUSINESS & IA)       -->
-                    <!-- ==================================== -->
-                    <div class="col-span-1 md:col-span-3 space-y-4 overflow-y-auto hidden-scrollbar pb-10">
-                        
-                        <!-- Le Deal -->
-                        <div class="bento-card p-6 border-t-4 border-gold bg-gradient-to-br from-card to-gold/5">
-                            <h4 class="text-[10px] font-bold text-gold uppercase tracking-widest mb-4 flex items-center justify-between border-b border-white/10 pb-2">
-                                <span>L'Affaire</span>
-                                <i class="fa-solid fa-sack-dollar"></i>
-                            </h4>
-                            <div class="mb-4">
-                                <label class="block text-[10px] text-gray-500 mb-1">Étape du Pipeline</label>
-                                <select id="deal-stage-select" class="cyber-select w-full font-bold text-white text-xs bg-black/50 border-white/20" onchange="changeDealStageFromFiche(this.value)">
-                                    <option value="LEAD">1. À Contacter</option>
-                                    <option value="RDV">2. RDV Qualifié</option>
-                                    <option value="OFFRE">3. Offre Envoyée</option>
-                                    <option value="NEGOCIATION">4. Négociation</option>
-                                    <option value="WON">5. Signé (Win)</option>
-                                </select>
-                            </div>
-                            <div class="flex justify-between items-end">
-                                <div>
-                                    <div class="text-[10px] text-gray-500">Valeur / Volume</div>
-                                    <div class="text-xl font-black text-white font-mono" id="cd-deal-volume">0</div>
+                        <!-- ==================================== -->
+                        <!-- COLONNE GAUCHE (CONTEXTE)            -->
+                        <!-- ==================================== -->
+                        <div class="col-span-1 md:col-span-3 space-y-4 overflow-y-auto hidden-scrollbar pb-10">
+                            <!-- En-tête Société -->
+                            <div class="bento-card p-6 text-center relative border-t-4 border-cyan">
+                                <div id="cd-logo" class="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-cyan to-blue-600 flex items-center justify-center text-abysse font-black text-3xl mb-4 shadow-[0_0_20px_rgba(0,229,255,0.2)] overflow-hidden"></div>
+                                <h3 class="text-xl font-black text-white truncate" id="cd-company-name">Société</h3>
+                                <p class="text-xs text-gray-400 mt-1 flex justify-center items-center gap-2" id="cd-website"></p>
+                                
+                                <!-- Barre d'Actions Rapides -->
+                                <div class="flex justify-center gap-3 mt-6">
+                                    <button onclick="setTimelineAction('note')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-cyan hover:text-abysse hover:border-cyan flex items-center justify-center transition shadow-lg tooltip" title="Note manuelle"><i class="fa-solid fa-pen"></i></button>
+                                    <button onclick="setTimelineAction('email')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-blue-500 hover:text-white flex items-center justify-center transition shadow-lg tooltip" title="Envoyer Email"><i class="fa-solid fa-envelope"></i></button>
+                                    <button onclick="App.toast('Module VoIP en cours d\'intégration.', 'info')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-green-500 hover:text-white flex items-center justify-center transition shadow-lg tooltip" title="Appeler (VoIP)"><i class="fa-solid fa-phone"></i></button>
+                                    <button onclick="App.toast('Module Agenda en Phase 4.', 'info')" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-purple-500 hover:text-white flex items-center justify-center transition shadow-lg tooltip" title="Planifier RDV"><i class="fa-solid fa-calendar"></i></button>
+                                    <button class="w-10 h-10 rounded-full bg-cyan/10 border border-cyan/30 text-cyan hover:bg-cyan hover:text-abysse flex items-center justify-center transition shadow-[0_0_10px_rgba(0,229,255,0.4)] tooltip relative" title="Dictaphone IA (Bientôt)">
+                                        <i class="fa-solid fa-microphone"></i>
+                                        <span class="absolute -top-1 -right-1 w-3 h-3 bg-alert rounded-full animate-pulse"></span>
+                                    </button>
                                 </div>
-                                <div class="text-right">
-                                    <div class="text-[10px] text-gray-500">Comm. Est.</div>
-                                    <div class="text-sm font-bold text-success font-mono" id="cd-deal-comm">0 €</div>
+                            </div>
+
+                            <!-- A Propos du Contact -->
+                            <div class="bento-card p-6">
+                                <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
+                                    <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Le Contact</h4>
+                                    <i class="fa-solid fa-user-tie text-cyan opacity-50"></i>
+                                </div>
+                                <div class="space-y-4 text-sm" id="cd-contact-info"></div>
+                            </div>
+                        </div>
+
+                        <!-- ==================================== -->
+                        <!-- COLONNE CENTRALE (TIMELINE)          -->
+                        <!-- ==================================== -->
+                        <div class="col-span-1 md:col-span-6 bento-card flex flex-col overflow-hidden relative shadow-2xl">
+                            <div class="flex gap-6 border-b border-white/10 px-6 pt-4 bg-black/20">
+                                <button id="tab-btn-activity" onclick="setTimelineAction('activity')" class="pb-3 text-xs font-bold text-cyan border-b-2 border-cyan"><i class="fa-solid fa-list-ul mr-1"></i> Activité</button>
+                                <button id="tab-btn-note" onclick="setTimelineAction('note')" class="pb-3 text-xs font-bold text-gray-500 hover:text-white transition"><i class="fa-solid fa-pen mr-1"></i> Note</button>
+                                <button id="tab-btn-email" onclick="setTimelineAction('email')" class="pb-3 text-xs font-bold text-gray-500 hover:text-white transition"><i class="fa-solid fa-envelope mr-1"></i> Email</button>
+                            </div>
+                            
+                            <div id="cd-action-box" class="p-6 bg-black/40 border-b border-white/5 hidden"></div>
+
+                            <div class="flex-1 overflow-y-auto p-6 relative hidden-scrollbar bg-abysse/30">
+                                <div class="absolute left-[39px] top-6 bottom-0 w-0.5 bg-white/10 z-0"></div>
+                                <div id="cd-timeline" class="space-y-6 relative z-10">
+                                    <div class="text-center text-gray-500 py-10"><i class="fa-solid fa-spinner fa-spin text-2xl"></i><br>Chargement historique...</div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- L'IA Cortex -->
-                        <div class="bento-card p-6 border-t-4 border-cyan bg-gradient-to-br from-card to-cyan/10">
-                            <h4 class="font-bold text-white text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-brain text-cyan"></i> IA CORTEX</h4>
-                            <div id="intel-content"><div class="text-[10px] text-gray-400 italic">Analyse en cours...</div></div>
-                        </div>
+                        <!-- ==================================== -->
+                        <!-- COLONNE DROITE (BUSINESS & IA)       -->
+                        <!-- ==================================== -->
+                        <div class="col-span-1 md:col-span-3 space-y-4 overflow-y-auto hidden-scrollbar pb-10">
+                            
+                            <div class="bento-card p-6 border-t-4 border-gold bg-gradient-to-br from-card to-gold/5">
+                                <h4 class="text-[10px] font-bold text-gold uppercase tracking-widest mb-4 flex items-center justify-between border-b border-white/10 pb-2">
+                                    <span>L'Affaire</span>
+                                    <i class="fa-solid fa-sack-dollar"></i>
+                                </h4>
+                                <div class="mb-4">
+                                    <label class="block text-[10px] text-gray-500 mb-1">Étape du Pipeline</label>
+                                    <select id="deal-stage-select" class="cyber-select w-full font-bold text-white text-xs bg-black/50 border-white/20" onchange="changeDealStageFromFiche(this.value)">
+                                        <option value="LEAD">1. À Contacter</option>
+                                        <option value="RDV">2. RDV Qualifié</option>
+                                        <option value="OFFRE">3. Offre Envoyée</option>
+                                        <option value="NEGOCIATION">4. Négociation</option>
+                                        <option value="WON">5. Signé (Win)</option>
+                                    </select>
+                                </div>
+                                <div class="flex justify-between items-end">
+                                    <div>
+                                        <div class="text-[10px] text-gray-500">Valeur / Volume</div>
+                                        <div class="text-xl font-black text-white font-mono" id="cd-deal-volume">0</div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-[10px] text-gray-500">Comm. Est.</div>
+                                        <div class="text-sm font-bold text-success font-mono" id="cd-deal-comm">0 €</div>
+                                    </div>
+                                </div>
+                            </div>
 
-                        <!-- Produits (Module CPQ Phase 3) -->
-                        <div class="bento-card p-6 border border-dashed border-white/10 bg-black/20 opacity-70">
-                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2"><i class="fa-solid fa-box-open mr-1"></i> Produits / Devis</h4>
-                            <p class="text-[11px] text-gray-400 italic text-center py-4">Catalogue CPQ - Phase 3</p>
+                            <div class="bento-card p-6 border-t-4 border-cyan bg-gradient-to-br from-card to-cyan/10">
+                                <h4 class="font-bold text-white text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-brain text-cyan"></i> IA CORTEX</h4>
+                                <div id="intel-content"><div class="text-[10px] text-gray-400 italic">Analyse en cours...</div></div>
+                            </div>
+
+                            <div class="bento-card p-6 border border-dashed border-white/10 bg-black/20 opacity-70">
+                                <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2"><i class="fa-solid fa-box-open mr-1"></i> Produits / Devis</h4>
+                                <p class="text-[11px] text-gray-400 italic text-center py-4">Module CPQ en attente Phase 3.2</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- ========================================== -->
-            <!-- VUE 3 : WAR ROOM (CARTE LEAFLET) -->
+            <!-- VUE 3 : WAR ROOM -->
             <!-- ========================================== -->
             <div id="view-map" class="view-section h-[500px] md:h-[700px]">
                 <div class="bento-card p-1 border-t-4 border-cyan relative h-full">
                     <div id="map"></div>
-                    <div class="absolute bottom-4 left-4 right-4 md:right-auto bg-abysse/90 p-4 rounded-xl border border-white/10 z-[1000] text-[10px] font-bold text-white backdrop-blur">
-                        <div class="mb-2 text-gray-400 uppercase tracking-widest border-b border-white/10 pb-1">Répartition Prospects</div>
-                        <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-saas"></span> Logiciel (SaaS)</div>
-                        <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-broker"></span> Courtage</div>
-                        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-supplier"></span> Fournisseurs</div>
-                    </div>
                 </div>
             </div>
-
+            
             <!-- ========================================== -->
-            <!-- VUE 4 : REPORTING DCO -->
+            <!-- VUE 4 : DASHBOARD -->
             <!-- ========================================== -->
             <div id="view-dashboard" class="view-section space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -332,9 +328,7 @@
         </div>
     </main>
 
-    <!-- ========================================== -->
-    <!-- MODALE CRÉATION DE LEAD -->
-    <!-- ========================================== -->
+    <!-- MODALE CRÉATION -->
     <div id="lead-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-start md:items-center justify-center p-0 md:p-4 backdrop-blur-sm overflow-y-auto pt-10 md:pt-4">
         <div class="bento-card p-6 md:p-8 rounded-t-3xl md:rounded-2xl w-full max-w-2xl relative border-t-4 border-cyan shadow-[0_0_50px_rgba(0,229,255,0.15)] min-h-[90vh] md:min-h-0 mt-auto md:mt-0">
             <button onclick="document.getElementById('lead-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-500 hover:text-white bg-white/5 p-2 rounded-lg"><i class="fa-solid fa-xmark text-xl"></i></button>
@@ -379,7 +373,7 @@
         </div>
     </div>
 
-    <!-- TOAST ENGINE -->
+    <!-- TOAST -->
     <div id="toast-container" class="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
     <script>
@@ -401,7 +395,6 @@
         let CURRENT_DEAL_ID = null;
         let mapInstance = null;
 
-        // --- GESTION SIDEBAR MOBILE ---
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('mobile-overlay');
@@ -409,16 +402,28 @@
             overlay.classList.toggle('hidden');
         }
 
-        // --- NAVIGATION ---
         window.switchView = function(viewId) {
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
             const btn = document.getElementById('nav-' + viewId);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
+            
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById('view-' + viewId).classList.add('active');
             
-            const titles = {'dashboard': 'Reporting DCO', 'pipeline': 'Gestion des Affaires', 'contacts': 'Fiche Client V12', 'map': 'War Room (Carte)'};
+            const titles = {'dashboard': 'Reporting DCO', 'pipeline': 'Gestion des Affaires', 'contacts': 'Fiche Client', 'map': 'War Room (Carte)'};
             document.getElementById('page-title').innerText = titles[viewId] || 'CRM';
+
+            if(viewId === 'contacts') {
+                if(!CURRENT_DEAL_ID) {
+                    document.getElementById('contact-empty-state').classList.remove('hidden');
+                    document.getElementById('contact-full-state').classList.add('hidden');
+                    document.getElementById('contact-full-state').classList.remove('flex');
+                } else {
+                    document.getElementById('contact-empty-state').classList.add('hidden');
+                    document.getElementById('contact-full-state').classList.remove('hidden');
+                    document.getElementById('contact-full-state').classList.add('flex');
+                }
+            }
             
             if(window.innerWidth < 768 && viewId !== 'contacts') toggleSidebar(); 
             if(viewId === 'map') setTimeout(initMap, 300);
@@ -428,7 +433,9 @@
             ACTIVE_PIPELINE = type;
             const btnSaas = document.getElementById('btn-pipe-saas');
             const btnBroker = document.getElementById('btn-pipe-broker');
-            const btnSupplier = document.getElementById('btn-pipe-supplier');[btnSaas, btnBroker, btnSupplier].forEach(b => b.className = "px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold text-gray-400 hover:text-white transition whitespace-nowrap");
+            const btnSupplier = document.getElementById('btn-pipe-supplier');
+            
+            [btnSaas, btnBroker, btnSupplier].forEach(b => b.className = "px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold text-gray-400 hover:text-white transition whitespace-nowrap");
             
             if(type === 'saas') { btnSaas.classList.add('bg-saas', 'text-white', 'shadow-lg'); btnSaas.classList.remove('text-gray-400'); } 
             else if(type === 'broker') { btnBroker.classList.add('bg-broker', 'text-white', 'shadow-lg'); btnBroker.classList.remove('text-gray-400'); }
@@ -437,7 +444,15 @@
             loadCRMPipeline(); 
         }
 
-        // --- API GOUV (SIRET) ---
+        // --- FILTRE LIVE KANBAN ---
+        window.filterKanban = function() {
+            const query = document.getElementById('kanban-search').value.toLowerCase();
+            document.querySelectorAll('.kanban-card').forEach(card => {
+                const text = card.innerText.toLowerCase();
+                card.style.display = text.includes(query) ? 'block' : 'none';
+            });
+        }
+
         window.checkSiret = async function() {
             const siret = document.getElementById('lead-siret').value.replace(/\s/g, '');
             if (siret.length >= 9) {
@@ -456,7 +471,6 @@
             }
         }
 
-        // --- CREATION LEAD -> DEAL ---
         window.openLeadModal = function() {
             document.getElementById('form-new-lead').reset();
             document.getElementById('lead-pipeline').value = ACTIVE_PIPELINE;
@@ -466,59 +480,49 @@
         window.createLead = async function(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-save-lead');
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> CREATION...'; btn.disabled = true;
-
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...'; btn.disabled = true;
             const payload = {
-                siret: document.getElementById('lead-siret').value,
-                company_name: document.getElementById('lead-company').value,
-                naf: document.getElementById('lead-naf').value,
-                city: document.getElementById('lead-city').value,
-                contact_firstname: document.getElementById('lead-firstname').value,
-                contact_lastname: document.getElementById('lead-lastname').value,
-                contact_role: document.getElementById('lead-role').value,
-                contact_email: document.getElementById('lead-email').value,
-                contact_phone: document.getElementById('lead-phone').value,
-                source: "Saisie V12", pipeline: document.getElementById('lead-pipeline').value
+                siret: document.getElementById('lead-siret').value, company_name: document.getElementById('lead-company').value,
+                naf: document.getElementById('lead-naf').value, city: document.getElementById('lead-city').value,
+                contact_firstname: document.getElementById('lead-firstname').value, contact_lastname: document.getElementById('lead-lastname').value,
+                contact_role: document.getElementById('lead-role').value, contact_email: document.getElementById('lead-email').value,
+                contact_phone: document.getElementById('lead-phone').value, source: "Saisie V12", pipeline: document.getElementById('lead-pipeline').value
             };
-
             try {
-                // Va déclencher le moteur de conversion dans main.py
                 const res = await fetch('/api/crm/lead', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
                 if(res.ok) {
-                    App.toast("Deal, Contact et Société créés !", "success");
+                    App.toast("Deal et Société créés !", "success");
                     document.getElementById('lead-modal').classList.add('hidden');
                     if(ACTIVE_PIPELINE !== payload.pipeline) { switchPipeline(payload.pipeline); } 
                     else { loadCRMPipeline(); }
                 } else App.toast("Erreur serveur.", "error");
             } catch(e) { App.toast("Erreur réseau.", "error"); }
-            
             btn.innerHTML = 'GÉNÉRER DEAL'; btn.disabled = false;
         }
 
-        // --- MOTEUR KANBAN ---
         async function loadCRMPipeline() {
             try {
                 const res = await fetch(`/api/crm/pipeline/${ACTIVE_PIPELINE}`);
                 const data = await res.json();
-                if(data.success && data.pipeline) {
-                    CRM_DATA = data.pipeline;
-                    renderKanban();
+                if(data.success && data.pipeline) { 
+                    CRM_DATA = data.pipeline; 
+                    renderKanban(); 
+                    
+                    // Ré-appliquer le filtre si une recherche est en cours
+                    filterKanban(); 
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) {}
         }
 
         function renderKanban() {
-            const cols = { 'LEAD':[], 'RDV': [], 'OFFRE':[], 'NEGOCIATION': [], 'WON':[] };
+            const cols = { 'LEAD':[], 'RDV': [], 'OFFRE':[], 'NEGOCIATION':[], 'WON':[] };
             let totalComm = 0;
-
             CRM_DATA.forEach(deal => {
                 const stage = deal.stage || 'LEAD';
                 if(cols[stage]) cols[stage].push(deal);
                 if(stage === 'WON') totalComm += (deal.commission_est || 0);
             });
-
             document.getElementById('my-commission').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalComm)) + " €";
-
             const pipeColor = ACTIVE_PIPELINE === 'saas' ? 'border-saas' : (ACTIVE_PIPELINE === 'broker' ? 'border-broker' : 'border-supplier');
             const unit = ACTIVE_PIPELINE === 'saas' ? '€' : 'MWh';
 
@@ -526,11 +530,9 @@
                 const container = document.getElementById(`col-${stage}`);
                 container.innerHTML = '';
                 document.getElementById(`count-${stage}`).innerText = cols[stage].length;
-
                 cols[stage].forEach(deal => {
                     const ctc = deal.contact || {};
                     let healthBadge = deal.health && deal.health.status !== "STABLE" ? `<div class="mt-2 text-[9px] font-bold ${deal.health.color} bg-black/40 px-2 py-1 rounded border border-white/5"><i class="fa-solid fa-triangle-exclamation"></i> ${deal.health.status}</div>` : '';
-                    
                     container.innerHTML += `
                         <div class="kanban-card border-l-4 ${pipeColor}" draggable="true" ondragstart="drag(event, '${deal.id}')" onclick="openContactDetail('${deal.id}')">
                             <div class="flex justify-between items-start mb-2"><span class="text-[9px] font-bold bg-white/10 px-2 py-0.5 rounded text-gray-300">NAF: ${deal.naf}</span><i class="fa-solid fa-grip-lines text-gray-600 hidden md:block"></i></div>
@@ -547,7 +549,6 @@
             }
         }
 
-        // Drag & Drop
         let draggedDealId = null;
         window.drag = function(ev, dealId) { draggedDealId = dealId; ev.dataTransfer.setData("text", dealId); }
         window.allowDrop = function(ev) { ev.preventDefault(); const col = ev.target.closest('.kanban-col'); if(col) col.classList.add('drag-over'); }
@@ -563,34 +564,38 @@
             }
         }
 
-        // --- FICHE 3 COLONNES (HUBSPOT KILLER) ---
+        // --- FICHE CLIENT & EDITIONS MANUELLES ---
         window.openContactDetail = function(id) {
             const deal = CRM_DATA.find(d => d.id === id);
             if(!deal) return;
             
             CURRENT_DEAL_ID = id;
             switchView('contacts');
-            setTimelineAction('activity'); // Reset center UI
+            setTimelineAction('activity');
 
             const ctc = deal.contact || {};
-            
-            // --- COLONNE GAUCHE (Contexte) ---
             document.getElementById('cd-deal-id').innerText = deal.id.split('_')[1] || deal.id;
             
-            // Scraping Logo Fallback
             let logoHtml = deal.logo ? `<img src="${deal.logo}" class="w-full h-full object-cover">` : `<span class="text-3xl">${deal.name.charAt(0).toUpperCase()}</span>`;
             document.getElementById('cd-logo').innerHTML = logoHtml;
             document.getElementById('cd-company-name').innerText = deal.name;
-            document.getElementById('cd-website').innerHTML = deal.website ? `<a href="https://${deal.website}" target="_blank" class="hover:text-cyan transition"><i class="fa-solid fa-link"></i> ${deal.website}</a>` : '<span class="italic opacity-50">Aucun site web</span>';
+            
+            // Edit Website (Bouton Crayon / Ajouter)
+            let websiteHtml = deal.website 
+                ? `<a href="${deal.website.startsWith('http') ? deal.website : 'https://'+deal.website}" target="_blank" class="hover:text-cyan transition truncate"><i class="fa-solid fa-link"></i> ${deal.website}</a> <button onclick="editField('website', '${deal.company_id}')" class="text-gray-500 hover:text-white ml-2 tooltip" title="Modifier"><i class="fa-solid fa-pen"></i></button>`
+                : `<span class="italic opacity-50 cursor-pointer hover:text-cyan transition" onclick="editField('website', '${deal.company_id}')"><i class="fa-solid fa-plus"></i> Ajouter site web</span>`;
+            document.getElementById('cd-website').innerHTML = websiteHtml;
 
-            // Infos Contact
-            let linkedInHtml = ctc.linkedin ? `<a href="${ctc.linkedin}" target="_blank" class="text-blue-400 hover:text-white"><i class="fa-brands fa-linkedin text-lg"></i> Profil</a>` : `<button class="text-gray-500 hover:text-cyan text-[10px]"><i class="fa-solid fa-plus"></i> Ajouter LinkedIn</button>`;
+            // Edit LinkedIn (Bouton Crayon / Ajouter)
+            let linkedInHtml = ctc.linkedin 
+                ? `<a href="${ctc.linkedin.startsWith('http') ? ctc.linkedin : 'https://'+ctc.linkedin}" target="_blank" class="text-blue-400 hover:text-white"><i class="fa-brands fa-linkedin text-lg"></i> Profil</a> <button onclick="editField('linkedin', '${deal.contact_id}')" class="text-gray-500 hover:text-white ml-2 tooltip" title="Modifier"><i class="fa-solid fa-pen"></i></button>` 
+                : `<button onclick="editField('linkedin', '${deal.contact_id}')" class="text-gray-500 hover:text-cyan text-[10px] transition"><i class="fa-solid fa-plus"></i> Ajouter LinkedIn</button>`;
             
             document.getElementById('cd-contact-info').innerHTML = `
                 <div><span class="text-[10px] text-gray-500 block mb-0.5">Nom complet</span><div class="font-bold text-white">${ctc.name}</div></div>
                 <div><span class="text-[10px] text-gray-500 block mb-0.5">Fonction</span><div class="text-gray-300">${ctc.role}</div></div>
                 <div class="flex items-center justify-between border-t border-white/5 pt-3 mt-3">
-                    <div><span class="text-[10px] text-gray-500 block mb-0.5">Email</span><a href="mailto:${ctc.email}" class="text-cyan hover:underline font-mono text-xs">${ctc.email}</a></div>
+                    <div><span class="text-[10px] text-gray-500 block mb-0.5">Email</span><a href="mailto:${ctc.email}" class="text-cyan hover:underline font-mono text-xs truncate max-w-[150px] block">${ctc.email}</a></div>
                     <button onclick="navigator.clipboard.writeText('${ctc.email}'); App.toast('Copié !', 'info')" class="text-gray-500 hover:text-white"><i class="fa-regular fa-copy"></i></button>
                 </div>
                 <div class="flex items-center justify-between">
@@ -602,7 +607,6 @@
                 </div>
             `;
 
-            // --- COLONNE DROITE (Business / Deal) ---
             const unit = ACTIVE_PIPELINE === 'saas' ? '€' : 'MWh';
             document.getElementById('deal-stage-select').value = deal.stage;
             document.getElementById('cd-deal-volume').innerText = `${deal.volume} ${unit}`;
@@ -610,17 +614,31 @@
 
             if(deal.intelligence) {
                 document.getElementById('intel-content').innerHTML = `
-                    <div class="mb-4"><span class="text-[10px] text-gray-500 uppercase font-bold block mb-1">Douleurs (NAF ${deal.naf})</span><p class="text-[11px] md:text-xs text-alert font-bold bg-alert/10 p-2 rounded border border-alert/20">${deal.intelligence.pain_points}</p></div>
+                    <div class="mb-4"><span class="text-[10px] text-gray-500 uppercase font-bold block mb-1">Stratégie (NAF ${deal.naf})</span><p class="text-[11px] md:text-xs text-alert font-bold bg-alert/10 p-2 rounded border border-alert/20">${deal.intelligence.pain_points}</p></div>
                     <div>
-                        <span class="text-[10px] text-gray-500 uppercase font-bold block mb-1">Pitch Commercial IA</span>
+                        <span class="text-[10px] text-gray-500 uppercase font-bold block mb-1">Pitch IA Suggéré</span>
                         <div class="bg-black/50 p-3 md:p-4 rounded-xl border border-white/5 text-[11px] md:text-xs text-gray-300 italic leading-relaxed border-l-2 border-l-cyan">"${deal.intelligence.pitch}"</div>
                         <button onclick="injectPitchInEmail()" class="mt-3 text-[10px] text-cyan hover:text-white transition bg-cyan/10 px-3 py-1 rounded"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Utiliser dans un email</button>
                     </div>
                 `;
             }
-
-            // --- COLONNE CENTRALE (Timeline) ---
             loadTimeline(deal.id);
+        }
+
+        // --- EDITION API ---
+        window.editField = async function(type, id) {
+            const val = prompt(`Saisir la nouvelle URL pour ${type}:`);
+            if (val !== null && val.trim() !== '') { 
+                try {
+                    const url = type === 'linkedin' ? `/api/crm/contact/${id}/linkedin` : `/api/crm/company/${id}/website`;
+                    const res = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({value: val}) });
+                    if(res.ok) {
+                        App.toast("Mis à jour avec succès !", "success");
+                        await loadCRMPipeline(); 
+                        setTimeout(() => openContactDetail(CURRENT_DEAL_ID), 200);
+                    } else App.toast("Erreur mise à jour.", "error");
+                } catch(e) { App.toast("Erreur réseau.", "error"); }
+            }
         }
 
         window.changeDealStageFromFiche = async function(newStage) {
@@ -631,40 +649,25 @@
             try { await fetch('/api/crm/deal/move', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ deal_id: CURRENT_DEAL_ID, new_stage: newStage }) }); loadTimeline(CURRENT_DEAL_ID); } catch(e) {}
         }
 
-        // --- GESTION COLONNE CENTRALE (ONGLETS) ---
         window.setTimelineAction = function(type) {
-            // Reset styles
-            ['activity', 'note', 'email'].forEach(t => {
+            // FIX SYNTAXE DU RESET
+            const tabs =['activity', 'note', 'email'];
+            tabs.forEach(t => {
                 const btn = document.getElementById(`tab-btn-${t}`);
-                if(btn) { btn.className = "pb-3 text-xs font-bold text-gray-500 hover:text-white transition"; }
+                if(btn) btn.className = "pb-3 text-xs font-bold text-gray-500 hover:text-white transition";
             });
-            
             const activeBtn = document.getElementById(`tab-btn-${type}`);
             if(activeBtn) activeBtn.className = "pb-3 text-xs font-bold text-cyan border-b-2 border-cyan";
 
             const box = document.getElementById('cd-action-box');
-            
             if(type === 'activity') {
                 box.classList.add('hidden');
             } else if (type === 'email') {
                 box.classList.remove('hidden');
-                box.innerHTML = `
-                    <input type="text" id="cd-email-sub" class="w-full bg-transparent border-b border-white/10 text-sm text-white outline-none mb-3 pb-2 font-bold" placeholder="Objet de l'email...">
-                    <textarea id="cd-email-body" class="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-cyan transition resize-none mb-3 hidden-scrollbar" rows="5" placeholder="Bonjour, suite à notre échange..."></textarea>
-                    <div class="flex justify-between items-center">
-                        <span class="text-[9px] text-gray-500"><i class="fa-solid fa-eye text-cyan"></i> Tracking pixel activé</span>
-                        <button onclick="sendEmailFromFiche()" class="bg-blue-600 text-white font-bold px-6 py-2 rounded-lg text-xs hover:bg-blue-500 transition shadow-lg"><i class="fa-solid fa-paper-plane mr-2"></i> Envoyer</button>
-                    </div>
-                `;
+                box.innerHTML = `<input type="text" id="cd-email-sub" class="w-full bg-transparent border-b border-white/10 text-sm text-white outline-none mb-3 pb-2 font-bold" placeholder="Objet de l'email..."><textarea id="cd-email-body" class="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-cyan transition resize-none mb-3 hidden-scrollbar" rows="5" placeholder="Bonjour..."></textarea><div class="flex justify-between items-center"><span class="text-[9px] text-gray-500"><i class="fa-solid fa-eye text-cyan"></i> Tracking activé</span><button onclick="sendEmailFromFiche()" class="bg-blue-600 text-white font-bold px-6 py-2 rounded-lg text-xs hover:bg-blue-500 transition shadow-lg"><i class="fa-solid fa-paper-plane mr-2"></i> Envoyer</button></div>`;
             } else if (type === 'note') {
                 box.classList.remove('hidden');
-                box.innerHTML = `
-                    <textarea id="cd-note-body" class="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-gold transition resize-none mb-3 hidden-scrollbar" rows="3" placeholder="Saisir un compte rendu de RDV ou d'appel..."></textarea>
-                    <div class="flex justify-between items-center">
-                        <span class="text-[9px] text-gray-500"><i class="fa-solid fa-lock"></i> Note interne (invisible client)</span>
-                        <button onclick="saveNoteFromFiche()" class="bg-cyan text-abysse font-bold px-6 py-2 rounded-lg text-xs hover:bg-white transition"><i class="fa-solid fa-check mr-2"></i> Enregistrer</button>
-                    </div>
-                `;
+                box.innerHTML = `<textarea id="cd-note-body" class="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-gold transition resize-none mb-3 hidden-scrollbar" rows="3" placeholder="Saisir un compte rendu..."></textarea><div class="flex justify-between items-center"><span class="text-[9px] text-gray-500"><i class="fa-solid fa-lock"></i> Note interne</span><button onclick="saveNoteFromFiche()" class="bg-cyan text-abysse font-bold px-6 py-2 rounded-lg text-xs hover:bg-white transition"><i class="fa-solid fa-check mr-2"></i> Enregistrer</button></div>`;
             }
         }
 
@@ -678,15 +681,11 @@
             const btn = document.querySelector('#cd-action-box button');
             const sub = document.getElementById('cd-email-sub').value;
             const body = document.getElementById('cd-email-body').value;
-            
             if(!sub || !body) return App.toast("Veuillez remplir l'email.", "error");
-            
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...'; btn.disabled = true;
             try {
                 await fetch('/api/crm/email/send', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ deal_id: CURRENT_DEAL_ID, subject: sub, body: body }) });
-                App.toast("Email envoyé !", "success");
-                setTimelineAction('activity');
-                loadTimeline(CURRENT_DEAL_ID);
+                App.toast("Email envoyé !", "success"); setTimelineAction('activity'); loadTimeline(CURRENT_DEAL_ID);
             } catch(e) { App.toast("Erreur d'envoi.", "error"); }
         }
 
@@ -697,20 +696,16 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...'; btn.disabled = true;
             try {
                 await fetch('/api/crm/activity', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ deal_id: CURRENT_DEAL_ID, type: 'NOTE', description: body }) });
-                App.toast("Note enregistrée.", "success");
-                setTimelineAction('activity');
-                loadTimeline(CURRENT_DEAL_ID);
+                App.toast("Note enregistrée.", "success"); setTimelineAction('activity'); loadTimeline(CURRENT_DEAL_ID);
             } catch(e) { App.toast("Erreur.", "error"); }
         }
 
         async function loadTimeline(dealId) {
             const container = document.getElementById('cd-timeline');
             container.innerHTML = '<div class="text-center text-gray-500 py-10"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>';
-            
             try {
                 const res = await fetch(`/api/crm/deal/${dealId}/activities`);
                 const data = await res.json();
-                
                 if(data.success && data.activities.length > 0) {
                     container.innerHTML = '';
                     data.activities.forEach(act => {
@@ -718,50 +713,27 @@
                         if(act.type === 'EMAIL') { icon = 'fa-envelope'; color = 'bg-blue-900 border-blue-700 text-blue-400'; }
                         if(act.type === 'NOTE') { icon = 'fa-pen'; color = 'bg-gold/20 border-gold/50 text-gold'; }
                         if(act.type === 'STAGE_CHANGE') { icon = 'fa-arrow-right-arrow-left'; color = 'bg-cyan/20 border-cyan/50 text-cyan'; }
-                        
                         const date = new Date(act.timestamp).toLocaleString('fr-FR', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
-                        
                         container.innerHTML += `
                             <div class="relative pl-10">
                                 <div class="absolute -left-4 w-8 h-8 rounded-full border-4 border-card flex items-center justify-center text-xs z-10 shadow-lg ${color}"><i class="fa-solid ${icon}"></i></div>
                                 <div class="bg-black/30 border border-white/10 rounded-xl p-4 hover:bg-black/50 transition">
                                     <div class="flex justify-between text-[10px] text-gray-500 mb-2 border-b border-white/5 pb-2">
-                                        <span class="font-bold text-gray-300">${act.title || act.type}</span>
-                                        <span>${date}</span>
+                                        <span class="font-bold text-gray-300">${act.title || act.type}</span><span>${date}</span>
                                     </div>
                                     <p class="text-xs text-gray-300 whitespace-pre-wrap">${act.description || ''}</p>
                                 </div>
                             </div>
                         `;
                     });
-                } else {
-                    container.innerHTML = `<div class="text-center text-gray-500 py-10 text-xs italic">Aucune activité enregistrée.</div>`;
-                }
-            } catch(e) {
-                container.innerHTML = `<div class="text-center text-alert py-10 text-xs">Erreur de chargement.</div>`;
-            }
+                } else { container.innerHTML = `<div class="text-center text-gray-500 py-10 text-xs italic">Aucune activité enregistrée.</div>`; }
+            } catch(e) { container.innerHTML = `<div class="text-center text-alert py-10 text-xs">Erreur de chargement.</div>`; }
         }
 
-        // --- CARTE LEAFLET (WAR ROOM) ---
         async function initMap() {
             if(mapInstance) { mapInstance.invalidateSize(); return; }
             mapInstance = L.map('map', {zoomControl: false}).setView([46.603354, 1.888334], 5); 
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM' }).addTo(mapInstance);
-
-            for(let d of CRM_DATA) {
-                if(d.city) {
-                    try {
-                        const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(d.city)}&type=municipality&limit=1`);
-                        const geo = await res.json();
-                        if(geo.features && geo.features.length > 0) {
-                            const coords = geo.features[0].geometry.coordinates;
-                            let color = d.pipeline === 'saas' ? '#A855F7' : (d.pipeline === 'broker' ? '#3B82F6' : '#8B5CF6');
-                            const marker = L.circleMarker([coords[1], coords[0]], { radius: 6, color: color, fillColor: color, fillOpacity: 0.8 }).addTo(mapInstance);
-                            marker.bindPopup(`<b style="color:black">${d.name}</b><br><span style="color:gray">${d.stage}</span>`);
-                        }
-                    } catch(e) {}
-                }
-            }
         }
 
         document.addEventListener('DOMContentLoaded', () => { 
