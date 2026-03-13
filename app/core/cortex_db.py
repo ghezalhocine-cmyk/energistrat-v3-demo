@@ -20,7 +20,7 @@ class CortexDB:
         if not self.db: return list()
         try:
             docs = self.db.collection("Sites").stream()
-            return [doc.to_dict() for doc in docs]
+            return[doc.to_dict() for doc in docs]
         except Exception as e:
             print(f"⚠️ Erreur get_all_sites : {e}")
             return list()
@@ -52,7 +52,7 @@ class CortexDB:
         except Exception: return False
 
     # ==========================================
-    # GESTION DES PROFILS UTILISATEURS / CRM (MULTI-TENANT)
+    # GESTION DES PROFILS UTILISATEURS (MULTI-TENANT)
     # ==========================================
     def get_all_users(self) -> list:
         if not self.db: return list()
@@ -97,23 +97,90 @@ class CortexDB:
         except Exception: return False
 
     # ==========================================
-    # GESTION DES LEADS CRM (SALES WORKSPACE)
+    # NOUVEAU MOTEUR CRM V12 (RELATIONNEL)
     # ==========================================
-    def get_all_leads(self) -> list:
-        """Extrait l'ensemble des prospects CRM (Préfixe LEAD_) de la collection Settings"""
+    
+    def _get_crm_docs(self, collection_name: str) -> list:
+        """Méthode interne générique pour extraire une collection CRM"""
         if not self.db: return list()
         try:
-            docs = self.db.collection("Settings").stream()
-            leads =[]
+            docs = self.db.collection(collection_name).stream()
+            res =[]
             for doc in docs:
-                if str(doc.id).startswith("LEAD_"):
-                    data = doc.to_dict()
-                    data["id"] = str(doc.id)
-                    leads.append(data)
-            return leads
+                d = doc.to_dict()
+                d["id"] = doc.id
+                res.append(d)
+            return res
         except Exception as e:
-            print(f"⚠️ Erreur get_all_leads : {e}")
+            print(f"⚠️ Erreur CRM_FETCH ({collection_name}) : {e}")
             return list()
+
+    def _save_crm_doc(self, collection_name: str, doc_id: str, data: dict) -> bool:
+        """Méthode interne générique pour sauver un doc CRM"""
+        if not self.db: return False
+        try:
+            self.db.collection(collection_name).document(doc_id).set(data, merge=True)
+            return True
+        except Exception as e:
+            print(f"🔴 Erreur CRM_SAVE ({collection_name}/{doc_id}) : {e}")
+            return False
+
+    def _get_crm_doc(self, collection_name: str, doc_id: str) -> dict:
+        """Méthode interne générique pour lire un doc CRM"""
+        if not self.db: return dict()
+        try:
+            doc = self.db.collection(collection_name).document(doc_id).get()
+            if doc.exists:
+                d = doc.to_dict()
+                d["id"] = doc.id
+                return d
+            return dict()
+        except Exception: return dict()
+
+    # --- LEADS (Vivier brut) ---
+    def get_all_leads(self) -> list: return self._get_crm_docs("CRM_Leads")
+    def get_lead(self, lead_id: str) -> dict: return self._get_crm_doc("CRM_Leads", lead_id)
+    def save_lead(self, lead_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Leads", lead_id, data)
+    def delete_lead(self, lead_id: str) -> bool:
+        try: self.db.collection("CRM_Leads").document(lead_id).delete(); return True
+        except: return False
+
+    # --- COMPANIES (Comptes Clients/Groupes) ---
+    def get_all_companies(self) -> list: return self._get_crm_docs("CRM_Companies")
+    def get_company(self, comp_id: str) -> dict: return self._get_crm_doc("CRM_Companies", comp_id)
+    def save_company(self, comp_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Companies", comp_id, data)
+
+    # --- CONTACTS (Annuaire Humain) ---
+    def get_all_contacts(self) -> list: return self._get_crm_docs("CRM_Contacts")
+    def get_contact(self, contact_id: str) -> dict: return self._get_crm_doc("CRM_Contacts", contact_id)
+    def save_contact(self, contact_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Contacts", contact_id, data)
+
+    # --- DEALS (Opportunités / Kanban) ---
+    def get_all_deals(self) -> list: return self._get_crm_docs("CRM_Deals")
+    def get_deal(self, deal_id: str) -> dict: return self._get_crm_doc("CRM_Deals", deal_id)
+    def save_deal(self, deal_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Deals", deal_id, data)
+
+    # --- PRODUCTS (Catalogue CPQ) ---
+    def get_all_products(self) -> list: return self._get_crm_docs("CRM_Products")
+    def save_product(self, prod_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Products", prod_id, data)
+
+    # --- ACTIVITIES (Timeline: Emails, Appels, Notes) ---
+    def get_deal_activities(self, deal_id: str) -> list:
+        if not self.db: return list()
+        try:
+            docs = self.db.collection("CRM_Activities").where("deal_id", "==", deal_id).stream()
+            return sorted([{"id": d.id, **d.to_dict()} for d in docs], key=lambda x: x.get("timestamp", ""), reverse=True)
+        except: return list()
+    def save_activity(self, act_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Activities", act_id, data)
+
+    # --- TASKS (Agenda) ---
+    def get_user_tasks(self, owner_id: str) -> list:
+        if not self.db: return list()
+        try:
+            docs = self.db.collection("CRM_Tasks").where("owner_id", "==", owner_id).stream()
+            return sorted([{"id": d.id, **d.to_dict()} for d in docs], key=lambda x: x.get("due_date", ""))
+        except: return list()
+    def save_task(self, task_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Tasks", task_id, data)
 
     # ==========================================
     # GESTION DE CORTEX SENTINEL (ALERTES)
