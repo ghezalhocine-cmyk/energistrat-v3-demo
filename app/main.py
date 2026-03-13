@@ -30,12 +30,8 @@ except ImportError:
 class FallbackPDFBuilder:
     def __init__(self):
         self.logo_svg = """<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="30" rx="8" y="5" fill="#00E5FF"/><path d="M10 15L20 15L15 25Z" fill="#001529"/><text x="40" y="27" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#001529">ENERGISTRAT</text></svg>"""
-    
-    def generate_bilan_ag(self, client_id, data, fin, kpis): 
-        return "<h1>Générateur PDF de Secours (Bilan AG)</h1>"
-    
-    def generate_bilan_ag_cluster(self, cluster_name, site_count, vol_total, budget_total, vol_elec, vol_gaz, ghost_total): 
-        return "<h1>Générateur PDF Grappe (Multi-sites)</h1>"
+    def generate_bilan_ag(self, client_id, data, fin, kpis): return "<h1>Générateur PDF de Secours</h1>"
+    def generate_bilan_ag_cluster(self, cluster_name, site_count, vol_total, budget_total, vol_elec, vol_gaz, ghost_total): return "<h1>Générateur PDF Grappe</h1>"
 
 # ==============================================================================
 # FALLBACK MOCKS (SÉCURITÉ CLOUD RUN)
@@ -52,8 +48,8 @@ class MockDB:
     def save_setting(self, n, d): return True
     def get_all_leads(self): return []
     def get_all_companies(self): return[]
-    def get_all_contacts(self): return[]
-    def get_all_deals(self): return []
+    def get_all_contacts(self): return []
+    def get_all_deals(self): return[]
     def get_all_products(self): return[]
     def save_lead(self, i, d): return True
     def save_company(self, i, d): return True
@@ -101,29 +97,25 @@ class MockRTE:
     def get_pulse_dashboard_data(self): return {"success": False, "error": "RTE Offline"}
 
 class MockForecast:
-    def simulate_5_years(self, s): return {"labels": ["N", "N+1", "N+2", "N+3", "N+4"], "dataset_trend":[100, 105, 110, 115, 120], "dataset_sobriety":[100, 90, 80, 70, 60], "gain_potential_mwh": 150}
+    def simulate_5_years(self, s): return {"labels":["N", "N+1", "N+2", "N+3", "N+4"], "dataset_trend":[100, 105, 110, 115, 120], "dataset_sobriety":[100, 90, 80, 70, 60], "gain_potential_mwh": 150}
 
 class MockCRM:
-    def generate_icebreaker(self, naf, pipe_type="saas"): return {"naf": naf, "pain_points": "Mode Démo", "pitch": "Argumentaire IA désactivé."}
+    def generate_icebreaker(self, naf, pipe_type="saas"): return {"naf": naf, "pain_points": "Mode Démo", "pitch": "Argumentaire non disponible."}
     def analyze_customer_health(self, cv, pv, lc): return {"status": "STABLE", "color": "text-success", "action_required": "RAS", "usage_score": 100, "is_churn_risk": False}
     def calculate_commission(self, v, is_s, saas_mrr=0): return round(v * 1.0, 2)
     def send_sales_email(self, *args, **kwargs): return True
 
-# ==============================================================================
-# AUTO-LOADER CORTEX ROBUSTE (ISOLEMENT ANTI-DOMINO)
-# ==============================================================================
 def load_module(mod_name, obj_name, mock_instance=None):
     paths =[f"app.core.{mod_name}", f"core.{mod_name}", mod_name]
     for path in paths:
         try:
             mod = importlib.import_module(path)
             return getattr(mod, obj_name)
-        except ModuleNotFoundError:
-            continue
+        except ModuleNotFoundError: continue
         except Exception as e:
-            print(f"⚠️ Erreur chargement {path} : {e}")
+            print(f"⚠️ Erreur {path} : {e}")
             continue
-    print(f"🔴 Auto-Loader: Impossible de trouver {mod_name}. Fallback Mock activé.")
+    print(f"🔴 Auto-Loader: Impossible de trouver {mod_name}. Mock activé.")
     return mock_instance
 
 db = load_module("cortex_db", "db", MockDB())
@@ -140,17 +132,12 @@ rte = load_module("cortex_rte", "rte", MockRTE())
 crm_engine = load_module("cortex_crm", "crm_engine", MockCRM())
 pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12-CRM-CPQ")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12-INTEGRAL")
 
 app.add_middleware(
-    CORSMiddleware, 
-    allow_origins=["*"], 
-    allow_credentials=True, 
-    allow_methods=["*"], 
-    allow_headers=["*"],
+    CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
 )
 
-# === SETUP DIRECTORIES ===
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
@@ -180,36 +167,17 @@ class CRMLeadModel(BaseModel):
     siret: str; company_name: str; naf: str; city: str
     contact_firstname: str; contact_lastname: str; contact_role: str; contact_email: str; contact_phone: str
     source: str; pipeline: str 
+class DealMoveModel(BaseModel): deal_id: str; new_stage: str
+class EmailRequestModel(BaseModel): deal_id: str; subject: str; body: str
+class CRMActivityModel(BaseModel): deal_id: str; type: str; description: str
+class UpdateFieldModel(BaseModel): value: str
+class ProductModel(BaseModel): name: str; category: str; unit_price: float; comm_rate: float = 1.0 
+class DealLineItemModel(BaseModel): product_id: str; quantity: float 
+class DealProductsUpdateModel(BaseModel): items: List[DealLineItemModel]
 
-class DealMoveModel(BaseModel):
-    deal_id: str; new_stage: str
-
-class EmailRequestModel(BaseModel):
-    deal_id: str; subject: str; body: str
-
-class CRMActivityModel(BaseModel):
-    deal_id: str; type: str; description: str
-
-class UpdateFieldModel(BaseModel):
-    value: str
-
-class ProductModel(BaseModel):
-    name: str
-    category: str 
-    unit_price: float 
-    comm_rate: float = 1.0 
-
-class DealLineItemModel(BaseModel):
-    product_id: str
-    quantity: float 
-
-class DealProductsUpdateModel(BaseModel):
-    items: List[DealLineItemModel]
-
-# === UTILS ===
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
-    elif isinstance(data, list): return [json_compliant(v) for v in data]
+    elif isinstance(data, list): return[json_compliant(v) for v in data]
     elif isinstance(data, float):
         if math.isnan(data) or math.isinf(data): return 0.0
     return data
@@ -226,9 +194,6 @@ async def get_current_user(request: Request):
     if t.startswith("Bearer "): t = t.split(" ")[1]
     return auth.verify_token(t)
 
-# ==========================================
-# AUTHENTIFICATION & ROUTAGE INTELLIGENT
-# ==========================================
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request, user = Depends(get_current_user)):
     if user: 
@@ -254,18 +219,17 @@ async def logout(response: Response):
     response.delete_cookie("access_token")
     return RedirectResponse(url="/login")
 
+
 # ==========================================
-# API CRM V12 & MODULE CPQ
+# API CRM V12 & MODULE CPQ (PATCHED)
 # ==========================================
 
 @app.post("/api/crm/lead")
 async def api_create_crm_lead_and_convert(payload: CRMLeadModel, user = Depends(get_current_user)):
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
-    owner_id = user.get("uid")
-    now = datetime.now().isoformat()
+    owner_id = user.get("uid"); now = datetime.now().isoformat()
 
-    domain = ""
-    logo_url = ""
+    domain = ""; logo_url = ""
     try:
         if "@" in payload.contact_email:
             parts = payload.contact_email.split("@")
@@ -275,36 +239,15 @@ async def api_create_crm_lead_and_convert(payload: CRMLeadModel, user = Depends(
     except: pass
 
     company_id = f"COMP_{payload.siret or uuid.uuid4().hex[:8]}"
-    company_data = {
-        "siret": payload.siret, "name": payload.company_name, "naf": payload.naf, 
-        "city": payload.city, "website": domain, "logo": logo_url, 
-        "created_at": now, "owner_id": owner_id
-    }
-    db.save_company(company_id, company_data)
+    db.save_company(company_id, {"siret": payload.siret, "name": payload.company_name, "naf": payload.naf, "city": payload.city, "website": domain, "logo": logo_url, "created_at": now, "owner_id": owner_id})
 
     contact_id = f"CONT_{uuid.uuid4().hex[:12]}"
-    contact_data = {
-        "company_id": company_id, "firstname": payload.contact_firstname, "lastname": payload.contact_lastname, 
-        "role": payload.contact_role, "email": payload.contact_email, "phone": payload.contact_phone, 
-        "linkedin": "", "created_at": now, "owner_id": owner_id
-    }
-    db.save_contact(contact_id, contact_data)
+    db.save_contact(contact_id, {"company_id": company_id, "firstname": payload.contact_firstname, "lastname": payload.contact_lastname, "role": payload.contact_role, "email": payload.contact_email, "phone": payload.contact_phone, "linkedin": "", "created_at": now, "owner_id": owner_id})
 
     deal_id = f"DEAL_{uuid.uuid4().hex[:12]}"
-    deal_data = {
-        "company_id": company_id, "primary_contact_id": contact_id, 
-        "name": f"{payload.company_name} - {payload.pipeline.upper()}", 
-        "pipeline": payload.pipeline, "stage": "LEAD", 
-        "volume_est": 0.0, "commission_est": 0.0, "products":[], 
-        "created_at": now, "owner_id": owner_id
-    }
-    db.save_deal(deal_id, deal_data)
+    db.save_deal(deal_id, {"company_id": company_id, "primary_contact_id": contact_id, "name": f"{payload.company_name} - {payload.pipeline.upper()}", "pipeline": payload.pipeline, "stage": "LEAD", "volume_est": 0.0, "commission_est": 0.0, "products":[], "created_at": now, "owner_id": owner_id})
 
-    act_id = f"ACT_{uuid.uuid4().hex[:12]}"
-    db.save_activity(act_id, {
-        "deal_id": deal_id, "type": "SYSTEM", "title": "Création du compte", 
-        "description": f"Import initial.", "timestamp": now, "owner_id": owner_id
-    })
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "SYSTEM", "title": "Création du compte", "description": "Import initial.", "timestamp": now, "owner_id": owner_id})
     return JSONResponse({"success": True, "deal_id": deal_id})
 
 @app.get("/api/crm/pipeline/{pipe_type}")
@@ -315,31 +258,22 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
     all_comps = {c.get("id"): c for c in db.get_all_companies()}
     all_conts = {c.get("id"): c for c in db.get_all_contacts()}
 
-    # Rétrocompatibilité avec les anciens prospects non convertis
     try:
-        old_leads = db.get_all_leads()
-        for old in old_leads:
+        for old in db.get_all_leads():
             if str(old.get("pipeline", "")).lower() == pipe_type.lower():
-                all_deals.append({
-                    "id": old.get("id"), "legacy": True, "name": old.get("company_name", "Ancien Lead"), 
-                    "stage": old.get("stage", "LEAD"), "volume_est": float(old.get("volume_est") or 0.0), 
-                    "pipeline": old.get("pipeline"), "_old_data": old
-                })
+                all_deals.append({"id": old.get("id"), "legacy": True, "name": old.get("company_name", "Ancien Lead"), "stage": old.get("stage", "LEAD"), "volume_est": float(old.get("volume_est") or 0.0), "commission_est": float(old.get("commission_est") or 0.0), "pipeline": old.get("pipeline"), "products": old.get("products",[]), "_old_data": old})
     except: pass
 
     formatted_deals =[]
     for deal in all_deals:
-        if str(deal.get("pipeline", "")).lower() != pipe_type.lower(): 
-            continue
+        if str(deal.get("pipeline", "")).lower() != pipe_type.lower(): continue
             
         if not deal.get("legacy"):
             comp = all_comps.get(deal.get("company_id"), {})
             cont = all_conts.get(deal.get("primary_contact_id"), {})
-            
             vol = float(deal.get("volume_est", 0.0))
             naf = comp.get("naf", "DEFAULT")
             intel = crm_engine.generate_icebreaker(naf, pipe_type) 
-            
             comms = float(deal.get("commission_est") or 0.0)
             if comms == 0.0: comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
 
@@ -348,32 +282,24 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
                 "name": comp.get("name", deal.get("name")), "city": comp.get("city", ""),
                 "website": comp.get("website", ""), "logo": comp.get("logo", ""), "naf": naf,
                 "volume": vol, "stage": deal.get("stage", "LEAD"),
-                "contact": {
-                    "name": f"{cont.get('firstname', '')} {cont.get('lastname', '')}".strip() or "Contact", 
-                    "role": cont.get("role", "Décideur"), "phone": cont.get("phone", ""), 
-                    "email": cont.get("email", ""), "linkedin": cont.get("linkedin", "")
-                },
-                "intelligence": intel, "health": crm_engine.analyze_customer_health(vol, vol,[]), 
-                "commission_est": comms, "last_contact": "Aujourd'hui",
-                "products": deal.get("products",[])
+                "contact": {"name": f"{cont.get('firstname', '')} {cont.get('lastname', '')}".strip() or "Contact", "role": cont.get("role", "Décideur"), "phone": cont.get("phone", ""), "email": cont.get("email", ""), "linkedin": cont.get("linkedin", "")},
+                "intelligence": intel, "health": crm_engine.analyze_customer_health(vol, vol,[]), "commission_est": comms, "last_contact": "Aujourd'hui", "products": deal.get("products",[])
             })
         else:
             old = deal.get("_old_data", {})
-            vol = float(old.get("volume_est") or 0.0)
+            vol = float(deal.get("volume_est", 0.0))
             naf = old.get("naf", "DEFAULT")
-            intel = crm_engine.generate_icebreaker(naf, pipe_type)
+            comms = float(deal.get("commission_est") or 0.0)
+            if comms == 0.0: comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
+            
+            # PATCH : GESTION DES ANCIENS DEALS
             formatted_deals.append({
                 "id": old.get("id"), "company_id": old.get("id"), "contact_id": old.get("id"),
                 "name": old.get("company_name", "Inconnu"), "city": old.get("city", ""),
-                "website": "", "logo": "", "naf": naf, "volume": vol, "stage": old.get("stage", "LEAD"),
-                "contact": {
-                    "name": f"{old.get('contact_firstname', '')} {old.get('contact_lastname', '')}".strip(), 
-                    "role": old.get("contact_role", "Contact"), "phone": old.get("contact_phone", ""), 
-                    "email": old.get("contact_email", ""), "linkedin": ""
-                },
-                "intelligence": intel, "health": crm_engine.analyze_customer_health(vol, vol,[]), 
-                "commission_est": crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299), 
-                "last_contact": old.get("last_contact", "Jamais"), "products":[]
+                "website": old.get("website", ""), "logo": "", "naf": naf, "volume": vol, "stage": old.get("stage", "LEAD"),
+                "contact": {"name": f"{old.get('contact_firstname', '')} {old.get('contact_lastname', '')}".strip(), "role": old.get("contact_role", "Contact"), "phone": old.get("contact_phone", ""), "email": old.get("contact_email", ""), "linkedin": old.get("linkedin", "")},
+                "intelligence": crm_engine.generate_icebreaker(naf, pipe_type), "health": crm_engine.analyze_customer_health(vol, vol,[]), 
+                "commission_est": comms, "last_contact": old.get("last_contact", "Jamais"), "products": deal.get("products",[])
             })
 
     return JSONResponse(json_compliant({"success": True, "pipeline": formatted_deals}))
@@ -386,8 +312,12 @@ async def update_contact_linkedin(contact_id: str, payload: UpdateFieldModel, us
         contact["linkedin"] = payload.value
         db.save_contact(contact_id, contact)
         return JSONResponse({"success": True})
+        
     legacy = db.get_setting(contact_id)
-    if legacy: return JSONResponse({"success": True}) 
+    if legacy: 
+        legacy["linkedin"] = payload.value
+        db.save_setting(contact_id, legacy)
+        return JSONResponse({"success": True}) 
     return JSONResponse({"success": False, "error": "Introuvable"})
 
 @app.post("/api/crm/company/{company_id}/website")
@@ -398,6 +328,12 @@ async def update_company_website(company_id: str, payload: UpdateFieldModel, use
         company["website"] = payload.value
         db.save_company(company_id, company)
         return JSONResponse({"success": True})
+        
+    legacy = db.get_setting(company_id)
+    if legacy:
+        legacy["website"] = payload.value
+        db.save_setting(company_id, legacy)
+        return JSONResponse({"success": True})
     return JSONResponse({"success": False, "error": "Introuvable"})
 
 @app.post("/api/crm/deal/move")
@@ -407,16 +343,13 @@ async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_u
     if deal_data:
         deal_data["stage"] = payload.new_stage
         db.save_deal(payload.deal_id, deal_data)
-        act_id = f"ACT_{uuid.uuid4().hex[:12]}"
-        db.save_activity(act_id, {
-            "deal_id": payload.deal_id, "type": "STAGE_CHANGE", "title": f"Passage à l'étape {payload.new_stage}", 
-            "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")
-        })
     else:
         lead_data = db.get_setting(payload.deal_id)
         if lead_data:
             lead_data["stage"] = payload.new_stage
             db.save_setting(payload.deal_id, lead_data)
+            
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": payload.deal_id, "type": "STAGE_CHANGE", "title": f"Passage à l'étape {payload.new_stage}", "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True})
 
 @app.post("/api/crm/email/send")
@@ -429,32 +362,19 @@ async def api_send_crm_email(payload: EmailRequestModel, background_tasks: Backg
         if cont: to_email = cont.get("email", to_email)
     
     background_tasks.add_task(crm_engine.send_sales_email, to_email=to_email, subject=payload.subject, html_content=payload.body, lead_id=payload.deal_id)
-    act_id = f"ACT_{uuid.uuid4().hex[:12]}"
-    db.save_activity(act_id, {
-        "deal_id": payload.deal_id, "type": "EMAIL", "title": f"Email: {payload.subject}", 
-        "description": payload.body, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")
-    })
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": payload.deal_id, "type": "EMAIL", "title": f"Email: {payload.subject}", "description": payload.body, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True, "message": "Email placé en file d'attente."})
 
 @app.get("/api/crm/track/open/{deal_id}")
 async def api_track_email_open(deal_id: str):
-    act_id = f"ACT_{uuid.uuid4().hex[:12]}"
-    db.save_activity(act_id, {
-        "deal_id": deal_id, "type": "TRACKING", "title": "Le client a ouvert un email", 
-        "timestamp": datetime.now().isoformat(), "owner_id": "SYSTEM"
-    })
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "TRACKING", "title": "Le client a ouvert un email", "timestamp": datetime.now().isoformat(), "owner_id": "SYSTEM"})
     pixel = base64.b64decode("R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
     return Response(content=pixel, media_type="image/gif")
 
 @app.post("/api/crm/activity")
 async def api_create_crm_activity(payload: CRMActivityModel, user = Depends(get_current_user)):
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
-    act_id = f"ACT_{uuid.uuid4().hex[:12]}"
-    db.save_activity(act_id, {
-        "deal_id": payload.deal_id, "type": payload.type, 
-        "title": "Note manuelle" if payload.type == "NOTE" else payload.type, 
-        "description": payload.description, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")
-    })
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": payload.deal_id, "type": payload.type, "title": "Note manuelle" if payload.type == "NOTE" else payload.type, "description": payload.description, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True})
 
 @app.get("/api/crm/deal/{deal_id}/activities")
@@ -483,10 +403,14 @@ async def api_delete_product(prod_id: str, user = Depends(get_current_user)):
 
 @app.post("/api/crm/deal/{deal_id}/products")
 async def api_update_deal_products(deal_id: str, payload: DealProductsUpdateModel, user = Depends(get_current_user)):
-    """Le Cœur du CPQ : Met à jour les lignes de produit et calcule la valeur réelle du Deal"""
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    
     deal = db.get_deal(deal_id)
-    if not deal: return JSONResponse({"error": "Deal introuvable (legacy ou erreur)."}, 404)
+    is_legacy = False
+    if not deal:
+        deal = db.get_setting(deal_id)
+        is_legacy = True
+        if not deal: return JSONResponse({"error": "Deal introuvable."}, 404)
 
     all_prods = {p["id"]: p for p in db.get_all_products()}
     total_vol = 0.0
@@ -496,39 +420,23 @@ async def api_update_deal_products(deal_id: str, payload: DealProductsUpdateMode
     for item in payload.items:
         prod = all_prods.get(item.product_id)
         if not prod: continue
-        
         cat = prod.get("category", "SERVICE")
         price = float(prod.get("unit_price", 0.0))
         qty = float(item.quantity)
         rate = float(prod.get("comm_rate", 1.0))
-
-        line_comm = 0.0
-        if cat == "SAAS":
-            line_comm = price * qty * rate 
-        elif cat == "COURTAGE":
-            total_vol += qty
-            line_comm = price * qty * rate 
-        else:
-            line_comm = price * qty * rate
-
+        line_comm = price * qty * rate 
+        if cat == "COURTAGE": total_vol += qty
         total_comm += line_comm
-        detailed_lines.append({
-            "product_id": prod["id"], "name": prod["name"], "category": cat,
-            "quantity": qty, "unit_price": price, "line_comm": line_comm
-        })
+        detailed_lines.append({"product_id": prod["id"], "name": prod["name"], "category": cat, "quantity": qty, "unit_price": price, "line_comm": line_comm})
 
     deal["products"] = detailed_lines
     deal["volume_est"] = total_vol
     deal["commission_est"] = total_comm
-    db.save_deal(deal_id, deal)
+    
+    if is_legacy: db.save_setting(deal_id, deal)
+    else: db.save_deal(deal_id, deal)
 
-    act_id = f"ACT_{uuid.uuid4().hex[:12]}"
-    db.save_activity(act_id, {
-        "deal_id": deal_id, "type": "SYSTEM", "title": "Devis (CPQ) mis à jour",
-        "description": f"Nouveau volume : {total_vol} | Nouvelle commission : {total_comm:,.2f} €",
-        "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")
-    })
-
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "SYSTEM", "title": "Devis (CPQ) mis à jour", "description": f"Nouvelle commission : {total_comm:,.2f} €", "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True})
     # ==========================================
 # API CORTEX SENTINEL & RTE
@@ -539,7 +447,7 @@ async def api_get_sentinel_alerts():
 
 @app.post("/api/ops/sentinel/run")
 async def api_run_sentinel_scan(user = Depends(get_current_user)):
-    return JSONResponse({"success": True, "message": "Scan SGE déclenché avec succès."})
+    return JSONResponse({"success": True, "message": "Scan SGE déclenché."})
 
 @app.get("/api/tools/sniper/market")
 async def api_sniper_market(user = Depends(get_current_user)):
@@ -773,9 +681,9 @@ async def api_generate_bilan_ag(client_id: str, user = Depends(get_current_user)
                 if (cluster_siret and str(d.get('identity', {}).get('siret', '')).strip() == cluster_siret) or (cluster_name and str(d.get('identity', {}).get('site_name', '')).strip() == cluster_name):
                     cluster_files.append(d)
         else:
-            cluster_files = [base_data]
+            cluster_files =[base_data]
             
-        if not cluster_files: cluster_files = [base_data]
+        if not cluster_files: cluster_files =[base_data]
             
         if len(cluster_files) > 1:
             v_tot = b_tot = v_el = v_gz = g_tot = 0
@@ -1007,7 +915,7 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
         "count": len(fleet_list), 
         "green_league": analysis.get('green_league'), 
         "global_kpis": analysis.get('global'), 
-        "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments":["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots": ["Lot 1", "Lot 2"] }
+        "filters_meta": { "cities": sorted(list(all_cities)), "providers": sorted(list(all_providers)), "segments":["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], "lots":["Lot 1", "Lot 2"] }
     }))
 
 @app.post("/api/settings/propagate_tariff")
@@ -1190,7 +1098,7 @@ VALID_VIEWS =[
     "ops_nexus", "ops_ingest", "ops_aggregator", "ops_market",
     "pme", "industry", "retail", "mairie", "sde", "oph", "syndic", "sante", "supplier", "citoyen",
     "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance", "dashboard_finance",
-    "sales_workspace"
+    "sales_workspace", "sales_playbook", "sales_outreach"
 ]
 
 PUBLIC_PAGES =[
@@ -1219,7 +1127,7 @@ async def serve_dynamic(request: Request, page_name: str, user = Depends(get_cur
 
 @app.get("/{full_path:path}")
 async def catch_all_deep(request: Request, full_path: str):
-    if any(x in full_path for x in ["static", "assets", "favicon"]): return JSONResponse({}, 404)
+    if any(x in full_path for x in["static", "assets", "favicon"]): return JSONResponse({}, 404)
     return templates.TemplateResponse("index.html", {"request": request})
 
 if __name__ == "__main__":
