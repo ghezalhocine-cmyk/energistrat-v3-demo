@@ -1,5 +1,4 @@
-import firebase_admin
-from firebase_admin import firestore
+from google.cloud import firestore
 import traceback
 
 class CortexDB:
@@ -7,8 +6,9 @@ class CortexDB:
     
     def __init__(self):
         try:
+            # Utilisation du SDK Natif GCP (Infaillible et prioritaire sur Cloud Run)
             self.db = firestore.Client(project="energistrat-saas")
-            print("🟢 CORTEX DB : Connexion Firestore FORCÉE sur energistrat-saas.")
+            print("🟢 CORTEX DB : Connexion native google.cloud.firestore RÉUSSIE.")
         except Exception as e:
             print(f"🔴 ERREUR CRITIQUE CORTEX DB (FIRESTORE) : {e}")
             self.db = None
@@ -138,7 +138,20 @@ class CortexDB:
         except Exception: return dict()
 
     # --- LEADS (Vivier brut) ---
-    def get_all_leads(self) -> list: return self._get_crm_docs("CRM_Leads")
+    def get_all_leads(self) -> list: 
+        """Récupère les anciens prospects de la collection Settings (Rétro-compatibilité)"""
+        if not self.db: return list()
+        try:
+            docs = self.db.collection("Settings").stream()
+            leads =[]
+            for doc in docs:
+                if str(doc.id).startswith("LEAD_"):
+                    data = doc.to_dict()
+                    data["id"] = str(doc.id)
+                    leads.append(data)
+            return leads
+        except Exception: return list()
+
     def get_lead(self, lead_id: str) -> dict: return self._get_crm_doc("CRM_Leads", lead_id)
     def save_lead(self, lead_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Leads", lead_id, data)
     def delete_lead(self, lead_id: str) -> bool:
