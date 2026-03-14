@@ -362,7 +362,7 @@ async def api_create_crm_lead_and_convert(payload: CRMCompany3DModel, user = Dep
     company_data = {
         "siren": payload.siren, 
         "name": final_name, 
-        "holding_name": payload.holding_name or final_name, # Tête de groupe par défaut
+        "holding_name": payload.holding_name or final_name,
         "naf": final_naf, 
         "address": final_address,
         "city": final_city,
@@ -381,7 +381,7 @@ async def api_create_crm_lead_and_convert(payload: CRMCompany3DModel, user = Dep
     deal_data = {
         "company_id": company_id, 
         "name": f"{final_name} - {payload.pipeline.upper()}", 
-        "pipeline": payload.pipeline, # saas, courtage, fournisseurs, fourniture
+        "pipeline": payload.pipeline, 
         "stage": "LEAD", 
         "volume_est": 0.0, 
         "commission_est": 0.0, 
@@ -418,18 +418,14 @@ async def api_inline_edit(entity_type: str, entity_id: str, payload: CRMInlineEd
         data = db.get_contact(entity_id)
         save_func = db.save_contact
     elif entity_type == "site":
-        # Dans le CRM 3D, les sites sont stockés via le module Data Unity
         data = db.get_site(entity_id)
         save_func = db.save_site
         
     if not data:
         return JSONResponse({"success": False, "error": "Entité introuvable."})
         
-    # Mise à jour de la donnée
     data[payload.field] = payload.value
-    # Flag d'override manuel pour empêcher l'écrasement par API
     data[f"{payload.field}_manual_override"] = True 
-    
     save_func(entity_id, data)
     
     return JSONResponse({"success": True, "message": "Mise à jour synchronisée."})
@@ -443,7 +439,7 @@ async def api_add_contact_3d(company_id: str, payload: CRMContactModel, user = D
     contact_id = f"CONT_{uuid.uuid4().hex[:12]}"
     contact_data = {
         "company_id": company_id, 
-        "site_id": payload.site_id, # Si None -> Contact Siège (DAF), sinon -> Contact Site (Tech)
+        "site_id": payload.site_id, 
         "firstname": payload.firstname, 
         "lastname": payload.lastname,
         "role": payload.role, 
@@ -466,7 +462,7 @@ async def api_add_site_3d(company_id: str, payload: CRMSiteModel, user = Depends
     site_data = {
         "identity": {
             "id": site_id,
-            "tenant_id": company_id, # Rattaché à l'Entité Légale
+            "tenant_id": company_id,
             "site_name": payload.site_name
         },
         "location": {"address": payload.address},
@@ -501,11 +497,8 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             continue
             
         comp = all_comps.get(deal.get("company_id"), {})
+        deal_contacts =[c for c in all_conts.values() if c.get("company_id") == comp.get("id")]
         
-        # Contacts (Siège & Sites)
-        deal_contacts = [c for c in all_conts.values() if c.get("company_id") == comp.get("id")]
-        
-        # Récupération des sites rattachés et alertes SaaS
         company_sites =[s for s in real_sites if s.get("identity", {}).get("tenant_id") == comp.get("id")]
         total_vol = sum([float(s.get("kpis", {}).get("volume_mwh", 0)) for s in company_sites])
         
@@ -541,6 +534,38 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
 
     return JSONResponse(json_compliant({"success": True, "pipeline": formatted_deals}))
 
+@app.post("/api/crm/contact/{contact_id}/linkedin")
+async def update_contact_linkedin(contact_id: str, payload: UpdateFieldModel, user = Depends(get_current_user)):
+    """(Maintenu pour Zéro Régression sur les anciens calls)"""
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    contact = db.get_contact(contact_id)
+    if contact:
+        contact["linkedin"] = payload.value
+        db.save_contact(contact_id, contact)
+        return JSONResponse({"success": True})
+    legacy = db.get_setting(contact_id)
+    if legacy: 
+        legacy["linkedin"] = payload.value
+        db.save_setting(contact_id, legacy)
+        return JSONResponse({"success": True}) 
+    return JSONResponse({"success": False, "error": "Introuvable"})
+
+@app.post("/api/crm/company/{company_id}/website")
+async def update_company_website(company_id: str, payload: UpdateFieldModel, user = Depends(get_current_user)):
+    """(Maintenu pour Zéro Régression)"""
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    company = db.get_company(company_id)
+    if company:
+        company["website"] = payload.value
+        db.save_company(company_id, company)
+        return JSONResponse({"success": True})
+    legacy = db.get_setting(company_id)
+    if legacy:
+        legacy["website"] = payload.value
+        db.save_setting(company_id, legacy)
+        return JSONResponse({"success": True})
+    return JSONResponse({"success": False, "error": "Introuvable"})
+
 @app.post("/api/crm/deal/move")
 async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_user)):
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès refusé"}, 401)
@@ -551,6 +576,27 @@ async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_u
         db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": payload.deal_id, "type": "STAGE_CHANGE", "title": f"Passage à l'étape {payload.new_stage}", "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
         return JSONResponse({"success": True})
     return JSONResponse({"success": False, "error": "Deal introuvable"})
+
+# ==========================================
+# RESTAURATION DU MOTEUR D'EMAILING & TRACKING
+# ==========================================
+@app.post("/api/crm/email/send")
+async def api_send_crm_email(payload: EmailRequestModel, background_tasks: BackgroundTasks, user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    deal_data = db.get_deal(payload.deal_id)
+    to_email = "test@energistrat.com"
+    if deal_data and deal_data.get("primary_contact_id"):
+        cont = db.get_contact(deal_data["primary_contact_id"])
+        if cont: to_email = cont.get("email", to_email)
+    background_tasks.add_task(crm_engine.send_sales_email, to_email=to_email, subject=payload.subject, html_content=payload.body, lead_id=payload.deal_id)
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": payload.deal_id, "type": "EMAIL", "title": f"Email: {payload.subject}", "description": payload.body, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
+    return JSONResponse({"success": True, "message": "Email placé en file d'attente."})
+
+@app.get("/api/crm/track/open/{deal_id}")
+async def api_track_email_open(deal_id: str):
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "TRACKING", "title": "Le client a ouvert un email", "timestamp": datetime.now().isoformat(), "owner_id": "SYSTEM"})
+    pixel = base64.b64decode("R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
+    return Response(content=pixel, media_type="image/gif")
 
 @app.post("/api/crm/activity")
 async def api_create_crm_activity(payload: CRMActivityModel, user = Depends(get_current_user)):
@@ -563,23 +609,81 @@ async def api_get_crm_activities(deal_id: str, user = Depends(get_current_user))
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès réservé"}, 401)
     return JSONResponse({"success": True, "activities": db.get_deal_activities(deal_id)})
 
-@app.post("/api/crm/deal/{deal_id}/upload")
-async def api_upload_deal_file(deal_id: str, file: UploadFile = File(...), user = Depends(get_current_user)):
-    """GED: Gestion Électronique des Documents (Contrats générés par le Quick Quote)"""
+# ==========================================
+# RESTAURATION DU CATALOGUE PRODUITS CPQ V1
+# ==========================================
+@app.get("/api/crm/products")
+async def api_get_products(user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès réservé"}, 401)
+    return JSONResponse({"success": True, "products": db.get_all_products()})
+
+@app.post("/api/crm/products")
+async def api_save_product(payload: ProductModel, user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    prod_id = f"PROD_{uuid.uuid4().hex[:8]}"
+    db.save_product(prod_id, payload.dict())
+    return JSONResponse({"success": True, "product_id": prod_id})
+
+@app.delete("/api/crm/products/{prod_id}")
+async def api_delete_product(prod_id: str, user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    db.delete_product(prod_id)
+    return JSONResponse({"success": True})
+
+@app.post("/api/crm/deal/{deal_id}/products")
+async def api_update_deal_products(deal_id: str, payload: DealProductsUpdateModel, user = Depends(get_current_user)):
     if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     deal = db.get_deal(deal_id)
-    if not deal: return JSONResponse({"error": "Deal introuvable"}, 404)
+    is_legacy = False
+    if not deal:
+        deal = db.get_setting(deal_id)
+        is_legacy = True
+        if not deal: return JSONResponse({"error": "Deal introuvable."}, 404)
+
+    all_prods = {p["id"]: p for p in db.get_all_products()}
+    total_vol = 0.0
+    total_comm = 0.0
+    detailed_lines =[]
+
+    for item in payload.items:
+        prod = all_prods.get(item.product_id)
+        if not prod: continue
+        cat = prod.get("category", "SERVICE")
+        price = float(prod.get("unit_price", 0.0))
+        qty = float(item.quantity)
+        rate = float(prod.get("comm_rate", 1.0))
+        line_comm = price * qty * rate 
+        if cat == "COURTAGE": total_vol += qty
+        total_comm += line_comm
+        detailed_lines.append({"product_id": prod["id"], "name": prod["name"], "category": cat, "quantity": qty, "unit_price": price, "line_comm": line_comm})
+
+    deal["products"] = detailed_lines
+    deal["volume_est"] = total_vol
+    deal["commission_est"] = total_comm
+    if is_legacy: db.save_setting(deal_id, deal)
+    else: db.save_deal(deal_id, deal)
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "SYSTEM", "title": "Devis mis à jour", "description": f"Nouvelle commission : {total_comm:,.2f} €", "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
+    return JSONResponse({"success": True})
+
+@app.post("/api/crm/deal/{deal_id}/upload")
+async def api_upload_deal_file(deal_id: str, file: UploadFile = File(...), user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    deal = db.get_deal(deal_id)
+    is_legacy = False
+    if not deal:
+        deal = db.get_setting(deal_id)
+        is_legacy = True
+        if not deal: return JSONResponse({"error": "Deal introuvable"}, 404)
     
     file_meta = {"id": f"DOC_{uuid.uuid4().hex[:8]}", "name": file.filename, "size": f"{round(len(await file.read()) / 1024)} KB", "uploaded_at": datetime.now().isoformat()}
-    if "documents" not in deal: deal["documents"] = []
+    if "documents" not in deal: deal["documents"] =[]
     deal["documents"].append(file_meta)
     db.save_deal(deal_id, deal)
     
     db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "DOCUMENT", "title": "Document ajouté", "description": file.filename, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True, "document": file_meta})
-
-# ==========================================
-# API CORTEX ACADEMY V12.4 (LMS)
+    # ==========================================
+# API CORTEX ACADEMY V12.4 (LMS & SPACED REPETITION)
 # ==========================================
 @app.get("/api/v1/academy/modules")
 async def api_get_academy_modules(user = Depends(get_current_user)):
@@ -606,44 +710,68 @@ async def api_post_academy_answer(payload: AcademyAnswerRequest, user = Depends(
 # ==========================================
 @app.post("/api/v1/cpq/quote")
 async def api_generate_cpq_quote(payload: CPQQuoteRequest, user = Depends(get_current_user)):
-    """Génère la cotation ERP (Sert au CPQ et au Quick Quote CRM)"""
-    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
-    if not pricer_engine: return JSONResponse({"success": False, "error": "Moteur Pricer hors ligne."})
-    return JSONResponse(pricer_engine.build_quote(payload.dict()))
+    """Génère la cotation ERP (Shadow Pricing & Oracle)"""
+    if not user: 
+        return JSONResponse({"error": "Non autorisé"}, 401)
+    if not pricer_engine:
+        return JSONResponse({"success": False, "error": "Moteur Pricer hors ligne."})
+    result = pricer_engine.build_quote(payload.dict())
+    return JSONResponse(result)
 
 @app.post("/api/v1/cpq/ingest_dqe")
 async def api_ingest_dqe(file: UploadFile = File(...), user = Depends(get_current_user)):
-    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
-    if not PANDAS_READY: return JSONResponse({"error": "Pandas introuvable."}, 500)
+    """Smart-Mapping : Convertit le DQE Excel Mairie en JSON Structuré"""
+    if not user: 
+        return JSONResponse({"error": "Non autorisé"}, 401)
+    if not PANDAS_READY:
+        return JSONResponse({"error": "Pandas introuvable sur le serveur."}, 500)
     
     try:
         content = await file.read()
         df = pd.read_excel(io.BytesIO(content))
         
-        vol_col = next((c for c in df.columns if any(k in str(c).lower() for k in ["volume", "conso", "kwh", "mwh", "quantité"])), None)
-        type_col = next((c for c in df.columns if any(k in str(c).lower() for k in ["type", "usage", "ep", "bat"])), None)
+        # Heuristique basique : trouver les colonnes cibles
+        pdl_col = next((c for c in df.columns if any(k in str(c).lower() for k in["pdl", "pce", "point de", "référence"])), None)
+        vol_col = next((c for c in df.columns if any(k in str(c).lower() for k in["volume", "conso", "kwh", "mwh", "quantité"])), None)
+        type_col = next((c for c in df.columns if any(k in str(c).lower() for k in["type", "usage", "ep", "bat", "catégorie"])), None)
         
-        if not vol_col: return JSONResponse({"success": False, "error": "Impossible d'identifier les volumes."})
+        if not pdl_col or not vol_col:
+            return JSONResponse({"success": False, "error": "Impossible d'identifier les colonnes PDL et Volume dans ce fichier."})
             
         lots = {"EP (Éclairage Public)": 0, "BAT (Bâtiments)": 0, "Non Classifié": 0}
         sites_count = 0
         
         for idx, row in df.iterrows():
-            try: vol_val = float(row[vol_col])
+            vol = row[vol_col]
+            try: vol_val = float(vol)
             except: continue
             
+            # Smart Tagging
             usage = str(row[type_col]).upper() if type_col else ""
-            if "EP" in usage or "ECLAIRAGE" in usage: lots["EP (Éclairage Public)"] += vol_val
-            elif "BAT" in usage or "MAIRIE" in usage: lots["BAT (Bâtiments)"] += vol_val
-            else: lots["Non Classifié"] += vol_val
+            if "EP" in usage or "ECLAIRAGE" in usage:
+                lots["EP (Éclairage Public)"] += vol_val
+            elif "BAT" in usage or "MAIRIE" in usage or "ECOLE" in usage:
+                lots["BAT (Bâtiments)"] += vol_val
+            else:
+                lots["Non Classifié"] += vol_val
             sites_count += 1
             
-        if sum(lots.values()) > 50000: lots = {k: v/1000 for k, v in lots.items()}
+        # Conversion kWh en MWh si nécessaire (heuristique)
+        total_mwh = sum(lots.values())
+        if total_mwh > 50000: # Probablement des kWh
+            lots = {k: v/1000 for k, v in lots.items()}
             
-        return JSONResponse({"success": True, "sites_detected": sites_count, "total_volume_mwh": round(sum(lots.values()), 2), "suggested_lots": {k: round(v, 2) for k, v in lots.items() if v > 0}})
+        return JSONResponse({
+            "success": True,
+            "filename": file.filename,
+            "sites_detected": sites_count,
+            "total_volume_mwh": round(sum(lots.values()), 2),
+            "suggested_lots": {k: round(v, 2) for k, v in lots.items() if v > 0}
+        })
     except Exception as e:
         return JSONResponse({"success": False, "error": f"Erreur Smart-Mapping : {str(e)}"})
-        @app.post("/api/v1/cpq/ingest_curves")
+
+@app.post("/api/v1/cpq/ingest_curves")
 async def api_ingest_curves(files: List[UploadFile] = File(...), user = Depends(get_current_user)):
     """Mass Curve Aggregator : Compile X fichiers SGE en un seul profil macro"""
     if not user: return JSONResponse({"error": "Non autorisé"}, 401)
@@ -656,10 +784,12 @@ async def api_ingest_curves(files: List[UploadFile] = File(...), user = Depends(
     for file in files:
         try:
             content = await file.read()
+            # Simulation de l'agrégation Pandas (dans la vraie vie on somme les 8760 points)
             df = pd.read_csv(io.BytesIO(content), sep=';', on_bad_lines='skip', nrows=5000)
             val_col = next((c for c in df.columns if "valeur" in str(c).lower() or "conso" in str(c).lower()), None)
             
             if val_col:
+                # Si données 10 min, on divise par 6 pour avoir des kWh
                 vol = (pd.to_numeric(df[val_col], errors='coerce').sum() / 6) / 1000
                 pmax = pd.to_numeric(df[val_col], errors='coerce').max()
                 if vol > 0:
@@ -675,8 +805,7 @@ async def api_ingest_curves(files: List[UploadFile] = File(...), user = Depends(
         "aggregated_volume_mwh": round(total_volume_mwh, 2),
         "aggregated_peak_kw": round(max_power_kw, 2)
     })
-
-# ==========================================
+    # ==========================================
 # API CORTEX SENTINEL & RTE
 # ==========================================
 @app.get("/api/ops/sentinel/alerts")
@@ -1263,7 +1392,7 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
             "cities": sorted(list(all_cities)), 
             "providers": sorted(list(all_providers)), 
             "segments":["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], 
-            "lots":["Lot 1", "Lot 2"] 
+            "lots": ["Lot 1", "Lot 2"] 
         }
     }))
 
