@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CORTEX PRICER (CPQ) | ENERGISTRAT V12.4</title>
+    <title>CORTEX CPQ | Deal Desk Commercial</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -11,7 +11,7 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: { abysse: '#001529', panel: '#001D3D', cyan: '#00E5FF', alert: '#FF0055', success: '#00FF66' },
+                    colors: { abysse: '#001529', panel: '#001D3D', cyan: '#00E5FF', alert: '#FF0055', success: '#00FF66', warning: '#FFB800' },
                     fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
                     borderRadius: { 'bento': '1.5rem', 'bento-lg': '2.5rem' }
                 }
@@ -23,7 +23,11 @@
         .bento-card { background-color: #001D3D; border: 1px solid rgba(0, 229, 255, 0.1); border-radius: 1.5rem; }
         input[type="number"], select { background: #001529; border: 1px solid rgba(0,229,255,0.2); color: white; border-radius: 0.5rem; padding: 0.5rem; width: 100%; outline: none; font-family: 'JetBrains Mono'; transition: border-color 0.3s ease; }
         input[type="number"]:focus, select:focus { border-color: #00E5FF; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
-        .stack-row { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; }
+        .drop-zone { border: 2px dashed rgba(0, 229, 255, 0.3); border-radius: 1rem; padding: 1.5rem; text-align: center; transition: all 0.3s ease; cursor: pointer; }
+        .drop-zone:hover { background: rgba(0, 229, 255, 0.05); border-color: #00E5FF; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.2); border-radius: 10px; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col font-sans antialiased selection:bg-cyan selection:text-abysse">
@@ -33,11 +37,11 @@
         <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
             <div class="flex items-center gap-4">
                 <div class="w-10 h-10 bg-cyan rounded-xl flex items-center justify-center text-abysse font-bold text-xl shadow-[0_0_15px_rgba(0,229,255,0.4)]">
-                    <i class="ph ph-calculator"></i>
+                    <i class="ph ph-shopping-cart"></i>
                 </div>
                 <div>
-                    <h1 class="font-mono font-bold text-xl tracking-wider">CORTEX<span class="text-cyan">PRICER</span></h1>
-                    <p class="text-xs text-gray-400">Générateur CPQ | Moteur d'Empilement</p>
+                    <h1 class="font-mono font-bold text-xl tracking-wider">CORTEX<span class="text-cyan">CPQ</span></h1>
+                    <p class="text-xs text-gray-400">Deal Desk Commercial | Génération d'Offres</p>
                 </div>
             </div>
             <a href="/sales_workspace" class="text-sm font-medium text-gray-400 hover:text-cyan transition-colors flex items-center gap-2">
@@ -47,147 +51,180 @@
     </header>
 
     <!-- MAIN CONTENT -->
-    <main class="flex-grow max-w-7xl mx-auto w-full px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <main class="flex-grow max-w-5xl mx-auto w-full px-6 py-8 grid grid-cols-1 md:grid-cols-12 gap-6">
         
-        <!-- COLONNE 1 : PROFIL CLIENT -->
-        <div class="lg:col-span-3 bento-card p-6 flex flex-col gap-6 h-fit">
-            <h2 class="text-lg font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-3">
-                <i class="ph ph-identification-card text-cyan text-xl"></i> 1. Profil Client
-            </h2>
+        <!-- COLONNE 1 : DÉFINITION DU BESOIN CLIENT -->
+        <div class="md:col-span-5 flex flex-col gap-4">
             
-            <div>
-                <label class="text-xs text-gray-400 font-mono mb-1 block">Type d'Énergie</label>
-                <select id="cpq-energy" onchange="updateDefaults()">
-                    <option value="elec">Électricité</option>
-                    <option value="gaz">Gaz Naturel</option>
-                </select>
+            <!-- Ingestion Intelligente -->
+            <div class="bento-card p-5">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-2 mb-4 uppercase tracking-wider">
+                    <i class="ph ph-upload-simple text-cyan"></i> Fichier Client (Optionnel)
+                </h2>
+                
+                <div class="flex flex-col gap-3">
+                    <label for="dqe-upload" class="drop-zone" id="dqe-drop-zone">
+                        <i class="ph ph-file-xls text-2xl text-cyan mb-2"></i>
+                        <p class="text-xs text-gray-400 font-mono">DQE / Excel (Appel d'Offres)</p>
+                        <input type="file" id="dqe-upload" class="hidden" accept=".xlsx,.xls" onchange="handleFileUpload(this, 'dqe')">
+                    </label>
+                </div>
+                <div id="ingest-status" class="mt-3 text-xs font-mono text-cyan hidden text-center animate-pulse"></div>
             </div>
 
-            <div>
-                <label class="text-xs text-gray-400 font-mono mb-1 block">Segment Tarifaire</label>
-                <select id="cpq-segment">
-                    <option value="C5">C5 (< 36 kVA) / T1-T2</option>
-                    <option value="C4">C4 (Tarif Jaune) / T3</option>
-                    <option value="C3">C3 (Tarif Vert) / T4</option>
-                    <option value="C1">C1 (Hyper-Intensif)</option>
-                </select>
-            </div>
+            <!-- Paramètres Commerciaux -->
+            <div class="bento-card p-5 flex flex-col gap-4">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-2 uppercase tracking-wider">
+                    <i class="ph ph-target text-cyan"></i> Paramètres de l'Offre
+                </h2>
 
-            <div>
-                <label class="text-xs text-gray-400 font-mono mb-1 block">Volume Annuel (MWh)</label>
-                <input type="number" id="cpq-volume" value="150" placeholder="Ex: 150">
-            </div>
-        </div>
-
-        <!-- COLONNE 2 : LE MASQUE DE RÉSILIENCE -->
-        <div class="lg:col-span-5 bento-card p-6 flex flex-col gap-6 relative overflow-hidden h-fit">
-            <div class="bg-cyan/10 border border-cyan/30 rounded-xl p-3 text-xs text-cyan font-mono flex items-start gap-3">
-                <i class="ph ph-shield-check text-xl shrink-0 mt-0.5"></i>
-                <p><strong>Masque de Résilience.</strong> Les APIs de marché sont by-passables ici. Forcez vos valeurs pour écraser l'algorithme CORTEX.</p>
-            </div>
-
-            <h2 class="text-lg font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-3">
-                <i class="ph ph-sliders text-cyan text-xl"></i> 2. Masque Paramétrique
-            </h2>
-
-            <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="text-xs text-gray-400 font-mono mb-1 block">Prix Marché (Base)</label>
-                    <div class="flex items-center"><input type="number" id="mask-market" value="85.0" step="0.1"><span class="text-xs ml-2 text-gray-500 w-10">€/MWh</span></div>
-                </div>
-                <div>
-                    <label class="text-xs text-cyan font-bold font-mono mb-1 block">Mark-up ENERGISTRAT</label>
-                    <div class="flex items-center"><input type="number" id="mask-markup" value="2.0" step="0.1" class="border-cyan/50"><span class="text-xs ml-2 text-cyan w-10">€/MWh</span></div>
-                </div>
-                <div>
-                    <label class="text-xs text-gray-400 font-mono mb-1 block">Coût CEE</label>
-                    <div class="flex items-center"><input type="number" id="mask-cee" value="6.5" step="0.1"><span class="text-xs ml-2 text-gray-500 w-10">€/MWh</span></div>
-                </div>
-                <div>
-                    <label class="text-xs text-gray-400 font-mono mb-1 block">Capacité (Élec seul)</label>
-                    <div class="flex items-center"><input type="number" id="mask-capa" value="2.5" step="0.1"><span class="text-xs ml-2 text-gray-500 w-10">€/MWh</span></div>
-                </div>
-                <div>
-                    <label class="text-xs text-gray-400 font-mono mb-1 block">Risque Profilage</label>
-                    <div class="flex items-center"><input type="number" id="mask-profiling" value="2.0" step="0.1"><span class="text-xs ml-2 text-gray-500 w-10">€/MWh</span></div>
-                </div>
-                <div>
-                    <label class="text-xs text-gray-400 font-mono mb-1 block">Balancing (Écart)</label>
-                    <div class="flex items-center"><input type="number" id="mask-balancing" value="1.5" step="0.1"><span class="text-xs ml-2 text-gray-500 w-10">€/MWh</span></div>
-                </div>
-            </div>
-
-            <button onclick="calculateQuote()" id="btn-calc" class="w-full py-4 mt-2 bg-cyan text-abysse font-bold rounded-xl hover:bg-white transition-colors flex items-center justify-center gap-2">
-                <i class="ph ph-lightning"></i> LANCER L'EMPILEMENT CORTEX
-            </button>
-        </div>
-
-        <!-- COLONNE 3 : RÉSULTATS (COST STACK) -->
-        <div class="lg:col-span-4 bento-card p-6 flex flex-col gap-4">
-            <h2 class="text-lg font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-3">
-                <i class="ph ph-chart-bar text-cyan text-xl"></i> 3. Cost Stack Final
-            </h2>
-
-            <div id="result-placeholder" class="text-center text-gray-500 font-mono text-sm py-16 flex flex-col items-center gap-2">
-                <i class="ph ph-chart-pie-slice text-3xl opacity-20"></i>
-                En attente du calcul de la cotation...
-            </div>
-
-            <div id="result-data" class="hidden flex-col gap-4">
-                <!-- Prix final -->
-                <div class="bg-abysse border border-cyan/20 rounded-xl p-5 text-center relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan to-transparent"></div>
-                    <p class="text-xs text-gray-400 font-mono uppercase mb-2">Prix Moyen d'Achat Global</p>
-                    <h3 class="text-4xl font-bold text-cyan" id="res-price">0.00 <span class="text-sm text-gray-500">€/MWh</span></h3>
-                    <p class="text-sm text-gray-400 mt-2 font-mono">Budget: <span id="res-budget" class="text-white font-bold">0 € HT</span></p>
+                    <label class="text-xs text-gray-400 font-mono mb-1 block">Volume Annuel (MWh)</label>
+                    <input type="number" id="cpq-volume" value="150" step="0.1" class="border-cyan/50 text-cyan font-bold text-lg">
                 </div>
 
-                <!-- Détail de l'empilement -->
-                <div class="space-y-1 mt-2 text-sm font-mono bg-abysse/50 p-4 rounded-xl border border-cyan/10">
-                    <div class="stack-row"><span class="text-gray-400">Électron (Marché)</span><span id="res-mol" class="text-white">0 €</span></div>
-                    <div class="stack-row"><span class="text-gray-400">Couvertures (Risques)</span><span id="res-risk" class="text-white">0 €</span></div>
-                    <div class="stack-row"><span class="text-gray-400">Acheminement (Réseau)</span><span id="res-ach" class="text-white">0 €</span></div>
-                    <div class="stack-row"><span class="text-gray-400">Taxes (Accises+CTA)</span><span id="res-tax" class="text-white">0 €</span></div>
-                    <div class="stack-row pt-3 mt-2 border-t border-cyan/20">
-                        <span class="text-cyan font-bold flex items-center gap-2"><i class="ph ph-trend-up"></i> Marge Brute</span>
-                        <span id="res-margin" class="text-cyan font-bold text-base">0 €</span>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-xs text-gray-400 font-mono mb-1 block">Énergie</label>
+                        <select id="cpq-energy">
+                            <option value="elec">Électricité</option>
+                            <option value="gaz">Gaz Naturel</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 font-mono mb-1 block">Segment Tarifaire</label>
+                        <select id="cpq-segment">
+                            <option value="C5">C5 / T1-T2</option>
+                            <option value="C4">C4 / T3</option>
+                            <option value="C3">C3 / T4</option>
+                            <option value="C1">C1 (Lourd)</option>
+                        </select>
                     </div>
                 </div>
 
-                <button class="w-full py-3 mt-2 bg-abysse border border-cyan/50 text-cyan font-bold rounded-xl hover:bg-cyan hover:text-abysse transition-colors flex items-center justify-center gap-2">
-                    <i class="ph ph-file-pdf text-lg"></i> Exporter la Cotation
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-xs text-gray-400 font-mono mb-1 block">Durée du contrat</label>
+                        <select id="cpq-duration">
+                            <option value="1">1 an</option>
+                            <option value="2">2 ans</option>
+                            <option value="3">3 ans</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 font-mono mb-1 block">Option Verte</label>
+                        <select id="cpq-green">
+                            <option value="none">Gris (Standard)</option>
+                            <option value="standard">Garanties d'Origine</option>
+                            <option value="premium">Vert Premium (PPA)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button onclick="calculateQuote()" id="btn-calc" class="w-full py-4 mt-2 bg-cyan text-abysse font-bold rounded-xl hover:bg-white transition-colors shadow-[0_0_15px_rgba(0,229,255,0.4)] flex items-center justify-center gap-2">
+                    <i class="ph ph-magic-wand text-xl"></i> INTERROGER LE MARCHÉ
                 </button>
+            </div>
+        </div>
+
+        <!-- COLONNE 2 : L'ORACLE DE VENTE & PRIX FINAL -->
+        <div class="md:col-span-7 flex flex-col gap-4">
+            
+            <div id="result-placeholder" class="bento-card h-full flex flex-col items-center justify-center text-gray-500 font-mono text-sm p-10">
+                <i class="ph ph-robot text-4xl opacity-20 mb-4"></i>
+                <p>CORTEX attend les paramètres du client pour interroger la salle des marchés et formuler la meilleure offre.</p>
+            </div>
+
+            <div id="result-data" class="hidden flex-col gap-4 h-full">
+                
+                <!-- ORACLE CORTEX (Conseil Commercial) -->
+                <div class="bento-card p-6 border-cyan/50 shadow-[0_0_20px_rgba(0,229,255,0.1)] relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan to-transparent"></div>
+                    
+                    <div class="flex justify-between items-start mb-4">
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider">
+                            <i class="ph ph-robot text-cyan text-xl"></i> Recommandation CORTEX
+                        </h2>
+                        <span id="oracle-win-prob" class="px-3 py-1 text-xs font-bold rounded-full bg-success/20 text-success border border-success/30">
+                            85% CHANCE DE SUCCÈS
+                        </span>
+                    </div>
+                    
+                    <p id="oracle-insight" class="text-sm text-gray-300 font-mono leading-relaxed bg-abysse/50 p-4 rounded-xl border border-cyan/10">
+                        <!-- Message de l'IA -->
+                    </p>
+                </div>
+
+                <!-- PRIX DE VENTE (Ce que le client va payer) -->
+                <div class="bento-card p-8 text-center flex-grow flex flex-col justify-center">
+                    <p class="text-xs text-gray-400 font-mono uppercase mb-2">Prix de Vente Conseillé (TTC)</p>
+                    <h3 class="text-5xl font-bold text-cyan drop-shadow-[0_0_12px_rgba(0,229,255,0.4)] mb-2" id="res-price">0.00 <span class="text-xl text-gray-500">€/MWh</span></h3>
+                    <p class="text-sm text-gray-400 font-mono">Budget Annuel Estimé: <span id="res-budget" class="text-white font-bold">0 €</span></p>
+                    
+                    <div class="mt-6 flex gap-4 justify-center">
+                        <button class="px-6 py-3 bg-abysse border border-cyan text-cyan font-bold rounded-xl hover:bg-cyan hover:text-abysse transition-colors flex items-center gap-2">
+                            <i class="ph ph-file-pdf"></i> Éditer le Devis PDF
+                        </button>
+                        <button class="px-6 py-3 bg-cyan text-abysse font-bold rounded-xl hover:bg-white transition-colors flex items-center gap-2">
+                            <i class="ph ph-paper-plane-right"></i> Envoyer au Client
+                        </button>
+                    </div>
+                </div>
+
             </div>
         </div>
 
     </main>
 
     <script>
-        function updateDefaults() {
-            const isGas = document.getElementById('cpq-energy').value === 'gaz';
-            document.getElementById('mask-market').value = isGas ? 35.0 : 85.0;
-            document.getElementById('mask-cee').value = isGas ? 3.0 : 6.5;
-            document.getElementById('mask-capa').value = isGas ? 0.0 : 2.5;
-            document.getElementById('mask-profiling').value = isGas ? 1.0 : 2.0;
+        // === GESTION DE L'INGESTION INTELLIGENTE (DQE) ===
+        async function handleFileUpload(inputElement, type) {
+            const file = inputElement.files[0];
+            if (!file) return;
+
+            const statusBox = document.getElementById('ingest-status');
+            statusBox.classList.remove('hidden');
+            statusBox.innerHTML = `<i class="ph ph-spinner animate-spin inline-block"></i> Lecture du DQE en cours...`;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/v1/cpq/ingest_dqe', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (data.success) {
+                    const volField = document.getElementById('cpq-volume');
+                    volField.value = data.total_volume_mwh;
+                    
+                    volField.classList.add('bg-cyan/20');
+                    setTimeout(() => volField.classList.remove('bg-cyan/20'), 1500);
+
+                    statusBox.innerHTML = `<span class="text-success"><i class="ph ph-check-circle"></i> Fichier analysé : ${data.sites_detected} compteurs extraits.</span>`;
+                } else {
+                    statusBox.innerHTML = `<span class="text-alert"><i class="ph ph-warning-circle"></i> Fichier non reconnu.</span>`;
+                }
+            } catch (err) {
+                statusBox.innerHTML = `<span class="text-alert"><i class="ph ph-warning-circle"></i> Erreur serveur.</span>`;
+            }
         }
 
+        // === INTERROGATION DU MOTEUR (API BACKEND) ===
         async function calculateQuote() {
             const btn = document.getElementById('btn-calc');
-            btn.innerHTML = `<i class="ph ph-spinner animate-spin"></i> CALCUL EN COURS...`;
-            btn.classList.add('opacity-80');
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin"></i> ANALYSE EN COURS...`;
+            btn.classList.add('opacity-80', 'pointer-events-none');
 
+            // Le Frontend commercial n'envoie PAS de masque détaillé. 
+            // Le Backend appliquera les valeurs du marché réel et les optimisations (Franchise CEE, etc.) en silence.
             const payload = {
                 volume_mwh: parseFloat(document.getElementById('cpq-volume').value) || 0,
                 energy_type: document.getElementById('cpq-energy').value,
                 segment: document.getElementById('cpq-segment').value,
-                mask: {
-                    market_price: parseFloat(document.getElementById('mask-market').value),
-                    markup: parseFloat(document.getElementById('mask-markup').value),
-                    cee_price: parseFloat(document.getElementById('mask-cee').value),
-                    capa_price: parseFloat(document.getElementById('mask-capa').value),
-                    profiling: parseFloat(document.getElementById('mask-profiling').value),
-                    balancing: parseFloat(document.getElementById('mask-balancing').value)
-                }
+                duration_years: parseInt(document.getElementById('cpq-duration').value),
+                green_option: document.getElementById('cpq-green').value,
+                franchise_cee: true, // Automatiquement géré par la strat de l'entreprise
+                mask: {} // Masque vide = Le moteur utilise ses algorithmes Trading natifs
             };
 
             try {
@@ -199,31 +236,38 @@
                 const data = await response.json();
 
                 if (data.success) {
+                    // Bascule de l'interface
                     document.getElementById('result-placeholder').classList.add('hidden');
-                    document.getElementById('result-data').classList.remove('hidden');
-                    document.getElementById('result-data').classList.add('flex');
+                    const resData = document.getElementById('result-data');
+                    resData.classList.remove('hidden');
+                    resData.classList.add('flex');
 
-                    // Formatage FR (espaces pour les milliers, virgule pour décimales)
                     const fmt = (num) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
 
-                    document.getElementById('res-price').innerHTML = `${fmt(data.kpis.prix_moyen_mwh)} <span class="text-sm text-gray-500">€/MWh</span>`;
-                    document.getElementById('res-budget').innerText = `${fmt(data.kpis.budget_annuel_ht)} € HT`;
+                    // Affichage de la reco CORTEX (Adaptée pour le commercial)
+                    const o = data.oracle;
+                    document.getElementById('oracle-insight').innerHTML = `
+                        <strong>Stratégie de l'Offre :</strong> ${o.insight}<br><br>
+                        CORTEX a verrouillé le risque météo et profilage. Vous pouvez soumettre ce prix en toute sécurité.
+                    `;
+                    
+                    const probBadge = document.getElementById('oracle-win-prob');
+                    probBadge.innerText = o.win_probability + "% WIN PROBABILITY";
+                    probBadge.className = `px-3 py-1 text-xs font-bold rounded-full border ${o.win_probability > 80 ? 'bg-success/20 text-success border-success/30' : (o.win_probability > 60 ? 'bg-warning/20 text-warning border-warning/30' : 'bg-alert/20 text-alert border-alert/30')}`;
 
-                    document.getElementById('res-mol').innerText = `${fmt(data.stack.molecule_eur)} €`;
-                    const riskTotal = data.stack.cee_eur + data.stack.capa_eur + data.stack.risks_eur;
-                    document.getElementById('res-risk').innerText = `${fmt(riskTotal)} €`;
-                    document.getElementById('res-ach').innerText = `${fmt(data.stack.acheminement_eur)} €`;
-                    document.getElementById('res-tax').innerText = `${fmt(data.stack.taxes_eur)} €`;
-                    document.getElementById('res-margin').innerText = `${fmt(data.stack.margin_eur)} €`;
+                    // Prix de Vente TTC (Le seul KPI qui intéresse le commercial pour le client)
+                    document.getElementById('res-price').innerHTML = `${fmt(data.kpis.prix_moyen_mwh)} <span class="text-xl text-gray-500">€/MWh</span>`;
+                    document.getElementById('res-budget').innerText = `${fmt(data.kpis.budget_total_ht)} € HT`;
+
                 } else {
-                    alert("Erreur du Pricer : " + data.error);
+                    alert("Erreur CORTEX : " + data.error);
                 }
             } catch (error) {
                 console.error("Erreur API CPQ", error);
-                alert("Erreur de connexion au Moteur CORTEX.");
+                alert("Impossible de joindre la Salle des Marchés CORTEX.");
             } finally {
-                btn.innerHTML = `<i class="ph ph-lightning"></i> LANCER L'EMPILEMENT CORTEX`;
-                btn.classList.remove('opacity-80');
+                btn.innerHTML = `<i class="ph ph-magic-wand text-xl"></i> INTERROGER LE MARCHÉ`;
+                btn.classList.remove('opacity-80', 'pointer-events-none');
             }
         }
     </script>
