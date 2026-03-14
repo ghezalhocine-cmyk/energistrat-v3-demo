@@ -60,7 +60,7 @@ class CortexDB:
         if not self.db: return list()
         try:
             docs = self.db.collection("Users").stream()
-            return [doc.to_dict() for doc in docs]
+            return[doc.to_dict() for doc in docs]
         except Exception as e:
             print(f"⚠️ Erreur get_all_users : {e}")
             return list()
@@ -215,6 +215,44 @@ class CortexDB:
             self.db.collection("System").document("Sentinel").set(data)
             return True
         except Exception: return False
+
+    # ==========================================
+    # MODULE LMS ACADEMY (CORTEX V12.4)
+    # ==========================================
+    def get_all_lms_modules(self) -> list:
+        return self._get_crm_docs("LMS_Modules")
+
+    def save_lms_module(self, mod_id: str, data: dict) -> bool:
+        return self._save_crm_doc("LMS_Modules", mod_id, data)
+
+    def get_all_lms_questions(self) -> list:
+        return self._get_crm_docs("LMS_Questions")
+
+    def save_lms_question(self, q_id: str, data: dict) -> bool:
+        return self._save_crm_doc("LMS_Questions", q_id, data)
+
+    def get_user_lms_progress(self, uid: str) -> dict:
+        """Récupère la progression complexe du commercial (XP, Badges, Spaced Repetition)"""
+        default_progress = {
+            "uid": uid,
+            "xp": 0,
+            "level": 1,
+            "badges": [],
+            "completed_modules":[],
+            "srs_queue": {} # Structure Spaced Repetition System
+        }
+        if not self.db: return default_progress
+        try:
+            doc = self.db.collection("LMS_Progress").document(uid).get()
+            if doc.exists:
+                data = doc.to_dict()
+                data["id"] = doc.id
+                return data
+            return default_progress
+        except Exception: return default_progress
+
+    def save_user_lms_progress(self, uid: str, data: dict) -> bool:
+        return self._save_crm_doc("LMS_Progress", uid, data)
 
 db_service = CortexDB()
 db = db_service
