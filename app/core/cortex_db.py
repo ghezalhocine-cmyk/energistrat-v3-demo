@@ -3,20 +3,23 @@ from firebase_admin import credentials, firestore
 import traceback
 
 class CortexDB:
-    """Moteur de Base de Données NoSQL Enterprise-Grade (Firestore)."""
+    """
+    CORTEX DB V12.6 - Moteur de Base de Données NoSQL Enterprise-Grade.
+    Gère la Data Unity, le CRM 3D, le LMS Academy, le CPQ et le Trading Floor.
+    """
     
     def __init__(self):
         try:
             if not firebase_admin._apps:
                 firebase_admin.initialize_app()
             self.db = firestore.client()
-            print("🟢 CORTEX DB : Connexion firebase_admin.firestore RÉUSSIE.")
+            print("🟢 CORTEX DB : Connexion firebase_admin.firestore RÉUSSIE (V12.6).")
         except Exception as e:
             print(f"🔴 ERREUR CRITIQUE CORTEX DB (FIRESTORE) : {e}")
             self.db = None
 
     # ==========================================
-    # GESTION DES SITES (DATA UNITY)
+    # GESTION DES SITES (DATA UNITY & JUMEAUX SGE)
     # ==========================================
     def get_all_sites(self) -> list:
         if not self.db: return list()
@@ -36,6 +39,16 @@ class CortexDB:
         except Exception as e:
             print(f"⚠️ Erreur get_site ({site_id}) : {e}")
             return None
+
+    def get_company_sites(self, company_id: str) -> list:
+        """Requête Haute Performance : Récupère uniquement les sites d'une Entité Légale"""
+        if not self.db: return list()
+        try:
+            docs = self.db.collection("Sites").where("identity.tenant_id", "==", company_id).stream()
+            return [doc.to_dict() for doc in docs]
+        except Exception as e:
+            print(f"⚠️ Erreur get_company_sites : {e}")
+            return list()
 
     def save_site(self, site_id: str, data: dict) -> bool:
         if not self.db: return False
@@ -60,7 +73,7 @@ class CortexDB:
         if not self.db: return list()
         try:
             docs = self.db.collection("Users").stream()
-            return[doc.to_dict() for doc in docs]
+            return [doc.to_dict() for doc in docs]
         except Exception as e:
             print(f"⚠️ Erreur get_all_users : {e}")
             return list()
@@ -99,14 +112,13 @@ class CortexDB:
         except Exception: return False
 
     # ==========================================
-    # MOTEUR CRM V12 (RELATIONNEL & CPQ)
+    # MOTEUR CRM V12.6 (3D, PIPELINES & CONTACTS)
     # ==========================================
-    
     def _get_crm_docs(self, collection_name: str) -> list:
         if not self.db: return list()
         try:
             docs = self.db.collection(collection_name).stream()
-            res =[]
+            res = []
             for doc in docs:
                 d = doc.to_dict()
                 d["id"] = doc.id
@@ -136,7 +148,7 @@ class CortexDB:
             return dict()
         except Exception: return dict()
 
-    # --- LEADS ---
+    # --- LEADS (Legacy) ---
     def get_all_leads(self) -> list: 
         if not self.db: return list()
         try:
@@ -156,7 +168,7 @@ class CortexDB:
         try: self.db.collection("CRM_Leads").document(lead_id).delete(); return True
         except: return False
 
-    # --- COMPANIES ---
+    # --- COMPANIES (Tête de Groupe & Entité Légale) ---
     def get_all_companies(self) -> list: return self._get_crm_docs("CRM_Companies")
     def get_company(self, comp_id: str) -> dict: return self._get_crm_doc("CRM_Companies", comp_id)
     def save_company(self, comp_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Companies", comp_id, data)
@@ -165,13 +177,21 @@ class CortexDB:
     def get_all_contacts(self) -> list: return self._get_crm_docs("CRM_Contacts")
     def get_contact(self, contact_id: str) -> dict: return self._get_crm_doc("CRM_Contacts", contact_id)
     def save_contact(self, contact_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Contacts", contact_id, data)
+    
+    def get_company_contacts(self, company_id: str) -> list:
+        """Requête Haute Performance : Récupère les contacts d'un compte précis"""
+        if not self.db: return list()
+        try:
+            docs = self.db.collection("CRM_Contacts").where("company_id", "==", company_id).stream()
+            return [{"id": d.id, **d.to_dict()} for d in docs]
+        except Exception: return list()
 
-    # --- DEALS ---
+    # --- DEALS (Pipelines) ---
     def get_all_deals(self) -> list: return self._get_crm_docs("CRM_Deals")
     def get_deal(self, deal_id: str) -> dict: return self._get_crm_doc("CRM_Deals", deal_id)
     def save_deal(self, deal_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Deals", deal_id, data)
 
-    # --- PRODUCTS (Catalogue CPQ) ---
+    # --- PRODUCTS (Catalogue V1) ---
     def get_all_products(self) -> list: return self._get_crm_docs("CRM_Products")
     def save_product(self, prod_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Products", prod_id, data)
     def delete_product(self, prod_id: str) -> bool:
@@ -179,7 +199,7 @@ class CortexDB:
         try: self.db.collection("CRM_Products").document(prod_id).delete(); return True
         except: return False
 
-    # --- ACTIVITIES ---
+    # --- ACTIVITIES (Historique & Notes) ---
     def get_deal_activities(self, deal_id: str) -> list:
         if not self.db: return list()
         try:
@@ -198,7 +218,7 @@ class CortexDB:
     def save_task(self, task_id: str, data: dict) -> bool: return self._save_crm_doc("CRM_Tasks", task_id, data)
 
     # ==========================================
-    # GESTION DE CORTEX SENTINEL
+    # CORTEX SENTINEL (ALERTES SGE)
     # ==========================================
     def get_sentinel_alerts(self) -> dict:
         default_resp = {"last_scan": "Jamais", "alert_count": 0, "alerts": list()}
@@ -232,14 +252,9 @@ class CortexDB:
         return self._save_crm_doc("LMS_Questions", q_id, data)
 
     def get_user_lms_progress(self, uid: str) -> dict:
-        """Récupère la progression complexe du commercial (XP, Badges, Spaced Repetition)"""
         default_progress = {
-            "uid": uid,
-            "xp": 0,
-            "level": 1,
-            "badges": [],
-            "completed_modules":[],
-            "srs_queue": {} # Structure Spaced Repetition System
+            "uid": uid, "xp": 0, "level": 1, "badges": [],
+            "completed_modules":[], "srs_queue": {}
         }
         if not self.db: return default_progress
         try:
@@ -253,6 +268,41 @@ class CortexDB:
 
     def save_user_lms_progress(self, uid: str, data: dict) -> bool:
         return self._save_crm_doc("LMS_Progress", uid, data)
+
+    # ==========================================
+    # DEAL DESK CPQ & TRADING FLOOR (V12.6)
+    # ==========================================
+    def get_cpq_basket(self, deal_id: str) -> dict:
+        """Récupère le panier de cotation multi-énergies (Sites C5, C4, Gaz)"""
+        return self._get_crm_doc("CPQ_Baskets", deal_id)
+
+    def save_cpq_basket(self, deal_id: str, data: dict) -> bool:
+        """Sauvegarde l'état du panier du commercial"""
+        return self._save_crm_doc("CPQ_Baskets", deal_id, data)
+
+    def get_active_trading_tickets(self) -> list:
+        """Récupère les demandes de cotations (Carnet d'ordres) pour le Middle-Office"""
+        if not self.db: return list()
+        try:
+            # On exclut les tickets déjà couverts (HEDGED) ou expirés (EXPIRED) pour la vue active
+            docs = self.db.collection("Trading_Tickets").where("status", "in",["REQUESTED", "PRICED", "HEDGE_PENDING"]).stream()
+            return sorted([{"id": d.id, **d.to_dict()} for d in docs], key=lambda x: x.get("created_at", ""), reverse=True)
+        except Exception: return list()
+
+    def save_trading_ticket(self, ticket_id: str, data: dict) -> bool:
+        """Crée ou met à jour un ticket de communication Vente <-> Achat"""
+        return self._save_crm_doc("Trading_Tickets", ticket_id, data)
+
+    def update_trading_ticket_status(self, ticket_id: str, new_status: str) -> bool:
+        """Mise à jour rapide du statut (ex: passage à HEDGED)"""
+        if not self.db: return False
+        try:
+            self.db.collection("Trading_Tickets").document(ticket_id).update({
+                "status": new_status,
+                "updated_at": datetime.now().isoformat()
+            })
+            return True
+        except Exception: return False
 
 db_service = CortexDB()
 db = db_service
