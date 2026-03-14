@@ -5,7 +5,7 @@ logger = logging.getLogger("CORTEX_PRICER_V12")
 class CortexPricer:
     """
     CORTEX PRICER V12.4 - MOTEUR CPQ (Cost Stack)
-    Architecture Isolée et Résiliente. Calcule le prix final (C1 à C5)
+    Architecture Isolée. Calcule le prix final (C1 à C5)
     en priorisant le "Masque Manuel" (Override) du commercial.
     """
 
@@ -26,14 +26,14 @@ class CortexPricer:
         segment = payload.get("segment", "C5").upper()
 
         # ==========================================
-        # 1. LE MASQUE DE RÉSILIENCE (Variables)
+        # 1. LE MASQUE DE RÉSILIENCE (Variables Override)
         # ==========================================
-        # Si l'utilisateur a rempli le masque, on prend sa valeur. Sinon on met une valeur par défaut du marché.
-        market_price = float(mask.get("market_price") or 85.0)
-        cee_price = float(mask.get("cee_price") or (6.5 if energy == "elec" else 3.0))
-        capa_price = float(mask.get("capa_price") or (2.5 if energy == "elec" else 0.0))
+        # On lit le masque. Si vide, valeurs par défaut du marché du jour.
+        market_price = float(mask.get("market_price") or (35.0 if energy == "gaz" else 85.0))
+        cee_price = float(mask.get("cee_price") or (3.0 if energy == "gaz" else 6.5))
+        capa_price = float(mask.get("capa_price") or (0.0 if energy == "gaz" else 2.5))
+        profiling = float(mask.get("profiling") or (1.0 if energy == "gaz" else 2.0))
         balancing = float(mask.get("balancing") or 1.5)
-        profiling = float(mask.get("profiling") or 2.0)
         markup = float(mask.get("markup") or 2.0) # Marge ENERGISTRAT
 
         # ==========================================
@@ -52,22 +52,27 @@ class CortexPricer:
         margin_totale = vol * markup
         
         # C. L'Acheminement (Estimation TURPE / ATRD)
-        # En C1-C4, l'abonnement est lourd. En C5, c'est le KWh acheminé qui pèse.
-        turpe_fixe = 240.0 if segment == "C5" else 1200.0
-        turpe_var = vol * (15.0 if segment == "C5" else 10.0)
-        acheminement_total = turpe_fixe + turpe_var
+        # Différenciation massive entre Profilé (C5) et Courbe de charge (C4-C1)
+        if segment == "C5":
+            acheminement_fixe = 240.0
+            acheminement_var = vol * (15.0 if energy == "elec" else 12.0)
+        else:
+            acheminement_fixe = 1200.0 if segment == "C4" else 4500.0
+            acheminement_var = vol * (10.0 if energy == "elec" else 8.0)
+            
+        acheminement_total = acheminement_fixe + acheminement_var
 
-        # D. Les Taxes (CSPE/TICFE et CTA)
-        tax_cspe = vol * 21.0 if energy == "elec" else vol * 16.37
-        tax_cta = turpe_fixe * 0.27
-        taxes_totales = tax_cspe + tax_cta
+        # D. Les Taxes (CSPE/TICFE, TICGN et CTA)
+        tax_accise = vol * (21.0 if energy == "elec" else 16.37) # CSPE ou TICGN
+        tax_cta = acheminement_fixe * 0.27
+        taxes_totales = tax_accise + tax_cta
 
         # ==========================================
         # 3. RÉSULTAT FINAL
         # ==========================================
         budget_ht = fourniture_totale + margin_totale + acheminement_total + taxes_totales
         
-        logger.info(f"Cotation générée : Segment {segment} | Vol: {vol} | Prix: {round(budget_ht/vol, 2)} €/MWh")
+        logger.info(f"Cotation CPQ : Segment {segment} | Énergie: {energy} | Vol: {vol} | Prix: {round(budget_ht/vol, 2)} €/MWh")
 
         return {
             "success": True,
