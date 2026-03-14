@@ -38,7 +38,6 @@ class FallbackPDFBuilder:
 # ==============================================================================
 class MockAuth:
     def verify_token(self, t): return {"uid": "mock", "email": "admin@energistrat.com", "role": "ADMIN", "sub": "admin"}
-
 class MockDB:
     def get_all_sites(self): return[]
     def get_site(self, sid): return {}
@@ -68,22 +67,17 @@ class MockDB:
     def get_all_users(self): return[]
     def get_user_profile(self, u): return {}
     def save_user_profile(self, u, d): return True
-
 class MockFinance:
     def parse_invoice(self, c, f): return {"status": "ERROR"}
     def audit_invoice(self, i, s): return {}
     def simulate_landing(self, s): return {}
-
 class MockRouter:
     def get_api_status(self): return {"status": "DEGRADED"}
     def analyze_file_stream(self, c, f): return {"status": "ERROR"}
-
 class MockMarket:
     def valoriser_strategie(self, l, b): return {"error": "Market missing"}
-
 class MockAggregator:
     def aggregate_sites(self, s, y): return None
-
 class MockCortex:
     def enrich_site_financials(self, data): return {"volume_mwh": 0, "budget_annual": 0, "meta": {"is_gas": False}, "kpis": {"pmc_eur_mwh": 0, "ghost_savings": 0}}
     def analyze_portfolio(self, sites): return {"global": {}, "green_league": {}}
@@ -91,14 +85,11 @@ class MockCortex:
     def analyze_market_position(self, p, r, is_gas): return {"status": "ANALYSE"}
     def simulate_budget_from_bpu(self, b, s): return {}
     def analyze_load_curve(self, f, n): return {}
-
 class MockRTE:
     def get_wholesale_market(self): return {"success": False, "error": "RTE Offline"}
     def get_pulse_dashboard_data(self): return {"success": False, "error": "RTE Offline"}
-
 class MockForecast:
     def simulate_5_years(self, s): return {"labels":["N", "N+1", "N+2", "N+3", "N+4"], "dataset_trend":[100, 105, 110, 115, 120], "dataset_sobriety":[100, 90, 80, 70, 60], "gain_potential_mwh": 150}
-
 class MockCRM:
     def generate_icebreaker(self, naf, pipe_type="saas"): return {"naf": naf, "pain_points": "Mode Démo", "pitch": "Argumentaire IA désactivé."}
     def analyze_customer_health(self, cv, pv, lc): return {"status": "STABLE", "color": "text-success", "action_required": "RAS", "usage_score": 100, "is_churn_risk": False}
@@ -112,13 +103,8 @@ def load_module(mod_name, obj_name, mock_instance=None):
     paths =[f"app.core.{mod_name}", f"core.{mod_name}", mod_name]
     for path in paths:
         try:
-            mod = importlib.import_module(path)
-            return getattr(mod, obj_name)
-        except ModuleNotFoundError:
-            continue
-        except Exception as e:
-            print(f"⚠️ Erreur chargement {path} : {e}")
-            continue
+            return getattr(importlib.import_module(path), obj_name)
+        except: continue
     print(f"🔴 Auto-Loader: Impossible de trouver {mod_name}. Fallback Mock activé.")
     return mock_instance
 
@@ -136,7 +122,7 @@ rte = load_module("cortex_rte", "rte", MockRTE())
 crm_engine = load_module("cortex_crm", "crm_engine", MockCRM())
 pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.3-FULL")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.4-MULTI-CONTACTS")
 
 app.add_middleware(
     CORSMiddleware, 
@@ -146,7 +132,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# === SETUP DIRECTORIES ===
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
@@ -171,7 +156,7 @@ class VoteRequestModel(BaseModel): site_id: str; vote: bool
 class LegalSignModel(BaseModel): site_id: str; consent: bool
 class SolarRequest(BaseModel): address: str; surface_roof: float; electricity_price: float
 
-# Models CRM V12.3 (CPQ + GED + ACADEMY)
+# Models CRM V12.4 (Contacts Multiples & Production)
 class CRMLeadModel(BaseModel):
     siret: str; company_name: str; naf: str; city: str
     contact_firstname: str; contact_lastname: str; contact_role: str; contact_email: str; contact_phone: str
@@ -184,11 +169,11 @@ class ProductModel(BaseModel): name: str; category: str; unit_price: float; comm
 class DealLineItemModel(BaseModel): product_id: str; quantity: float 
 class DealProductsUpdateModel(BaseModel): items: List[DealLineItemModel]
 class AcademyProgressModel(BaseModel): xp: int; badges: List[Dict[str, str]]
+class NewContactModel(BaseModel): firstname: str; lastname: str; role: str; email: str; phone: str
 
-# === UTILS ===
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
-    elif isinstance(data, list): return [json_compliant(v) for v in data]
+    elif isinstance(data, list): return[json_compliant(v) for v in data]
     elif isinstance(data, float):
         if math.isnan(data) or math.isinf(data): return 0.0
     return data
@@ -205,14 +190,9 @@ async def get_current_user(request: Request):
     if t.startswith("Bearer "): t = t.split(" ")[1]
     return auth.verify_token(t)
 
-# ==========================================
-# AUTHENTIFICATION & ROUTAGE INTELLIGENT
-# ==========================================
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request, user = Depends(get_current_user)):
-    if user: 
-        if user.get("role") == "ADMIN": return RedirectResponse(url="/ops_nexus")
-        return RedirectResponse(url=f"/{user.get('role', 'settings')}")
+    if user: return RedirectResponse(url="/ops_nexus" if user.get("role") == "ADMIN" else f"/{user.get('role', 'settings')}")
     res = templates.TemplateResponse("login.html", {"request": request})
     res.delete_cookie("access_token")
     return res
@@ -232,13 +212,13 @@ async def api_session(payload: SessionRequest, response: Response):
 async def logout(response: Response):
     response.delete_cookie("access_token")
     return RedirectResponse(url="/login")
-    # ==========================================
-# API CRM V12.3 (CPQ, GED, ACADEMY)
+
+# ==========================================
+# API CRM V12.4 (MULTI-CONTACTS & LIEN PROD)
 # ==========================================
 
 @app.get("/api/crm/academy/progress")
 async def api_get_academy_progress(user = Depends(get_current_user)):
-    """Récupère la progression XP et les médailles du commercial connecté"""
     if not user: return JSONResponse({"error": "Non autorisé"}, 401)
     profile = db.get_user_profile(user.get("uid"))
     academy_data = profile.get("academy", {"xp": 0, "badges":[]})
@@ -246,7 +226,6 @@ async def api_get_academy_progress(user = Depends(get_current_user)):
 
 @app.post("/api/crm/academy/progress")
 async def api_save_academy_progress(payload: AcademyProgressModel, user = Depends(get_current_user)):
-    """Sauvegarde la progression XP et les médailles en direct dans le profil"""
     if not user: return JSONResponse({"error": "Non autorisé"}, 401)
     profile = db.get_user_profile(user.get("uid"))
     profile["academy"] = {"xp": payload.xp, "badges":[b for b in payload.badges]}
@@ -260,8 +239,7 @@ async def api_create_crm_lead_and_convert(payload: CRMLeadModel, user = Depends(
     owner_id = user.get("uid")
     now = datetime.now().isoformat()
 
-    domain = ""
-    logo_url = ""
+    domain = ""; logo_url = ""
     try:
         if "@" in payload.contact_email:
             parts = payload.contact_email.split("@")
@@ -274,7 +252,7 @@ async def api_create_crm_lead_and_convert(payload: CRMLeadModel, user = Depends(
     company_data = {
         "siret": payload.siret, "name": payload.company_name, "naf": payload.naf, 
         "city": payload.city, "website": domain, "logo": logo_url, 
-        "created_at": now, "owner_id": owner_id
+        "created_at": now, "owner_id": owner_id, "source": payload.source
     }
     db.save_company(company_id, company_data)
 
@@ -298,10 +276,23 @@ async def api_create_crm_lead_and_convert(payload: CRMLeadModel, user = Depends(
 
     act_id = f"ACT_{uuid.uuid4().hex[:12]}"
     db.save_activity(act_id, {
-        "deal_id": deal_id, "type": "SYSTEM", "title": "Création du compte", 
-        "description": "Import initial.", "timestamp": now, "owner_id": owner_id
+        "deal_id": deal_id, "type": "SYSTEM", "title": "Création de l'affaire", 
+        "description": f"Source du lead : {payload.source}", "timestamp": now, "owner_id": owner_id
     })
     return JSONResponse({"success": True, "deal_id": deal_id})
+
+@app.post("/api/crm/company/{company_id}/contacts")
+async def api_add_company_contact(company_id: str, payload: NewContactModel, user = Depends(get_current_user)):
+    """Ajoute un contact supplémentaire à une entreprise existante"""
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    contact_id = f"CONT_{uuid.uuid4().hex[:12]}"
+    contact_data = {
+        "company_id": company_id, "firstname": payload.firstname, "lastname": payload.lastname,
+        "role": payload.role, "email": payload.email, "phone": payload.phone,
+        "linkedin": "", "created_at": datetime.now().isoformat(), "owner_id": user.get("uid")
+    }
+    db.save_contact(contact_id, contact_data)
+    return JSONResponse({"success": True})
 
 @app.get("/api/crm/pipeline/{pipe_type}")
 async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user)):
@@ -310,6 +301,9 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
     all_deals = db.get_all_deals()
     all_comps = {c.get("id"): c for c in db.get_all_companies()}
     all_conts = {c.get("id"): c for c in db.get_all_contacts()}
+    
+    # 1. Extraction de la VRAIE BDD de production (Sites) pour croiser les données
+    real_sites = db.get_all_sites()
 
     # Rétrocompatibilité avec les anciens prospects
     try:
@@ -331,7 +325,12 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             
         if not deal.get("legacy"):
             comp = all_comps.get(deal.get("company_id"), {})
-            cont = all_conts.get(deal.get("primary_contact_id"), {})
+            
+            # --- GESTION DU MULTI-CONTACTS ---
+            deal_contacts =[c for c in all_conts.values() if c.get("company_id") == comp.get("id")]
+            if not deal_contacts and deal.get("primary_contact_id"):
+                primary = all_conts.get(deal.get("primary_contact_id"))
+                if primary: deal_contacts.append(primary)
             
             vol = float(deal.get("volume_est", 0.0))
             naf = comp.get("naf", "DEFAULT")
@@ -339,20 +338,36 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             
             comms = float(deal.get("commission_est") or 0.0)
             if comms == 0.0: comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
+            
+            # --- CROISEMENT DATA PRODUCTION SI CLIENT SIGNÉ ---
+            prod_data = None
+            if deal.get("stage") == "WON" and pipe_type in ["saas", "broker"]:
+                siret = str(comp.get("siret", "")).replace(" ", "")
+                if siret:
+                    for s in real_sites:
+                        site_siret = str(s.get("identity", {}).get("siret", "")).replace(" ", "")
+                        if siret == site_siret:
+                            fin = cortex.enrich_site_financials(s) if cortex else {}
+                            is_gas = fin.get("meta", {}).get("is_gas", False)
+                            prod_data = {
+                                "provider": s.get("contract", {}).get("provider", "Inconnu"),
+                                "end_date": s.get("contract", {}).get("end_date", "N/A"),
+                                "volume_elec": 0 if is_gas else fin.get("volume_mwh", 0),
+                                "volume_gaz": fin.get("volume_mwh", 0) if is_gas else 0,
+                                "forecast_trend": "+4%" # Trend simulée IA
+                            }
+                            break
 
             formatted_deals.append({
-                "id": deal.get("id"), "company_id": comp.get("id"), "contact_id": cont.get("id"),
+                "id": deal.get("id"), "company_id": comp.get("id"), "primary_contact_id": deal.get("primary_contact_id"),
                 "name": comp.get("name", deal.get("name")), "city": comp.get("city", ""),
-                "website": comp.get("website", ""), "logo": comp.get("logo", ""), "naf": naf,
+                "website": comp.get("website", ""), "logo": comp.get("logo", ""), "naf": naf, "source": comp.get("source", "Saisie"),
                 "volume": vol, "stage": deal.get("stage", "LEAD"),
-                "contact": {
-                    "name": f"{cont.get('firstname', '')} {cont.get('lastname', '')}".strip() or "Contact", 
-                    "role": cont.get("role", "Décideur"), "phone": cont.get("phone", ""), 
-                    "email": cont.get("email", ""), "linkedin": cont.get("linkedin", "")
-                },
+                "all_contacts": deal_contacts,
                 "intelligence": intel, "health": crm_engine.analyze_customer_health(vol, vol,[]), 
                 "commission_est": comms, "last_contact": "Aujourd'hui",
-                "products": deal.get("products", []), "documents": deal.get("documents",[])
+                "products": deal.get("products", []), "documents": deal.get("documents",[]),
+                "production_data": prod_data
             })
         else:
             old = deal.get("_old_data", {})
@@ -361,18 +376,21 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             comms = float(deal.get("commission_est") or 0.0)
             if comms == 0.0: comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
             
+            fake_contact = {
+                "id": old.get("id"), "name": f"{old.get('contact_firstname', '')} {old.get('contact_lastname', '')}".strip(), 
+                "role": old.get("contact_role", "Contact"), "phone": old.get("contact_phone", ""), 
+                "email": old.get("contact_email", ""), "linkedin": old.get("linkedin", "")
+            }
+            
             formatted_deals.append({
-                "id": old.get("id"), "company_id": old.get("id"), "contact_id": old.get("id"),
+                "id": old.get("id"), "company_id": old.get("id"), "primary_contact_id": old.get("id"),
                 "name": old.get("company_name", "Inconnu"), "city": old.get("city", ""),
-                "website": old.get("website", ""), "logo": "", "naf": naf, "volume": vol, "stage": old.get("stage", "LEAD"),
-                "contact": {
-                    "name": f"{old.get('contact_firstname', '')} {old.get('contact_lastname', '')}".strip(), 
-                    "role": old.get("contact_role", "Contact"), "phone": old.get("contact_phone", ""), 
-                    "email": old.get("contact_email", ""), "linkedin": old.get("linkedin", "")
-                },
+                "website": old.get("website", ""), "logo": "", "naf": naf, "source": old.get("source", "Legacy"),
+                "volume": vol, "stage": old.get("stage", "LEAD"),
+                "all_contacts": [fake_contact],
                 "intelligence": crm_engine.generate_icebreaker(naf, pipe_type), "health": crm_engine.analyze_customer_health(vol, vol,[]), 
                 "commission_est": comms, "last_contact": old.get("last_contact", "Jamais"), 
-                "products": deal.get("products", []), "documents": deal.get("documents",[])
+                "products": deal.get("products", []), "documents": deal.get("documents",
             })
 
     return JSONResponse(json_compliant({"success": True, "pipeline": formatted_deals}))
@@ -563,7 +581,8 @@ async def api_upload_deal_file(deal_id: str, file: UploadFile = File(...), user 
     })
     
     return JSONResponse({"success": True, "document": file_meta})
-    # ==========================================
+
+# ==========================================
 # API CORTEX SENTINEL & RTE
 # ==========================================
 @app.get("/api/ops/sentinel/alerts")
@@ -833,12 +852,12 @@ async def get_thermic_signature(client_id: str):
     fin = cortex.enrich_site_financials(data)
     vol = float(fin.get('volume_mwh') or data.get('kpis', {}).get('volume_mwh', 0))
     city = str(data.get('location', {}).get('city', 'Paris')).upper()
-    dju_profile =[x * 1.2 if any(v in city for v in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
+    dju_profile = [x * 1.2 if any(v in city for v in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
     total_dju = sum(dju_profile) or 1
     talon_monthly = (vol * (0.15 if fin.get('meta', {}).get('is_gas', False) else 0.30)) / 12
     chauf_ann = vol - (talon_monthly * 12)
     
-    points =[{"x": round(dju_profile[m]), "y": round(((dju_profile[m]/total_dju)*chauf_ann) + talon_monthly, 2), "month": m+1} for m in range(12)]
+    points = [{"x": round(dju_profile[m]), "y": round(((dju_profile[m]/total_dju)*chauf_ann) + talon_monthly, 2), "month": m+1} for m in range(12)]
     xm = sum(p['x'] for p in points) / 12; ym = sum(p['y'] for p in points) / 12
     den = sum((p['x'] - xm)**2 for p in points)
     a = sum((p['x'] - xm) * (p['y'] - ym) for p in points) / den if den != 0 else 0
@@ -955,7 +974,7 @@ async def api_import_csv(file: UploadFile = File(...), user = Depends(get_curren
                 existing = db.get_site(safe_id)
                 if existing:
                     if existing.get("identity", {}).get("tenant_id") != tenant_id and user.get("role") != "ADMIN": continue
-                    for sec in['contract', 'pricing', 'identity', 'technical', 'location']:
+                    for sec in ['contract', 'pricing', 'identity', 'technical', 'location']:
                         if sec in s:
                             if sec not in existing: existing[sec] = {}
                             existing[sec].update(s[sec])
@@ -1215,7 +1234,7 @@ async def api_finance_landing(site_id: str, user = Depends(get_current_user)):
         return JSONResponse({"error": str(e)}, 500)
 
 # ==========================================
-# VUES HTML & ROUTAGE (ANTI-404 V12.3)
+# VUES HTML & ROUTAGE (ANTI-404 V12.4)
 # ==========================================
 
 VALID_VIEWS =[
@@ -1234,7 +1253,7 @@ PUBLIC_PAGES =[
 
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
-    if any(x in page_name for x in[".js", ".css", ".png", ".jpg", ".ico", ".svg"]): 
+    if any(x in page_name for x in [".js", ".css", ".png", ".jpg", ".ico", ".svg"]): 
         return JSONResponse({}, 404)
         
     target_file = page_name if page_name.endswith(".html") else f"{page_name}.html"
@@ -1252,7 +1271,7 @@ async def serve_dynamic(request: Request, page_name: str, user = Depends(get_cur
 
 @app.get("/{full_path:path}")
 async def catch_all_deep(request: Request, full_path: str):
-    if any(x in full_path for x in["static", "assets", "favicon"]): return JSONResponse({}, 404)
+    if any(x in full_path for x in ["static", "assets", "favicon"]): return JSONResponse({}, 404)
     return templates.TemplateResponse("index.html", {"request": request})
 
 if __name__ == "__main__":
