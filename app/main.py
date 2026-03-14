@@ -54,7 +54,7 @@ class MockDB:
     def get_all_leads(self): return []
     def get_all_companies(self): return[]
     def get_all_contacts(self): return[]
-    def get_all_deals(self): return[]
+    def get_all_deals(self): return []
     def get_all_products(self): return[]
     def save_lead(self, i, d): return True
     def save_company(self, i, d): return True
@@ -73,6 +73,8 @@ class MockDB:
     def get_all_users(self): return[]
     def get_user_profile(self, u): return {}
     def save_user_profile(self, u, d): return True
+    def get_all_lms_modules(self): return[]
+    def get_user_lms_progress(self, u): return {}
 
 class MockFinance:
     def parse_invoice(self, c, f): return {"status": "ERROR"}
@@ -114,6 +116,9 @@ class MockAcademy:
     def process_answer(self, u, q, c): return {"success": c, "message": "Academy Offline", "new_xp": 0, "level_up": False, "current_level": 1}
     def get_daily_training(self, u): return[]
 
+class MockPricer:
+    def build_quote(self, payload): return {"success": False, "error": "CORTEX Pricer Offline. Le Cost Stack ne peut pas être généré."}
+
 # ==============================================================================
 # AUTO-LOADER CORTEX ROBUSTE (ISOLEMENT ANTI-DOMINO)
 # ==============================================================================
@@ -143,10 +148,11 @@ aggregator = load_module("cortex_aggregator", "aggregator", MockAggregator())
 finance = load_module("cortex_finance", "finance", MockFinance())
 rte = load_module("cortex_rte", "rte", MockRTE())
 crm_engine = load_module("cortex_crm", "crm_engine", MockCRM())
-academy_engine = load_module("cortex_academy", "academy_engine", MockAcademy()) # Injection LMS Academy
+academy_engine = load_module("cortex_academy", "academy_engine", MockAcademy())
+pricer_engine = load_module("cortex_pricer", "pricer_engine", MockPricer()) # Injection PRICER CPQ V12.5
 pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 
-app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.4-STABLE")
+app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.5-STABLE")
 
 app.add_middleware(
     CORSMiddleware, 
@@ -235,7 +241,7 @@ class SolarRequest(BaseModel):
     surface_roof: float
     electricity_price: float
 
-# --- Models CRM V12.4 (Contacts Multiples, Production, Academy, CPQ) ---
+# --- Models CRM V12.4 ---
 class CRMLeadModel(BaseModel):
     siret: str
     company_name: str
@@ -294,6 +300,17 @@ class NewContactModel(BaseModel):
     email: str
     phone: str
 
+# --- Models PRICER / CPQ V12.5 ---
+class CPQQuoteRequest(BaseModel):
+    site_id: Optional[str] = None
+    volume_mwh: float
+    energy_type: str
+    segment: str
+    duration_years: int = 1
+    franchise_cee: bool = False
+    green_option: str = "none"
+    mask: Dict[str, Any] = {}
+
 # === UTILS ===
 def json_compliant(data):
     if isinstance(data, dict): 
@@ -310,8 +327,7 @@ def get_safe_id(raw_id):
 
 def get_market_ref():
     m = db.get_setting("Market")
-    if m:
-        return m
+    if m: return m
     return { 
         "updated_at": datetime.now().isoformat(), 
         "elec": { "cal_n1": 85.0 }, 
@@ -322,10 +338,8 @@ def get_market_ref():
 
 async def get_current_user(request: Request):
     t = request.cookies.get("access_token")
-    if not t: 
-        return None
-    if t.startswith("Bearer "): 
-        t = t.split(" ")[1]
+    if not t: return None
+    if t.startswith("Bearer "): t = t.split(" ")[1]
     return auth.verify_token(t)
 
 # ==========================================
@@ -368,8 +382,7 @@ async def api_session(payload: SessionRequest, response: Response):
 async def logout(response: Response):
     response.delete_cookie("access_token")
     return RedirectResponse(url="/login")
-
-# ==========================================
+    # ==========================================
 # API CRM V12.4 (MULTI-CONTACTS, CPQ & LIEN PROD)
 # ==========================================
 @app.post("/api/crm/lead")
@@ -435,7 +448,7 @@ async def api_create_crm_lead_and_convert(payload: CRMLeadModel, user = Depends(
         "stage": "LEAD", 
         "volume_est": 0.0, 
         "commission_est": 0.0, 
-        "products":[], 
+        "products": [], 
         "documents":[],
         "created_at": now, 
         "owner_id": owner_id
@@ -485,11 +498,8 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
     all_deals = db.get_all_deals()
     all_comps = {c.get("id"): c for c in db.get_all_companies()}
     all_conts = {c.get("id"): c for c in db.get_all_contacts()}
-    
-    # Extraction de la VRAIE base de données de production pour le widget CRM
     real_sites = db.get_all_sites()
 
-    # Rétro-compatibilité pour les vieux leads
     try:
         old_leads = db.get_all_leads()
         for old in old_leads:
@@ -502,7 +512,7 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
                     "volume_est": float(old.get("volume_est") or 0.0), 
                     "commission_est": float(old.get("commission_est") or 0.0), 
                     "pipeline": old.get("pipeline"), 
-                    "products": old.get("products",[]), 
+                    "products": old.get("products", []), 
                     "documents": old.get("documents",[]), 
                     "_old_data": old
                 })
@@ -517,25 +527,20 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             
         if not deal.get("legacy"):
             comp = all_comps.get(deal.get("company_id"), {})
-            
-            # Gestion des Multi-Contacts
             deal_contacts =[c for c in all_conts.values() if c.get("company_id") == comp.get("id")]
             if not deal_contacts and deal.get("primary_contact_id"):
                 primary = all_conts.get(deal.get("primary_contact_id"))
-                if primary: 
-                    deal_contacts.append(primary)
+                if primary: deal_contacts.append(primary)
             
             vol = float(deal.get("volume_est", 0.0))
             naf = comp.get("naf", "DEFAULT")
             intel = crm_engine.generate_icebreaker(naf, pipe_type) 
             
             comms = float(deal.get("commission_est") or 0.0)
-            if comms == 0.0: 
-                comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
+            if comms == 0.0: comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
             
-            # LE PONT AVEC LA PRODUCTION (Le "Graal")
             prod_data = None
-            if deal.get("stage") == "WON" and pipe_type in["saas", "broker"]:
+            if deal.get("stage") == "WON" and pipe_type in ["saas", "broker"]:
                 siret = str(comp.get("siret", "")).replace(" ", "")
                 if siret:
                     for s in real_sites:
@@ -548,116 +553,73 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
                                 "end_date": s.get("contract", {}).get("end_date", "N/A"),
                                 "volume_elec": 0 if is_gas else fin.get("volume_mwh", 0),
                                 "volume_gaz": fin.get("volume_mwh", 0) if is_gas else 0,
-                                "forecast_trend": "+4%" # Trend simulée IA
+                                "forecast_trend": "+4%"
                             }
                             break
 
             formatted_deals.append({
-                "id": deal.get("id"), 
-                "company_id": comp.get("id"), 
-                "primary_contact_id": deal.get("primary_contact_id"),
-                "name": comp.get("name", deal.get("name")), 
-                "city": comp.get("city", ""),
-                "website": comp.get("website", ""), 
-                "logo": comp.get("logo", ""), 
-                "naf": naf, 
-                "source": comp.get("source", "Saisie"),
-                "volume": vol, 
-                "stage": deal.get("stage", "LEAD"),
-                "all_contacts": deal_contacts,
-                "intelligence": intel, 
-                "health": crm_engine.analyze_customer_health(vol, vol,[]), 
-                "commission_est": comms, 
-                "last_contact": "Aujourd'hui",
-                "products": deal.get("products",[]), 
-                "documents": deal.get("documents",[]),
+                "id": deal.get("id"), "company_id": comp.get("id"), "primary_contact_id": deal.get("primary_contact_id"),
+                "name": comp.get("name", deal.get("name")), "city": comp.get("city", ""),
+                "website": comp.get("website", ""), "logo": comp.get("logo", ""), "naf": naf, 
+                "source": comp.get("source", "Saisie"), "volume": vol, "stage": deal.get("stage", "LEAD"),
+                "all_contacts": deal_contacts, "intelligence": intel, 
+                "health": crm_engine.analyze_customer_health(vol, vol,[]), "commission_est": comms, 
+                "last_contact": "Aujourd'hui", "products": deal.get("products", []), "documents": deal.get("documents",[]),
                 "production_data": prod_data
             })
-            
         else:
             old = deal.get("_old_data", {})
             vol = float(deal.get("volume_est", 0.0))
             naf = old.get("naf", "DEFAULT")
             comms = float(deal.get("commission_est") or 0.0)
-            if comms == 0.0: 
-                comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
-            
-            fake_contact = {
-                "id": old.get("id"), 
-                "name": f"{old.get('contact_firstname', '')} {old.get('contact_lastname', '')}".strip(), 
-                "role": old.get("contact_role", "Contact"), 
-                "phone": old.get("contact_phone", ""), 
-                "email": old.get("contact_email", ""), 
-                "linkedin": old.get("linkedin", "")
-            }
+            if comms == 0.0: comms = crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)
+            fake_contact = {"id": old.get("id"), "name": f"{old.get('contact_firstname', '')} {old.get('contact_lastname', '')}".strip(), "role": old.get("contact_role", "Contact"), "phone": old.get("contact_phone", ""), "email": old.get("contact_email", ""), "linkedin": old.get("linkedin", "")}
             
             formatted_deals.append({
-                "id": old.get("id"), 
-                "company_id": old.get("id"), 
-                "primary_contact_id": old.get("id"),
-                "name": old.get("company_name", "Inconnu"), 
-                "city": old.get("city", ""),
-                "website": old.get("website", ""), 
-                "logo": "", 
-                "naf": naf, 
-                "source": old.get("source", "Legacy"),
-                "volume": vol, 
-                "stage": old.get("stage", "LEAD"),
-                "all_contacts": [fake_contact],
+                "id": old.get("id"), "company_id": old.get("id"), "primary_contact_id": old.get("id"),
+                "name": old.get("company_name", "Inconnu"), "city": old.get("city", ""),
+                "website": old.get("website", ""), "logo": "", "naf": naf, "source": old.get("source", "Legacy"),
+                "volume": vol, "stage": old.get("stage", "LEAD"), "all_contacts": [fake_contact],
                 "intelligence": crm_engine.generate_icebreaker(naf, pipe_type), 
-                "health": crm_engine.analyze_customer_health(vol, vol,[]), 
-                "commission_est": comms, 
-                "last_contact": old.get("last_contact", "Jamais"), 
-                "products": deal.get("products", []), 
-                "documents": deal.get("documents",[]), 
-                "production_data": None
+                "health": crm_engine.analyze_customer_health(vol, vol,[]), "commission_est": comms, 
+                "last_contact": old.get("last_contact", "Jamais"), "products": deal.get("products", []), 
+                "documents": deal.get("documents",[]), "production_data": None
             })
-
     return JSONResponse(json_compliant({"success": True, "pipeline": formatted_deals}))
 
 @app.post("/api/crm/contact/{contact_id}/linkedin")
 async def update_contact_linkedin(contact_id: str, payload: UpdateFieldModel, user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-        
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     contact = db.get_contact(contact_id)
     if contact:
         contact["linkedin"] = payload.value
         db.save_contact(contact_id, contact)
         return JSONResponse({"success": True})
-        
     legacy = db.get_setting(contact_id)
     if legacy: 
         legacy["linkedin"] = payload.value
         db.save_setting(contact_id, legacy)
         return JSONResponse({"success": True}) 
-        
     return JSONResponse({"success": False, "error": "Introuvable"})
 
 @app.post("/api/crm/company/{company_id}/website")
 async def update_company_website(company_id: str, payload: UpdateFieldModel, user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-        
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     company = db.get_company(company_id)
     if company:
         company["website"] = payload.value
         db.save_company(company_id, company)
         return JSONResponse({"success": True})
-        
     legacy = db.get_setting(company_id)
     if legacy:
         legacy["website"] = payload.value
         db.save_setting(company_id, legacy)
         return JSONResponse({"success": True})
-        
     return JSONResponse({"success": False, "error": "Introuvable"})
 
 @app.post("/api/crm/deal/move")
 async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Accès refusé"}, 401)
-        
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès refusé"}, 401)
     deal_data = db.get_deal(payload.deal_id)
     if deal_data:
         deal_data["stage"] = payload.new_stage
@@ -667,120 +629,65 @@ async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_u
         if lead_data:
             lead_data["stage"] = payload.new_stage
             db.save_setting(payload.deal_id, lead_data)
-            
-    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {
-        "deal_id": payload.deal_id, 
-        "type": "STAGE_CHANGE", 
-        "title": f"Passage à l'étape {payload.new_stage}", 
-        "timestamp": datetime.now().isoformat(), 
-        "owner_id": user.get("uid")
-    })
-    
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": payload.deal_id, "type": "STAGE_CHANGE", "title": f"Passage à l'étape {payload.new_stage}", "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True})
 
 @app.post("/api/crm/email/send")
 async def api_send_crm_email(payload: EmailRequestModel, background_tasks: BackgroundTasks, user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-        
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     deal_data = db.get_deal(payload.deal_id)
     to_email = "test@energistrat.com"
-    
     if deal_data and deal_data.get("primary_contact_id"):
         cont = db.get_contact(deal_data["primary_contact_id"])
-        if cont: 
-            to_email = cont.get("email", to_email)
-    
-    background_tasks.add_task(
-        crm_engine.send_sales_email, 
-        to_email=to_email, 
-        subject=payload.subject, 
-        html_content=payload.body, 
-        lead_id=payload.deal_id
-    )
-    
-    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {
-        "deal_id": payload.deal_id, 
-        "type": "EMAIL", 
-        "title": f"Email: {payload.subject}", 
-        "description": payload.body, 
-        "timestamp": datetime.now().isoformat(), 
-        "owner_id": user.get("uid")
-    })
-    
+        if cont: to_email = cont.get("email", to_email)
+    background_tasks.add_task(crm_engine.send_sales_email, to_email=to_email, subject=payload.subject, html_content=payload.body, lead_id=payload.deal_id)
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": payload.deal_id, "type": "EMAIL", "title": f"Email: {payload.subject}", "description": payload.body, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True, "message": "Email placé en file d'attente."})
 
 @app.get("/api/crm/track/open/{deal_id}")
 async def api_track_email_open(deal_id: str):
-    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {
-        "deal_id": deal_id, 
-        "type": "TRACKING", 
-        "title": "Le client a ouvert un email", 
-        "timestamp": datetime.now().isoformat(), 
-        "owner_id": "SYSTEM"
-    })
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "TRACKING", "title": "Le client a ouvert un email", "timestamp": datetime.now().isoformat(), "owner_id": "SYSTEM"})
     pixel = base64.b64decode("R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
     return Response(content=pixel, media_type="image/gif")
 
 @app.post("/api/crm/activity")
 async def api_create_crm_activity(payload: CRMActivityModel, user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-        
-    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {
-        "deal_id": payload.deal_id, 
-        "type": payload.type, 
-        "title": "Note manuelle" if payload.type == "NOTE" else payload.type, 
-        "description": payload.description, 
-        "timestamp": datetime.now().isoformat(), 
-        "owner_id": user.get("uid")
-    })
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": payload.deal_id, "type": payload.type, "title": "Note manuelle" if payload.type == "NOTE" else payload.type, "description": payload.description, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True})
 
 @app.get("/api/crm/deal/{deal_id}/activities")
 async def api_get_crm_activities(deal_id: str, user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Accès réservé"}, 401)
-        
-    activities = db.get_deal_activities(deal_id)
-    return JSONResponse({"success": True, "activities": activities})
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès réservé"}, 401)
+    return JSONResponse({"success": True, "activities": db.get_deal_activities(deal_id)})
 
 @app.get("/api/crm/products")
 async def api_get_products(user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Accès réservé"}, 401)
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès réservé"}, 401)
     return JSONResponse({"success": True, "products": db.get_all_products()})
 
 @app.post("/api/crm/products")
 async def api_save_product(payload: ProductModel, user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-        
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     prod_id = f"PROD_{uuid.uuid4().hex[:8]}"
     db.save_product(prod_id, payload.dict())
     return JSONResponse({"success": True, "product_id": prod_id})
 
 @app.delete("/api/crm/products/{prod_id}")
 async def api_delete_product(prod_id: str, user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-        
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     db.delete_product(prod_id)
     return JSONResponse({"success": True})
 
 @app.post("/api/crm/deal/{deal_id}/products")
 async def api_update_deal_products(deal_id: str, payload: DealProductsUpdateModel, user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-    
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     deal = db.get_deal(deal_id)
     is_legacy = False
-    
     if not deal:
         deal = db.get_setting(deal_id)
         is_legacy = True
-        if not deal: 
-            return JSONResponse({"error": "Deal introuvable."}, 404)
+        if not deal: return JSONResponse({"error": "Deal introuvable."}, 404)
 
     all_prods = {p["id"]: p for p in db.get_all_products()}
     total_vol = 0.0
@@ -789,127 +696,165 @@ async def api_update_deal_products(deal_id: str, payload: DealProductsUpdateMode
 
     for item in payload.items:
         prod = all_prods.get(item.product_id)
-        if not prod: 
-            continue
-            
+        if not prod: continue
         cat = prod.get("category", "SERVICE")
         price = float(prod.get("unit_price", 0.0))
         qty = float(item.quantity)
         rate = float(prod.get("comm_rate", 1.0))
-        
         line_comm = price * qty * rate 
-        
-        if cat == "COURTAGE": 
-            total_vol += qty
-            
+        if cat == "COURTAGE": total_vol += qty
         total_comm += line_comm
-        
-        detailed_lines.append({
-            "product_id": prod["id"], 
-            "name": prod["name"], 
-            "category": cat, 
-            "quantity": qty, 
-            "unit_price": price, 
-            "line_comm": line_comm
-        })
+        detailed_lines.append({"product_id": prod["id"], "name": prod["name"], "category": cat, "quantity": qty, "unit_price": price, "line_comm": line_comm})
 
     deal["products"] = detailed_lines
     deal["volume_est"] = total_vol
     deal["commission_est"] = total_comm
-    
-    if is_legacy: 
-        db.save_setting(deal_id, deal)
-    else: 
-        db.save_deal(deal_id, deal)
-
-    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {
-        "deal_id": deal_id, 
-        "type": "SYSTEM", 
-        "title": "Devis (CPQ) mis à jour", 
-        "description": f"Nouvelle commission : {total_comm:,.2f} €", 
-        "timestamp": datetime.now().isoformat(), 
-        "owner_id": user.get("uid")
-    })
-    
+    if is_legacy: db.save_setting(deal_id, deal)
+    else: db.save_deal(deal_id, deal)
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "SYSTEM", "title": "Devis (CPQ) mis à jour", "description": f"Nouvelle commission : {total_comm:,.2f} €", "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True})
 
 @app.post("/api/crm/deal/{deal_id}/upload")
 async def api_upload_deal_file(deal_id: str, file: UploadFile = File(...), user = Depends(get_current_user)):
-    """GED: Gestion Électronique des Documents"""
-    if not user or user.get("role") != "ADMIN": 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-    
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
     deal = db.get_deal(deal_id)
     is_legacy = False
-    
     if not deal:
         deal = db.get_setting(deal_id)
         is_legacy = True
-        if not deal: 
-            return JSONResponse({"error": "Deal introuvable"}, 404)
-    
-    file_meta = {
-        "id": f"DOC_{uuid.uuid4().hex[:8]}",
-        "name": file.filename,
-        "size": f"{round(len(await file.read()) / 1024)} KB",
-        "uploaded_at": datetime.now().isoformat()
-    }
-    
-    if "documents" not in deal: 
-        deal["documents"] =[]
-        
+        if not deal: return JSONResponse({"error": "Deal introuvable"}, 404)
+    file_meta = {"id": f"DOC_{uuid.uuid4().hex[:8]}", "name": file.filename, "size": f"{round(len(await file.read()) / 1024)} KB", "uploaded_at": datetime.now().isoformat()}
+    if "documents" not in deal: deal["documents"] = []
     deal["documents"].append(file_meta)
-    
-    if is_legacy: 
-        db.save_setting(deal_id, deal)
-    else: 
-        db.save_deal(deal_id, deal)
-    
-    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {
-        "deal_id": deal_id, 
-        "type": "DOCUMENT", 
-        "title": "Document ajouté (GED)", 
-        "description": file.filename, 
-        "timestamp": datetime.now().isoformat(), 
-        "owner_id": user.get("uid")
-    })
-    
+    if is_legacy: db.save_setting(deal_id, deal)
+    else: db.save_deal(deal_id, deal)
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "DOCUMENT", "title": "Document ajouté (GED)", "description": file.filename, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True, "document": file_meta})
-    # ==========================================
+
+# ==========================================
 # API CORTEX ACADEMY V12.4 (LMS & SPACED REPETITION)
 # ==========================================
 @app.get("/api/v1/academy/modules")
 async def api_get_academy_modules(user = Depends(get_current_user)):
-    """Récupère le Curriculum des 7 Piliers (Héritage, Réglementation, Vente...)"""
-    if not user: 
-        return JSONResponse({"error": "Non autorisé"}, 401)
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
     return JSONResponse({"success": True, "modules": db.get_all_lms_modules()})
 
 @app.get("/api/v1/academy/progress")
 async def api_get_lms_progress(user = Depends(get_current_user)):
-    """Récupère l'XP, le niveau et l'état d'apprentissage du commercial"""
-    if not user: 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-    progress = db.get_user_lms_progress(user.get("uid"))
-    return JSONResponse({"success": True, "progress": progress})
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    return JSONResponse({"success": True, "progress": db.get_user_lms_progress(user.get("uid"))})
 
 @app.get("/api/v1/academy/arena")
 async def api_get_arena_training(user = Depends(get_current_user)):
-    """Génère la session du jour (Battle Cards) via l'algo Spaced Repetition (SRS)"""
-    if not user: 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-    questions = academy_engine.get_daily_training(user.get("uid"))
-    return JSONResponse({"success": True, "questions": questions})
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    return JSONResponse({"success": True, "questions": academy_engine.get_daily_training(user.get("uid"))})
 
 @app.post("/api/v1/academy/answer")
 async def api_post_academy_answer(payload: AcademyAnswerRequest, user = Depends(get_current_user)):
-    """Traite la réponse à un simulateur et met à jour l'XP et le SRS dans Firestore"""
-    if not user: 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-    result = academy_engine.process_answer(user.get("uid"), payload.question_id, payload.is_correct)
-    return JSONResponse(result)
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    return JSONResponse(academy_engine.process_answer(user.get("uid"), payload.question_id, payload.is_correct))
 
 # ==========================================
+# API PRICER / CPQ V12.5 (ERP FOURNISSEUR)
+# ==========================================
+@app.post("/api/v1/cpq/quote")
+async def api_generate_cpq_quote(payload: CPQQuoteRequest, user = Depends(get_current_user)):
+    """Génère la cotation ERP (Shadow Pricing & Oracle)"""
+    if not user: 
+        return JSONResponse({"error": "Non autorisé"}, 401)
+    if not pricer_engine:
+        return JSONResponse({"success": False, "error": "Moteur Pricer hors ligne."})
+    result = pricer_engine.build_quote(payload.dict())
+    return JSONResponse(result)
+
+@app.post("/api/v1/cpq/ingest_dqe")
+async def api_ingest_dqe(file: UploadFile = File(...), user = Depends(get_current_user)):
+    """Smart-Mapping : Convertit le DQE Excel Mairie en JSON Structuré"""
+    if not user: 
+        return JSONResponse({"error": "Non autorisé"}, 401)
+    if not PANDAS_READY:
+        return JSONResponse({"error": "Pandas introuvable sur le serveur."}, 500)
+    
+    try:
+        content = await file.read()
+        df = pd.read_excel(io.BytesIO(content))
+        
+        # Heuristique basique : trouver les colonnes cibles
+        pdl_col = next((c for c in df.columns if any(k in str(c).lower() for k in ["pdl", "pce", "point de", "référence"])), None)
+        vol_col = next((c for c in df.columns if any(k in str(c).lower() for k in["volume", "conso", "kwh", "mwh", "quantité"])), None)
+        type_col = next((c for c in df.columns if any(k in str(c).lower() for k in["type", "usage", "ep", "bat", "catégorie"])), None)
+        
+        if not pdl_col or not vol_col:
+            return JSONResponse({"success": False, "error": "Impossible d'identifier les colonnes PDL et Volume dans ce fichier."})
+            
+        lots = {"EP (Éclairage Public)": 0, "BAT (Bâtiments)": 0, "Non Classifié": 0}
+        sites_count = 0
+        
+        for idx, row in df.iterrows():
+            vol = row[vol_col]
+            try: vol_val = float(vol)
+            except: continue
+            
+            # Smart Tagging
+            usage = str(row[type_col]).upper() if type_col else ""
+            if "EP" in usage or "ECLAIRAGE" in usage:
+                lots["EP (Éclairage Public)"] += vol_val
+            elif "BAT" in usage or "MAIRIE" in usage or "ECOLE" in usage:
+                lots["BAT (Bâtiments)"] += vol_val
+            else:
+                lots["Non Classifié"] += vol_val
+            sites_count += 1
+            
+        # Conversion kWh en MWh si nécessaire (heuristique)
+        total_mwh = sum(lots.values())
+        if total_mwh > 50000: # Probablement des kWh
+            lots = {k: v/1000 for k, v in lots.items()}
+            
+        return JSONResponse({
+            "success": True,
+            "filename": file.filename,
+            "sites_detected": sites_count,
+            "total_volume_mwh": round(sum(lots.values()), 2),
+            "suggested_lots": {k: round(v, 2) for k, v in lots.items() if v > 0}
+        })
+    except Exception as e:
+        return JSONResponse({"success": False, "error": f"Erreur Smart-Mapping : {str(e)}"})
+
+@app.post("/api/v1/cpq/ingest_curves")
+async def api_ingest_curves(files: List[UploadFile] = File(...), user = Depends(get_current_user)):
+    """Mass Curve Aggregator : Compile X fichiers SGE en un seul profil macro"""
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    if not PANDAS_READY: return JSONResponse({"error": "Pandas introuvable."}, 500)
+    
+    total_volume_mwh = 0
+    max_power_kw = 0
+    processed_count = 0
+    
+    for file in files:
+        try:
+            content = await file.read()
+            # Simulation de l'agrégation Pandas (dans la vraie vie on somme les 8760 points)
+            df = pd.read_csv(io.BytesIO(content), sep=';', on_bad_lines='skip', nrows=5000)
+            val_col = next((c for c in df.columns if "valeur" in str(c).lower() or "conso" in str(c).lower()), None)
+            
+            if val_col:
+                # Si données 10 min, on divise par 6 pour avoir des kWh
+                vol = (pd.to_numeric(df[val_col], errors='coerce').sum() / 6) / 1000
+                pmax = pd.to_numeric(df[val_col], errors='coerce').max()
+                if vol > 0:
+                    total_volume_mwh += vol
+                    max_power_kw = max(max_power_kw, pmax)
+                    processed_count += 1
+        except:
+            continue
+            
+    return JSONResponse({
+        "success": True,
+        "files_processed": processed_count,
+        "aggregated_volume_mwh": round(total_volume_mwh, 2),
+        "aggregated_peak_kw": round(max_power_kw, 2)
+    })
+    # ==========================================
 # API CORTEX SENTINEL & RTE
 # ==========================================
 @app.get("/api/ops/sentinel/alerts")
@@ -1266,7 +1211,7 @@ async def get_thermic_signature(client_id: str):
     fin = cortex.enrich_site_financials(data)
     vol = float(fin.get('volume_mwh') or data.get('kpis', {}).get('volume_mwh', 0))
     city = str(data.get('location', {}).get('city', 'Paris')).upper()
-    dju_profile = [x * 1.2 if any(v in city for v in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
+    dju_profile =[x * 1.2 if any(v in city for v in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
     total_dju = sum(dju_profile) or 1
     talon_monthly = (vol * (0.15 if fin.get('meta', {}).get('is_gas', False) else 0.30)) / 12
     chauf_ann = vol - (talon_monthly * 12)
@@ -1705,7 +1650,7 @@ async def api_finance_landing(site_id: str, user = Depends(get_current_user)):
         return JSONResponse({"error": str(e)}, 500)
 
 # ==========================================
-# VUES HTML & ROUTAGE (ANTI-404 V12.4)
+# VUES HTML & ROUTAGE (ANTI-404 V12.5)
 # ==========================================
 
 VALID_VIEWS =[
@@ -1713,7 +1658,7 @@ VALID_VIEWS =[
     "ops_nexus", "ops_ingest", "ops_aggregator", "ops_market",
     "pme", "industry", "retail", "mairie", "sde", "oph", "syndic", "sante", "supplier", "citoyen",
     "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance", "dashboard_finance",
-    "sales_workspace", "sales_playbook", "sales_outreach", "sales_academy"
+    "sales_workspace", "sales_playbook", "sales_outreach", "sales_academy", "sales_cpq"
 ]
 
 PUBLIC_PAGES =[
