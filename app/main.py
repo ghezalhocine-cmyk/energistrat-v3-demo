@@ -42,7 +42,8 @@ class FallbackPDFBuilder:
 # FALLBACK MOCKS (SÉCURITÉ CLOUD RUN)
 # ==============================================================================
 class MockAuth:
-    def verify_token(self, t): return {"uid": "mock", "email": "admin@energistrat.com", "role": "ADMIN", "sub": "admin"}
+    def verify_token(self, t): 
+        return {"uid": "mock", "email": "admin@energistrat.com", "role": "ADMIN", "sub": "admin"}
 
 class MockDB:
     def get_all_sites(self): return[]
@@ -51,10 +52,10 @@ class MockDB:
     def delete_site(self, sid): return True
     def get_setting(self, n): return {}
     def save_setting(self, n, d): return True
-    def get_all_leads(self): return []
+    def get_all_leads(self): return[]
     def get_all_companies(self): return[]
     def get_all_contacts(self): return[]
-    def get_all_deals(self): return[]
+    def get_all_deals(self): return []
     def get_all_products(self): return[]
     def save_lead(self, i, d): return True
     def save_company(self, i, d): return True
@@ -76,6 +77,21 @@ class MockDB:
     def get_all_lms_modules(self): return[]
     def get_user_lms_progress(self, u): return {}
 
+class MockFinance:
+    def parse_invoice(self, c, f): return {"status": "ERROR"}
+    def audit_invoice(self, i, s): return {}
+    def simulate_landing(self, s): return {}
+
+class MockRouter:
+    def get_api_status(self): return {"status": "DEGRADED"}
+    def analyze_file_stream(self, c, f): return {"status": "ERROR"}
+
+class MockMarket:
+    def valoriser_strategie(self, l, b): return {"error": "Market missing"}
+
+class MockAggregator:
+    def aggregate_sites(self, s, y): return None
+
 class MockCortex:
     def enrich_site_financials(self, data): return {"volume_mwh": 0, "budget_annual": 0, "meta": {"is_gas": False}, "kpis": {"pmc_eur_mwh": 0, "ghost_savings": 0}}
     def analyze_portfolio(self, sites): return {"global": {}, "green_league": {}}
@@ -84,18 +100,25 @@ class MockCortex:
     def simulate_budget_from_bpu(self, b, s): return {}
     def analyze_load_curve(self, f, n): return {}
 
+class MockRTE:
+    def get_wholesale_market(self): return {"success": False, "error": "RTE Offline"}
+    def get_pulse_dashboard_data(self): return {"success": False, "error": "RTE Offline"}
+
+class MockForecast:
+    def simulate_5_years(self, s): return {"labels":["N", "N+1", "N+2", "N+3", "N+4"], "dataset_trend":[100, 105, 110, 115, 120], "dataset_sobriety":[100, 90, 80, 70, 60], "gain_potential_mwh": 150}
+
 class MockCRM:
     def generate_icebreaker(self, naf, pipe_type="saas"): return {"naf": naf, "pain_points": "Mode Démo", "pitch": "Argumentaire IA désactivé."}
     def analyze_customer_health(self, cv, pv, lc): return {"status": "STABLE", "color": "text-success", "action_required": "RAS", "usage_score": 100, "is_churn_risk": False}
     def calculate_commission(self, v, is_s, saas_mrr=0): return round(v * 1.0, 2)
     def send_sales_email(self, *args, **kwargs): return True
 
-class MockPricer:
-    def build_quote(self, payload): return {"success": False, "error": "CORTEX Pricer Offline."}
-
 class MockAcademy:
     def process_answer(self, u, q, c): return {"success": c, "message": "Academy Offline", "new_xp": 0, "level_up": False, "current_level": 1}
     def get_daily_training(self, u): return[]
+
+class MockPricer:
+    def build_quote(self, payload): return {"success": False, "error": "CORTEX Pricer Offline. Le Cost Stack ne peut pas être généré."}
 
 # ==============================================================================
 # AUTO-LOADER CORTEX ROBUSTE (ISOLEMENT ANTI-DOMINO)
@@ -119,15 +142,15 @@ auth = load_module("cortex_auth", "auth", MockAuth())
 cortex = load_module("cortex_engine", "cortex", MockCortex())
 ingest = load_module("cortex_ingest", "ingest", None)
 physics = load_module("cortex_physics", "physics", None)
-forecast = load_module("cortex_forecast", "forecast", None)
-router = load_module("cortex_router", "router", None)
-market = load_module("cortex_market", "market", None)
-aggregator = load_module("cortex_aggregator", "aggregator", None)
-finance = load_module("cortex_finance", "finance", None)
-rte = load_module("cortex_rte", "rte", None)
+forecast = load_module("cortex_forecast", "forecast", MockForecast())
+router = load_module("cortex_router", "router", MockRouter())
+market = load_module("cortex_market", "market", MockMarket())
+aggregator = load_module("cortex_aggregator", "aggregator", MockAggregator())
+finance = load_module("cortex_finance", "finance", MockFinance())
+rte = load_module("cortex_rte", "rte", MockRTE())
 crm_engine = load_module("cortex_crm", "crm_engine", MockCRM())
 academy_engine = load_module("cortex_academy", "academy_engine", MockAcademy())
-pricer_engine = load_module("cortex_pricer", "pricer_engine", MockPricer())
+pricer_engine = load_module("cortex_pricer", "pricer_engine", MockPricer()) # Injection PRICER CPQ V12.5
 pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 
 app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.6-CRM3D")
@@ -143,24 +166,84 @@ app.add_middleware(
 # === SETUP DIRECTORIES ===
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
-if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
+if not os.path.exists(DATA_DIR): 
+    os.makedirs(DATA_DIR, exist_ok=True)
+    
 TEMPLATE_DIR = os.path.join(BASE_DIR, "app/templates")
-if not os.path.exists(TEMPLATE_DIR): TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
+if not os.path.exists(TEMPLATE_DIR): 
+    TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
+    
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
+
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
-if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+if not os.path.exists(STATIC_DIR): 
+    STATIC_DIR = os.path.join(BASE_DIR, "app/static")
+if os.path.exists(STATIC_DIR): 
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # ==============================================================================
-# PYDANTIC MODELS (ARCHITECTURE CRM 3D & CPQ V12.6)
-# ==========================================
-
+# PYDANTIC MODELS (AÉRÉS POUR ÉVITER LES SYNTAX ERRORS CLOUD RUN)
+# ==============================================================================
 class SessionRequest(BaseModel): 
     id_token: str
 
-# --- 1. Modèles d'Ingénierie CRM 3D ---
+class MarketUpdateModel(BaseModel): 
+    elec: Dict[str, Any]
+    gaz: Dict[str, Any]
+    trve: Optional[Dict[str, Any]] = None
+    targets: Optional[Dict[str, Any]] = None
+
+class StrategyRequest(BaseModel): 
+    site_id: str
+    bloc_kw: float
+
+class AggregationRequest(BaseModel): 
+    site_ids: List[str]
+    years: int = 3
+
+class PropagateRequest(BaseModel): 
+    source_client_id: str
+    target_date: str
+    filters: Dict[str, str]
+    pricing_data: Dict[str, Any]
+
+class AdoptionRequest(BaseModel): 
+    target_tenant_id: str
+    site_ids: List[str]
+
+class TenantCreateRequest(BaseModel): 
+    siret: str
+    name: str
+
+class M57SettingsModel(BaseModel): 
+    bp_elec: float = 0.0
+    bp_gaz: float = 0.0
+    consumed_elec: float = 0.0
+    consumed_gaz: float = 0.0
+    bp_irve: float = 0.0
+    consumed_irve: float = 0.0
+    bp_enr: float = 0.0
+    consumed_enr: float = 0.0
+
+class CarbonSettingsModel(BaseModel): 
+    baseline_year: int = 2010
+    baseline_kwh_sqm: float = 0.0
+
+class VoteRequestModel(BaseModel): 
+    site_id: str
+    vote: bool
+
+class LegalSignModel(BaseModel): 
+    site_id: str
+    consent: bool
+
+class SolarRequest(BaseModel): 
+    address: str
+    surface_roof: float
+    electricity_price: float
+
+# --- NOUVEAUX MODÈLES CRM 3D V12.6 ---
 class CRMSiteModel(BaseModel):
-    """Niveau 3 : Le Site Physique (Jumeau Numérique SGE)"""
     pdl_pce: str
     energy_type: str = "elec"
     site_name: str
@@ -170,20 +253,18 @@ class CRMSiteModel(BaseModel):
     profile: str = "PRO1"
     car_mwh: float = 0.0
     is_active: bool = True
-    company_id: str  # Lien avec l'Entité Légale
+    company_id: str
 
 class CRMContactModel(BaseModel):
-    """Contact rattaché soit à la Holding, soit à un Site spécifique"""
     firstname: str
     lastname: str
     role: str
     email: str
     phone: str
     company_id: str
-    site_id: Optional[str] = None # Si renseigné, c'est un contact local
+    site_id: Optional[str] = None
 
 class CRMCompany3DModel(BaseModel):
-    """Niveau 1 & 2 : Holding et Entité Légale"""
     siren: str
     company_name: str
     holding_name: Optional[str] = None
@@ -191,23 +272,50 @@ class CRMCompany3DModel(BaseModel):
     address: str
     city: str
     source: str
-    pipeline: str # saas, courtage, fournisseurs, fourniture
+    pipeline: str 
 
 class CRMInlineEditModel(BaseModel):
-    """Pour le petit stylo cyan (Édition rapide)"""
     field: str
     value: Any
+
+class DealMoveModel(BaseModel): 
+    deal_id: str
+    new_stage: str
+
+class EmailRequestModel(BaseModel): 
+    deal_id: str
+    subject: str
+    body: str
 
 class CRMActivityModel(BaseModel): 
     deal_id: str
     type: str
     description: str
 
-class DealMoveModel(BaseModel): 
-    deal_id: str
-    new_stage: str
+class UpdateFieldModel(BaseModel): 
+    value: str
 
-# --- 2. Modèles Pricer & LMS ---
+class ProductModel(BaseModel): 
+    name: str
+    category: str 
+    unit_price: float 
+    comm_rate: float = 1.0 
+
+class DealLineItemModel(BaseModel): 
+    product_id: str
+    quantity: float 
+
+class DealProductsUpdateModel(BaseModel): 
+    items: List[DealLineItemModel]
+
+class AcademyProgressModel(BaseModel): 
+    xp: int
+    badges: List[Dict[str, str]]
+
+class AcademyAnswerRequest(BaseModel):
+    question_id: str
+    is_correct: bool
+
 class CPQQuoteRequest(BaseModel):
     site_id: Optional[str] = None
     volume_mwh: float
@@ -218,11 +326,13 @@ class CPQQuoteRequest(BaseModel):
     green_option: str = "none"
     mask: Dict[str, Any] = {}
 
-class AcademyAnswerRequest(BaseModel):
-    question_id: str
-    is_correct: bool
-
-# ==============================================================================
+class NewContactModel(BaseModel): 
+    firstname: str
+    lastname: str
+    role: str
+    email: str
+    phone: str
+    # ==============================================================================
 # OUTILS (API GOUVERNEMENT & SOLVABILITÉ)
 # ==============================================================================
 
@@ -274,15 +384,30 @@ def fetch_company_info_api_gouv(siren: str) -> dict:
     except Exception as e:
         return {"success": False, "error": f"API Gouv indisponible: {str(e)}"}
 
+# === UTILS ===
 def json_compliant(data):
-    if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
-    elif isinstance(data, list): return [json_compliant(v) for v in data]
+    if isinstance(data, dict): 
+        return {k: json_compliant(v) for k, v in data.items()}
+    elif isinstance(data, list): 
+        return[json_compliant(v) for v in data]
     elif isinstance(data, float):
-        if math.isnan(data) or math.isinf(data): return 0.0
+        if math.isnan(data) or math.isinf(data): 
+            return 0.0
     return data
 
 def get_safe_id(raw_id): 
     return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
+
+def get_market_ref():
+    m = db.get_setting("Market")
+    if m: return m
+    return { 
+        "updated_at": datetime.now().isoformat(), 
+        "elec": { "cal_n1": 85.0 }, 
+        "gaz": { "peg_n1": 35.0 }, 
+        "trve": { "elec_c5": 230.0 }, 
+        "targets": { "c5": 190.0 } 
+    }
 
 async def get_current_user(request: Request):
     t = request.cookies.get("access_token")
@@ -296,7 +421,8 @@ async def get_current_user(request: Request):
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request, user = Depends(get_current_user)):
     if user: 
-        if user.get("role") == "ADMIN": return RedirectResponse(url="/ops_nexus")
+        if user.get("role") == "ADMIN":
+            return RedirectResponse(url="/ops_nexus")
         return RedirectResponse(url=f"/{user.get('role', 'settings')}")
     res = templates.TemplateResponse("login.html", {"request": request})
     res.delete_cookie("access_token")
@@ -305,18 +431,23 @@ async def view_login(request: Request, user = Depends(get_current_user)):
 @app.post("/api/auth/session")
 async def api_session(payload: SessionRequest, response: Response):
     u = auth.verify_token(payload.id_token)
-    if not u: return JSONResponse({"detail": "Token invalide"}, status_code=401)
+    if not u: 
+        return JSONResponse({"detail": "Token invalide"}, status_code=401)
     
     response.set_cookie(
-        key="access_token", value=f"Bearer {payload.id_token}", 
-        httponly=True, max_age=3600*24, samesite="lax", 
+        key="access_token", 
+        value=f"Bearer {payload.id_token}", 
+        httponly=True, 
+        max_age=3600*24, 
+        samesite="lax", 
         secure=True if "https" in str(response.headers) else False
     )
     
     role = u.get("role", "USER")
     if role != "ADMIN":
         profile = db.get_user_profile(u.get("uid"))
-        if profile and profile.get("role"): role = profile.get("role")
+        if profile and profile.get("role"): 
+            role = profile.get("role")
             
     return {"success": True, "role": role}
 
@@ -324,7 +455,8 @@ async def api_session(payload: SessionRequest, response: Response):
 async def logout(response: Response):
     response.delete_cookie("access_token")
     return RedirectResponse(url="/login")
-    # ==========================================
+
+# ==========================================
 # API CRM V12.6 (MODÈLE 3D, SOLVABILITÉ & INLINE EDIT)
 # ==========================================
 
@@ -362,7 +494,7 @@ async def api_create_crm_lead_and_convert(payload: CRMCompany3DModel, user = Dep
     company_data = {
         "siren": payload.siren, 
         "name": final_name, 
-        "holding_name": payload.holding_name or final_name,
+        "holding_name": payload.holding_name or final_name, # Tête de groupe par défaut
         "naf": final_naf, 
         "address": final_address,
         "city": final_city,
@@ -381,7 +513,7 @@ async def api_create_crm_lead_and_convert(payload: CRMCompany3DModel, user = Dep
     deal_data = {
         "company_id": company_id, 
         "name": f"{final_name} - {payload.pipeline.upper()}", 
-        "pipeline": payload.pipeline, 
+        "pipeline": payload.pipeline, # saas, courtage, fournisseurs, fourniture
         "stage": "LEAD", 
         "volume_est": 0.0, 
         "commission_est": 0.0, 
@@ -418,14 +550,18 @@ async def api_inline_edit(entity_type: str, entity_id: str, payload: CRMInlineEd
         data = db.get_contact(entity_id)
         save_func = db.save_contact
     elif entity_type == "site":
+        # Dans le CRM 3D, les sites sont stockés via le module Data Unity
         data = db.get_site(entity_id)
         save_func = db.save_site
         
     if not data:
         return JSONResponse({"success": False, "error": "Entité introuvable."})
         
+    # Mise à jour de la donnée
     data[payload.field] = payload.value
+    # Flag d'override manuel pour empêcher l'écrasement par API
     data[f"{payload.field}_manual_override"] = True 
+    
     save_func(entity_id, data)
     
     return JSONResponse({"success": True, "message": "Mise à jour synchronisée."})
@@ -439,7 +575,7 @@ async def api_add_contact_3d(company_id: str, payload: CRMContactModel, user = D
     contact_id = f"CONT_{uuid.uuid4().hex[:12]}"
     contact_data = {
         "company_id": company_id, 
-        "site_id": payload.site_id, 
+        "site_id": payload.site_id, # Si None -> Contact Siège (DAF), sinon -> Contact Site (Tech)
         "firstname": payload.firstname, 
         "lastname": payload.lastname,
         "role": payload.role, 
@@ -462,7 +598,7 @@ async def api_add_site_3d(company_id: str, payload: CRMSiteModel, user = Depends
     site_data = {
         "identity": {
             "id": site_id,
-            "tenant_id": company_id,
+            "tenant_id": company_id, # Rattaché à l'Entité Légale
             "site_name": payload.site_name
         },
         "location": {"address": payload.address},
@@ -497,8 +633,11 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             continue
             
         comp = all_comps.get(deal.get("company_id"), {})
+        
+        # Contacts (Siège & Sites)
         deal_contacts =[c for c in all_conts.values() if c.get("company_id") == comp.get("id")]
         
+        # Récupération des sites rattachés et alertes SaaS
         company_sites =[s for s in real_sites if s.get("identity", {}).get("tenant_id") == comp.get("id")]
         total_vol = sum([float(s.get("kpis", {}).get("volume_mwh", 0)) for s in company_sites])
         
@@ -528,7 +667,7 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             "saas_alerts": saas_alerts,
             "intelligence": intel, 
             "commission_est": comms, 
-            "products": deal.get("products", []), 
+            "products": deal.get("products",[]), 
             "documents": deal.get("documents",[])
         })
 
@@ -784,12 +923,10 @@ async def api_ingest_curves(files: List[UploadFile] = File(...), user = Depends(
     for file in files:
         try:
             content = await file.read()
-            # Simulation de l'agrégation Pandas (dans la vraie vie on somme les 8760 points)
             df = pd.read_csv(io.BytesIO(content), sep=';', on_bad_lines='skip', nrows=5000)
             val_col = next((c for c in df.columns if "valeur" in str(c).lower() or "conso" in str(c).lower()), None)
             
             if val_col:
-                # Si données 10 min, on divise par 6 pour avoir des kWh
                 vol = (pd.to_numeric(df[val_col], errors='coerce').sum() / 6) / 1000
                 pmax = pd.to_numeric(df[val_col], errors='coerce').max()
                 if vol > 0:
@@ -1392,7 +1529,7 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
             "cities": sorted(list(all_cities)), 
             "providers": sorted(list(all_providers)), 
             "segments":["C5", "C4", "C3", "C2", "C1", "T1", "T2", "T3"], 
-            "lots": ["Lot 1", "Lot 2"] 
+            "lots":["Lot 1", "Lot 2"] 
         }
     }))
 
@@ -1638,7 +1775,7 @@ async def serve_dynamic(request: Request, page_name: str, user = Depends(get_cur
 
 @app.get("/{full_path:path}")
 async def catch_all_deep(request: Request, full_path: str):
-    if any(x in full_path for x in[".static", ".assets", "favicon"]): 
+    if any(x in full_path for x in [".static", ".assets", "favicon"]): 
         return JSONResponse({}, 404)
     return templates.TemplateResponse("index.html", {"request": request})
 
