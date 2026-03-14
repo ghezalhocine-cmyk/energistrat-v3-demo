@@ -54,7 +54,7 @@ class MockDB:
     def get_all_leads(self): return []
     def get_all_companies(self): return[]
     def get_all_contacts(self): return[]
-    def get_all_deals(self): return []
+    def get_all_deals(self): return[]
     def get_all_products(self): return[]
     def save_lead(self, i, d): return True
     def save_company(self, i, d): return True
@@ -110,6 +110,10 @@ class MockCRM:
     def calculate_commission(self, v, is_s, saas_mrr=0): return round(v * 1.0, 2)
     def send_sales_email(self, *args, **kwargs): return True
 
+class MockAcademy:
+    def process_answer(self, u, q, c): return {"success": c, "message": "Academy Offline", "new_xp": 0, "level_up": False, "current_level": 1}
+    def get_daily_training(self, u): return[]
+
 # ==============================================================================
 # AUTO-LOADER CORTEX ROBUSTE (ISOLEMENT ANTI-DOMINO)
 # ==============================================================================
@@ -139,6 +143,7 @@ aggregator = load_module("cortex_aggregator", "aggregator", MockAggregator())
 finance = load_module("cortex_finance", "finance", MockFinance())
 rte = load_module("cortex_rte", "rte", MockRTE())
 crm_engine = load_module("cortex_crm", "crm_engine", MockCRM())
+academy_engine = load_module("cortex_academy", "academy_engine", MockAcademy()) # Injection LMS Academy
 pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 
 app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.4-STABLE")
@@ -278,6 +283,10 @@ class AcademyProgressModel(BaseModel):
     xp: int
     badges: List[Dict[str, str]]
 
+class AcademyAnswerRequest(BaseModel):
+    question_id: str
+    is_correct: bool
+
 class NewContactModel(BaseModel): 
     firstname: str
     lastname: str
@@ -359,37 +368,10 @@ async def api_session(payload: SessionRequest, response: Response):
 async def logout(response: Response):
     response.delete_cookie("access_token")
     return RedirectResponse(url="/login")
-    # ==========================================
+
+# ==========================================
 # API CRM V12.4 (MULTI-CONTACTS, CPQ & LIEN PROD)
 # ==========================================
-
-@app.get("/api/crm/academy/progress")
-async def api_get_academy_progress(user = Depends(get_current_user)):
-    """Récupère la progression XP et les médailles du commercial connecté"""
-    if not user: 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-        
-    profile = db.get_user_profile(user.get("uid"))
-    academy_data = profile.get("academy", {"xp": 0, "badges":[]})
-    
-    return JSONResponse({"success": True, "progress": academy_data})
-
-@app.post("/api/crm/academy/progress")
-async def api_save_academy_progress(payload: AcademyProgressModel, user = Depends(get_current_user)):
-    """Sauvegarde la progression XP et les médailles en direct dans le profil"""
-    if not user: 
-        return JSONResponse({"error": "Non autorisé"}, 401)
-        
-    profile = db.get_user_profile(user.get("uid"))
-    profile["academy"] = {
-        "xp": payload.xp, 
-        "badges": [b for b in payload.badges]
-    }
-    
-    db.save_user_profile(user.get("uid"), profile)
-    return JSONResponse({"success": True})
-
-
 @app.post("/api/crm/lead")
 async def api_create_crm_lead_and_convert(payload: CRMLeadModel, user = Depends(get_current_user)):
     """
@@ -453,7 +435,7 @@ async def api_create_crm_lead_and_convert(payload: CRMLeadModel, user = Depends(
         "stage": "LEAD", 
         "volume_est": 0.0, 
         "commission_est": 0.0, 
-        "products": [], 
+        "products":[], 
         "documents":[],
         "created_at": now, 
         "owner_id": owner_id
@@ -520,7 +502,7 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
                     "volume_est": float(old.get("volume_est") or 0.0), 
                     "commission_est": float(old.get("commission_est") or 0.0), 
                     "pipeline": old.get("pipeline"), 
-                    "products": old.get("products", []), 
+                    "products": old.get("products",[]), 
                     "documents": old.get("documents",[]), 
                     "_old_data": old
                 })
@@ -553,7 +535,7 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             
             # LE PONT AVEC LA PRODUCTION (Le "Graal")
             prod_data = None
-            if deal.get("stage") == "WON" and pipe_type in ["saas", "broker"]:
+            if deal.get("stage") == "WON" and pipe_type in["saas", "broker"]:
                 siret = str(comp.get("siret", "")).replace(" ", "")
                 if siret:
                     for s in real_sites:
@@ -874,7 +856,7 @@ async def api_upload_deal_file(deal_id: str, file: UploadFile = File(...), user 
     }
     
     if "documents" not in deal: 
-        deal["documents"] = []
+        deal["documents"] =[]
         
     deal["documents"].append(file_meta)
     
@@ -894,6 +876,40 @@ async def api_upload_deal_file(deal_id: str, file: UploadFile = File(...), user 
     
     return JSONResponse({"success": True, "document": file_meta})
     # ==========================================
+# API CORTEX ACADEMY V12.4 (LMS & SPACED REPETITION)
+# ==========================================
+@app.get("/api/v1/academy/modules")
+async def api_get_academy_modules(user = Depends(get_current_user)):
+    """Récupère le Curriculum des 7 Piliers (Héritage, Réglementation, Vente...)"""
+    if not user: 
+        return JSONResponse({"error": "Non autorisé"}, 401)
+    return JSONResponse({"success": True, "modules": db.get_all_lms_modules()})
+
+@app.get("/api/v1/academy/progress")
+async def api_get_lms_progress(user = Depends(get_current_user)):
+    """Récupère l'XP, le niveau et l'état d'apprentissage du commercial"""
+    if not user: 
+        return JSONResponse({"error": "Non autorisé"}, 401)
+    progress = db.get_user_lms_progress(user.get("uid"))
+    return JSONResponse({"success": True, "progress": progress})
+
+@app.get("/api/v1/academy/arena")
+async def api_get_arena_training(user = Depends(get_current_user)):
+    """Génère la session du jour (Battle Cards) via l'algo Spaced Repetition (SRS)"""
+    if not user: 
+        return JSONResponse({"error": "Non autorisé"}, 401)
+    questions = academy_engine.get_daily_training(user.get("uid"))
+    return JSONResponse({"success": True, "questions": questions})
+
+@app.post("/api/v1/academy/answer")
+async def api_post_academy_answer(payload: AcademyAnswerRequest, user = Depends(get_current_user)):
+    """Traite la réponse à un simulateur et met à jour l'XP et le SRS dans Firestore"""
+    if not user: 
+        return JSONResponse({"error": "Non autorisé"}, 401)
+    result = academy_engine.process_answer(user.get("uid"), payload.question_id, payload.is_correct)
+    return JSONResponse(result)
+
+# ==========================================
 # API CORTEX SENTINEL & RTE
 # ==========================================
 @app.get("/api/ops/sentinel/alerts")
@@ -1061,7 +1077,7 @@ async def api_forecast_simulate(client_id: str, user = Depends(get_current_user)
         vol = 100
         
     return JSONResponse({
-        "labels": ["N", "N+1", "N+2", "N+3", "N+4"],
+        "labels":["N", "N+1", "N+2", "N+3", "N+4"],
         "dataset_trend":[vol, vol*1.02, vol*1.04, vol*1.06, vol*1.08],
         "dataset_sobriety":[vol, vol*0.9, vol*0.82, vol*0.75, vol*0.68],
         "gain_potential_mwh": round(vol * 1.5)
@@ -1250,7 +1266,7 @@ async def get_thermic_signature(client_id: str):
     fin = cortex.enrich_site_financials(data)
     vol = float(fin.get('volume_mwh') or data.get('kpis', {}).get('volume_mwh', 0))
     city = str(data.get('location', {}).get('city', 'Paris')).upper()
-    dju_profile = [x * 1.2 if any(v in city for v in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in ['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
+    dju_profile = [x * 1.2 if any(v in city for v in['LILLE', 'STRASBOURG', 'NANCY', 'METZ']) else (x * 0.7 if any(v in city for v in['MARSEILLE', 'NICE', 'MONTPELLIER', 'TOULON']) else x) for x in[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420]]
     total_dju = sum(dju_profile) or 1
     talon_monthly = (vol * (0.15 if fin.get('meta', {}).get('is_gas', False) else 0.30)) / 12
     chauf_ann = vol - (talon_monthly * 12)
