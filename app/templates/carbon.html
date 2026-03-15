@@ -1,9 +1,11 @@
+--- START OF FILE carbon.html ---
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V10.0 | CSRD & Bilan Carbone</title>
+    <title>ENERGISTRAT V12.6 | CORTEX Climate (CSRD)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -15,257 +17,209 @@
             theme: {
                 extend: {
                     colors: { 
-                        abysse: '#001529', 
-                        card: '#0F172A', 
-                        sidebar: '#020617', 
-                        cyan: '#00E5FF', 
-                        eco: '#14B8A6', // Vert/Teal RSE (CSRD)
-                        scope1: '#EF4444', // Rouge Gaz
-                        scope2: '#3B82F6', // Bleu Elec
-                        alert: '#EF4444',
-                        gold: '#F59E0B',
-                        muted: '#64748B'
+                        abysse: '#001529', card: '#001D3D', sidebar: '#001529', cyan: '#00E5FF', 
+                        eco: '#14B8A6', scope1: '#EF4444', scope2: '#3B82F6', 
+                        alert: '#EF4444', gold: '#F59E0B'
                     },
-                    fontFamily: { 
-                        sans: ['Inter', 'sans-serif'], 
-                        mono: ['JetBrains Mono', 'monospace'] 
-                    },
-                    borderRadius: { 'bento': '1.5rem' }
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] }
                 }
             }
         }
     </script>
     <style>
         body { background-color: #001529; color: #e2e8f0; overflow: hidden; font-family: 'Inter', sans-serif; }
-        .bento-card { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
-        .bento-card:hover { border-color: rgba(20, 184, 166, 0.3); }
+        .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 3rem; transition: all 0.3s ease; }
+        .bento-card:hover { border-color: rgba(20, 184, 166, 0.3); transform: translateY(-2px); box-shadow: 0 10px 30px -10px rgba(20, 184, 166, 0.2); }
         
         select.cyber-select {
-            appearance: none; background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 10px 35px 10px 15px; border-radius: 1rem;
+            appearance: none; background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 10px 40px 10px 20px; border-radius: 2rem;
             background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2314B8A6%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
             background-repeat: no-repeat; background-position: right 1rem top 50%; background-size: 0.65rem auto; cursor: pointer; outline: none;
         }
-        select.cyber-select option { background-color: #0F172A; color: white; }
+        select.cyber-select option { background-color: #001529; color: white; }
 
-        /* Toggle Switch pour Location vs Market Based */
         .toggle-checkbox:checked { right: 0; border-color: #14B8A6; }
         .toggle-checkbox:checked + .toggle-label { background-color: #14B8A6; }
         .toggle-checkbox { right: 0; z-index: 1; border-color: #e2e8f0; transition: all 0.3s; }
         .toggle-label { background-color: #334155; transition: all 0.3s; }
 
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #020617; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(20, 184, 166, 0.3); border-radius: 3px; }
     </style>
 </head>
-<body class="flex h-screen w-screen">
+<body class="flex h-screen w-screen bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
 
-    <!-- SIDEBAR ÉPURÉE (SATELLITE) -->
-    <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
-        <button onclick="history.back()" title="Retour au Dashboard" class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition mb-8 border border-white/5">
+    <!-- SIDEBAR -->
+    <aside class="w-24 bg-abysse border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50 shadow-2xl">
+        <button onclick="goBack()" title="Retour au Dashboard" class="w-12 h-12 rounded-[2rem] bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition mb-8 border border-white/5">
             <i class="fa-solid fa-arrow-left"></i>
         </button>
-        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-eco to-green-900 flex items-center justify-center text-white font-bold shadow-[0_0_15px_rgba(20,184,166,0.4)] mb-2" title="Module CSRD">
-            <i class="fa-solid fa-leaf text-xl"></i>
+        <div class="w-14 h-14 rounded-[2rem] bg-gradient-to-br from-eco to-green-900 flex items-center justify-center text-white font-bold shadow-[0_0_15px_rgba(20,184,166,0.4)] mb-2" title="Module CSRD">
+            <i class="fa-solid fa-leaf text-2xl"></i>
         </div>
         <div class="text-[8px] font-bold text-eco uppercase tracking-widest mt-1 text-center">ESRS<br>E1</div>
         
-        <div class="mt-auto flex flex-col gap-4 w-full px-2">
-            <button onclick="window.print()" title="Exporter Rapport PDF" class="w-full h-12 rounded-xl bg-white/5 flex items-center justify-center text-gray-400 hover:text-eco hover:border-eco/50 transition border border-white/5">
+        <div class="mt-auto flex flex-col gap-4 w-full px-4">
+            <button onclick="window.print()" title="Exporter Rapport PDF" class="w-full h-12 rounded-[2rem] bg-white/5 flex items-center justify-center text-gray-400 hover:text-eco hover:border-eco/50 transition border border-white/5">
                 <i class="fa-solid fa-print"></i>
             </button>
         </div>
     </aside>
 
     <!-- MAIN CONTENT -->
-    <main class="flex-1 flex flex-col min-w-0 relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+    <main class="flex-1 flex flex-col min-w-0 relative overflow-hidden">
         
-        <!-- HEADER -->
-        <header class="h-20 border-b border-white/5 flex items-center justify-between px-10 bg-abysse/90 backdrop-blur sticky top-0 z-40">
+        <header class="h-24 border-b border-white/5 flex items-center justify-between px-10 bg-abysse/90 backdrop-blur sticky top-0 z-40">
             <div>
-                <h1 class="text-2xl font-black text-white tracking-tight">CORTEX <span class="text-eco">CLIMATE</span></h1>
+                <h1 class="text-3xl font-black text-white italic tracking-tight">CORTEX <span class="text-eco">CLIMATE</span></h1>
                 <p class="text-xs text-gray-400 mt-1 font-mono">Bilan GES Protocol & Décret Tertiaire</p>
             </div>
             
             <div class="flex items-center gap-6">
-                <!-- LE TOGGLE DOUBLE COMPTABILITÉ (STANDARD INTERNATIONAL) -->
-                <div class="bg-card border border-white/10 px-4 py-2 rounded-xl flex items-center gap-4 shadow-lg">
+                <div class="bg-card/50 border border-white/10 px-6 py-3 rounded-[2rem] flex items-center gap-4 shadow-lg">
                     <div class="text-right">
-                        <div class="text-[9px] text-gray-400 uppercase font-bold tracking-widest">Méthode de Calcul (Scope 2)</div>
-                        <div class="text-xs font-bold text-white" id="lbl-method">Location-based (Mix France)</div>
+                        <div class="text-[9px] text-gray-400 uppercase font-bold tracking-widest">Calcul (Scope 2)</div>
+                        <div class="text-xs font-bold text-white" id="lbl-method">Location-based</div>
                     </div>
-                    <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+                    <div class="relative inline-block w-12 mx-2 align-middle select-none transition duration-200 ease-in">
                         <input type="checkbox" name="toggle" id="market-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" onchange="toggleMethodology()"/>
                         <label for="market-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
                     </div>
-                    <div class="text-[10px] text-gray-500 font-mono w-24 leading-tight">Activer Garanties d'Origine (GO)</div>
+                    <div class="text-[9px] text-gray-500 font-mono w-24 leading-tight">Activer Garanties d'Origine (GO)</div>
                 </div>
 
                 <div class="w-px h-8 bg-white/10"></div>
 
-                <div class="flex items-center gap-3">
-                    <span class="text-[10px] text-gray-500 uppercase font-bold">Périmètre :</span>
-                    <select id="perimeter-select" onchange="changePerimeter()" class="cyber-select text-xs font-bold w-64 truncate">
+                <div class="flex flex-col gap-1">
+                    <span class="text-[9px] text-gray-500 uppercase font-bold tracking-widest pl-4">Périmètre Carbone :</span>
+                    <select id="perimeter-select" onchange="changePerimeter()" class="cyber-select text-sm font-bold w-72 truncate">
                         <option value="ALL">🏢 Parc Global Consolidé</option>
                     </select>
                 </div>
             </div>
         </header>
 
-        <!-- DASHBOARD AREA -->
         <div class="flex-1 overflow-y-auto p-10 pb-32">
-            
-            <div class="max-w-7xl mx-auto space-y-8">
+            <div class="max-w-[1600px] mx-auto space-y-8">
                 
-                <!-- ROW 1 : KPIS CARBONE & PREUVES -->
-                <div class="grid grid-cols-12 gap-6">
-                    
-                    <!-- L'EMPREINTE TOTALE -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     <div class="col-span-4 bento-card p-8 border-t-4 border-eco relative overflow-hidden group">
-                        <i class="fa-solid fa-cloud absolute -right-4 -bottom-4 text-eco opacity-10 text-8xl group-hover:scale-110 transition"></i>
-                        <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                            <i class="fa-solid fa-earth-europe text-eco"></i> Bilan CO2e Annuel
-                        </div>
-                        <div class="flex items-end gap-3 mb-2">
-                            <div class="text-5xl font-black text-white font-mono" id="kpi-co2">--</div>
-                            <div class="text-lg text-eco font-bold pb-1">Tonnes</div>
-                        </div>
-                        <div class="text-xs text-gray-500 font-mono mt-4 flex items-center justify-between border-t border-white/5 pt-4">
+                        <i class="fa-solid fa-cloud absolute -right-4 -bottom-4 text-eco opacity-10 text-9xl group-hover:scale-110 transition"></i>
+                        <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-earth-europe text-eco"></i> Bilan CO2e Annuel</div>
+                        <div class="flex items-end gap-3 mb-4"><div class="text-6xl font-black text-white font-mono drop-shadow-md" id="kpi-co2">--</div><div class="text-xl text-eco font-bold pb-1">Tonnes</div></div>
+                        <div class="text-xs text-gray-500 font-mono mt-6 flex items-center justify-between border-t border-white/5 pt-4">
                             <span><div class="w-2 h-2 inline-block rounded-full bg-scope1 mr-1"></div> Scope 1 (Gaz) : <b class="text-white" id="kpi-sc1">-- t</b></span>
                             <span><div class="w-2 h-2 inline-block rounded-full bg-scope2 mr-1"></div> Scope 2 (Élec) : <b class="text-white" id="kpi-sc2">-- t</b></span>
                         </div>
                     </div>
 
-                    <!-- LE RADAR SECTORIEL (API ADEME / NAF) -->
-                    <div class="col-span-4 bento-card p-8 relative overflow-hidden">
-                        <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <i class="fa-solid fa-ranking-star text-gold"></i> Benchmarking Sectoriel (Code NAF)
+                    <div class="col-span-4 bento-card p-8 relative overflow-hidden border border-white/5">
+                        <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2"><i class="fa-solid fa-ranking-star text-gold"></i> Benchmarking Sectoriel</div>
+                        <div class="flex justify-between items-end mb-4">
+                            <div><div class="text-xs text-gray-500 mb-1">Votre Intensité</div><div class="text-4xl font-black text-white font-mono"><span id="kpi-intensity">--</span> <span class="text-xs text-gray-400 font-sans font-normal">kgCO2e/m²</span></div></div>
+                            <div class="text-right"><div class="text-xs text-gray-500 mb-1">Moyenne NAF (<span id="lbl-naf">--</span>)</div><div class="text-2xl font-bold text-gray-400 font-mono" id="kpi-naf-avg">--</div></div>
                         </div>
-                        <div class="flex justify-between items-end mb-2">
-                            <div>
-                                <div class="text-xs text-gray-500 mb-1">Votre Intensité Carbone</div>
-                                <div class="text-3xl font-black text-white font-mono"><span id="kpi-intensity">--</span> <span class="text-xs text-gray-400 font-sans font-normal">kgCO2e/m²</span></div>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-xs text-gray-500 mb-1">Moyenne NAF (<span id="lbl-naf">--</span>)</div>
-                                <div class="text-xl font-bold text-gray-400 font-mono" id="kpi-naf-avg">--</div>
-                            </div>
-                        </div>
-                        <div class="w-full bg-gray-800 h-2 rounded-full mt-4 relative overflow-hidden">
+                        <div class="w-full bg-abysse border border-white/10 h-3 rounded-full mt-6 relative overflow-hidden">
                             <div class="absolute top-0 bottom-0 w-1 bg-white z-20" id="gauge-naf-avg" style="left: 50%" title="Moyenne Secteur"></div>
                             <div class="h-full rounded-full transition-all duration-1000 z-10 relative" id="gauge-intensity" style="width: 0%"></div>
                         </div>
-                        <div class="text-[10px] font-bold mt-3" id="naf-diagnostic">Analyse en cours...</div>
+                        <div class="text-[10px] font-bold mt-4" id="naf-diagnostic">Analyse en cours...</div>
                     </div>
 
-                    <!-- LE CERTIFICAT D'AUDITABILITÉ (DATA LINEAGE) -->
-                    <div class="col-span-4 bento-card p-8 bg-gradient-to-br from-card to-blue-900/20 border border-blue-500/30">
+                    <div class="col-span-4 bento-card p-8 bg-gradient-to-br from-card to-blue-900/20 border-l-4 border-blue-500">
                         <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-shield-check text-blue-400"></i> Certificat d'Auditabilité (CSRD)</h3>
-                        <p class="text-xs text-gray-300 leading-relaxed mb-4">
-                            Données inaltérables extraites directement des Systèmes de Gestion des Échanges (SGE) des distributeurs nationaux.
-                        </p>
-                        <div class="space-y-2 bg-abysse/50 p-4 rounded-xl border border-white/5 text-[10px] font-mono text-gray-400">
-                            <div class="flex justify-between"><span>Source des données :</span> <span class="text-white">API ENEDIS / GRDF</span></div>
-                            <div class="flex justify-between"><span>Facteurs d'Émissions :</span> <span class="text-white">Base Carbone ADEME</span></div>
-                            <div class="flex justify-between"><span>Périmètre :</span> <span class="text-cyan font-bold" id="cert-sites">-- PDL/PCE</span></div>
+                        <p class="text-xs text-gray-300 leading-relaxed mb-6">Données inaltérables extraites directement des SGE des distributeurs nationaux.</p>
+                        <div class="space-y-3 bg-abysse/50 p-6 rounded-[2rem] border border-white/5 text-xs font-mono text-gray-400">
+                            <div class="flex justify-between"><span>Source des données :</span> <span class="text-white font-bold">API ENEDIS / GRDF</span></div>
+                            <div class="flex justify-between"><span>Facteurs d'Émissions :</span> <span class="text-white font-bold">Base Carbone ADEME</span></div>
+                            <div class="flex justify-between border-t border-white/10 pt-3"><span>Périmètre Actif :</span> <span class="text-cyan font-bold" id="cert-sites">-- PDL/PCE</span></div>
                         </div>
                     </div>
-
                 </div>
 
-                <!-- ROW 2 : SMART TWIN FORECAST (LA TRAJECTOIRE) -->
-                <div class="bento-card p-8 border-l-4 border-eco relative overflow-hidden shadow-2xl">
+                <div class="bento-card p-10 border border-eco/30 relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
                     <div class="flex justify-between items-start mb-8 relative z-10">
                         <div>
-                            <h3 class="text-lg font-black text-white uppercase tracking-wider flex items-center gap-3">
-                                <i class="fa-solid fa-crystal-ball text-eco"></i> Smart Twin : Trajectoire Carbone à 5 ans
-                            </h3>
-                            <p class="text-xs text-gray-400 mt-2">Conversion du modèle prédictif CORTEX en tonnes de CO2e. Suivi des objectifs Décret Tertiaire.</p>
+                            <h3 class="text-xl font-black text-white uppercase tracking-wider flex items-center gap-3"><i class="fa-solid fa-crystal-ball text-eco"></i> Smart Twin : Trajectoire à 5 ans</h3>
+                            <p class="text-sm text-gray-400 mt-2">Conversion du modèle CORTEX en CO2e. Suivi Loi ELAN.</p>
                         </div>
-                        <div class="bg-eco/10 border border-eco/30 px-6 py-3 rounded-xl text-right">
-                            <div class="text-[10px] text-eco uppercase font-bold tracking-widest mb-1">Gisement de Réduction (5 ans)</div>
-                            <div class="text-2xl font-black text-white font-mono" id="forecast-gain">-- tCO2e</div>
+                        <div class="bg-eco/10 border border-eco/30 px-6 py-4 rounded-[2rem] text-right">
+                            <div class="text-[10px] text-eco uppercase font-bold tracking-widest mb-1">Gisement de Réduction</div>
+                            <div class="text-3xl font-black text-white font-mono" id="forecast-gain">-- tCO2e</div>
                         </div>
                     </div>
-                    
-                    <div class="h-[350px] w-full relative z-10">
+                    <div class="h-[400px] w-full relative z-10">
                         <canvas id="forecastChart"></canvas>
-                        <div id="chart-loader" class="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur z-20">
-                            <i class="fa-solid fa-spinner fa-spin text-3xl text-eco mb-3"></i>
-                            <span class="text-xs font-mono text-eco tracking-widest uppercase">Génération de la trajectoire IA...</span>
+                        <div id="chart-loader" class="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-md rounded-[2rem] z-20">
+                            <i class="fa-solid fa-spinner fa-spin text-4xl text-eco mb-4"></i>
+                            <span class="text-sm font-mono text-eco tracking-widest uppercase">Génération IA...</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- ROW 3 : PLAN D'ACTION RSE (Lien avec l'Énergie) -->
                 <div class="grid grid-cols-2 gap-6">
                     <div class="bento-card p-8">
                         <h3 class="text-sm font-bold text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-ghost text-purple-400"></i> Impact Carbone du Gaspillage</h3>
-                        <div class="flex items-center gap-6">
-                            <div class="w-24 h-24 relative">
-                                <canvas id="wasteChart"></canvas>
-                            </div>
+                        <div class="flex items-center gap-8">
+                            <div class="w-32 h-32 relative"><canvas id="wasteChart"></canvas></div>
                             <div>
-                                <p class="text-xs text-gray-300 leading-relaxed mb-3">
-                                    Le talon de consommation (nuits et week-ends) de vos bâtiments génère des émissions inutiles. Couper ces veilles est l'action RSE la plus rapide.
-                                </p>
-                                <div class="text-2xl font-black text-white font-mono" id="waste-co2">-- tCO2e <span class="text-[10px] text-gray-500 font-sans font-normal uppercase">Évitables immédiatement</span></div>
+                                <p class="text-xs text-gray-300 leading-relaxed mb-4">Le talon de consommation (nuits et week-ends) de vos bâtiments génère des émissions inutiles. Couper ces veilles est l'action RSE la plus rapide.</p>
+                                <div class="text-3xl font-black text-white font-mono" id="waste-co2">-- tCO2e <span class="text-[10px] text-gray-500 font-sans font-bold uppercase block mt-1">Évitables immédiatement</span></div>
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="bento-card p-8 bg-gradient-to-br from-card to-yellow-500/10 border border-yellow-500/30 flex flex-col justify-center">
+                    <div class="bento-card p-8 bg-gradient-to-br from-card to-yellow-500/10 border-l-4 border-yellow-500 flex flex-col justify-center">
                         <div class="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-solar-panel text-yellow-500"></i> Plan d'Action : Autoconsommation</h3>
-                                <p class="text-xs text-gray-400 mt-1">Réduisez votre Scope 2 en produisant votre énergie.</p>
-                            </div>
-                            <span class="bg-yellow-500 text-abysse px-3 py-1 rounded text-[10px] font-black uppercase">Solution</span>
+                            <div><h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-solar-panel text-yellow-500"></i> Solution : Autoconsommation</h3><p class="text-xs text-gray-400 mt-2">Réduisez votre Scope 2 en produisant votre énergie.</p></div>
                         </div>
-                        <button onclick="window.location.href='/solar'" class="w-full bg-white/10 hover:bg-yellow-500 text-white hover:text-abysse font-bold py-4 rounded-xl transition shadow-lg flex justify-center items-center gap-3">
-                            <i class="fa-solid fa-map-location-dot"></i> Lancer l'Audit Toitures (Cadastre Solaire)
+                        <button onclick="goToSolar()" class="w-full bg-yellow-500 hover:bg-white text-abysse font-bold py-4 rounded-[2rem] transition shadow-lg flex justify-center items-center gap-3 text-sm mt-4">
+                            <i class="fa-solid fa-map-location-dot"></i> Lancer l'Audit Toitures (Solar Studio)
                         </button>
                     </div>
                 </div>
-
             </div>
         </div>
     </main>
 
-    <!-- LOGIQUE JAVASCRIPT & APPEL API (ZÉRO MOCK) -->
     <script>
-        // --- CONSTANTES D'ÉMISSION (BASE CARBONE ADEME) ---
-        // Exprimées en tCO2e / MWh
-        const FE_GAZ = 0.227; 
-        const FE_ELEC_LOC = 0.052; // Location-based (Mix France Moyen)
-        const FE_ELEC_MKT = 0.000; // Market-based (Si Garanties d'Origine actives)
+        const FE_GAZ = 0.227; const FE_ELEC_LOC = 0.052; const FE_ELEC_MKT = 0.000;
+        const NAF_BENCHMARK = { "86": 120, "47": 65, "64": 35, "84": 40, "85": 30, "DEFAULT": 50 };
 
-        // --- RÉFÉRENTIEL NAF (kgCO2e / m²) ---
-        const NAF_BENCHMARK = {
-            "86": 120, // Hôpitaux
-            "47": 65,  // Retail / Supermarchés
-            "64": 35,  // Banques
-            "84": 40,  // Mairies / Admin
-            "85": 30,  // Écoles
-            "DEFAULT": 50
-        };
+        let FLEET_DATA =[]; let forecastChartInst = null; let wasteChartInst = null; let CURRENT_METHOD = 'LOCATION';
 
-        let FLEET_DATA = [];
-        let forecastChartInst = null;
-        let wasteChartInst = null;
-        let CURRENT_METHOD = 'LOCATION'; // 'LOCATION' ou 'MARKET'
+        // --- CORTEX INTERCEPTOR : LECTURE DU GOD MODE ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceTenant = urlParams.get('force_tenant') || localStorage.getItem('cortex_god_mode_tenant');
 
-        // --- 1. INITIALISATION ---
+        function goBack() {
+            if(window.history.length > 1) window.history.back();
+            else window.location.href = '/dashboard';
+        }
+
+        function goToSolar() {
+            let url = '/solar';
+            const siteId = document.getElementById('perimeter-select').value;
+            if (siteId && siteId !== 'ALL') url += `?id=${siteId}`;
+            if (forceTenant && forceTenant !== 'ALL') url += (url.includes('?') ? '&' : '?') + `force_tenant=${forceTenant}`;
+            window.location.href = url;
+        }
+
         async function initModule() {
             try {
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
                 
                 if(data.fleet) {
-                    FLEET_DATA = data.fleet;
+                    // APPLICATION DU GOD MODE SUR LA FLOTTE
+                    if (forceTenant && forceTenant !== 'ALL') {
+                        FLEET_DATA = data.fleet.filter(s => s.tenant_id === forceTenant);
+                    } else {
+                        FLEET_DATA = data.fleet;
+                    }
+                    
                     populateSelector();
                     
-                    const urlParams = new URLSearchParams(window.location.search);
                     const targetId = urlParams.get('id');
                     if (targetId && FLEET_DATA.find(s => s.id === targetId)) {
                         document.getElementById('perimeter-select').value = targetId;
@@ -279,173 +233,101 @@
             const sel = document.getElementById('perimeter-select');
             FLEET_DATA.sort((a,b) => a.name.localeCompare(b.name)).forEach(s => {
                 const opt = document.createElement('option');
-                opt.value = s.id;
-                opt.innerText = `${s.energy === 'gaz' ? '🔥' : '⚡'} ${s.name} (${s.pdl || s.id})`;
+                opt.value = s.id; opt.innerText = `${s.energy === 'gaz' ? '🔥' : '⚡'} ${s.name} (${s.pdl || s.id})`;
                 sel.appendChild(opt);
             });
         }
 
-        // --- 2. TOGGLE MÉTHODOLOGIE (LOCATION VS MARKET BASED) ---
         window.toggleMethodology = function() {
-            const isChecked = document.getElementById('market-toggle').checked;
-            CURRENT_METHOD = isChecked ? 'MARKET' : 'LOCATION';
-            document.getElementById('lbl-method').innerText = isChecked ? "Market-based (Contrat Vert)" : "Location-based (Mix France)";
-            changePerimeter(); // Recalcul immédiat
+            CURRENT_METHOD = document.getElementById('market-toggle').checked ? 'MARKET' : 'LOCATION';
+            document.getElementById('lbl-method').innerText = CURRENT_METHOD === 'MARKET' ? "Market-based" : "Location-based";
+            changePerimeter(); 
         }
 
-        // --- 3. MOTEUR DE CALCUL RSE ---
         window.changePerimeter = function() {
             const target = document.getElementById('perimeter-select').value;
             let sites = target === 'ALL' ? FLEET_DATA : FLEET_DATA.filter(s => s.id === target);
             
-            let volElec = 0; let volGaz = 0; let totalSurf = 0; let ghostMwh = 0;
-            let mainNaf = "DEFAULT";
+            let volElec = 0; let volGaz = 0; let totalSurf = 0; let ghostMwh = 0; let mainNaf = "DEFAULT";
 
             sites.forEach(s => {
                 const v = parseFloat(s.volume) || 0;
                 if(s.energy === 'gaz') volGaz += v; else volElec += v;
                 totalSurf += parseFloat(s.surface) || 0;
-                
-                // Approximation du ghost_savings (€) en MWh (sur base de 180€/MWh)
                 if(s.ghost_savings) ghostMwh += (s.ghost_savings / 180);
-
-                // Extraction du NAF pour le benchmark (On prend le premier dispo)
-                if (mainNaf === "DEFAULT" && s.naf) mainNaf = str(s.naf).substring(0,2);
+                if (mainNaf === "DEFAULT" && s.naf) mainNaf = String(s.naf).substring(0,2);
             });
 
-            // Application des Facteurs d'Émission
             const feElec = CURRENT_METHOD === 'MARKET' ? FE_ELEC_MKT : FE_ELEC_LOC;
             const tco2Gaz = volGaz * FE_GAZ;
             const tco2Elec = volElec * feElec;
             const totalCo2 = tco2Gaz + tco2Elec;
 
-            // Mise à jour de l'UI
             document.getElementById('kpi-co2').innerText = totalCo2 > 0 ? totalCo2.toFixed(1) : "0";
             document.getElementById('kpi-sc1').innerText = tco2Gaz.toFixed(1) + " t";
             document.getElementById('kpi-sc2').innerText = tco2Elec.toFixed(1) + " t";
-            document.getElementById('cert-sites').innerText = `${sites.length} Compteurs (PDL/PCE)`;
+            document.getElementById('cert-sites').innerText = `${sites.length} Compteurs`;
 
-            // Calcul Intensité et Benchmarking NAF
             const intensityKgCo2 = totalSurf > 0 ? (totalCo2 * 1000) / totalSurf : 0;
             document.getElementById('kpi-intensity').innerText = intensityKgCo2 > 0 ? Math.round(intensityKgCo2) : "N/A";
             
-            // Si on a le nom du client dans l'identity, on essaye de deviner le NAF, sinon on prend Retail par defaut
             const refNaf = NAF_BENCHMARK[mainNaf] || NAF_BENCHMARK["47"]; 
-            document.getElementById('lbl-naf').innerText = mainNaf !== "DEFAULT" ? `Code ${mainNaf}` : "Moyenne Nationale";
+            document.getElementById('lbl-naf').innerText = mainNaf !== "DEFAULT" ? `Code ${mainNaf}` : "Moyenne";
             document.getElementById('kpi-naf-avg').innerText = `${refNaf} kgCO2e/m²`;
 
             renderNafGauge(intensityKgCo2, refNaf);
-            renderWasteChart(ghostMwh, totalCo2, feElec, tco2Gaz); // Le gaspillage est souvent électrique, mais on mixe si besoin
+            renderWasteChart(ghostMwh, totalCo2, feElec);
 
-            // Lancement du Smart Twin Forecast
             const forecastTarget = target === 'ALL' ? (FLEET_DATA.length > 0 ? FLEET_DATA[0].id : null) : target;
-            if(forecastTarget) fetchForecast(forecastTarget, totalCo2, feElec, FE_GAZ);
+            if(forecastTarget) fetchForecast(forecastTarget, totalCo2, feElec);
         }
 
         function renderNafGauge(intensity, ref) {
-            const gauge = document.getElementById('gauge-intensity');
-            const diag = document.getElementById('naf-diagnostic');
-            
-            if (intensity === 0) {
-                gauge.style.width = "0%"; diag.innerText = "Surface manquante pour le calcul."; return;
-            }
+            const gauge = document.getElementById('gauge-intensity'); const diag = document.getElementById('naf-diagnostic');
+            if (intensity === 0) { gauge.style.width = "0%"; diag.innerText = "Surface manquante."; return; }
 
-            const ratio = intensity / ref;
-            // On map ratio 0.5 (excellent) -> 20%, ratio 1.0 (moyen) -> 50%, ratio 1.5+ (mauvais) -> 90%
-            let pct = (ratio * 50);
-            if (pct > 100) pct = 100;
-            
-            gauge.style.width = `${pct}%`;
-            
+            const ratio = intensity / ref; let pct = Math.min(ratio * 50, 100); gauge.style.width = `${pct}%`;
             if (ratio < 0.8) {
                 gauge.className = "h-full rounded-full bg-success z-10 relative transition-all duration-1000";
-                diag.innerHTML = `<span class="text-success"><i class="fa-solid fa-medal"></i> Leader RSE : Vous émettez <b>${Math.round((1-ratio)*100)}% de moins</b> que votre secteur.</span>`;
+                diag.innerHTML = `<span class="text-success"><i class="fa-solid fa-medal"></i> Leader RSE : <b>${Math.round((1-ratio)*100)}% de moins</b> que votre secteur.</span>`;
             } else if (ratio < 1.2) {
                 gauge.className = "h-full rounded-full bg-gold z-10 relative transition-all duration-1000";
-                diag.innerHTML = `<span class="text-gold">Dans la moyenne : Votre intensité est alignée avec la profession.</span>`;
+                diag.innerHTML = `<span class="text-gold">Dans la moyenne sectorielle.</span>`;
             } else {
                 gauge.className = "h-full rounded-full bg-alert z-10 relative transition-all duration-1000 shadow-[0_0_15px_rgba(239,68,68,0.5)]";
-                diag.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Risque d'Image : Vous émettez <b>${Math.round((ratio-1)*100)}% de plus</b> que vos concurrents.</span>`;
+                diag.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Vous émettez <b>${Math.round((ratio-1)*100)}% de plus</b> que vos concurrents.</span>`;
             }
         }
 
-        // --- 4. SMART TWIN FORECAST (API PYTHON) ---
-        async function fetchForecast(siteId, currentTotalCo2, currentFeElec, feGaz) {
-            const loader = document.getElementById('chart-loader');
-            loader.classList.remove('hidden');
-
+        async function fetchForecast(siteId, currentTotalCo2, currentFeElec) {
+            const loader = document.getElementById('chart-loader'); loader.classList.remove('hidden');
             try {
-                // Appel au vrai Cerveau Python
-                const res = await fetch(`/api/forecast/simulate/${siteId}`);
-                const data = await res.json();
-                
+                const res = await fetch(`/api/forecast/simulate/${siteId}`); const data = await res.json();
                 if (data && data.labels) {
-                    // Le backend renvoie des MWh. On doit les convertir en tCO2e pour ce dashboard.
-                    // On fait une moyenne pondérée simplifiée des FE si le site est mixte, 
-                    // ou on utilise le FE Electrique dominant.
-                    const conversionFactor = currentFeElec > 0 ? currentFeElec : (currentTotalCo2 > 0 ? currentTotalCo2 / data.dataset_trend[0] : FE_ELEC_LOC);
-                    
-                    const co2Trend = data.dataset_trend.map(v => v * conversionFactor);
-                    const co2Sobriety = data.dataset_sobriety.map(v => v * conversionFactor);
-                    const gainCo2 = data.gain_potential_mwh * conversionFactor;
-
-                    document.getElementById('forecast-gain').innerText = `- ${Math.round(gainCo2)} tCO2e`;
-                    drawForecastChart(data.labels, co2Trend, co2Sobriety);
+                    const cf = currentFeElec > 0 ? currentFeElec : (currentTotalCo2 > 0 ? currentTotalCo2 / data.dataset_trend[0] : FE_ELEC_LOC);
+                    document.getElementById('forecast-gain').innerText = `- ${Math.round(data.gain_potential_mwh * cf)} tCO2e`;
+                    drawForecastChart(data.labels, data.dataset_trend.map(v => v * cf), data.dataset_sobriety.map(v => v * cf));
                 }
-            } catch(e) { console.error("Erreur Forecast", e); }
-            finally { loader.classList.add('hidden'); }
+            } catch(e) {} finally { loader.classList.add('hidden'); }
         }
 
         function drawForecastChart(labels, dataTrend, dataSobriety) {
             const ctx = document.getElementById('forecastChart').getContext('2d');
             if (forecastChartInst) forecastChartInst.destroy();
-
             forecastChartInst = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets:[
-                        { label: 'Scénario Tendanciel (Inaction)', data: dataTrend, borderColor: '#EF4444', borderDash: [5, 5], tension: 0.4, borderWidth: 2, pointRadius: 0 },
-                        { label: 'Trajectoire Sobriété (Loi ELAN)', data: dataSobriety, borderColor: '#14B8A6', backgroundColor: 'rgba(20, 184, 166, 0.1)', borderWidth: 4, tension: 0.4, fill: true }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom', labels: { color: '#94A3B8' } } },
-                    scales: { 
-                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' }, title: { display: true, text: 'Emissions (tCO2e)', color: '#64748B'} }, 
-                        x: { grid: { display: false }, ticks: { color: '#64748B'} } 
-                    },
-                    interaction: { mode: 'index', intersect: false }
-                }
+                type: 'line', data: { labels: labels, datasets:[ { label: 'Scénario Inaction', data: dataTrend, borderColor: '#EF4444', borderDash:[5, 5], tension: 0.4, borderWidth: 2, pointRadius: 0 }, { label: 'Trajectoire Loi ELAN', data: dataSobriety, borderColor: '#14B8A6', backgroundColor: 'rgba(20, 184, 166, 0.1)', borderWidth: 4, tension: 0.4, fill: true } ] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94A3B8', font: { family: 'JetBrains Mono' } } } }, scales: { y: { grid: { color: 'rgba(0,229,255,0.05)' }, ticks: { color: '#64748B', font: { family: 'JetBrains Mono' } } }, x: { grid: { display: false }, ticks: { color: '#64748B', font: { family: 'JetBrains Mono' } } } }, interaction: { mode: 'index', intersect: false } }
             });
         }
 
-        function renderWasteChart(ghostMwh, totalCo2, feElec, tco2Gaz) {
-            // Le ghost est presque toujours électrique.
+        function renderWasteChart(ghostMwh, totalCo2, feElec) {
             const ghostCo2 = ghostMwh * feElec;
-            document.getElementById('waste-co2').innerHTML = `${ghostCo2.toFixed(1)} <span class="text-[10px] text-gray-500 font-sans font-normal uppercase">tCO2e Évitables immédiatement</span>`;
-            
+            document.getElementById('waste-co2').innerHTML = `${ghostCo2.toFixed(1)} <span class="text-[10px] text-gray-500 font-sans font-bold uppercase block mt-1">tCO2e Évitables</span>`;
             const ctx = document.getElementById('wasteChart').getContext('2d');
             if (wasteChartInst) wasteChartInst.destroy();
-            
-            const usefulCo2 = Math.max(0, totalCo2 - ghostCo2);
-            
-            wasteChartInst = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['CO2 Utile', 'CO2 Gaspillé (Nuites/WE)'],
-                    datasets: [{
-                        data: [usefulCo2, ghostCo2],
-                        backgroundColor: ['#14B8A6', '#A855F7'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { display: false } } }
-            });
+            wasteChartInst = new Chart(ctx, { type: 'doughnut', data: { labels:['Utile', 'Gaspillé'], datasets: [{ data:[Math.max(0, totalCo2 - ghostCo2), ghostCo2], backgroundColor: ['#14B8A6', '#A855F7'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { display: false } } } });
         }
 
-        // Lancement au chargement de la page
         document.addEventListener('DOMContentLoaded', initModule);
     </script>
 </body>
