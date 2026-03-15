@@ -618,7 +618,7 @@ async def api_add_site_3d(company_id: str, payload: CRMSiteModel, user = Depends
 @app.get("/api/crm/pipeline/{pipe_type}")
 async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user)):
     """Assemble toutes les données CRM (Holding, Solvabilité, Alertes SaaS)"""
-    if not user or user.get("role") != "ADMIN": 
+    if not user: 
         return JSONResponse({"error": "Accès réservé"}, 401)
     
     all_deals = db.get_all_deals()
