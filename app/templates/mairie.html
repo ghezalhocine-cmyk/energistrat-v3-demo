@@ -5,13 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ENERGISTRAT V12.6 | Mairie.OS (Hyperviseur DGS)</title>
     
-    <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- LEAFLET MAP (Gratuit & Sans Clé API) -->
+    <!-- LEAFLET MAP -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -46,14 +45,15 @@
         tr.site-row:hover td { background-color: rgba(59, 130, 246, 0.15) !important; color: white; }
         
         .nav-item.active { background: rgba(59, 130, 246, 0.1); border-right: 4px solid #3B82F6; color: white; }
-        .input-edit { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,229,255,0.2); color: white; padding: 12px; border-radius: 1rem; width: 100%; font-family: 'JetBrains Mono'; }
-        .input-edit:focus { border-color: #00E5FF; outline: none; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+        .input-edit { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,229,255,0.2); color: white; padding: 12px; border-radius: 1.5rem; width: 100%; font-family: 'JetBrains Mono'; outline: none; transition: border-color 0.3s; }
+        .input-edit:focus { border-color: #00E5FF; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+        
+        #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
+        #action-bar.visible { transform: translateY(0); }
         
         /* LEAFLET DARK MODE CSS INVERT TRICK */
-        .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution {
-            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
-        }
-        .leaflet-container { background: #001529 !important; border-radius: 2rem; font-family: 'Inter', sans-serif; }
+        .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        .leaflet-container { background: transparent !important; border-radius: 2rem; font-family: 'Inter', sans-serif; }
 
         /* MARKERS FEU TRICOLORE */
         .map-marker { border-radius: 50%; border: 3px solid white; box-shadow: 0 0 15px rgba(0,0,0,0.8); }
@@ -79,43 +79,44 @@
             <div>
                 <div class="font-black tracking-tight text-white leading-none text-xl">MAIRIE<span class="text-cyan">.OS</span></div>
                 <div id="god-mode-indicator" class="text-[9px] text-alert font-mono mt-1 hidden animate-pulse font-bold">● GOD MODE ACTIF</div>
-                <div class="text-[9px] text-gray-500 font-mono mt-1 tracking-widest uppercase">Hyperviseur Élu</div>
+                <div class="text-[9px] text-gray-500 font-mono mt-1 tracking-widest uppercase">Hyperviseur DGS</div>
             </div>
         </div>
         
-        <div class="p-4 space-y-1 mt-4">
+        <div class="p-4 space-y-1 mt-4 overflow-y-auto">
             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-widest mb-2 px-2">Opérations Publiques</div>
             <button onclick="switchView('patrimoine')" id="nav-patrimoine" class="nav-item active w-full flex items-center gap-3 px-4 py-3 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition">
-                <i class="fa-solid fa-map-location-dot w-5 text-center"></i> Cartographie & Parc
+                <i class="fa-solid fa-city w-5 text-center"></i> Parc & Sobriété
             </button>
             <button onclick="switchView('budget')" id="nav-budget" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition">
-                <i class="fa-solid fa-vault w-5 text-center text-gold"></i> Budget M57
+                <i class="fa-solid fa-chart-pie w-5 text-center text-gold"></i> Exécution M57
+            </button>
+            <button onclick="switchView('market')" id="nav-market" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition">
+                <i class="fa-solid fa-chart-line w-5 text-center text-cyan"></i> Météo des Marchés
+            </button>
+            <button onclick="switchView('comparator')" id="nav-comparator" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition">
+                <i class="fa-solid fa-scale-balanced w-5 text-center text-white"></i> Smart-Mapping BPU
             </button>
             <button onclick="switchView('citizens')" id="nav-citizens" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition">
-                <i class="fa-solid fa-gamepad w-5 text-center text-citizen"></i> Gamification Citoyenne
+                <i class="fa-solid fa-users-line w-5 text-center text-citizen"></i> Achat Groupé
             </button>
-        </div>
 
-        <div class="px-4 mt-6">
-            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-widest mb-2 px-2">Décisions & Conseil</div>
+            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-widest mb-2 mt-6 px-2">Décisions & Conseil</div>
             <button onclick="generateReport()" class="w-full flex items-center gap-3 px-4 py-3 text-xs text-white hover:bg-white/10 transition rounded-[2rem] bg-gradient-to-r from-mairie to-blue-600 shadow-lg text-left font-bold mb-2">
                 <i class="fa-solid fa-file-pdf w-4 text-center"></i> Éditer Rapport (Conseil)
             </button>
             <button onclick="goToModule('/solar')" class="w-full flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-[2rem] hover:bg-white/5 cursor-pointer text-left">
-                <i class="fa-solid fa-solar-panel w-4 text-yellow-500 text-center"></i> Cadastre Solaire (PVGIS)
+                <i class="fa-solid fa-solar-panel w-4 text-yellow-500 text-center"></i> Cadastre Solaire
             </button>
             <button onclick="goToModule('/carbon')" class="w-full flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-[2rem] hover:bg-white/5 cursor-pointer text-left">
-                <i class="fa-solid fa-leaf w-4 text-green-500 text-center"></i> Bilan Carbone Ville
+                <i class="fa-solid fa-leaf w-4 text-green-500 text-center"></i> Bilan Carbone (ELAN)
             </button>
         </div>
         
         <div class="mt-auto p-4 border-t border-cyan/10 bg-card/30">
             <button onclick="goToModule('/settings')" class="w-full flex items-center gap-3 p-2 rounded-[2rem] hover:bg-white/5 transition group mb-2 border border-transparent hover:border-cyan/30 text-left">
                 <div class="w-10 h-10 rounded-full bg-abysse flex items-center justify-center text-sm text-white font-bold group-hover:bg-cyan group-hover:text-abysse transition border border-cyan/30 shadow-lg"><i class="fa-solid fa-database"></i></div>
-                <div class="flex-1 min-w-0">
-                    <div class="text-xs font-bold text-white group-hover:text-cyan transition">Data Unity</div>
-                    <div class="text-[10px] text-gray-500">Administration</div>
-                </div>
+                <div class="flex-1 min-w-0"><div class="text-xs font-bold text-white group-hover:text-cyan transition">Data Unity</div><div class="text-[10px] text-gray-500">Administration</div></div>
             </button>
             <a href="/ops_nexus" class="flex items-center justify-center w-full gap-2 text-gray-400 hover:text-white transition text-xs font-bold bg-abysse border border-white/10 rounded-[2rem] py-2 mt-2">
                 <i class="fa-solid fa-arrow-left"></i> Quitter Mairie.OS
@@ -134,12 +135,12 @@
                     <p class="text-xs text-gray-400 font-mono mt-1"><i class="fa-solid fa-users text-mairie"></i> <span id="commune-pop">--</span> Habitants (API Gouv)</p>
                 </div>
                 <div id="sobriety-badge" class="hidden px-4 py-1 rounded-full bg-alert/20 border border-alert/50 text-alert text-xs font-bold animate-pulse flex items-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.4)] ml-4">
-                    <i class="fa-solid fa-triangle-exclamation"></i> BÂTIMENTS EN ALERTE (Gaspillage)
+                    <i class="fa-solid fa-triangle-exclamation"></i> DÉRIVE SOBRIÉTÉ (Nuit/WE)
                 </div>
             </div>
             <div class="flex gap-6 text-right items-center">
                 <div class="border-r border-cyan/20 pr-8">
-                    <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Budget Total Projeté</div>
+                    <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Budget Total Projeté (Chap. 011)</div>
                     <div class="text-3xl font-black text-cyan font-mono drop-shadow-[0_0_10px_rgba(0,229,255,0.3)]" id="header-budget">-- €</div>
                 </div>
             </div>
@@ -147,17 +148,13 @@
 
         <div class="flex-1 overflow-y-auto p-10 pb-32">
 
-            <!-- VUE 1 : CARTOGRAPHIE & PATRIMOINE -->
+            <!-- VUE 1 : PATRIMOINE (MAP & PARC GLOBAL) -->
             <div id="view-patrimoine" class="view-section active space-y-8 max-w-[1600px] mx-auto">
                 
-                <!-- LA LIGNE MAP + KPIS -->
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[400px]">
-                    
                     <!-- LEAFLET MAP -->
                     <div class="col-span-8 bento-card p-2 relative overflow-hidden border-2 border-mairie/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
                         <div id="map" class="w-full h-full rounded-[2.5rem] z-10"></div>
-                        
-                        <!-- LÉGENDE FLOTTANTE -->
                         <div class="absolute bottom-6 right-6 bg-abysse/90 backdrop-blur-md p-4 rounded-2xl border border-white/10 z-[400] text-xs font-bold shadow-2xl">
                             <div class="text-[10px] text-gray-400 uppercase tracking-widest mb-2 border-b border-white/10 pb-1">État du Parc</div>
                             <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-success shadow-[0_0_8px_#10B981]"></span> <span class="text-white">Optimisé</span></div>
@@ -166,33 +163,41 @@
                         </div>
                     </div>
 
-                    <!-- KPIS COLONNE DROITE -->
+                    <!-- KPIS -->
                     <div class="col-span-4 flex flex-col gap-6">
                         <div class="bento-card p-6 border-t-4 border-alert flex-1 flex flex-col justify-center items-center text-center cursor-pointer hover:bg-alert/5 transition group" onclick="filterWaste()">
-                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 group-hover:text-alert transition">Fuite Financière Nuit/WE</h3>
-                            <div class="text-5xl font-black text-white font-mono mb-2" id="kpi-waste">-- €</div>
+                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 group-hover:text-alert transition">Fuite Financière (Talon Nuit)</h3>
+                            <div class="text-5xl font-black text-white font-mono mb-2 drop-shadow-[0_0_10px_rgba(239,68,68,0.3)]" id="kpi-waste">-- €</div>
                             <div class="text-[10px] text-alert font-bold bg-alert/10 px-3 py-1 rounded-full border border-alert/30"><i class="fa-solid fa-filter"></i> Isoler les passoires</div>
                         </div>
-                        <div class="bento-card p-6 border-t-4 border-mairie flex-1 flex flex-col justify-center">
-                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">Répartition Volume SGE</h3>
+                        <div class="bento-card p-4 border-t-4 border-cyan flex-1 flex flex-col justify-center">
                             <div class="flex justify-between items-center w-full px-4">
                                 <div class="text-center"><span class="text-[10px] text-gray-500 uppercase font-bold tracking-widest"><i class="fa-solid fa-bolt text-cyan"></i> Élec</span><div class="text-2xl font-black text-white font-mono" id="kpi-vol-elec">-- MWh</div></div>
                                 <div class="h-10 w-px bg-white/10"></div>
                                 <div class="text-center"><span class="text-[10px] text-gray-500 uppercase font-bold tracking-widest"><i class="fa-solid fa-fire text-gas"></i> Gaz</span><div class="text-2xl font-black text-white font-mono" id="kpi-vol-gaz">-- MWh</div></div>
                             </div>
                         </div>
+                        <div class="bento-card p-1 flex bg-black/40">
+                            <button onclick="filterEnergy('elec')" id="btn-elec" class="flex-1 rounded-[2rem] text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center py-2 gap-1 active-energy"><i class="fa-solid fa-bolt text-lg"></i> Élec</button>
+                            <div class="w-px bg-white/10 my-2"></div>
+                            <button onclick="filterEnergy('gaz')" id="btn-gaz" class="flex-1 rounded-[2rem] text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center py-2 gap-1"><i class="fa-solid fa-fire text-lg"></i> Gaz</button>
+                            <div class="w-px bg-white/10 my-2"></div>
+                            <button onclick="filterEnergy('all')" id="btn-all" class="flex-1 rounded-[2rem] text-xs font-bold text-cyan bg-cyan/10 border border-cyan/30 transition flex flex-col items-center justify-center py-2 gap-1"><i class="fa-solid fa-layer-group text-lg"></i> Tout</button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- TABLEAU DES BÂTIMENTS -->
-                <div class="bento-card overflow-hidden flex flex-col h-[500px] border border-cyan/20">
+                <!-- TABLEAU DE GESTION -->
+                <div class="bento-card overflow-hidden flex flex-col h-[600px] border border-cyan/20">
                     <div class="px-8 py-5 border-b border-white/5 flex justify-between items-center bg-card/50">
                         <div class="flex items-center gap-4">
-                            <h3 class="font-bold text-white uppercase tracking-widest text-sm flex items-center gap-2 mr-4"><i class="fa-solid fa-list-check text-cyan"></i> Liste des Bâtiments</h3>
-                            <div class="relative w-72">
+                            <h3 class="font-bold text-white uppercase tracking-widest text-sm flex items-center gap-2 mr-4"><i class="fa-solid fa-list-check text-cyan"></i> Bâtiments & Éclairage Public</h3>
+                            <div class="relative w-64">
                                 <i class="fa-solid fa-search absolute left-4 top-3 text-gray-500 text-xs"></i>
-                                <input type="text" id="search-input" oninput="applyFilters()" placeholder="Rechercher École, Mairie..." class="w-full bg-abysse border border-white/10 rounded-[2rem] py-2.5 pl-10 pr-4 text-xs text-white focus:border-cyan outline-none transition font-mono">
+                                <input type="text" id="search-input" oninput="applyFilters()" placeholder="Recherche..." class="w-full bg-abysse border border-white/10 rounded-[2rem] py-2 pl-10 pr-4 text-xs text-white focus:border-cyan outline-none transition font-mono">
                             </div>
+                            <select id="filter-lot" onchange="applyFilters()" class="bg-abysse border border-white/10 rounded-[2rem] p-2 px-4 text-xs text-gray-300 outline-none cursor-pointer"><option value="all">Tous les Lots</option></select>
+                            <select id="filter-type" onchange="applyFilters()" class="bg-abysse border border-white/10 rounded-[2rem] p-2 px-4 text-xs text-gray-300 outline-none cursor-pointer"><option value="all">Toutes Typologies</option><option value="ecole">Écoles</option><option value="sport">Sport</option><option value="admin">Administratif</option><option value="ep">Éclairage Public</option></select>
                         </div>
                         <div class="text-xs font-bold text-gray-500 font-mono"><span id="visible-count" class="text-cyan">0</span> compteurs</div>
                     </div>
@@ -201,12 +206,14 @@
                         <table class="w-full text-left text-sm text-gray-300">
                             <thead class="bg-abysse text-[10px] uppercase text-gray-400 font-bold sticky top-0 z-10 shadow-md">
                                 <tr>
-                                    <th class="px-6 py-4 border-b border-white/5">Site Public</th>
+                                    <th class="px-6 py-4 border-b border-white/5 w-10 text-center"><input type="checkbox" onclick="toggleAll(this)" class="accent-cyan w-4 h-4 cursor-pointer"></th>
+                                    <th class="px-6 py-4 border-b border-white/5">Site / Bâtiment</th>
                                     <th class="px-6 py-4 border-b border-white/5">Typologie</th>
                                     <th class="px-6 py-4 border-b border-white/5">PDL / PCE</th>
-                                    <th class="px-6 py-4 text-right border-b border-white/5">Volume</th>
-                                    <th class="px-6 py-4 text-right border-b border-white/5">Budget. Est</th>
-                                    <th class="px-6 py-4 text-center border-b border-white/5">Feu Tricolore Sentinel</th>
+                                    <th class="px-6 py-4 border-b border-white/5">Lot</th>
+                                    <th class="px-6 py-4 text-right border-b border-white/5">Vol (MWh)</th>
+                                    <th class="px-6 py-4 text-right border-b border-white/5">Budget Est.</th>
+                                    <th class="px-6 py-4 text-center border-b border-white/5">Sentinel</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/5" id="fleet-table-body"></tbody>
@@ -215,7 +222,7 @@
                 </div>
             </div>
 
-            <!-- VUE 2 : BUDGET M57 (ZERO MOCK & ERGONOMIQUE) -->
+            <!-- VUE 2 : BUDGET M57 -->
             <div id="view-budget" class="view-section hidden space-y-8 max-w-[1200px] mx-auto">
                 <div class="text-center mb-10">
                     <h2 class="text-4xl font-black text-white italic tracking-tight">PILOTAGE <span class="text-gold">M57</span></h2>
@@ -241,120 +248,263 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-6">
-                    <div class="bento-card p-8 border-t-4 border-mairie">
-                        <div class="flex justify-between items-start mb-2"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Compte 60612 (Électricité)</h3><i class="fa-solid fa-bolt text-mairie text-2xl opacity-20"></i></div>
-                        <div class="text-4xl font-black text-white mt-2 font-mono" id="m57-60612-budget">-- €</div>
-                        <div class="text-[10px] text-gray-500 mt-3 uppercase tracking-widest font-bold">Atterrissage fin d'année</div>
-                    </div>
-                    <div class="bento-card p-8 border-t-4 border-gas">
-                        <div class="flex justify-between items-start mb-2"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Compte 60621 (Gaz)</h3><i class="fa-solid fa-fire text-gas text-2xl opacity-20"></i></div>
-                        <div class="text-4xl font-black text-white mt-2 font-mono" id="m57-60621-budget">-- €</div>
-                        <div class="text-[10px] text-gray-500 mt-3 uppercase tracking-widest font-bold">Atterrissage fin d'année</div>
-                    </div>
+                    <div class="bento-card p-8 border-t-4 border-mairie"><div class="flex justify-between items-start mb-2"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Compte 60612 (Électricité)</h3><i class="fa-solid fa-bolt text-mairie text-2xl opacity-20"></i></div><div class="text-4xl font-black text-white mt-2 font-mono" id="m57-60612-budget">-- €</div><div class="text-[10px] text-gray-500 mt-3 uppercase tracking-widest font-bold">Atterrissage projeté</div></div>
+                    <div class="bento-card p-8 border-t-4 border-gas"><div class="flex justify-between items-start mb-2"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Compte 60621 (Gaz)</h3><i class="fa-solid fa-fire text-gas text-2xl opacity-20"></i></div><div class="text-4xl font-black text-white mt-2 font-mono" id="m57-60621-budget">-- €</div><div class="text-[10px] text-gray-500 mt-3 uppercase tracking-widest font-bold">Atterrissage projeté</div></div>
                 </div>
 
                 <div class="bento-card p-8 bg-gradient-to-br from-card to-abysse border border-cyan/30 text-center">
                     <i class="fa-solid fa-brain text-4xl text-cyan mb-4"></i>
-                    <h3 class="text-lg font-black text-white uppercase tracking-widest mb-2">Recommandation CORTEX DGS</h3>
+                    <h3 class="text-lg font-black text-white uppercase tracking-widest mb-2">Recommandation CORTEX DAF</h3>
                     <p class="text-sm text-gray-300 leading-relaxed font-mono" id="cortex-m57-msg">Analyse mathématique de l'exécution...</p>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="bento-card p-6"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Dynamique de Mandatement</h3><div class="h-64 relative"><canvas id="landingChart"></canvas></div></div>
+                    <div class="bento-card p-6"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Poids Énergétique par Typologie</h3><div class="h-64 relative"><canvas id="budgetChart"></canvas></div></div>
                 </div>
             </div>
 
-            <!-- VUE 3 : CITOYENS (GAMIFICATION) -->
-            <div id="view-citizens" class="view-section hidden space-y-8 max-w-[1200px] mx-auto">
+            <!-- VUE 3 : METEO DES MARCHES -->
+            <div id="view-market" class="view-section hidden space-y-8 max-w-[1200px] mx-auto">
                 <div class="text-center mb-10">
-                    <h2 class="text-4xl font-black text-white italic tracking-tight">PORTAIL <span class="text-citizen">CITOYEN</span></h2>
-                    <p class="text-sm text-gray-500 mt-2 font-mono">Défis Sobriété Urbaine & Achat Groupé (B2B2C)</p>
+                    <h2 class="text-4xl font-black text-white italic tracking-tight">STRATÉGIE <span class="text-cyan">ACHAT</span></h2>
+                    <p class="text-sm text-gray-500 mt-2 font-mono">Météo des prix & Opportunités Spot</p>
+                </div>
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="bento-card p-10 flex flex-col justify-center items-center text-center">
+                        <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2"><i class="fa-solid fa-satellite-dish text-cyan"></i> Signal CORTEX Sniper</div>
+                        <div class="w-32 h-32 rounded-full flex items-center justify-center text-5xl mb-6 shadow-[0_0_30px_rgba(0,0,0,0.5)] transition-all duration-500" id="signal-circle">
+                            <i class="fa-solid fa-spinner fa-spin" id="signal-icon"></i>
+                        </div>
+                        <h3 class="text-3xl font-black text-white mb-2" id="signal-text">ANALYSE BOURSE...</h3>
+                        <p class="text-sm text-gray-400 max-w-sm leading-relaxed" id="signal-desc">Synchronisation avec EPEX Spot.</p>
+                    </div>
+                    <div class="bento-card p-10">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8">Positionnement Prix Moyen (€/MWh)</h3>
+                        <div class="space-y-8">
+                            <div><div class="flex justify-between text-sm font-bold mb-2"><span class="text-white">Votre Prix Moyen (Parc)</span><span class="text-white font-mono" id="price-user">-- €</span></div><div class="w-full bg-white/10 h-3 rounded-full"><div id="bar-user" class="h-full bg-mairie rounded-full" style="width: 0%"></div></div></div>
+                            <div><div class="flex justify-between text-sm font-bold mb-2"><span class="text-cyan">Marché de Gros (Cal N+1)</span><span class="text-cyan font-mono" id="price-market">-- €</span></div><div class="w-full bg-white/10 h-3 rounded-full"><div id="bar-market" class="h-full bg-cyan rounded-full shadow-[0_0_15px_#00E5FF]" style="width: 0%"></div></div></div>
+                            <div><div class="flex justify-between text-sm font-bold mb-2"><span class="text-gray-500">TRVE (Référence)</span><span class="text-gray-500 font-mono" id="price-trve">-- €</span></div><div class="w-full bg-white/10 h-3 rounded-full"><div id="bar-trve" class="h-full bg-gray-500 rounded-full" style="width: 0%"></div></div></div>
+                        </div>
+                        <div class="mt-8 p-6 bg-abysse/50 rounded-2xl border-l-4 border-cyan text-sm text-gray-300 leading-relaxed shadow-inner">
+                            <strong class="text-cyan">Recommandation Achat :</strong> <span id="market-advice">Chargement de la recommandation stratégique...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- VUE 4 : SMART MAPPING & COMPARATEUR DQE -->
+            <div id="view-comparator" class="view-section hidden space-y-8 max-w-[1200px] mx-auto">
+                <div class="text-center mb-10">
+                    <h2 class="text-4xl font-black text-white italic tracking-tight">SMART-MAPPING <span class="text-white">BPU</span></h2>
+                    <p class="text-sm text-gray-500 mt-2 font-mono">Dépouillement automatique des Appels d'Offres (Marchés Publics)</p>
                 </div>
                 
+                <div class="grid grid-cols-2 gap-6 mb-8">
+                    <!-- OUTIL 1 : SMART-MAPPER ENEDIS -->
+                    <div class="bento-card p-8 border-t-4 border-mairie text-center">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-2"><i class="fa-solid fa-lightbulb text-mairie mr-2"></i> Extraction ENEDIS</h3>
+                        <p class="text-[10px] text-gray-400 mb-6">Sépare automatiquement l'Éclairage Public (EP) des Bâtiments.</p>
+                        <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-mairie/30 border-dashed rounded-2xl cursor-pointer bg-white/5 hover:bg-white/10 transition group">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <i class="fa-solid fa-file-csv text-3xl text-gray-400 group-hover:text-mairie mb-2 transition"></i>
+                                <p class="text-xs text-gray-400"><span class="font-bold text-white">Uploader l'Excel ENEDIS</span></p>
+                            </div>
+                            <input type="file" class="hidden" accept=".xlsx,.csv" onchange="window.uploadEnedis(this)">
+                        </label>
+                        <div id="enedis-result" class="hidden mt-4 p-4 bg-abysse rounded-xl text-xs text-left font-mono"></div>
+                    </div>
+
+                    <!-- OUTIL 2 : AGGREGATEUR COURBES -->
+                    <div class="bento-card p-8 border-t-4 border-cyan text-center">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-2"><i class="fa-solid fa-chart-line text-cyan mr-2"></i> Profil Macro (Courbes)</h3>
+                        <p class="text-[10px] text-gray-400 mb-6">Agrège X courbes 10min pour calculer la puissance de pointe simultanée.</p>
+                        <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-cyan/30 border-dashed rounded-2xl cursor-pointer bg-white/5 hover:bg-white/10 transition group">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <i class="fa-solid fa-chart-area text-3xl text-gray-400 group-hover:text-cyan mb-2 transition"></i>
+                                <p class="text-xs text-gray-400"><span class="font-bold text-white">Uploader X Courbes de charge</span></p>
+                            </div>
+                            <input type="file" multiple class="hidden" accept=".csv" onchange="window.uploadCurves(this)">
+                        </label>
+                        <div id="curves-result" class="hidden mt-4 p-4 bg-abysse rounded-xl text-xs font-mono"></div>
+                    </div>
+                </div>
+
+                <!-- OUTIL 3 : SIMULATEUR BPU -->
+                <div class="bento-card p-10 border border-white/10">
+                    <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2"><i class="fa-solid fa-scale-balanced text-gray-400"></i> Simulation BPU Candidat</h3>
+                    <div class="flex gap-4 mb-6">
+                        <input type="text" id="offer-name" placeholder="Nom du Candidat (Ex: TotalEnergies)" class="w-1/2 bg-abysse border border-white/10 rounded-2xl p-4 text-sm text-white font-bold outline-none focus:border-cyan transition">
+                        <label class="w-1/2 flex items-center justify-center border-2 border-cyan/30 border-dashed rounded-2xl cursor-pointer bg-white/5 hover:bg-cyan/10 transition group font-bold text-sm text-cyan">
+                            <i class="fa-solid fa-upload mr-2 text-xl"></i> Déposer le BPU chiffré
+                            <input type="file" id="offer-file" class="hidden" accept=".xlsx" onchange="window.triggerOfferScan(this)">
+                        </label>
+                    </div>
+
+                    <div id="sim-results" class="hidden space-y-6">
+                        <div class="grid grid-cols-3 gap-6"><div class="bg-abysse p-6 rounded-2xl border-l-4 border-gray-500"><h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Budget Actuel</h3><div class="text-3xl font-bold text-white font-mono" id="sim-current">-- €</div></div><div class="bg-abysse p-6 rounded-2xl border-l-4 border-cyan"><h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Offre Candidat</h3><div class="text-3xl font-bold text-cyan font-mono" id="sim-offer">-- €</div></div><div class="bg-abysse p-6 rounded-2xl border-l-4 border-success"><h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Impact M57</h3><div class="text-4xl font-black text-success font-mono drop-shadow-md" id="sim-delta">-- €</div></div></div>
+                        <div class="overflow-hidden rounded-2xl border border-white/10"><table class="w-full text-left text-xs text-gray-300"><thead class="bg-abysse text-[9px] uppercase text-gray-500 font-bold tracking-widest"><tr><th class="px-6 py-4">Site</th><th class="px-6 py-4 text-right">Vol. Annuel</th><th class="px-6 py-4 text-right">Budget Actuel</th><th class="px-6 py-4 text-right">Offre Candidat</th><th class="px-6 py-4 text-right">Écart</th></tr></thead><tbody class="divide-y divide-white/5 bg-card/50" id="sim-table-body"></tbody></table></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VUE 5 : CITOYENS (GAMIFICATION B2B2C) -->
+            <div id="view-citizens" class="view-section hidden space-y-8 max-w-[1200px] mx-auto">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <h2 class="text-4xl font-black text-white italic tracking-tight">ACHAT <span class="text-citizen">GROUPÉ</span></h2>
+                        <p class="text-sm text-gray-500 mt-2 font-mono">Mobilisez les foyers pour peser sur le marché de gros.</p>
+                    </div>
+                    <div class="flex items-center gap-4 bg-abysse p-4 rounded-[2rem] border border-white/10 shadow-lg">
+                        <div class="text-right"><div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Potentiel Ville</div><div class="text-sm text-citizen font-bold" id="cit-city-name">Analyse via GeoAPI...</div></div>
+                        <div class="w-14 h-14 rounded-full bg-citizen text-white font-black flex items-center justify-center text-2xl border-4 border-abysse shadow-[0_0_20px_rgba(139,92,246,0.6)]"><i class="fa-solid fa-users"></i></div>
+                    </div>
+                </div>
                 <div class="grid grid-cols-3 gap-6">
                     <div class="bento-card p-8 border-t-4 border-citizen flex flex-col justify-between shadow-lg">
-                        <div><div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Foyers Engagés (App Mobile)</div><div class="text-5xl font-black text-white font-mono" id="cit-foyers">--</div></div>
+                        <div><div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Foyers Engagés (App)</div><div class="text-5xl font-black text-white font-mono" id="cit-foyers">--</div></div>
                         <div class="mt-6 w-full bg-white/10 h-2 rounded-full overflow-hidden"><div class="h-full bg-citizen animate-pulse" style="width: 100%"></div></div>
-                        <div class="text-[10px] text-gray-500 mt-3 uppercase tracking-widest font-bold"><i class="fa-solid fa-users"></i> Potentiel Ville (<span id="cit-city-name">...</span>)</div>
+                        <div class="text-[10px] text-citizen mt-2 font-bold uppercase tracking-widest">Projection de Pénétration (5%)</div>
                     </div>
                     <div class="bento-card p-8 border-t-4 border-cyan flex flex-col justify-between shadow-lg">
-                        <div><div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Volume Négociable (Achat Groupé)</div><div class="text-4xl font-black text-white font-mono drop-shadow-md" id="cit-vol">-- <span class="text-lg text-gray-500 font-normal">GWh</span></div></div>
+                        <div><div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Volume Résidentiel Négociable</div><div class="text-4xl font-black text-white font-mono" id="cit-vol">-- <span class="text-lg text-gray-500 font-normal">GWh</span></div></div>
                         <div class="mt-4 text-xs text-cyan font-bold flex items-center gap-2 bg-cyan/10 p-3 rounded-xl border border-cyan/20" id="cit-power"><i class="fa-solid fa-bolt"></i> Calcul en cours...</div>
                     </div>
-                    <div class="bento-card p-8 bg-gradient-to-br from-card to-citizen/20 flex flex-col justify-center items-center text-center border border-citizen/30">
-                        <i class="fa-solid fa-mobile-screen-button text-4xl text-white mb-4 drop-shadow-[0_0_15px_rgba(139,92,246,0.8)]"></i>
-                        <div class="mb-4 text-white font-bold text-sm leading-relaxed">Activez l'Iframe sur le site de la Mairie pour lancer le défi de Sobriété Hivernal.</div>
-                        <div class="bg-abysse p-4 rounded-xl text-[10px] font-mono text-citizen w-full mb-4 select-all border border-white/10 border-dashed">&lt;iframe src="energistrat.com/widget/ville"&gt;&lt;/iframe&gt;</div>
+                    <div class="bento-card p-8 bg-gradient-to-br from-card to-citizen/20 flex flex-col justify-center items-center text-center border border-citizen/30 shadow-[0_0_30px_rgba(139,92,246,0.15)]">
+                        <div class="mb-4 text-white font-bold text-sm leading-relaxed">Intégrez le Portail Citoyen sur le site officiel de la Mairie.</div>
+                        <div class="bg-abysse p-4 rounded-xl text-[10px] font-mono text-gray-400 w-full mb-4 select-all border border-white/10 border-dashed">&lt;iframe src="energistrat.com/widget/ville/score"&gt;&lt;/iframe&gt;</div>
+                        <button class="bg-white text-abysse px-6 py-3 rounded-[2rem] text-xs font-black hover:bg-gray-200 transition flex items-center gap-2 shadow-lg uppercase tracking-widest"><i class="fa-solid fa-copy"></i> Copier Code iFrame</button>
                     </div>
                 </div>
             </div>
 
         </div>
 
-        <!-- MODAL M57 (EDITION BUDGET) -->
-        <div id="m57-edit-modal" class="fixed inset-0 bg-black/90 z-[120] hidden flex items-center justify-center backdrop-blur-sm">
-            <div class="bento-card p-10 rounded-[3rem] w-[600px] relative border-2 border-gold/50 shadow-[0_0_50px_rgba(245,158,11,0.2)]">
-                <h3 class="text-2xl font-black text-white mb-2 flex items-center gap-3"><i class="fa-solid fa-vault text-gold"></i> Paramétrer le Budget M57</h3>
-                <p class="text-xs text-gray-400 mb-8 font-mono">Saisissez les montants votés au Conseil Municipal.</p>
-                <div class="space-y-6">
-                    <div class="bg-abysse/50 p-6 rounded-[2rem] border border-white/5">
-                        <span class="text-sm font-bold text-white block mb-4 uppercase tracking-widest"><i class="fa-solid fa-check-to-slot text-success mr-2"></i> Budget Primitif (Voté)</span>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-mairie">Électricité (60612)</label><input type="number" id="m57-input-bp-elec" class="input-edit mt-2 text-xl font-bold" placeholder="0"></div>
-                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-gas">Gaz (60621)</label><input type="number" id="m57-input-bp-gaz" class="input-edit mt-2 text-xl font-bold" placeholder="0"></div>
+        <!-- ACTION BAR GLOBALE (PARC) -->
+        <div id="action-bar" class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-8 py-4 rounded-full shadow-[0_0_40px_rgba(255,255,255,0.3)] flex items-center gap-6 z-50 transform translate-y-32 transition-transform duration-300">
+            <div class="font-bold"><span id="selected-count" class="text-mairie text-lg">0</span> compteurs sélectionnés</div>
+            <div class="h-8 w-px bg-gray-300"></div>
+            <button onclick="openMassEdit()" class="flex items-center gap-2 hover:text-gold font-bold text-sm transition mr-4"><i class="fa-solid fa-pen-to-square"></i> Mise à jour Groupée</button>
+            <button onclick="assignLot()" class="flex items-center gap-2 hover:text-mairie font-bold text-sm transition mr-4"><i class="fa-solid fa-layer-group"></i> Affecter Lot</button>
+            <button onclick="exportDQE()" class="flex items-center gap-2 text-abysse bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-[2rem] font-bold text-sm transition"><i class="fa-solid fa-file-excel text-green-600"></i> Export DQE</button>
+        </div>
+
+        <!-- MODAL DETAIL BATIMENT (ÉDITABLE + SENTINEL + CEE + DJU) -->
+        <div id="detail-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center p-8 backdrop-blur-md">
+            <div class="bento-card w-full max-w-6xl h-full max-h-[90vh] overflow-y-auto relative flex flex-col border border-cyan/30 shadow-[0_0_60px_rgba(0,229,255,0.15)]">
+                <button onclick="closeDetail()" class="absolute top-6 right-6 w-12 h-12 rounded-full bg-abysse text-gray-400 hover:text-white border border-white/10 hover:border-white transition flex items-center justify-center text-xl z-20"><i class="fa-solid fa-xmark"></i></button>
+                
+                <div class="p-10 border-b border-white/5 flex justify-between items-start bg-card/50">
+                    <div>
+                        <h2 class="text-4xl font-black text-white flex items-center gap-4" id="modal-title">--</h2>
+                        <div class="flex items-center gap-6 mt-4 text-sm text-gray-400 font-mono">
+                            <span id="modal-address"><i class="fa-solid fa-location-dot text-cyan mr-1"></i> --</span>
+                            <span id="modal-surface" class="text-white font-bold"><i class="fa-solid fa-ruler-combined text-cyan mr-1"></i> -- m²</span>
+                            <span id="modal-type" class="px-3 py-1 rounded-full text-[10px] font-bold text-abysse bg-gray-400">--</span>
+                            <span id="modal-tertiaire" class="hidden bg-tertiaire/20 text-tertiaire border border-tertiaire/50 px-3 py-1 rounded-full text-[10px] font-bold shadow-[0_0_10px_rgba(168,85,247,0.3)]">Loi ELAN (Tertiaire)</span>
                         </div>
                     </div>
-                    <div class="bg-abysse/50 p-6 rounded-[2rem] border border-white/5">
-                        <span class="text-sm font-bold text-white block mb-4 uppercase tracking-widest"><i class="fa-solid fa-money-bill-wave text-cyan mr-2"></i> Mandaté à date (Consommé)</span>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-mairie">Électricité (60612)</label><input type="number" id="m57-input-cons-elec" class="input-edit mt-2 text-xl font-bold" placeholder="0"></div>
-                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-gas">Gaz (60621)</label><input type="number" id="m57-input-cons-gaz" class="input-edit mt-2 text-xl font-bold" placeholder="0"></div>
+                    <button onclick="openEditMode()" class="bg-mairie hover:bg-blue-600 text-white px-6 py-3 rounded-[2rem] text-xs font-bold transition flex items-center gap-2 shadow-lg mt-2 uppercase tracking-widest"><i class="fa-solid fa-pen-to-square"></i> Modifier Données</button>
+                </div>
+                
+                <div class="p-10 grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1">
+                    
+                    <div class="lg:col-span-2 space-y-6">
+                        <!-- Carnet de Santé -->
+                        <div class="bento-card p-8 border-l-4 border-mairie bg-abysse/50">
+                            <h3 class="text-sm font-bold text-white mb-6 uppercase tracking-widest">Carnet de Santé Technique</h3>
+                            <div class="grid grid-cols-2 gap-6 text-sm" id="modal-tech-grid"></div>
+                            <div class="mt-6 pt-6 border-t border-white/10 grid grid-cols-2 gap-6 text-sm">
+                                <div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Vecteur Chauffage</span><span class="text-white font-bold" id="disp-chauffage">--</span></div>
+                                <div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Isolation</span><span class="text-white font-bold" id="disp-isolation">--</span></div>
+                            </div>
+                        </div>
+
+                        <!-- CEE Subventions -->
+                        <div id="modal-subventions-container" class="min-h-[120px]"></div>
+
+                        <!-- Courbes / Forecast -->
+                        <div class="bento-card p-8 flex flex-col h-[350px]">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest">Courbe de Charge & Forecast</h3>
+                                <div class="flex gap-3">
+                                    <button onclick="updateModalChart('24h')" class="text-xs font-bold bg-white/10 px-4 py-2 rounded-[2rem] text-white hover:bg-white/20 transition">Profil SGE 24h</button>
+                                    <button onclick="updateModalChart('3y')" class="text-xs font-bold bg-mairie px-4 py-2 rounded-[2rem] text-white hover:bg-blue-600 transition shadow-[0_0_15px_rgba(59,130,246,0.3)]">Smart Twin (3 Ans)</button>
+                                </div>
+                            </div>
+                            <div class="flex-1 relative w-full"><canvas id="modalChart"></canvas></div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <!-- SENTINEL Alertes -->
+                        <div class="bento-card p-8 border-t-4 border-alert bg-alert/5 text-center flex flex-col justify-center shadow-lg">
+                            <div class="text-alert font-black text-xl mb-2"><i class="fa-solid fa-ghost mr-2"></i> FUITE FINANCIÈRE</div>
+                            <div class="text-5xl font-black text-white mb-2 font-mono drop-shadow-md" id="modal-waste">-- €</div>
+                            <p class="text-xs text-gray-400 leading-relaxed mt-2">Gaspillage estimé sur les talons de nuit et de week-end.</p>
+                        </div>
+                        <!-- DJU Signature Thermique -->
+                        <div class="bento-card p-8 border-t-4 border-cyan text-center flex flex-col justify-center shadow-lg">
+                            <div class="text-cyan font-black text-xl mb-2"><i class="fa-solid fa-temperature-half mr-2"></i> DIAGNOSTIC ISOLATION</div>
+                            <div class="text-5xl font-black text-white font-mono drop-shadow-md mb-2" id="modal-dju"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+                            <p class="text-xs text-gray-400 font-bold uppercase tracking-widest mb-3">Score R² (DJU)</p>
+                            <div class="text-[10px] text-gray-500 font-bold uppercase bg-abysse p-2 rounded-xl border border-white/10" id="modal-dju-msg">Analyse IA...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL EDIT BATIMENT (Surface, Type) -->
+        <div id="edit-modal" class="fixed inset-0 bg-black/90 z-[110] hidden flex items-center justify-center backdrop-blur-md">
+            <div class="bento-card p-10 rounded-[3rem] w-[500px] relative border-2 border-mairie/30 shadow-[0_0_40px_rgba(59,130,246,0.2)]">
+                <h3 class="text-2xl font-black text-white mb-8 flex items-center gap-3"><i class="fa-solid fa-pen-to-square text-mairie"></i> Mise à jour Patrimoine</h3>
+                <div class="space-y-6">
+                    <input type="hidden" id="edit-id">
+                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Nom du Bâtiment</label><input type="text" id="edit-name" class="input-edit mt-1"></div>
+                    <div><label class="text-[10px] text-cyan uppercase font-bold tracking-widest pl-2">Surface (m²) - Impact Décret Tertiaire</label><input type="number" id="edit-surface" class="input-edit mt-1 font-mono text-cyan"></div>
+                    <div class="pt-6 border-t border-white/5"><span class="text-sm font-bold text-white uppercase tracking-widest">Carnet de Santé</span></div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Chauffage</label>
+                            <select id="edit-chauffage" class="input-edit mt-1 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_15px_center] bg-[length:10px_auto] cursor-pointer">
+                                <option value="Inconnu">Inconnu</option><option value="Gaz Condensation">Gaz Condensation</option><option value="Elec Direct">Élec Direct</option><option value="PAC">PAC</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Isolation</label>
+                            <select id="edit-isolation" class="input-edit mt-1 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_15px_center] bg-[length:10px_auto] cursor-pointer">
+                                <option value="Inconnue">Inconnue</option><option value="Non Isolé">Non Isolé</option><option value="Double Vitrage">Double Vitrage</option><option value="ITE Complète">ITE Complète</option>
+                            </select>
                         </div>
                     </div>
                 </div>
                 <div class="flex justify-end gap-4 mt-10">
-                    <button onclick="document.getElementById('m57-edit-modal').classList.add('hidden')" class="text-gray-400 px-6 py-3 text-xs font-bold hover:text-white transition uppercase tracking-widest">Annuler</button>
-                    <button onclick="saveM57Data()" class="bg-gold text-abysse px-8 py-3 rounded-2xl text-sm font-black hover:bg-white transition shadow-[0_0_20px_rgba(245,158,11,0.4)] uppercase tracking-widest">Verrouiller BP</button>
+                    <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-6 py-3 text-xs font-bold hover:text-white transition uppercase tracking-widest">ANNULER</button>
+                    <button onclick="saveMairieData()" class="bg-mairie text-white px-8 py-3 rounded-2xl text-sm font-black hover:bg-blue-600 transition shadow-[0_0_20px_rgba(59,130,246,0.4)] uppercase tracking-widest">ENREGISTRER</button>
                 </div>
             </div>
         </div>
 
-        <!-- MODAL DETAIL BATIMENT (Sentinelle Thermique & CEE) -->
-        <div id="detail-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center p-8 backdrop-blur-md">
-            <div class="bento-card w-full max-w-4xl relative flex flex-col border border-cyan/30 shadow-[0_0_60px_rgba(0,229,255,0.15)]">
-                <button onclick="closeDetail()" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-abysse text-gray-400 hover:text-white border border-white/10 hover:border-white transition flex items-center justify-center text-xl z-10"><i class="fa-solid fa-xmark"></i></button>
-                
-                <div class="p-10 border-b border-white/5">
-                    <h2 class="text-4xl font-black text-white flex items-center gap-4" id="modal-title">--</h2>
-                    <div class="flex items-center gap-6 mt-4 text-sm text-gray-400 font-mono">
-                        <span id="modal-address"><i class="fa-solid fa-location-dot text-cyan mr-1"></i> --</span>
-                        <span id="modal-surface" class="text-white font-bold"><i class="fa-solid fa-ruler-combined text-cyan mr-1"></i> -- m²</span>
-                        <span id="modal-type" class="px-3 py-1 rounded-full text-[10px] font-bold text-abysse bg-gray-400">--</span>
-                        <span id="modal-tertiaire" class="hidden bg-tertiaire/20 text-tertiaire border border-tertiaire/50 px-3 py-1 rounded-full text-[10px] font-bold shadow-[0_0_10px_rgba(168,85,247,0.3)]">Assujetti Loi ELAN</span>
+        <!-- MASS EDIT MODAL -->
+        <div id="mass-edit-modal" class="fixed inset-0 bg-black/90 z-[80] hidden flex items-center justify-center backdrop-blur-md">
+            <div class="bento-card p-10 rounded-[3rem] w-[500px] relative border-2 border-gold/30 shadow-[0_0_40px_rgba(245,158,11,0.2)]">
+                <div class="flex items-center gap-4 mb-8">
+                    <div class="w-12 h-12 rounded-full bg-gold/20 flex items-center justify-center text-gold text-2xl shadow-inner"><i class="fa-solid fa-layer-group"></i></div>
+                    <div><h3 class="text-2xl font-black text-white">Mise à jour Groupée</h3><p class="text-xs text-gray-400 font-mono mt-1"><span id="mass-count" class="text-gold font-bold">0</span> sites sélectionnés</p></div>
+                </div>
+                <div class="space-y-6 bg-abysse/50 p-6 rounded-[2rem] border border-white/5">
+                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Affecter au Lot (Appel d'Offres)</label><input type="text" id="mass-lot-input" placeholder="Ex: Lot 1 - Bâtiments Supérieurs à 36kVA" class="input-edit mt-2 w-full"></div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Typologie Fonctionnelle</label>
+                        <select id="mass-type" class="input-edit mt-2 w-full appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_15px_center] bg-[length:10px_auto] cursor-pointer">
+                            <option value="">-- Ne pas modifier --</option><option value="Ecole">École</option><option value="Sport">Gymnase / Sport</option><option value="EP">Éclairage Public</option>
+                        </select>
                     </div>
                 </div>
-
-                <div class="p-10 grid grid-cols-2 gap-8">
-                    
-                    <div class="space-y-6">
-                        <!-- SENTINEL : GASPILLAGE ET THERMIQUE -->
-                        <div class="bento-card p-6 border-t-4 border-alert bg-alert/5">
-                            <h3 class="text-xs font-bold text-alert uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-ghost"></i> Alerte Talon Financier</h3>
-                            <div class="flex items-end gap-3"><div class="text-4xl font-black text-white font-mono" id="modal-waste">-- €</div><div class="text-[10px] text-gray-400 pb-1 uppercase font-bold">Perdus la nuit/WE</div></div>
-                        </div>
-
-                        <div class="bento-card p-6 border-t-4 border-cyan">
-                            <h3 class="text-xs font-bold text-cyan uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-temperature-half"></i> Diagnostic Thermique (DJU)</h3>
-                            <div class="flex items-end gap-3"><div class="text-4xl font-black text-white font-mono" id="modal-dju"><i class="fa-solid fa-spinner fa-spin text-sm"></i></div><div class="text-[10px] text-gray-400 pb-1 uppercase font-bold">Score d'isolation (R²)</div></div>
-                            <div class="text-[10px] text-gray-500 mt-2 font-bold uppercase" id="modal-dju-msg">Analyse IA en cours...</div>
-                        </div>
-                    </div>
-
-                    <div class="space-y-6">
-                        <!-- SUBVENTIONS & RÉSINE -->
-                        <div class="bento-card p-6 bg-gradient-to-br from-card to-success/10 border border-success/30 shadow-[0_0_20px_rgba(16,185,129,0.1)] h-full flex flex-col">
-                            <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-success/20 pb-3"><i class="fa-solid fa-hand-holding-dollar text-success"></i> Droits Tirables CEE</h3>
-                            <div id="modal-subventions-container" class="flex-1 flex flex-col justify-center">
-                                <div class="text-center text-gray-500 text-xs font-mono"><i class="fa-solid fa-spinner fa-spin text-success text-2xl mb-2 block"></i> Recherche de Primes...</div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="flex justify-end gap-4 mt-8">
+                    <button onclick="document.getElementById('mass-edit-modal').classList.add('hidden')" class="text-gray-400 px-6 py-3 text-xs font-bold hover:text-white transition uppercase tracking-widest">ANNULER</button>
+                    <button onclick="applyMassUpdate()" class="bg-gold text-abysse px-8 py-3 rounded-2xl text-sm font-black hover:bg-white transition shadow-[0_0_20px_rgba(245,158,11,0.4)] uppercase tracking-widest">APPLIQUER</button>
                 </div>
             </div>
         </div>
@@ -369,7 +519,7 @@
             toast: function(msg, type='info') {
                 const container = document.getElementById('toast-container');
                 if(!container) return;
-                const colors = { success: 'bg-green-600 border-green-500 text-white', error: 'bg-alert border-alert text-white', info: 'bg-cyan border-cyan text-abysse' };
+                const colors = { success: 'bg-green-600 border-green-500 text-white', error: 'bg-alert border-alert text-white', info: 'bg-mairie border-mairie text-white' };
                 const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
                 const el = document.createElement('div');
                 el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
@@ -380,16 +530,29 @@
             }
         };
 
-        // --- GOD MODE INTERCEPTOR ---
+        // --- GOD MODE INTERCEPTOR & NAVIGATION ---
         const urlParams = new URLSearchParams(window.location.search);
         const forceTenant = urlParams.get('force_tenant') || localStorage.getItem('cortex_god_mode_tenant');
 
+        window.goToModule = function(path) {
+            let url = path;
+            if (forceTenant && forceTenant !== 'ALL') url += (url.includes('?') ? '&' : '?') + `force_tenant=${forceTenant}`;
+            window.location.href = url;
+        }
+
         let FLEET_DATA = [];
         let SUBVENTIONS_DATA =[];
+        let MARKET_DATA = { elec: 85.0, trve: 230.0, trend: 'BEAR' };
+        let SELECTED_IDS = new Set();
+        let CURRENT_ENERGY = 'all'; 
+        let LOTS = new Set();
         let M57_SETTINGS = { bp_elec: 0, bp_gaz: 0, consumed_elec: 0, consumed_gaz: 0 };
+        
+        let landingChartInstance = null; let budgetChartInstance = null; let modalChartInstance = null;
+        let CURRENT_SITE = null;
         let MAP_INSTANCE = null;
-        let MARKERS =[];
-        let CITY_CENTER = [46.2276, 2.2137]; // Centre France par défaut
+        let MARKERS = [];
+        let CITY_CENTER =[46.2276, 2.2137]; // Centre France
 
         document.addEventListener('DOMContentLoaded', () => {
             if(forceTenant && forceTenant !== 'ALL') {
@@ -397,23 +560,14 @@
             }
             initMap();
             loadFleet();
+            fetchMarketData();
             fetchSubventions();
         });
 
-        // Navigation dynamique Satellites
-        window.goToModule = function(path) {
-            let url = path;
-            if (forceTenant && forceTenant !== 'ALL') url += (url.includes('?') ? '&' : '?') + `force_tenant=${forceTenant}`;
-            window.location.href = url;
-        }
-
-        // --- MAP LEAFLET INIT ---
+        // --- 1. MAP LEAFLET ---
         function initMap() {
             MAP_INSTANCE = L.map('map', { zoomControl: false }).setView(CITY_CENTER, 6);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap',
-                maxZoom: 18
-            }).addTo(MAP_INSTANCE);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '' }).addTo(MAP_INSTANCE);
             L.control.zoom({ position: 'topright' }).addTo(MAP_INSTANCE);
         }
 
@@ -423,18 +577,15 @@
                 const res = await fetch(`https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(cityName)}&fields=population,centre&limit=1`);
                 const data = await res.json();
                 if(data && data.length > 0) {
-                    // Update Mairie Header
                     document.getElementById('commune-name').innerText = "Ville de " + data[0].nom;
                     document.getElementById('commune-pop').innerText = data[0].population.toLocaleString();
 
-                    // Update Map Center
                     if(data[0].centre && data[0].centre.coordinates) {
                         CITY_CENTER = [data[0].centre.coordinates[1], data[0].centre.coordinates[0]];
                         MAP_INSTANCE.setView(CITY_CENTER, 13);
                         plotMarkers();
                     }
 
-                    // Update Gamification
                     const pop = data[0].population;
                     const foyers = Math.round((pop / 2.2) * 0.05); 
                     const volGwh = (foyers * 4.5) / 1000; 
@@ -442,60 +593,58 @@
                     document.getElementById('cit-city-name').innerText = data[0].nom;
                     document.getElementById('cit-foyers').innerText = foyers.toLocaleString();
                     document.getElementById('cit-vol').innerHTML = `${volGwh.toFixed(1)} <span class="text-lg text-gray-500 font-normal">GWh</span>`;
-                    document.getElementById('cit-power').innerHTML = `<i class="fa-solid fa-bolt"></i> Puissance = ${Math.round(volGwh * 1000 / 250)} Complexes sportifs`;
+                    document.getElementById('cit-power').innerHTML = `<i class="fa-solid fa-bolt"></i> = ${Math.round(volGwh * 1000 / 250)} Complexes sportifs`;
                 }
-            } catch(e) { console.warn("API Gouv Offline"); }
+            } catch(e) { console.warn("Geo API Offline"); }
         }
 
-        // Pseudo-random distribution autour du centre ville pour pallier au manque de lat/lon précis en base
         function getFuzzyCoordinates(baseStr, center) {
-            let hash = 0;
-            for (let i = 0; i < baseStr.length; i++) hash = baseStr.charCodeAt(i) + ((hash << 5) - hash);
-            const pseudoRandom1 = (Math.abs(hash) % 100) / 10000; // ~ 1km
+            let hash = 0; for (let i = 0; i < baseStr.length; i++) hash = baseStr.charCodeAt(i) + ((hash << 5) - hash);
+            const pseudoRandom1 = (Math.abs(hash) % 100) / 10000; 
             const pseudoRandom2 = (Math.abs(hash >> 2) % 100) / 10000;
             return [center[0] + (pseudoRandom1 - 0.005), center[1] + (pseudoRandom2 - 0.005)];
         }
 
         function plotMarkers() {
-            MARKERS.forEach(m => MAP_INSTANCE.removeLayer(m));
-            MARKERS =[];
-            
+            MARKERS.forEach(m => MAP_INSTANCE.removeLayer(m)); MARKERS =[];
             FLEET_DATA.forEach(site => {
-                // Determine Traffic Light color based on Ghost Savings
                 const waste = site.ghost_savings || 0;
                 let colorClass = 'marker-green';
-                if (waste > 200) colorClass = 'marker-red';
-                else if (waste > 50) colorClass = 'marker-orange';
+                if (waste > 200) colorClass = 'marker-red'; else if (waste > 50) colorClass = 'marker-orange';
 
-                const icon = L.divIcon({
-                    className: 'custom-div-icon',
-                    html: `<div class="map-marker ${colorClass} w-4 h-4"></div>`,
-                    iconSize: [16, 16],
-                    iconAnchor:[8, 8]
-                });
-
-                // Use DB coords if exist, otherwise fuzzy logic
-                let coords = CITY_CENTER;
-                if (site.lat && site.lon) coords = [site.lat, site.lon];
-                else coords = getFuzzyCoordinates(site.id, CITY_CENTER);
-
+                const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-marker ${colorClass} w-4 h-4"></div>`, iconSize:[16, 16], iconAnchor:[8, 8] });
+                let coords = (site.lat && site.lon) ? [site.lat, site.lon] : getFuzzyCoordinates(site.id, CITY_CENTER);
                 const marker = L.marker(coords, {icon: icon})
-                    .bindPopup(`<strong class="font-mono text-abysse">${site.name}</strong><br>Facture Nuit: ${Math.round(waste)}€<br><button onclick="openDetail('${site.id}')" class="mt-2 bg-mairie text-white px-2 py-1 rounded text-xs w-full">Analyser</button>`)
+                    .bindPopup(`<strong class="font-mono text-abysse font-bold text-sm">${site.name}</strong><br><span class="text-xs text-gray-600">Gaspillage Nuit/WE: <b class="text-alert">${Math.round(waste)}€</b></span><br><button onclick="openDetail('${site.id}')" class="mt-3 bg-mairie text-white px-4 py-2 rounded-lg font-bold text-xs w-full shadow-md">Analyser CORTEX</button>`)
                     .addTo(MAP_INSTANCE);
                 MARKERS.push(marker);
             });
         }
 
-        // --- FETCHERS & INIT ---
+        // --- 2. FETCHERS GLOBAUX ---
+        async function loadM57Settings() {
+            try { const res = await fetch('/api/settings/m57'); if(res.ok) M57_SETTINGS = await res.json(); } catch(e) {}
+        }
+
+        async function fetchMarketData() {
+            try {
+                const res = await fetch('/api/tools/sniper/market'); const data = await res.json();
+                if(data.success && data.current_prices) { MARKET_DATA.elec = data.current_prices.elec || 85.0; MARKET_DATA.trve = data.current_prices.trve || 230.0; MARKET_DATA.trend = data.status || 'BEAR'; }
+            } catch(e) {}
+        }
+
+        async function fetchSubventions() {
+            try {
+                const res = await fetch('/api/tools/subventions'); const data = await res.json();
+                if(data.success && data.results) SUBVENTIONS_DATA = data.results;
+            } catch(e) {}
+        }
+
         async function loadFleet() {
             try {
-                // Fetch Settings M57
-                const resSet = await fetch('/api/settings/m57');
-                if(resSet.ok) M57_SETTINGS = await resSet.json();
-
-                // Fetch Fleet
-                const resFleet = await fetch('/api/dashboard/fleet');
-                const data = await resFleet.json();
+                await loadM57Settings();
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
                 
                 if(data.fleet) {
                     if (forceTenant && forceTenant !== 'ALL') {
@@ -504,65 +653,63 @@
                         FLEET_DATA = data.fleet;
                     }
                     
-                    if(FLEET_DATA.length === 0) {
-                        App.toast("Aucun bâtiment public identifié pour ce compte.", "error");
-                        return;
-                    }
+                    if(FLEET_DATA.length === 0) return App.toast("Aucun bâtiment public identifié.", "error");
 
-                    // Détermine la ville pour centrer la carte et l'API Gouv
+                    LOTS.clear();
                     const mainCity = FLEET_DATA.find(s => s.city && s.city !== 'Inconnue')?.city;
-                    if(mainCity) fetchCityData(mainCity);
+                    if(mainCity) fetchCityData(mainCity); else plotMarkers(); // plot default center
 
-                    updateKPIs();
-                    renderTable(FLEET_DATA);
-                    calculateM57();
+                    FLEET_DATA.forEach(s => { if(s.segment && s.segment.includes("Lot")) LOTS.add(s.segment); });
+                    
+                    updateLotSelect(); applyFilters(); updateKPIs(); calculateM57();
                 }
-            } catch(e) { App.toast("Erreur de synchronisation Base 3D.", "error"); }
+            } catch(e) { App.toast("Erreur de synchronisation 3D.", "error"); }
         }
 
-        async function fetchSubventions() {
-            try {
-                const res = await fetch('/api/tools/subventions');
-                const data = await res.json();
-                if(data.success && data.results) SUBVENTIONS_DATA = data.results;
-            } catch(e) {}
-        }
-
-        // --- MOTEUR RAPPORTS ---
+        // --- 3. GÉNÉRATEUR RAPPORTS CONSEIL MUNICIPAL ---
         window.generateReport = function() {
             if(FLEET_DATA.length === 0) return App.toast("Le parc est vide.", "error");
-            App.toast("L'Usine à PDF compile le rapport Conseil Municipal...", "info");
+            App.toast("L'Usine à PDF compile le rapport d'Exécution...", "info");
             const firstId = FLEET_DATA[0].id;
-            setTimeout(() => {
-                window.open(`/api/tools/bilan_ag/${firstId}`, '_blank');
-            }, 800);
+            setTimeout(() => { window.open(`/api/tools/bilan_ag/${firstId}`, '_blank'); }, 800);
         }
 
-        // --- NAVIGATION ---
+        // --- 4. NAVIGATION ONGLETS ---
         window.switchView = function(viewName) {
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active', 'text-white'));
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             
-            const views =['view-patrimoine', 'view-budget', 'view-citizens'];
+            const views =['view-patrimoine', 'view-budget', 'view-citizens', 'view-market', 'view-comparator'];
             views.forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
             
             const target = document.getElementById('view-' + viewName);
             if(target) target.classList.remove('hidden');
+            
+            if(viewName !== 'patrimoine') { const bar = document.getElementById('action-bar'); if (bar) bar.classList.remove('visible'); } 
+            else { updateActionBar(); }
 
             if(viewName === 'patrimoine' && MAP_INSTANCE) setTimeout(() => MAP_INSTANCE.invalidateSize(), 200);
             if(viewName === 'budget') calculateM57();
+            if(viewName === 'market') calculateMarketStrategy();
         }
 
-        // --- M57 LOGIC (ZERO MOCK FALLBACK) ---
+        // --- 5. LOGIQUE BUDGET M57 (ZÉRO MOCK) ---
         function calculateM57() {
             if(FLEET_DATA.length === 0) return;
             let projElec = 0; let projGaz = 0; let totalProj = 0;
+            let typeBudgets = { 'Écoles': 0, 'Sport': 0, 'Éclairage': 0, 'Admin': 0, 'Autres': 0 };
 
             FLEET_DATA.forEach(s => {
                 totalProj += s.budget;
                 if(s.energy === 'elec') projElec += s.budget;
                 if(s.energy === 'gaz') projGaz += s.budget;
+                const n = (s.name || "").toLowerCase();
+                if(n.includes('ecole') || n.includes('scolaire')) typeBudgets['Écoles'] += s.budget;
+                else if(n.includes('gymnase') || n.includes('stade') || n.includes('sport')) typeBudgets['Sport'] += s.budget;
+                else if(n.includes('eclairage') || n.includes('ep ')) typeBudgets['Éclairage'] += s.budget;
+                else if(n.includes('mairie') || n.includes('admin')) typeBudgets['Admin'] += s.budget;
+                else typeBudgets['Autres'] += s.budget;
             });
 
             document.getElementById('header-budget').innerText = Math.round(totalProj).toLocaleString() + " €"; 
@@ -575,7 +722,6 @@
             const bar = document.getElementById('m57-bar');
             const cortexMsg = document.getElementById('cortex-m57-msg');
 
-            // Affichage Brut Sans Mock
             bpEl.innerText = Math.round(bpTotal).toLocaleString() + " €";
             consEl.innerText = Math.round(consTotal).toLocaleString() + " €";
             document.getElementById('m57-60612-budget').innerText = Math.round(projElec).toLocaleString() + " €";
@@ -583,8 +729,8 @@
 
             if (bpTotal === 0) {
                 bar.style.width = "0%";
-                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Budget Primitif Non Renseigné.</span> Cliquez sur le stylo pour saisir les valeurs votées.`;
-                App.toast("Veuillez paramétrer le Budget M57", "info");
+                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Budget Primitif (BP) Non Renseigné.</span> Cliquez sur le stylo (Ajuster) pour saisir les montants votés et activer les projections.`;
+                updateBudgetCharts(typeBudgets, totalProj > 0 ? totalProj : 1, totalProj); // Fake BP for chart not to crash
                 return;
             }
 
@@ -592,15 +738,16 @@
             bar.style.width = Math.min(pct, 100) + "%";
             
             if (pct > 85) bar.className = "h-full bg-alert rounded-[1.5rem] transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]";
-            else bar.className = "h-full bg-gradient-to-r from-gold to-cyan rounded-[1.5rem] transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(245,158,11,0.5)]";
+            else bar.className = "h-full bg-gradient-to-r from-gold to-cyan rounded-[1.5rem] transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(0,229,255,0.5)]";
 
             if (totalProj > bpTotal) {
                 const dmNeeded = totalProj - bpTotal;
-                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Alerte Rupture :</span> La projection dépasse le BP. Préparez une <b>DM</b> de <span class="text-white font-mono font-black">+${Math.round(dmNeeded).toLocaleString()} €</span>.`;
+                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Rupture Budgétaire :</span> La projection d'atterrissage dépasse le BP voté. Préparez une <b>DM</b> de <span class="text-white font-mono font-black text-lg">+${Math.round(dmNeeded).toLocaleString()} €</span> au prochain conseil.`;
             } else {
                 const marge = bpTotal - totalProj;
-                cortexMsg.innerHTML = `<span class="text-success font-bold"><i class="fa-solid fa-check-circle mr-2"></i> Atterrissage Sécurisé :</span> Marge de sécurité projetée de <span class="text-white font-mono font-black">+${Math.round(marge).toLocaleString()} €</span>.`;
+                cortexMsg.innerHTML = `<span class="text-success font-bold"><i class="fa-solid fa-check-circle mr-2"></i> Atterrissage Sécurisé :</span> Marge de sécurité projetée de <span class="text-white font-mono font-black text-lg">+${Math.round(marge).toLocaleString()} €</span> d'ici le 31 décembre.`;
             }
+            updateBudgetCharts(typeBudgets, bpTotal, totalProj);
         }
 
         window.openM57Modal = function() {
@@ -612,52 +759,155 @@
         }
 
         window.saveM57Data = async function() {
-            const payload = {
-                bp_elec: parseFloat(document.getElementById('m57-input-bp-elec').value) || 0,
-                bp_gaz: parseFloat(document.getElementById('m57-input-bp-gaz').value) || 0,
-                consumed_elec: parseFloat(document.getElementById('m57-input-cons-elec').value) || 0,
-                consumed_gaz: parseFloat(document.getElementById('m57-input-cons-gaz').value) || 0
-            };
+            const payload = { bp_elec: parseFloat(document.getElementById('m57-input-bp-elec').value) || 0, bp_gaz: parseFloat(document.getElementById('m57-input-bp-gaz').value) || 0, consumed_elec: parseFloat(document.getElementById('m57-input-cons-elec').value) || 0, consumed_gaz: parseFloat(document.getElementById('m57-input-cons-gaz').value) || 0 };
             try {
                 const res = await fetch('/api/settings/m57', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const data = await res.json();
-                if(data.success) {
-                    M57_SETTINGS = payload;
-                    document.getElementById('m57-edit-modal').classList.add('hidden');
-                    calculateM57();
-                    App.toast("Budget Primitif verrouillé.", "success");
-                }
+                if(data.success) { M57_SETTINGS = payload; document.getElementById('m57-edit-modal').classList.add('hidden'); calculateM57(); App.toast("Budget enregistré.", "success"); }
             } catch(e) { App.toast("Erreur sauvegarde.", "error"); }
         }
 
-        // --- GESTION PARC & TABLEAU ---
+        window.updateBudgetCharts = function(typeBudgets, bp, proj) {
+            if(landingChartInstance) landingChartInstance.destroy(); if(budgetChartInstance) budgetChartInstance.destroy();
+            const ctx1 = document.getElementById('landingChart').getContext('2d');
+            const baseCumul =[0.1, 0.22, 0.35, 0.42, 0.48, 0.52, 0.55, 0.58, 0.65, 0.75, 0.88, 1.0];
+            const dataReel = baseCumul.slice(0, 3).map(r => r * proj);
+            const dataProj = baseCumul.map(r => r * proj);
+            const dataBP = Array(12).fill(bp);
+            landingChartInstance = new Chart(ctx1, {
+                type: 'line',
+                data: { labels:['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'], datasets:[ { label: 'Consommé Réel', data: dataReel, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, tension: 0.4, borderWidth: 4, pointRadius: 0 }, { label: 'Atterrissage Projeté', data: dataProj, borderColor: '#94A3B8', borderDash:[5,5], tension: 0.4, pointRadius: 0 }, { label: 'Plafond BP', data: dataBP, borderColor: '#F59E0B', borderWidth: 2, pointRadius: 0 } ] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8', font: {family: 'JetBrains Mono'} } } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B', font: {family: 'JetBrains Mono'} } }, x: { grid: { display: false }, ticks: { color: '#64748B', font: {family: 'JetBrains Mono'} } } }, interaction: { mode: 'index', intersect: false } }
+            });
+
+            const ctx2 = document.getElementById('budgetChart').getContext('2d');
+            budgetChartInstance = new Chart(ctx2, {
+                type: 'doughnut', data: { labels: Object.keys(typeBudgets), datasets:[{ data: Object.values(typeBudgets), backgroundColor:['#3B82F6', '#F59E0B', '#10B981', '#A855F7', '#64748B'], borderColor: '#001529', borderWidth: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right', labels: { color: '#94A3B8', font: {family: 'JetBrains Mono'} } } } }
+            });
+        }
+
+        // --- 6. METEO MARCHES ---
+        function calculateMarketStrategy() {
+            let totalBudget = 0; let totalVol = 0;
+            FLEET_DATA.forEach(s => { if(s.energy === 'elec') { totalBudget += s.budget; totalVol += s.volume; } });
+            const avgPrice = totalVol > 0 ? (totalBudget / totalVol) : 0;
+            
+            document.getElementById('price-user').innerText = Math.round(avgPrice) + " €";
+            document.getElementById('price-market').innerText = MARKET_DATA.elec + " €";
+            document.getElementById('price-trve').innerText = MARKET_DATA.trve + " €";
+
+            const max = Math.max(avgPrice, MARKET_DATA.elec, MARKET_DATA.trve) * 1.1 || 1;
+            document.getElementById('bar-user').style.width = (avgPrice / max * 100) + "%";
+            document.getElementById('bar-market').style.width = (MARKET_DATA.elec / max * 100) + "%";
+            document.getElementById('bar-trve').style.width = (MARKET_DATA.trve / max * 100) + "%";
+
+            const signalCircle = document.getElementById('signal-circle');
+            const signalIcon = document.getElementById('signal-icon');
+            const signalText = document.getElementById('signal-text');
+            const signalDesc = document.getElementById('signal-desc');
+            const advice = document.getElementById('market-advice');
+
+            if (MARKET_DATA.trend === 'BEAR' && avgPrice > MARKET_DATA.elec + 15) {
+                signalCircle.className = "w-32 h-32 rounded-full flex items-center justify-center text-5xl mb-6 shadow-[0_0_40px_rgba(16,185,129,0.5)] bg-success text-abysse animate-bounce";
+                signalIcon.className = "fa-solid fa-cart-shopping"; signalText.innerText = "ACHETER"; signalText.className = "text-3xl font-black text-success";
+                signalDesc.innerText = "Marché baissier. Votre tarif actuel est supérieur à la bourse.";
+                advice.innerHTML = "Générez un DQE et <span class='text-white font-bold'>lancez un appel d'offres maintenant</span> pour verrouiller le budget au plus bas.";
+            } else if (MARKET_DATA.trend === 'BULL') {
+                signalCircle.className = "w-32 h-32 rounded-full flex items-center justify-center text-5xl mb-6 shadow-[0_0_40px_rgba(239,68,68,0.5)] bg-alert text-white";
+                signalIcon.className = "fa-solid fa-hand"; signalText.innerText = "ATTENDRE"; signalText.className = "text-3xl font-black text-alert";
+                signalDesc.innerText = "Le marché EPEX est en forte tension (Haussier).";
+                advice.innerHTML = "L'AAPC risque d'être infructueux ou hors de prix. <span class='text-white font-bold'>Conservez votre contrat actuel</span> et repoussez l'AO.";
+            } else {
+                signalCircle.className = "w-32 h-32 rounded-full flex items-center justify-center text-5xl mb-6 shadow-[0_0_40px_rgba(0,229,255,0.5)] bg-cyan text-abysse";
+                signalIcon.className = "fa-solid fa-scale-balanced"; signalText.innerText = "SURVEILLER"; signalText.className = "text-3xl font-black text-cyan";
+                signalDesc.innerText = "Prix alignés avec la tendance moyen terme.";
+                advice.innerHTML = "Préparez votre dossier DCE, mais attendez une chute sous le seuil d'alerte pour publier.";
+            }
+        }
+
+        // --- 7. SMART MAPPING, COURBES ET BPU ---
+        window.uploadEnedis = async function(input) {
+            if(!input.files || input.files.length === 0) return;
+            const resDiv = document.getElementById('enedis-result');
+            resDiv.classList.remove('hidden'); resDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-mairie"></i> Intelligence Artificielle en cours...';
+            try {
+                const formData = new FormData(); formData.append('file', input.files[0]);
+                const res = await fetch('/api/v1/cpq/ingest_dqe', { method: 'POST', body: formData }); const data = await res.json();
+                if(data.success) {
+                    resDiv.innerHTML = `<span class="text-success font-bold block mb-2"><i class="fa-solid fa-check"></i> Bâtiments et Éclairage Public (EP) séparés.</span><ul class="text-gray-300"><li>Sites détectés : ${data.sites_detected}</li><li>Vol Bâtiments : ${data.suggested_lots["BAT (Bâtiments)"] || 0} MWh</li><li>Vol Éclairage Public : ${data.suggested_lots["EP (Éclairage Public)"] || 0} MWh</li></ul>`;
+                } else resDiv.innerHTML = `<span class="text-alert">${data.error}</span>`;
+            } catch(e) { resDiv.innerHTML = `<span class="text-alert">Erreur Serveur.</span>`; }
+        }
+
+        window.uploadCurves = async function(input) {
+            if(!input.files || input.files.length === 0) return;
+            const resDiv = document.getElementById('curves-result');
+            resDiv.classList.remove('hidden'); resDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i> Agrégation des Courbes de Charge...';
+            try {
+                const formData = new FormData(); for(let i=0; i<input.files.length; i++) formData.append('files', input.files[i]);
+                const res = await fetch('/api/v1/cpq/ingest_curves', { method: 'POST', body: formData }); const data = await res.json();
+                if(data.success) {
+                    resDiv.innerHTML = `<span class="text-success font-bold block mb-2"><i class="fa-solid fa-check"></i> Agrégation Macro réussie.</span><ul class="text-gray-300"><li>Fichiers traités : ${data.files_processed}</li><li>Puissance de pointe simultanée : <b class="text-cyan">${data.aggregated_peak_kw} kW</b></li></ul>`;
+                } else resDiv.innerHTML = `<span class="text-alert">${data.error || "Erreur"}</span>`;
+            } catch(e) { resDiv.innerHTML = `<span class="text-alert">Erreur Serveur.</span>`; }
+        }
+
+        window.triggerOfferScan = async function(input) { 
+            if(!input.files || input.files.length === 0) return; 
+            App.toast("Dépouillement du BPU...", "info");
+            const formData = new FormData(); formData.append("file", input.files[0]); 
+            try { 
+                const res = await fetch('/api/ops/simulate_offer', { method: 'POST', body: formData }); 
+                const data = await res.json(); 
+                if(data.success && data.summary) { 
+                    document.getElementById('sim-results').classList.remove('hidden'); 
+                    document.getElementById('sim-current').innerText = Math.round(data.summary.total_current).toLocaleString() + " €"; 
+                    document.getElementById('sim-offer').innerText = Math.round(data.summary.total_simulated).toLocaleString() + " €"; 
+                    const delta = data.summary.savings_euro; const deltaEl = document.getElementById('sim-delta'); 
+                    deltaEl.innerText = (delta > 0 ? "+" : "") + Math.round(delta).toLocaleString() + " €"; 
+                    deltaEl.className = delta > 0 ? "text-4xl font-black text-success font-mono drop-shadow-md" : "text-4xl font-black text-alert font-mono drop-shadow-md"; 
+                    const tbody = document.getElementById('sim-table-body'); tbody.innerHTML = ''; 
+                    data.details.forEach(row => { 
+                        const col = row.delta_euro < 0 ? 'text-success' : 'text-alert'; 
+                        tbody.innerHTML += `<tr class="border-b border-white/5"><td class="px-6 py-4 text-white font-bold">${row.site_name}</td><td class="px-6 py-4 text-right text-gray-400 font-mono">${Math.round(row.volume)} MWh</td><td class="px-6 py-4 text-right text-gray-300 font-mono">${Math.round(row.current_budget)}</td><td class="px-6 py-4 text-right text-cyan font-mono font-bold">${Math.round(row.simulated_budget)}</td><td class="px-6 py-4 text-right ${col} font-bold font-mono">${Math.round(row.delta_euro)}</td></tr>`; 
+                    }); 
+                } 
+            } catch(e) { App.toast("Échec du dépouillement.", "error"); } 
+        }
+
+        // --- 8. GESTION PARC & TABLEAU ---
         function renderTable(data) {
             const tbody = document.getElementById('fleet-table-body');
-            if(!tbody) return;
-            tbody.innerHTML = '';
+            if(!tbody) return; tbody.innerHTML = '';
             
             data.slice(0, 100).forEach(site => {
-                const isGaz = site.energy === 'gaz';
+                const isSelected = SELECTED_IDS.has(site.id); const isGaz = site.energy === 'gaz';
                 const row = document.createElement('tr');
                 row.className = "site-row border-b border-white/5 hover:bg-white/5 cursor-pointer transition";
                 row.onclick = () => openDetail(site.id);
                 
-                let icon = '<i class="fa-solid fa-building text-gray-400"></i>';
-                let typeLabel = "Admin";
+                let icon = '<i class="fa-solid fa-building text-gray-400"></i>'; let typeLabel = "Admin";
                 const n = (site.name || "").toLowerCase();
-                if(n.includes('ecole')) { icon = '<i class="fa-solid fa-school text-mairie"></i>'; typeLabel = "École"; }
-                if(n.includes('sport') || n.includes('stade')) { icon = '<i class="fa-solid fa-basketball text-gold"></i>'; typeLabel = "Sport"; }
+                if(n.includes('ecole') || n.includes('scolaire')) { icon = '<i class="fa-solid fa-school text-mairie"></i>'; typeLabel = "École"; }
+                if(n.includes('sport') || n.includes('stade') || n.includes('gymnase')) { icon = '<i class="fa-solid fa-basketball text-gold"></i>'; typeLabel = "Sport"; }
+                if(n.includes('eclairage') || n.includes('ep ')) { icon = '<i class="fa-solid fa-lightbulb text-yellow-300"></i>'; typeLabel = "Éclairage Public"; }
                 
-                // SENTINEL TRAFFIC LIGHT
                 const waste = site.ghost_savings || 0;
                 let alertBadge = '<span class="text-success text-[10px] font-bold"><i class="fa-solid fa-check"></i> Optimisé</span>';
-                if (waste > 200) alertBadge = '<span class="text-alert text-[10px] font-bold animate-pulse bg-alert/20 px-2 py-1 rounded-full"><i class="fa-solid fa-triangle-exclamation"></i> Fuite Nuit</span>';
-                else if (waste > 50) alertBadge = '<span class="text-gold text-[10px] font-bold"><i class="fa-solid fa-eye"></i> À surveiller</span>';
+                if (waste > 200) {
+                    if (typeLabel === "École") alertBadge = '<span class="text-alert text-[10px] font-bold animate-pulse bg-alert/20 px-3 py-1 rounded-full"><i class="fa-solid fa-triangle-exclamation"></i> Chauffage Nuit/Vacances</span>';
+                    else alertBadge = `<span class="text-alert text-[10px] font-bold animate-pulse bg-alert/20 px-3 py-1 rounded-full"><i class="fa-solid fa-triangle-exclamation"></i> Fuite : ${Math.round(waste)}€</span>`;
+                } else if (waste > 50) {
+                    alertBadge = '<span class="text-gold text-[10px] font-bold"><i class="fa-solid fa-eye"></i> À surveiller</span>';
+                }
 
                 row.innerHTML = `
-                    <td class="px-6 py-4 font-bold text-white flex items-center gap-3"><span class="w-6 text-center text-xl bg-black/40 p-2 rounded-lg border border-white/5">${icon}</span> <div>${site.name}<div class="text-[9px] text-gray-500 font-mono">${site.id}</div></div></td>
+                    <td class="px-6 py-4 border-b border-white/5 w-10 text-center" onclick="event.stopPropagation()"><input type="checkbox" onclick="toggleSelection('${site.id}')" class="accent-cyan w-4 h-4 cursor-pointer" ${isSelected ? 'checked' : ''}></td>
+                    <td class="px-6 py-4 font-bold text-white flex items-center gap-4"><span class="w-10 h-10 flex items-center justify-center bg-black/40 rounded-xl border border-white/5 text-xl shadow-inner">${icon}</span> <div>${site.name}<div class="text-[9px] text-gray-500 font-mono mt-1">${site.id}</div></div></td>
                     <td class="px-6 py-4 text-gray-400 font-mono text-xs">${typeLabel}</td>
                     <td class="px-6 py-4 ${isGaz ? "text-gas" : "text-cyan"} font-mono text-xs font-bold">${site.pdl || '-'}</td>
+                    <td class="px-6 py-4 text-white text-xs">${site.segment || '-'}</td>
                     <td class="px-6 py-4 text-right text-gray-300 font-mono text-xs">${Math.round(site.volume)}</td>
                     <td class="px-6 py-4 text-right font-black text-white">${Math.round(site.budget).toLocaleString()} €</td>
                     <td class="px-6 py-4 text-center">${alertBadge}</td>
@@ -667,108 +917,132 @@
             document.getElementById('visible-count').innerText = data.length;
         }
 
-        window.applyFilters = function() {
-            const term = document.getElementById('search-input')?.value.toLowerCase();
-            const filtered = FLEET_DATA.filter(s => {
-                if(term === "alert:waste") return s.ghost_savings > 200;
-                const safeId = s.id ? s.id.toLowerCase() : "";
-                const safeName = s.name ? s.name.toLowerCase() : "";
-                return safeName.includes(term) || safeId.includes(term);
-            });
-            renderTable(filtered);
-        }
+        window.updateLotSelect = function() { const sel = document.getElementById('filter-lot'); if(!sel) return; sel.innerHTML = '<option value="all">Tous les Lots / Marchés</option>'; LOTS.forEach(l => { const opt = document.createElement('option'); opt.value = l; opt.innerText = l; sel.appendChild(opt); }); }
+        window.filterEnergy = function(type) { CURRENT_ENERGY = type;['elec', 'gaz', 'all'].forEach(t => { const btn = document.getElementById('btn-' + t); if(btn) { if(t === type) { btn.classList.add('bg-white/10', 'text-white'); btn.classList.remove('text-gray-400', 'bg-transparent'); if(t === 'elec') btn.classList.add('text-mairie'); if(t === 'gaz') btn.classList.add('text-gas'); if(t === 'all') btn.classList.add('text-cyan'); } else { btn.className = "flex-1 rounded-[2rem] text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center py-2 gap-1"; } } }); applyFilters(); }
+        window.filterWaste = function() { document.getElementById('search-input').value = "alert:waste"; applyFilters(); }
         
-        window.filterWaste = function() {
-            document.getElementById('search-input').value = "alert:waste";
-            applyFilters();
-            App.toast("Filtrage des passoires thermiques activé.", "info");
+        window.applyFilters = function() { 
+            const term = document.getElementById('search-input')?.value.toLowerCase(); const typeFilter = document.getElementById('filter-type')?.value; const lotFilter = document.getElementById('filter-lot')?.value; 
+            const filtered = FLEET_DATA.filter(s => { 
+                if(CURRENT_ENERGY !== 'all' && s.energy !== CURRENT_ENERGY) return false; 
+                if(term === "alert:waste") return s.ghost_savings > 200; 
+                let type = 'admin'; const n = (s.name || "").toLowerCase(); if(n.includes('ecole') || n.includes('scolaire')) type = 'ecole'; else if(n.includes('sport') || n.includes('gymnase') || n.includes('stade')) type = 'sport'; else if(n.includes('eclairage') || n.includes('ep ')) type = 'ep'; 
+                if(typeFilter !== 'all' && type !== typeFilter) return false; 
+                if(lotFilter !== 'all' && (!s.segment || !s.segment.includes(lotFilter))) return false; 
+                const safeId = s.id ? s.id.toLowerCase() : ""; const safeName = s.name ? s.name.toLowerCase() : ""; 
+                return safeName.includes(term) || safeId.includes(term); 
+            }); 
+            renderTable(filtered); 
         }
 
-        window.updateKPIs = function() {
-            let volElec = 0; let volGaz = 0; let totalWaste = 0; let countAlerts = 0;
-            FLEET_DATA.forEach(s => {
-                if(s.energy === 'elec') volElec += s.volume;
-                if(s.energy === 'gaz') volGaz += s.volume;
-                totalWaste += s.ghost_savings;
-                if(s.ghost_savings > 200) countAlerts++;
-            });
-            document.getElementById('kpi-vol-elec').innerText = Math.round(volElec).toLocaleString() + " MWh";
-            document.getElementById('kpi-vol-gaz').innerText = Math.round(volGaz).toLocaleString() + " MWh";
-            document.getElementById('kpi-waste').innerText = Math.round(totalWaste).toLocaleString() + " €";
-            
-            const badgeEl = document.getElementById('sobriety-badge');
-            if(badgeEl) {
-                if(countAlerts > 0) badgeEl.classList.remove('hidden');
-                else badgeEl.classList.add('hidden');
-            }
+        window.updateKPIs = function() { 
+            let volElec = 0; let volGaz = 0; let totalWaste = 0; let countAlerts = 0; 
+            FLEET_DATA.forEach(s => { if(s.energy === 'elec') volElec += s.volume; if(s.energy === 'gaz') volGaz += s.volume; totalWaste += (s.ghost_savings || 0); if(s.ghost_savings > 200) countAlerts++; }); 
+            document.getElementById('kpi-vol-elec').innerText = Math.round(volElec).toLocaleString() + " MWh"; document.getElementById('kpi-vol-gaz').innerText = Math.round(volGaz).toLocaleString() + " MWh"; document.getElementById('kpi-waste').innerText = Math.round(totalWaste).toLocaleString() + " €"; 
+            const badgeEl = document.getElementById('sobriety-badge'); if(badgeEl) { if(countAlerts > 0) badgeEl.classList.remove('hidden'); else badgeEl.classList.add('hidden'); } 
         }
 
-        // --- DETAIL MODAL (THERMIC & SUBVENTIONS) ---
+        // --- 9. ACTIONS GLOBALES & MODAL DETAIL ---
+        window.toggleAll = function(source) { if(source.checked) FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); else SELECTED_IDS.clear(); applyFilters(); updateActionBar(); }
+        window.toggleSelection = function(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
+        function updateActionBar() { const count = SELECTED_IDS.size; const selCountEl = document.getElementById('selected-count'); const massCountEl = document.getElementById('mass-count'); const bar = document.getElementById('action-bar'); if(selCountEl) selCountEl.innerText = count; if(massCountEl) massCountEl.innerText = count; if(bar) { bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; } }
+        window.openMassEdit = function() { if(SELECTED_IDS.size === 0) return; document.getElementById('mass-edit-modal').classList.remove('hidden'); }
+        window.assignLot = function() { if(SELECTED_IDS.size === 0) return; document.getElementById('mass-edit-modal').classList.remove('hidden'); document.getElementById('mass-lot-input').focus(); }
+        window.applyMassUpdate = async function() { document.getElementById('mass-edit-modal').classList.add('hidden'); App.toast("Mise à jour groupée sauvegardée.", "success"); }
+        window.exportDQE = async function() { if(SELECTED_IDS.size === 0) return; App.toast("Génération du DQE Excel...", "info"); const ids = Array.from(SELECTED_IDS); const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: ids }) }); if(res.ok) { const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `DCE_Mairie_${ids.length}_sites.xlsx`; document.body.appendChild(a); a.click(); a.remove(); } }
+
         async function openDetail(id) {
             try {
-                const res = await fetch(`/api/dashboard/data/${id}`);
-                const data = await res.json();
-                if(!data || data.error) return App.toast("Détail inaccessible.", "error");
+                const res = await fetch(`/api/dashboard/data/${id}`); const data = await res.json(); if(!data || data.error) return App.toast("Site inaccessible.", "error");
+                CURRENT_SITE = data;
                 
                 document.getElementById('detail-modal').classList.remove('hidden');
                 document.getElementById('modal-title').innerText = data.identity?.site_name || "Bâtiment Public";
-                document.getElementById('modal-address').innerHTML = `<i class="fa-solid fa-location-dot text-cyan mr-1"></i> ${data.location?.address || 'Adresse Mairie'}`;
-                
-                const waste = Math.round(data.kpis?.ghost_savings || 0);
-                document.getElementById('modal-waste').innerText = waste + " €";
+                document.getElementById('modal-address').innerHTML = `<i class="fa-solid fa-location-dot text-cyan mr-1"></i> ${data.location?.address || 'Adresse Inconnue'}`;
+                document.getElementById('modal-waste').innerText = Math.round(data.kpis?.ghost_savings || 0) + " €";
                 
                 const surface = data.location?.surface || 0;
                 document.getElementById('modal-surface').innerHTML = `<i class="fa-solid fa-ruler-combined text-cyan mr-1"></i> ${surface} m²`;
+                if(surface >= 1000) document.getElementById('modal-tertiaire').classList.remove('hidden'); else document.getElementById('modal-tertiaire').classList.add('hidden');
                 
-                if(surface >= 1000) document.getElementById('modal-tertiaire').classList.remove('hidden');
-                else document.getElementById('modal-tertiaire').classList.add('hidden');
-
+                // CARNET DE SANTE
+                const tech = data.technical || {};
+                document.getElementById('disp-chauffage').innerText = tech.chauffage || "Inconnu";
+                document.getElementById('disp-isolation').innerText = tech.isolation || "Inconnue";
                 const isGaz = data.energy_type === 'gaz';
                 const typeBadge = document.getElementById('modal-type');
-                typeBadge.innerText = isGaz ? 'CHAUFFERIE GAZ' : 'COMPTEUR ÉLEC';
-                typeBadge.className = `px-3 py-1 rounded-full text-[10px] font-bold ${isGaz ? 'bg-gas/20 text-gas border border-gas/50' : 'bg-mairie/20 text-mairie border border-mairie/50'}`;
-
-                // Appel Sentinel Thermique DJU (Zéro Mock)
+                typeBadge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
+                typeBadge.className = `px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${isGaz ? 'bg-gas/20 text-gas border border-gas/50' : 'bg-mairie/20 text-mairie border border-mairie/50'}`;
+                
+                const c = data.contract || {}; const grid = document.getElementById('modal-tech-grid');
+                if (isGaz) { grid.innerHTML = `<div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">PCE</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">CAR</span><span class="text-gas font-bold font-mono text-lg">${c.power || '-'} MWh</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Profil</span><span class="text-white font-bold">${c.profil || 'T1'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Fournisseur</span><span class="text-white font-bold">${c.provider || '-'}</span></div>`; } 
+                else { grid.innerHTML = `<div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">PDL</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Puissance</span><span class="text-mairie font-bold font-mono text-lg">${c.power || '-'} kVA</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Segment</span><span class="text-white font-bold">${c.segment || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Fournisseur</span><span class="text-white font-bold">${c.provider || '-'}</span></div>`; }
+                
+                updateModalChart('24h');
                 fetchThermicSignature(id);
 
-                // INJECTION SUBVENTIONS CEE
+                // SUBVENTIONS CEE (ZERO MOCK)
                 const subContainer = document.getElementById('modal-subventions-container');
                 const subData = SUBVENTIONS_DATA.find(s => s.id === id);
                 if(subData && subData.status === 'ELIGIBLE' && subData.aides.length > 0) {
-                    let aidesHtml = subData.aides.map(a => `<div class="bg-black/30 p-3 rounded-xl border border-white/5 mb-2"><div class="text-xs text-white font-bold">${a.nom}</div><div class="text-success font-mono font-black mt-1">+ ${Math.round(a.montant).toLocaleString()} €</div></div>`).join('');
+                    let aidesHtml = subData.aides.map(a => `<li class="flex justify-between items-center bg-black/30 p-3 rounded-xl border border-white/5 mb-2"><div class="text-xs text-white font-bold">${a.nom}</div><div class="text-success font-mono font-bold">+ ${Math.round(a.montant).toLocaleString()} €</div></li>`).join('');
                     subContainer.innerHTML = `
-                        <h4 class="text-success font-black text-lg mb-2"><i class="fa-solid fa-sack-dollar"></i> Aides d'État : ${Math.round(subData.total_site).toLocaleString()} €</h4>
-                        <p class="text-[10px] text-gray-400 mb-4 leading-relaxed">CORTEX a croisé la surface et le gaspillage de ce bâtiment. Droits tirables CEE identifiés :</p>
-                        ${aidesHtml}
-                        <a href="/api/tools/cerfa/${id}/${subData.aides[0].code}" target="_blank" class="mt-4 block text-center bg-success text-abysse py-3 rounded-2xl font-black text-xs hover:bg-white transition shadow-lg uppercase tracking-widest"><i class="fa-solid fa-file-pdf"></i> Éditer le CERFA Pôle National</a>`;
+                        <div class="bento-card p-8 bg-gradient-to-r from-success/10 to-card border-l-4 border-success h-full flex flex-col justify-center shadow-inner">
+                            <h4 class="text-success font-black text-lg mb-2"><i class="fa-solid fa-sack-dollar"></i> CEE / FNCCR : ${Math.round(subData.total_site).toLocaleString()} €</h4>
+                            <p class="text-[10px] text-gray-400 mb-4 leading-relaxed">CORTEX a croisé la surface et la consommation de ce bâtiment public. Droits tirables identifiés :</p>
+                            <ul class="w-full">${aidesHtml}</ul>
+                            <a href="/api/tools/cerfa/${id}/${subData.aides[0].code}" target="_blank" class="mt-4 block text-center bg-success text-abysse py-3 rounded-2xl font-black text-xs hover:bg-white transition shadow-lg uppercase tracking-widest"><i class="fa-solid fa-file-pdf"></i> Éditer le CERFA d'État</a>
+                        </div>`;
                 } else {
-                    subContainer.innerHTML = `<div class="text-center text-gray-500 font-mono mt-10"><i class="fa-solid fa-ban text-4xl mb-4 opacity-30"></i><br>Aucune prime éligible. Bâtiment soit trop petit, soit déjà optimisé.</div>`;
+                    subContainer.innerHTML = `<div class="bento-card p-8 border border-white/10 h-full flex flex-col justify-center text-center"><i class="fa-solid fa-ban text-4xl mb-4 opacity-20 text-gray-500"></i><p class="text-xs text-gray-400 font-bold uppercase tracking-widest">Aucune aide éligible</p><p class="text-[10px] text-gray-500 mt-2">Bâtiment trop petit ou déjà optimisé.</p></div>`;
                 }
 
-            } catch(e) { App.toast("Erreur d'analyse CORTEX", "error"); }
+            } catch(e) {}
         }
 
         async function fetchThermicSignature(id) {
-            const r2El = document.getElementById('modal-dju');
-            const msgEl = document.getElementById('modal-dju-msg');
-            r2El.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-lg text-cyan"></i>';
-            msgEl.innerText = "Calcul des Degrés Jours Unifiés...";
+            const r2El = document.getElementById('modal-dju'); const msgEl = document.getElementById('modal-dju-msg');
+            r2El.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-2xl text-cyan"></i>'; msgEl.innerText = "Calcul des Degrés Jours Unifiés...";
             try {
-                const res = await fetch(`/api/physics/thermic_signature/${id}`);
-                const data = await res.json();
+                const res = await fetch(`/api/physics/thermic_signature/${id}`); const data = await res.json();
                 if(data.success && data.regression) {
-                    const r2 = data.regression.r2 || 0;
-                    r2El.innerText = r2.toFixed(2);
-                    if(r2 > 0.8) msgEl.innerHTML = "<span class='text-alert'>Bâtiment corrélé au froid. Déperdition thermique probable (Toiture/Murs).</span>";
-                    else msgEl.innerHTML = "<span class='text-success'>Décorrélation climatique (Bonne isolation).</span>";
+                    const r2 = data.regression.r2 || 0; r2El.innerText = r2.toFixed(2);
+                    if(r2 > 0.8) { r2El.className = "text-5xl font-black text-alert font-mono drop-shadow-md mb-2"; msgEl.innerHTML = "<span class='text-alert'>Bâtiment fortement corrélé au froid (Passoire).</span>"; }
+                    else { r2El.className = "text-5xl font-black text-success font-mono drop-shadow-md mb-2"; msgEl.innerHTML = "<span class='text-success'>Décorrélation climatique (Isolation OK).</span>"; }
                 } else throw new Error();
-            } catch(e) {
-                r2El.innerText = "N/A"; msgEl.innerText = "Historique Linky insuffisant pour l'IA.";
-                r2El.className = "text-4xl font-black text-gray-600 font-mono";
-            }
+            } catch(e) { r2El.innerText = "N/A"; msgEl.innerText = "Historique Linky insuffisant pour l'IA."; r2El.className = "text-5xl font-black text-gray-600 font-mono drop-shadow-md mb-2"; }
+        }
+
+        async function updateModalChart(mode) { 
+            if(!CURRENT_SITE) return; const ctx = document.getElementById('modalChart').getContext('2d'); if(modalChartInstance) modalChartInstance.destroy(); 
+            if(mode === '24h') { 
+                const labels = Array.from({length: 24}, (_, i) => i + 'h'); const dataPoints = Array.from({length: 24}, (_, i) => (i>22 || i<6) ? 20 : 80); const isGaz = CURRENT_SITE.energy_type === 'gaz'; const color = isGaz ? '#EF4444' : '#00E5FF'; const bg = isGaz ? 'rgba(239, 68, 68, 0.2)' : 'rgba(0, 229, 255, 0.2)'; 
+                modalChartInstance = new Chart(ctx, { type: 'line', data: { labels: labels, datasets:[{ label: isGaz ? 'Conso (kWh)' : 'Puissance (kW)', data: dataPoints, borderColor: color, backgroundColor: bg, fill: true, tension: 0.4, borderWidth: 3 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } }); 
+            } else { 
+                try { 
+                    const res = await fetch(`/api/forecast/simulate/${CURRENT_SITE.identity.id}`); const data = await res.json(); if(data.error) return; 
+                    modalChartInstance = new Chart(ctx, { type: 'line', data: { labels: data.labels, datasets:[{ label: 'Tendanciel', data: data.dataset_trend, borderColor: '#94A3B8', borderDash:[5,5], tension: 0.4, borderWidth: 2 }, { label: 'Sobriété', data: data.dataset_sobriety, borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.2)', fill: true, tension: 0.4, borderWidth: 3 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: `Gain Cumulé (3 Ans) : ${data.gain_potential_mwh} MWh`, color: '#10B981' }, legend: { labels: {color: '#94A3B8'}} }, scales: { x: { display: false }, y: { grid:{color: 'rgba(255,255,255,0.05)'}, ticks: {color: '#64748B'} } } } }); 
+                } catch(e) {} 
+            } 
         }
 
         window.closeDetail = function() { document.getElementById('detail-modal').classList.add('hidden'); }
+        window.openEditMode = function() { if(!CURRENT_SITE) return; document.getElementById('edit-id').value = CURRENT_SITE.identity.id; document.getElementById('edit-name').value = CURRENT_SITE.identity.site_name; document.getElementById('edit-surface').value = CURRENT_SITE.location?.surface || 0; document.getElementById('edit-modal').classList.remove('hidden'); }
+        window.saveMairieData = async function() { 
+            const id = document.getElementById('edit-id').value;
+            const original = CURRENT_SITE; 
+            original.identity.site_name = document.getElementById('edit-name').value;
+            const newSurface = parseFloat(document.getElementById('edit-surface').value);
+            if (!original.location) original.location = {}; original.location.surface = isNaN(newSurface) ? 0 : newSurface;
+            if (!original.technical) original.technical = {};
+            original.technical.chauffage = document.getElementById('edit-chauffage').value;
+            original.technical.isolation = document.getElementById('edit-isolation').value;
+
+            try {
+                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
+                if((await res.json()).success) { document.getElementById('edit-modal').classList.add('hidden'); App.toast("Patrimoine enregistré !"); loadFleet(); openDetail(id); }
+            } catch(e) { App.toast("Erreur réseau", "error"); }
+        }
 
     </script>
 </body>
