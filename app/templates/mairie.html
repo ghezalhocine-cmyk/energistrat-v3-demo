@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ENERGISTRAT V12.6 | Mairie.OS (Hyperviseur DGS)</title>
     
+    <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- LEAFLET MAP -->
@@ -51,11 +52,9 @@
         #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
         #action-bar.visible { transform: translateY(0); }
         
-        /* LEAFLET DARK MODE CSS INVERT TRICK */
         .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
-        .leaflet-container { background: transparent !important; border-radius: 2rem; font-family: 'Inter', sans-serif; }
+        .leaflet-container { background: transparent !important; border-radius: 2.5rem; font-family: 'Inter', sans-serif; }
 
-        /* MARKERS FEU TRICOLORE */
         .map-marker { border-radius: 50%; border: 3px solid white; box-shadow: 0 0 15px rgba(0,0,0,0.8); }
         .marker-red { background-color: #EF4444; box-shadow: 0 0 20px #EF4444; animation: pulse-red 2s infinite; }
         .marker-orange { background-color: #F59E0B; box-shadow: 0 0 15px #F59E0B; }
@@ -86,10 +85,10 @@
         <div class="p-4 space-y-1 mt-4 overflow-y-auto">
             <div class="text-[10px] uppercase text-gray-500 font-bold tracking-widest mb-2 px-2">Opérations Publiques</div>
             <button onclick="switchView('patrimoine')" id="nav-patrimoine" class="nav-item active w-full flex items-center gap-3 px-4 py-3 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition">
-                <i class="fa-solid fa-city w-5 text-center"></i> Parc & Sobriété
+                <i class="fa-solid fa-map-location-dot w-5 text-center"></i> Cartographie & Parc
             </button>
             <button onclick="switchView('budget')" id="nav-budget" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition">
-                <i class="fa-solid fa-chart-pie w-5 text-center text-gold"></i> Exécution M57
+                <i class="fa-solid fa-vault w-5 text-center text-gold"></i> Budget M57
             </button>
             <button onclick="switchView('market')" id="nav-market" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition">
                 <i class="fa-solid fa-chart-line w-5 text-center text-cyan"></i> Météo des Marchés
@@ -135,7 +134,7 @@
                     <p class="text-xs text-gray-400 font-mono mt-1"><i class="fa-solid fa-users text-mairie"></i> <span id="commune-pop">--</span> Habitants (API Gouv)</p>
                 </div>
                 <div id="sobriety-badge" class="hidden px-4 py-1 rounded-full bg-alert/20 border border-alert/50 text-alert text-xs font-bold animate-pulse flex items-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.4)] ml-4">
-                    <i class="fa-solid fa-triangle-exclamation"></i> DÉRIVE SOBRIÉTÉ (Nuit/WE)
+                    <i class="fa-solid fa-triangle-exclamation"></i> BÂTIMENTS EN ALERTE (Gaspillage)
                 </div>
             </div>
             <div class="flex gap-6 text-right items-center">
@@ -151,7 +150,7 @@
             <!-- VUE 1 : PATRIMOINE (MAP & PARC GLOBAL) -->
             <div id="view-patrimoine" class="view-section active space-y-8 max-w-[1600px] mx-auto">
                 
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[400px]">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[450px]">
                     <!-- LEAFLET MAP -->
                     <div class="col-span-8 bento-card p-2 relative overflow-hidden border-2 border-mairie/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
                         <div id="map" class="w-full h-full rounded-[2.5rem] z-10"></div>
@@ -165,36 +164,30 @@
 
                     <!-- KPIS -->
                     <div class="col-span-4 flex flex-col gap-6">
-                        <div class="bento-card p-6 border-t-4 border-alert flex-1 flex flex-col justify-center items-center text-center cursor-pointer hover:bg-alert/5 transition group" onclick="filterWaste()">
-                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 group-hover:text-alert transition">Fuite Financière (Talon Nuit)</h3>
+                        <div class="bento-card p-6 border-t-4 border-alert flex flex-col justify-center items-center text-center cursor-pointer hover:bg-alert/5 transition group shadow-lg" onclick="filterWaste()">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 group-hover:text-alert transition">Fuite Financière Nuit/WE</h3>
                             <div class="text-5xl font-black text-white font-mono mb-2 drop-shadow-[0_0_10px_rgba(239,68,68,0.3)]" id="kpi-waste">-- €</div>
                             <div class="text-[10px] text-alert font-bold bg-alert/10 px-3 py-1 rounded-full border border-alert/30"><i class="fa-solid fa-filter"></i> Isoler les passoires</div>
                         </div>
-                        <div class="bento-card p-4 border-t-4 border-cyan flex-1 flex flex-col justify-center">
-                            <div class="flex justify-between items-center w-full px-4">
-                                <div class="text-center"><span class="text-[10px] text-gray-500 uppercase font-bold tracking-widest"><i class="fa-solid fa-bolt text-cyan"></i> Élec</span><div class="text-2xl font-black text-white font-mono" id="kpi-vol-elec">-- MWh</div></div>
-                                <div class="h-10 w-px bg-white/10"></div>
-                                <div class="text-center"><span class="text-[10px] text-gray-500 uppercase font-bold tracking-widest"><i class="fa-solid fa-fire text-gas"></i> Gaz</span><div class="text-2xl font-black text-white font-mono" id="kpi-vol-gaz">-- MWh</div></div>
+                        
+                        <!-- NOUVEAU WIDGET : CONTRATS & FOURNISSEURS -->
+                        <div class="bento-card p-6 border-t-4 border-gold flex-1 flex flex-col shadow-lg overflow-hidden">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fa-solid fa-file-signature text-gold"></i> Fournisseurs & Engagements</h3>
+                            <div id="lots-deadlines-container" class="space-y-3 overflow-y-auto flex-1 pr-1">
+                                <div class="text-xs text-gray-500 font-mono text-center mt-4">Analyse des contrats en cours...</div>
                             </div>
-                        </div>
-                        <div class="bento-card p-1 flex bg-black/40">
-                            <button onclick="filterEnergy('elec')" id="btn-elec" class="flex-1 rounded-[2rem] text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center py-2 gap-1 active-energy"><i class="fa-solid fa-bolt text-lg"></i> Élec</button>
-                            <div class="w-px bg-white/10 my-2"></div>
-                            <button onclick="filterEnergy('gaz')" id="btn-gaz" class="flex-1 rounded-[2rem] text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center py-2 gap-1"><i class="fa-solid fa-fire text-lg"></i> Gaz</button>
-                            <div class="w-px bg-white/10 my-2"></div>
-                            <button onclick="filterEnergy('all')" id="btn-all" class="flex-1 rounded-[2rem] text-xs font-bold text-cyan bg-cyan/10 border border-cyan/30 transition flex flex-col items-center justify-center py-2 gap-1"><i class="fa-solid fa-layer-group text-lg"></i> Tout</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- TABLEAU DE GESTION -->
+                <!-- TABLEAU DES BÂTIMENTS -->
                 <div class="bento-card overflow-hidden flex flex-col h-[600px] border border-cyan/20">
                     <div class="px-8 py-5 border-b border-white/5 flex justify-between items-center bg-card/50">
                         <div class="flex items-center gap-4">
                             <h3 class="font-bold text-white uppercase tracking-widest text-sm flex items-center gap-2 mr-4"><i class="fa-solid fa-list-check text-cyan"></i> Bâtiments & Éclairage Public</h3>
                             <div class="relative w-64">
                                 <i class="fa-solid fa-search absolute left-4 top-3 text-gray-500 text-xs"></i>
-                                <input type="text" id="search-input" oninput="applyFilters()" placeholder="Recherche..." class="w-full bg-abysse border border-white/10 rounded-[2rem] py-2 pl-10 pr-4 text-xs text-white focus:border-cyan outline-none transition font-mono">
+                                <input type="text" id="search-input" oninput="applyFilters()" placeholder="Recherche..." class="w-full bg-abysse border border-white/10 rounded-[2rem] py-2.5 pl-10 pr-4 text-xs text-white focus:border-cyan outline-none transition font-mono">
                             </div>
                             <select id="filter-lot" onchange="applyFilters()" class="bg-abysse border border-white/10 rounded-[2rem] p-2 px-4 text-xs text-gray-300 outline-none cursor-pointer"><option value="all">Tous les Lots</option></select>
                             <select id="filter-type" onchange="applyFilters()" class="bg-abysse border border-white/10 rounded-[2rem] p-2 px-4 text-xs text-gray-300 outline-none cursor-pointer"><option value="all">Toutes Typologies</option><option value="ecole">Écoles</option><option value="sport">Sport</option><option value="admin">Administratif</option><option value="ep">Éclairage Public</option></select>
@@ -210,10 +203,9 @@
                                     <th class="px-6 py-4 border-b border-white/5">Site / Bâtiment</th>
                                     <th class="px-6 py-4 border-b border-white/5">Typologie</th>
                                     <th class="px-6 py-4 border-b border-white/5">PDL / PCE</th>
-                                    <th class="px-6 py-4 border-b border-white/5">Lot</th>
-                                    <th class="px-6 py-4 text-right border-b border-white/5">Vol (MWh)</th>
-                                    <th class="px-6 py-4 text-right border-b border-white/5">Budget Est.</th>
-                                    <th class="px-6 py-4 text-center border-b border-white/5">Sentinel</th>
+                                    <th class="px-6 py-4 text-right border-b border-white/5">Volume</th>
+                                    <th class="px-6 py-4 text-right border-b border-white/5">Budget. Est</th>
+                                    <th class="px-6 py-4 text-center border-b border-white/5">Feu Tricolore Sentinel</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/5" id="fleet-table-body"></tbody>
@@ -222,7 +214,7 @@
                 </div>
             </div>
 
-            <!-- VUE 2 : BUDGET M57 -->
+            <!-- VUE 2 : BUDGET M57 (ZERO MOCK) -->
             <div id="view-budget" class="view-section hidden space-y-8 max-w-[1200px] mx-auto">
                 <div class="text-center mb-10">
                     <h2 class="text-4xl font-black text-white italic tracking-tight">PILOTAGE <span class="text-gold">M57</span></h2>
@@ -248,19 +240,22 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-6">
-                    <div class="bento-card p-8 border-t-4 border-mairie"><div class="flex justify-between items-start mb-2"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Compte 60612 (Électricité)</h3><i class="fa-solid fa-bolt text-mairie text-2xl opacity-20"></i></div><div class="text-4xl font-black text-white mt-2 font-mono" id="m57-60612-budget">-- €</div><div class="text-[10px] text-gray-500 mt-3 uppercase tracking-widest font-bold">Atterrissage projeté</div></div>
-                    <div class="bento-card p-8 border-t-4 border-gas"><div class="flex justify-between items-start mb-2"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Compte 60621 (Gaz)</h3><i class="fa-solid fa-fire text-gas text-2xl opacity-20"></i></div><div class="text-4xl font-black text-white mt-2 font-mono" id="m57-60621-budget">-- €</div><div class="text-[10px] text-gray-500 mt-3 uppercase tracking-widest font-bold">Atterrissage projeté</div></div>
+                    <div class="bento-card p-8 border-t-4 border-mairie">
+                        <div class="flex justify-between items-start mb-2"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Compte 60612 (Électricité)</h3><i class="fa-solid fa-bolt text-mairie text-2xl opacity-20"></i></div>
+                        <div class="text-4xl font-black text-white mt-2 font-mono" id="m57-60612-budget">-- €</div>
+                        <div class="text-[10px] text-gray-500 mt-3 uppercase tracking-widest font-bold">Atterrissage fin d'année</div>
+                    </div>
+                    <div class="bento-card p-8 border-t-4 border-gas">
+                        <div class="flex justify-between items-start mb-2"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Compte 60621 (Gaz)</h3><i class="fa-solid fa-fire text-gas text-2xl opacity-20"></i></div>
+                        <div class="text-4xl font-black text-white mt-2 font-mono" id="m57-60621-budget">-- €</div>
+                        <div class="text-[10px] text-gray-500 mt-3 uppercase tracking-widest font-bold">Atterrissage fin d'année</div>
+                    </div>
                 </div>
 
                 <div class="bento-card p-8 bg-gradient-to-br from-card to-abysse border border-cyan/30 text-center">
                     <i class="fa-solid fa-brain text-4xl text-cyan mb-4"></i>
-                    <h3 class="text-lg font-black text-white uppercase tracking-widest mb-2">Recommandation CORTEX DAF</h3>
+                    <h3 class="text-lg font-black text-white uppercase tracking-widest mb-2">Recommandation CORTEX DGS</h3>
                     <p class="text-sm text-gray-300 leading-relaxed font-mono" id="cortex-m57-msg">Analyse mathématique de l'exécution...</p>
-                </div>
-                
-                <div class="grid grid-cols-2 gap-6">
-                    <div class="bento-card p-6"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Dynamique de Mandatement</h3><div class="h-64 relative"><canvas id="landingChart"></canvas></div></div>
-                    <div class="bento-card p-6"><h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Poids Énergétique par Typologie</h3><div class="h-64 relative"><canvas id="budgetChart"></canvas></div></div>
                 </div>
             </div>
 
@@ -389,7 +384,7 @@
             <button onclick="exportDQE()" class="flex items-center gap-2 text-abysse bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-[2rem] font-bold text-sm transition"><i class="fa-solid fa-file-excel text-green-600"></i> Export DQE</button>
         </div>
 
-        <!-- MODAL DETAIL BATIMENT (ÉDITABLE + SENTINEL + CEE + DJU) -->
+        <!-- MODAL DETAIL BATIMENT (ÉDITABLE + SENTINEL + CEE + DJU + CONTRAT) -->
         <div id="detail-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center p-8 backdrop-blur-md">
             <div class="bento-card w-full max-w-6xl h-full max-h-[90vh] overflow-y-auto relative flex flex-col border border-cyan/30 shadow-[0_0_60px_rgba(0,229,255,0.15)]">
                 <button onclick="closeDetail()" class="absolute top-6 right-6 w-12 h-12 rounded-full bg-abysse text-gray-400 hover:text-white border border-white/10 hover:border-white transition flex items-center justify-center text-xl z-20"><i class="fa-solid fa-xmark"></i></button>
@@ -410,30 +405,23 @@
                 <div class="p-10 grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1">
                     
                     <div class="lg:col-span-2 space-y-6">
-                        <!-- Carnet de Santé -->
+                        <!-- Carnet de Santé & Contrat Public -->
                         <div class="bento-card p-8 border-l-4 border-mairie bg-abysse/50">
-                            <h3 class="text-sm font-bold text-white mb-6 uppercase tracking-widest">Carnet de Santé Technique</h3>
+                            <h3 class="text-sm font-bold text-white mb-6 uppercase tracking-widest">Carnet de Santé Technique & Contrat Public</h3>
                             <div class="grid grid-cols-2 gap-6 text-sm" id="modal-tech-grid"></div>
                             <div class="mt-6 pt-6 border-t border-white/10 grid grid-cols-2 gap-6 text-sm">
                                 <div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Vecteur Chauffage</span><span class="text-white font-bold" id="disp-chauffage">--</span></div>
                                 <div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Isolation</span><span class="text-white font-bold" id="disp-isolation">--</span></div>
+                            </div>
+                            <div class="mt-6 pt-6 border-t border-white/10 grid grid-cols-2 gap-6 text-sm bg-black/20 p-4 rounded-xl">
+                                <div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Fournisseur</span><span class="text-white font-bold" id="disp-provider">--</span></div>
+                                <div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Fin d'engagement (Marché)</span><span class="text-white font-bold" id="disp-end-date">--</span></div>
                             </div>
                         </div>
 
                         <!-- CEE Subventions -->
                         <div id="modal-subventions-container" class="min-h-[120px]"></div>
 
-                        <!-- Courbes / Forecast -->
-                        <div class="bento-card p-8 flex flex-col h-[350px]">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest">Courbe de Charge & Forecast</h3>
-                                <div class="flex gap-3">
-                                    <button onclick="updateModalChart('24h')" class="text-xs font-bold bg-white/10 px-4 py-2 rounded-[2rem] text-white hover:bg-white/20 transition">Profil SGE 24h</button>
-                                    <button onclick="updateModalChart('3y')" class="text-xs font-bold bg-mairie px-4 py-2 rounded-[2rem] text-white hover:bg-blue-600 transition shadow-[0_0_15px_rgba(59,130,246,0.3)]">Smart Twin (3 Ans)</button>
-                                </div>
-                            </div>
-                            <div class="flex-1 relative w-full"><canvas id="modalChart"></canvas></div>
-                        </div>
                     </div>
                     
                     <div class="space-y-6">
@@ -455,14 +443,15 @@
             </div>
         </div>
 
-        <!-- MODAL EDIT BATIMENT (Surface, Type) -->
+        <!-- MODAL EDIT BATIMENT (Surface, Type, CONTRAT) -->
         <div id="edit-modal" class="fixed inset-0 bg-black/90 z-[110] hidden flex items-center justify-center backdrop-blur-md">
-            <div class="bento-card p-10 rounded-[3rem] w-[500px] relative border-2 border-mairie/30 shadow-[0_0_40px_rgba(59,130,246,0.2)]">
+            <div class="bento-card p-10 rounded-[3rem] w-[550px] relative border-2 border-mairie/30 shadow-[0_0_40px_rgba(59,130,246,0.2)] max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-black text-white mb-8 flex items-center gap-3"><i class="fa-solid fa-pen-to-square text-mairie"></i> Mise à jour Patrimoine</h3>
                 <div class="space-y-6">
                     <input type="hidden" id="edit-id">
                     <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Nom du Bâtiment</label><input type="text" id="edit-name" class="input-edit mt-1"></div>
                     <div><label class="text-[10px] text-cyan uppercase font-bold tracking-widest pl-2">Surface (m²) - Impact Décret Tertiaire</label><input type="number" id="edit-surface" class="input-edit mt-1 font-mono text-cyan"></div>
+                    
                     <div class="pt-6 border-t border-white/5"><span class="text-sm font-bold text-white uppercase tracking-widest">Carnet de Santé</span></div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -477,6 +466,13 @@
                                 <option value="Inconnue">Inconnue</option><option value="Non Isolé">Non Isolé</option><option value="Double Vitrage">Double Vitrage</option><option value="ITE Complète">ITE Complète</option>
                             </select>
                         </div>
+                    </div>
+                    
+                    <div class="pt-6 border-t border-white/5"><span class="text-sm font-bold text-white uppercase tracking-widest text-gold">Contrat Public & Achat</span></div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Fournisseur</label><input type="text" id="edit-provider" class="input-edit mt-1"></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Lot (Segment)</label><input type="text" id="edit-segment" class="input-edit mt-1"></div>
+                        <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Date de fin d'engagement</label><input type="date" id="edit-end-date" class="input-edit mt-1 text-gray-400 cursor-pointer w-full" style="color-scheme: dark;"></div>
                     </div>
                 </div>
                 <div class="flex justify-end gap-4 mt-10">
@@ -495,12 +491,6 @@
                 </div>
                 <div class="space-y-6 bg-abysse/50 p-6 rounded-[2rem] border border-white/5">
                     <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Affecter au Lot (Appel d'Offres)</label><input type="text" id="mass-lot-input" placeholder="Ex: Lot 1 - Bâtiments Supérieurs à 36kVA" class="input-edit mt-2 w-full"></div>
-                    <div>
-                        <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Typologie Fonctionnelle</label>
-                        <select id="mass-type" class="input-edit mt-2 w-full appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_15px_center] bg-[length:10px_auto] cursor-pointer">
-                            <option value="">-- Ne pas modifier --</option><option value="Ecole">École</option><option value="Sport">Gymnase / Sport</option><option value="EP">Éclairage Public</option>
-                        </select>
-                    </div>
                 </div>
                 <div class="flex justify-end gap-4 mt-8">
                     <button onclick="document.getElementById('mass-edit-modal').classList.add('hidden')" class="text-gray-400 px-6 py-3 text-xs font-bold hover:text-white transition uppercase tracking-widest">ANNULER</button>
@@ -548,11 +538,10 @@
         let LOTS = new Set();
         let M57_SETTINGS = { bp_elec: 0, bp_gaz: 0, consumed_elec: 0, consumed_gaz: 0 };
         
-        let landingChartInstance = null; let budgetChartInstance = null; let modalChartInstance = null;
         let CURRENT_SITE = null;
         let MAP_INSTANCE = null;
         let MARKERS = [];
-        let CITY_CENTER =[46.2276, 2.2137]; // Centre France
+        let CITY_CENTER =[46.2276, 2.2137]; 
 
         document.addEventListener('DOMContentLoaded', () => {
             if(forceTenant && forceTenant !== 'ALL') {
@@ -657,13 +646,34 @@
 
                     LOTS.clear();
                     const mainCity = FLEET_DATA.find(s => s.city && s.city !== 'Inconnue')?.city;
-                    if(mainCity) fetchCityData(mainCity); else plotMarkers(); // plot default center
+                    if(mainCity) fetchCityData(mainCity); else plotMarkers(); 
 
                     FLEET_DATA.forEach(s => { if(s.segment && s.segment.includes("Lot")) LOTS.add(s.segment); });
                     
-                    updateLotSelect(); applyFilters(); updateKPIs(); calculateM57();
+                    updateLotSelect(); applyFilters(); updateKPIs(); calculateM57(); updateLotsDeadlines();
                 }
-            } catch(e) { App.toast("Erreur de synchronisation 3D.", "error"); }
+            } catch(e) { App.toast("Erreur de synchronisation Base 3D.", "error"); }
+        }
+
+        function updateLotsDeadlines() {
+            const container = document.getElementById('lots-deadlines-container');
+            if(!container) return;
+            const provMap = {};
+            FLEET_DATA.forEach(s => {
+                const p = s.provider || 'Inconnu';
+                if(!provMap[p]) provMap[p] = { count: 0, budget: 0 };
+                provMap[p].count++; provMap[p].budget += s.budget;
+            });
+            const html = Object.keys(provMap).map(p => `
+                <div class="flex justify-between items-center bg-black/30 p-3 rounded-xl border border-white/5 shadow-inner">
+                    <div class="text-xs text-white font-bold truncate max-w-[120px]">${p}</div>
+                    <div class="text-right">
+                        <div class="text-xs text-cyan font-mono font-bold">${Math.round(provMap[p].budget).toLocaleString()} €</div>
+                        <div class="text-[9px] text-gray-500">${provMap[p].count} sites liés</div>
+                    </div>
+                </div>
+            `).join('');
+            container.innerHTML = html || '<div class="text-xs text-gray-500 font-mono text-center">Aucun marché en cours.</div>';
         }
 
         // --- 3. GÉNÉRATEUR RAPPORTS CONSEIL MUNICIPAL ---
@@ -674,13 +684,14 @@
             setTimeout(() => { window.open(`/api/tools/bilan_ag/${firstId}`, '_blank'); }, 800);
         }
 
-        // --- 4. NAVIGATION ONGLETS ---
+        // --- 4. NAVIGATION ONGLETS (CORRIGÉ) ---
         window.switchView = function(viewName) {
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active', 'text-white'));
             const btn = document.getElementById('nav-' + viewName);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             
-            const views =['view-patrimoine', 'view-budget', 'view-citizens', 'view-market', 'view-comparator'];
+            // CORRECTION BUG FRONT : AJOUT DES ONGLETS MANQUANTS DANS LE TABLEAU DE MASQUAGE
+            const views =['view-patrimoine', 'view-budget', 'view-market', 'view-comparator', 'view-citizens'];
             views.forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
             
             const target = document.getElementById('view-' + viewName);
@@ -698,18 +709,11 @@
         function calculateM57() {
             if(FLEET_DATA.length === 0) return;
             let projElec = 0; let projGaz = 0; let totalProj = 0;
-            let typeBudgets = { 'Écoles': 0, 'Sport': 0, 'Éclairage': 0, 'Admin': 0, 'Autres': 0 };
 
             FLEET_DATA.forEach(s => {
                 totalProj += s.budget;
                 if(s.energy === 'elec') projElec += s.budget;
                 if(s.energy === 'gaz') projGaz += s.budget;
-                const n = (s.name || "").toLowerCase();
-                if(n.includes('ecole') || n.includes('scolaire')) typeBudgets['Écoles'] += s.budget;
-                else if(n.includes('gymnase') || n.includes('stade') || n.includes('sport')) typeBudgets['Sport'] += s.budget;
-                else if(n.includes('eclairage') || n.includes('ep ')) typeBudgets['Éclairage'] += s.budget;
-                else if(n.includes('mairie') || n.includes('admin')) typeBudgets['Admin'] += s.budget;
-                else typeBudgets['Autres'] += s.budget;
             });
 
             document.getElementById('header-budget').innerText = Math.round(totalProj).toLocaleString() + " €"; 
@@ -729,8 +733,8 @@
 
             if (bpTotal === 0) {
                 bar.style.width = "0%";
-                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Budget Primitif (BP) Non Renseigné.</span> Cliquez sur le stylo (Ajuster) pour saisir les montants votés et activer les projections.`;
-                updateBudgetCharts(typeBudgets, totalProj > 0 ? totalProj : 1, totalProj); // Fake BP for chart not to crash
+                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Budget Primitif Non Renseigné.</span> Cliquez sur le stylo pour saisir les valeurs votées.`;
+                App.toast("Veuillez paramétrer le Budget M57", "info");
                 return;
             }
 
@@ -738,16 +742,15 @@
             bar.style.width = Math.min(pct, 100) + "%";
             
             if (pct > 85) bar.className = "h-full bg-alert rounded-[1.5rem] transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]";
-            else bar.className = "h-full bg-gradient-to-r from-gold to-cyan rounded-[1.5rem] transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(0,229,255,0.5)]";
+            else bar.className = "h-full bg-gradient-to-r from-gold to-cyan rounded-[1.5rem] transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(245,158,11,0.5)]";
 
             if (totalProj > bpTotal) {
                 const dmNeeded = totalProj - bpTotal;
-                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Rupture Budgétaire :</span> La projection d'atterrissage dépasse le BP voté. Préparez une <b>DM</b> de <span class="text-white font-mono font-black text-lg">+${Math.round(dmNeeded).toLocaleString()} €</span> au prochain conseil.`;
+                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Alerte Rupture :</span> La projection dépasse le BP. Préparez une <b>DM</b> de <span class="text-white font-mono font-black">+${Math.round(dmNeeded).toLocaleString()} €</span>.`;
             } else {
                 const marge = bpTotal - totalProj;
-                cortexMsg.innerHTML = `<span class="text-success font-bold"><i class="fa-solid fa-check-circle mr-2"></i> Atterrissage Sécurisé :</span> Marge de sécurité projetée de <span class="text-white font-mono font-black text-lg">+${Math.round(marge).toLocaleString()} €</span> d'ici le 31 décembre.`;
+                cortexMsg.innerHTML = `<span class="text-success font-bold"><i class="fa-solid fa-check-circle mr-2"></i> Atterrissage Sécurisé :</span> Marge de sécurité projetée de <span class="text-white font-mono font-black">+${Math.round(marge).toLocaleString()} €</span>.`;
             }
-            updateBudgetCharts(typeBudgets, bpTotal, totalProj);
         }
 
         window.openM57Modal = function() {
@@ -759,38 +762,29 @@
         }
 
         window.saveM57Data = async function() {
-            const payload = { bp_elec: parseFloat(document.getElementById('m57-input-bp-elec').value) || 0, bp_gaz: parseFloat(document.getElementById('m57-input-bp-gaz').value) || 0, consumed_elec: parseFloat(document.getElementById('m57-input-cons-elec').value) || 0, consumed_gaz: parseFloat(document.getElementById('m57-input-cons-gaz').value) || 0 };
+            const payload = {
+                bp_elec: parseFloat(document.getElementById('m57-input-bp-elec').value) || 0,
+                bp_gaz: parseFloat(document.getElementById('m57-input-bp-gaz').value) || 0,
+                consumed_elec: parseFloat(document.getElementById('m57-input-cons-elec').value) || 0,
+                consumed_gaz: parseFloat(document.getElementById('m57-input-cons-gaz').value) || 0
+            };
             try {
                 const res = await fetch('/api/settings/m57', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const data = await res.json();
-                if(data.success) { M57_SETTINGS = payload; document.getElementById('m57-edit-modal').classList.add('hidden'); calculateM57(); App.toast("Budget enregistré.", "success"); }
+                if(data.success) {
+                    M57_SETTINGS = payload;
+                    document.getElementById('m57-edit-modal').classList.add('hidden');
+                    calculateM57();
+                    App.toast("Budget Primitif verrouillé.", "success");
+                }
             } catch(e) { App.toast("Erreur sauvegarde.", "error"); }
         }
 
-        window.updateBudgetCharts = function(typeBudgets, bp, proj) {
-            if(landingChartInstance) landingChartInstance.destroy(); if(budgetChartInstance) budgetChartInstance.destroy();
-            const ctx1 = document.getElementById('landingChart').getContext('2d');
-            const baseCumul =[0.1, 0.22, 0.35, 0.42, 0.48, 0.52, 0.55, 0.58, 0.65, 0.75, 0.88, 1.0];
-            const dataReel = baseCumul.slice(0, 3).map(r => r * proj);
-            const dataProj = baseCumul.map(r => r * proj);
-            const dataBP = Array(12).fill(bp);
-            landingChartInstance = new Chart(ctx1, {
-                type: 'line',
-                data: { labels:['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'], datasets:[ { label: 'Consommé Réel', data: dataReel, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, tension: 0.4, borderWidth: 4, pointRadius: 0 }, { label: 'Atterrissage Projeté', data: dataProj, borderColor: '#94A3B8', borderDash:[5,5], tension: 0.4, pointRadius: 0 }, { label: 'Plafond BP', data: dataBP, borderColor: '#F59E0B', borderWidth: 2, pointRadius: 0 } ] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8', font: {family: 'JetBrains Mono'} } } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B', font: {family: 'JetBrains Mono'} } }, x: { grid: { display: false }, ticks: { color: '#64748B', font: {family: 'JetBrains Mono'} } } }, interaction: { mode: 'index', intersect: false } }
-            });
-
-            const ctx2 = document.getElementById('budgetChart').getContext('2d');
-            budgetChartInstance = new Chart(ctx2, {
-                type: 'doughnut', data: { labels: Object.keys(typeBudgets), datasets:[{ data: Object.values(typeBudgets), backgroundColor:['#3B82F6', '#F59E0B', '#10B981', '#A855F7', '#64748B'], borderColor: '#001529', borderWidth: 4 }] },
-                options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right', labels: { color: '#94A3B8', font: {family: 'JetBrains Mono'} } } } }
-            });
-        }
-
-        // --- 6. METEO MARCHES ---
+        // --- 6. METEO DES MARCHES ---
         function calculateMarketStrategy() {
             let totalBudget = 0; let totalVol = 0;
             FLEET_DATA.forEach(s => { if(s.energy === 'elec') { totalBudget += s.budget; totalVol += s.volume; } });
+            
             const avgPrice = totalVol > 0 ? (totalBudget / totalVol) : 0;
             
             document.getElementById('price-user').innerText = Math.round(avgPrice) + " €";
@@ -812,21 +806,21 @@
                 signalCircle.className = "w-32 h-32 rounded-full flex items-center justify-center text-5xl mb-6 shadow-[0_0_40px_rgba(16,185,129,0.5)] bg-success text-abysse animate-bounce";
                 signalIcon.className = "fa-solid fa-cart-shopping"; signalText.innerText = "ACHETER"; signalText.className = "text-3xl font-black text-success";
                 signalDesc.innerText = "Marché baissier. Votre tarif actuel est supérieur à la bourse.";
-                advice.innerHTML = "Générez un DQE et <span class='text-white font-bold'>lancez un appel d'offres maintenant</span> pour verrouiller le budget au plus bas.";
+                advice.innerHTML = "L'achat d'énergie est opportun. Lancez un appel d'offres maintenant pour verrouiller le budget.";
             } else if (MARKET_DATA.trend === 'BULL') {
                 signalCircle.className = "w-32 h-32 rounded-full flex items-center justify-center text-5xl mb-6 shadow-[0_0_40px_rgba(239,68,68,0.5)] bg-alert text-white";
                 signalIcon.className = "fa-solid fa-hand"; signalText.innerText = "ATTENDRE"; signalText.className = "text-3xl font-black text-alert";
                 signalDesc.innerText = "Le marché EPEX est en forte tension (Haussier).";
-                advice.innerHTML = "L'AAPC risque d'être infructueux ou hors de prix. <span class='text-white font-bold'>Conservez votre contrat actuel</span> et repoussez l'AO.";
+                advice.innerHTML = "L'AAPC risque d'être infructueux. Conservez votre contrat actuel et repoussez l'AO.";
             } else {
                 signalCircle.className = "w-32 h-32 rounded-full flex items-center justify-center text-5xl mb-6 shadow-[0_0_40px_rgba(0,229,255,0.5)] bg-cyan text-abysse";
                 signalIcon.className = "fa-solid fa-scale-balanced"; signalText.innerText = "SURVEILLER"; signalText.className = "text-3xl font-black text-cyan";
                 signalDesc.innerText = "Prix alignés avec la tendance moyen terme.";
-                advice.innerHTML = "Préparez votre dossier DCE, mais attendez une chute sous le seuil d'alerte pour publier.";
+                advice.innerHTML = "Préparez votre dossier DCE (Smart-Mapping BPU), mais attendez une chute pour publier.";
             }
         }
 
-        // --- 7. SMART MAPPING, COURBES ET BPU ---
+        // --- 7. SMART MAPPING BPU ---
         window.uploadEnedis = async function(input) {
             if(!input.files || input.files.length === 0) return;
             const resDiv = document.getElementById('enedis-result');
@@ -835,7 +829,7 @@
                 const formData = new FormData(); formData.append('file', input.files[0]);
                 const res = await fetch('/api/v1/cpq/ingest_dqe', { method: 'POST', body: formData }); const data = await res.json();
                 if(data.success) {
-                    resDiv.innerHTML = `<span class="text-success font-bold block mb-2"><i class="fa-solid fa-check"></i> Bâtiments et Éclairage Public (EP) séparés.</span><ul class="text-gray-300"><li>Sites détectés : ${data.sites_detected}</li><li>Vol Bâtiments : ${data.suggested_lots["BAT (Bâtiments)"] || 0} MWh</li><li>Vol Éclairage Public : ${data.suggested_lots["EP (Éclairage Public)"] || 0} MWh</li></ul>`;
+                    resDiv.innerHTML = `<span class="text-success font-bold block mb-2"><i class="fa-solid fa-check"></i> Séparation Bâtiments / EP réussie.</span><ul class="text-gray-300"><li>Sites détectés : ${data.sites_detected}</li><li>Vol Bâtiments : ${data.suggested_lots["BAT (Bâtiments)"] || 0} MWh</li><li>Vol EP : ${data.suggested_lots["EP (Éclairage Public)"] || 0} MWh</li></ul>`;
                 } else resDiv.innerHTML = `<span class="text-alert">${data.error}</span>`;
             } catch(e) { resDiv.innerHTML = `<span class="text-alert">Erreur Serveur.</span>`; }
         }
@@ -843,7 +837,7 @@
         window.uploadCurves = async function(input) {
             if(!input.files || input.files.length === 0) return;
             const resDiv = document.getElementById('curves-result');
-            resDiv.classList.remove('hidden'); resDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i> Agrégation des Courbes de Charge...';
+            resDiv.classList.remove('hidden'); resDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i> Agrégation des Courbes...';
             try {
                 const formData = new FormData(); for(let i=0; i<input.files.length; i++) formData.append('files', input.files[i]);
                 const res = await fetch('/api/v1/cpq/ingest_curves', { method: 'POST', body: formData }); const data = await res.json();
@@ -896,8 +890,8 @@
                 const waste = site.ghost_savings || 0;
                 let alertBadge = '<span class="text-success text-[10px] font-bold"><i class="fa-solid fa-check"></i> Optimisé</span>';
                 if (waste > 200) {
-                    if (typeLabel === "École") alertBadge = '<span class="text-alert text-[10px] font-bold animate-pulse bg-alert/20 px-3 py-1 rounded-full"><i class="fa-solid fa-triangle-exclamation"></i> Chauffage Nuit/Vacances</span>';
-                    else alertBadge = `<span class="text-alert text-[10px] font-bold animate-pulse bg-alert/20 px-3 py-1 rounded-full"><i class="fa-solid fa-triangle-exclamation"></i> Fuite : ${Math.round(waste)}€</span>`;
+                    if (typeLabel === "École") alertBadge = '<span class="text-alert text-[10px] font-bold animate-pulse bg-alert/20 px-3 py-1 rounded-full"><i class="fa-solid fa-triangle-exclamation"></i> Vacances</span>';
+                    else alertBadge = `<span class="text-alert text-[10px] font-bold animate-pulse bg-alert/20 px-3 py-1 rounded-full"><i class="fa-solid fa-triangle-exclamation"></i> Fuite Nuit</span>`;
                 } else if (waste > 50) {
                     alertBadge = '<span class="text-gold text-[10px] font-bold"><i class="fa-solid fa-eye"></i> À surveiller</span>';
                 }
@@ -917,7 +911,7 @@
             document.getElementById('visible-count').innerText = data.length;
         }
 
-        window.updateLotSelect = function() { const sel = document.getElementById('filter-lot'); if(!sel) return; sel.innerHTML = '<option value="all">Tous les Lots / Marchés</option>'; LOTS.forEach(l => { const opt = document.createElement('option'); opt.value = l; opt.innerText = l; sel.appendChild(opt); }); }
+        window.updateLotSelect = function() { const sel = document.getElementById('filter-lot'); if(!sel) return; sel.innerHTML = '<option value="all">Tous les Lots</option>'; LOTS.forEach(l => { const opt = document.createElement('option'); opt.value = l; opt.innerText = l; sel.appendChild(opt); }); }
         window.filterEnergy = function(type) { CURRENT_ENERGY = type;['elec', 'gaz', 'all'].forEach(t => { const btn = document.getElementById('btn-' + t); if(btn) { if(t === type) { btn.classList.add('bg-white/10', 'text-white'); btn.classList.remove('text-gray-400', 'bg-transparent'); if(t === 'elec') btn.classList.add('text-mairie'); if(t === 'gaz') btn.classList.add('text-gas'); if(t === 'all') btn.classList.add('text-cyan'); } else { btn.className = "flex-1 rounded-[2rem] text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition flex flex-col items-center justify-center py-2 gap-1"; } } }); applyFilters(); }
         window.filterWaste = function() { document.getElementById('search-input').value = "alert:waste"; applyFilters(); }
         
@@ -942,15 +936,33 @@
             const badgeEl = document.getElementById('sobriety-badge'); if(badgeEl) { if(countAlerts > 0) badgeEl.classList.remove('hidden'); else badgeEl.classList.add('hidden'); } 
         }
 
-        // --- 9. ACTIONS GLOBALES & MODAL DETAIL ---
+        // --- 9. ACTIONS GLOBALES (EXPORT DQE CORRIGÉ) ---
         window.toggleAll = function(source) { if(source.checked) FLEET_DATA.forEach(s => SELECTED_IDS.add(s.id)); else SELECTED_IDS.clear(); applyFilters(); updateActionBar(); }
         window.toggleSelection = function(id) { if(SELECTED_IDS.has(id)) SELECTED_IDS.delete(id); else SELECTED_IDS.add(id); updateActionBar(); }
         function updateActionBar() { const count = SELECTED_IDS.size; const selCountEl = document.getElementById('selected-count'); const massCountEl = document.getElementById('mass-count'); const bar = document.getElementById('action-bar'); if(selCountEl) selCountEl.innerText = count; if(massCountEl) massCountEl.innerText = count; if(bar) { bar.style.transform = count > 0 ? 'translate(-50%, 0)' : 'translate(-50%, 200%)'; } }
         window.openMassEdit = function() { if(SELECTED_IDS.size === 0) return; document.getElementById('mass-edit-modal').classList.remove('hidden'); }
         window.assignLot = function() { if(SELECTED_IDS.size === 0) return; document.getElementById('mass-edit-modal').classList.remove('hidden'); document.getElementById('mass-lot-input').focus(); }
         window.applyMassUpdate = async function() { document.getElementById('mass-edit-modal').classList.add('hidden'); App.toast("Mise à jour groupée sauvegardée.", "success"); }
-        window.exportDQE = async function() { if(SELECTED_IDS.size === 0) return; App.toast("Génération du DQE Excel...", "info"); const ids = Array.from(SELECTED_IDS); const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: ids }) }); if(res.ok) { const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `DCE_Mairie_${ids.length}_sites.xlsx`; document.body.appendChild(a); a.click(); a.remove(); } }
+        
+        // CORRECTION DE L'EXPORT DQE AVEC CATCH D'ERREUR
+        window.exportDQE = async function() { 
+            if(SELECTED_IDS.size === 0) return; 
+            App.toast("Génération du DQE Excel en cours...", "info"); 
+            const ids = Array.from(SELECTED_IDS); 
+            try {
+                const res = await fetch('/api/ops/generate_tender', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ site_ids: ids }) }); 
+                if(!res.ok) throw new Error("Erreur Backend");
+                const blob = await res.blob(); 
+                const url = window.URL.createObjectURL(blob); 
+                const a = document.createElement('a'); a.href = url; a.download = `DCE_Mairie_${ids.length}_sites.xlsx`; 
+                document.body.appendChild(a); a.click(); a.remove(); 
+                App.toast("DQE téléchargé avec succès.", "success");
+            } catch(e) {
+                App.toast("Échec de la génération DQE (Erreur Serveur).", "error");
+            }
+        }
 
+        // --- 10. MODALS ET CONTRATS ---
         async function openDetail(id) {
             try {
                 const res = await fetch(`/api/dashboard/data/${id}`); const data = await res.json(); if(!data || data.error) return App.toast("Site inaccessible.", "error");
@@ -965,7 +977,6 @@
                 document.getElementById('modal-surface').innerHTML = `<i class="fa-solid fa-ruler-combined text-cyan mr-1"></i> ${surface} m²`;
                 if(surface >= 1000) document.getElementById('modal-tertiaire').classList.remove('hidden'); else document.getElementById('modal-tertiaire').classList.add('hidden');
                 
-                // CARNET DE SANTE
                 const tech = data.technical || {};
                 document.getElementById('disp-chauffage').innerText = tech.chauffage || "Inconnu";
                 document.getElementById('disp-isolation').innerText = tech.isolation || "Inconnue";
@@ -974,14 +985,32 @@
                 typeBadge.innerText = isGaz ? 'GAZ' : 'ÉLEC';
                 typeBadge.className = `px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${isGaz ? 'bg-gas/20 text-gas border border-gas/50' : 'bg-mairie/20 text-mairie border border-mairie/50'}`;
                 
-                const c = data.contract || {}; const grid = document.getElementById('modal-tech-grid');
-                if (isGaz) { grid.innerHTML = `<div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">PCE</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">CAR</span><span class="text-gas font-bold font-mono text-lg">${c.power || '-'} MWh</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Profil</span><span class="text-white font-bold">${c.profil || 'T1'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Fournisseur</span><span class="text-white font-bold">${c.provider || '-'}</span></div>`; } 
-                else { grid.innerHTML = `<div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">PDL</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Puissance</span><span class="text-mairie font-bold font-mono text-lg">${c.power || '-'} kVA</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Segment</span><span class="text-white font-bold">${c.segment || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Fournisseur</span><span class="text-white font-bold">${c.provider || '-'}</span></div>`; }
+                // GESTION DU CONTRAT & ÉCHÉANCES DANS LE CARNET DE SANTÉ
+                const c = data.contract || {}; 
+                const provider = c.provider || 'Inconnu';
+                const endDate = c.end_date || null;
+                let dateHtml = '<span class="text-gray-500 font-mono text-xs">Non renseignée</span>';
+
+                if (endDate) {
+                    const d = new Date(endDate);
+                    if (!isNaN(d.getTime())) {
+                        const diffMonths = Math.round((d - new Date()) / (1000 * 60 * 60 * 24 * 30));
+                        if (diffMonths < 0) dateHtml = `<span class="text-alert font-bold font-mono text-xs animate-pulse">Marché échu depuis ${Math.abs(diffMonths)} mois</span>`;
+                        else if (diffMonths <= 6) dateHtml = `<span class="text-alert font-bold font-mono text-xs"><i class="fa-solid fa-triangle-exclamation"></i> Expire dans ${diffMonths} mois</span>`;
+                        else dateHtml = `<span class="text-success font-bold font-mono text-xs">Valide (${diffMonths} mois)</span>`;
+                    }
+                }
+
+                document.getElementById('disp-provider').innerText = provider;
+                document.getElementById('disp-end-date').innerHTML = dateHtml;
+                
+                const grid = document.getElementById('modal-tech-grid');
+                if (isGaz) { grid.innerHTML = `<div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">PCE</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">CAR</span><span class="text-gas font-bold font-mono text-lg">${c.power || '-'} MWh</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Profil</span><span class="text-white font-bold">${c.profil || 'T1'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Lot (Segment)</span><span class="text-white font-bold">${c.segment || '-'}</span></div>`; } 
+                else { grid.innerHTML = `<div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">PDL</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Puissance</span><span class="text-mairie font-bold font-mono text-lg">${c.power || '-'} kVA</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Segment</span><span class="text-white font-bold">${c.segment || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Lot d'affectation</span><span class="text-white font-bold">${c.segment || '-'}</span></div>`; }
                 
                 updateModalChart('24h');
                 fetchThermicSignature(id);
 
-                // SUBVENTIONS CEE (ZERO MOCK)
                 const subContainer = document.getElementById('modal-subventions-container');
                 const subData = SUBVENTIONS_DATA.find(s => s.id === id);
                 if(subData && subData.status === 'ELIGIBLE' && subData.aides.length > 0) {
@@ -1027,21 +1056,50 @@
         }
 
         window.closeDetail = function() { document.getElementById('detail-modal').classList.add('hidden'); }
-        window.openEditMode = function() { if(!CURRENT_SITE) return; document.getElementById('edit-id').value = CURRENT_SITE.identity.id; document.getElementById('edit-name').value = CURRENT_SITE.identity.site_name; document.getElementById('edit-surface').value = CURRENT_SITE.location?.surface || 0; document.getElementById('edit-modal').classList.remove('hidden'); }
+        
+        // --- 11. ÉDITION DES CONTRATS ET DU PATRIMOINE ---
+        window.openEditMode = function() { 
+            if(!CURRENT_SITE) return; 
+            document.getElementById('edit-id').value = CURRENT_SITE.identity.id; 
+            document.getElementById('edit-name').value = CURRENT_SITE.identity.site_name || ""; 
+            document.getElementById('edit-surface').value = CURRENT_SITE.location?.surface || 0; 
+            
+            // Remplissage des champs de contrats
+            document.getElementById('edit-provider').value = CURRENT_SITE.contract?.provider || "";
+            document.getElementById('edit-segment').value = CURRENT_SITE.contract?.segment || "";
+            document.getElementById('edit-end-date').value = CURRENT_SITE.contract?.end_date || "";
+
+            document.getElementById('edit-modal').classList.remove('hidden'); 
+        }
+
         window.saveMairieData = async function() { 
             const id = document.getElementById('edit-id').value;
             const original = CURRENT_SITE; 
             original.identity.site_name = document.getElementById('edit-name').value;
             const newSurface = parseFloat(document.getElementById('edit-surface').value);
-            if (!original.location) original.location = {}; original.location.surface = isNaN(newSurface) ? 0 : newSurface;
+            
+            if (!original.location) original.location = {}; 
+            original.location.surface = isNaN(newSurface) ? 0 : newSurface;
+            
             if (!original.technical) original.technical = {};
             original.technical.chauffage = document.getElementById('edit-chauffage').value;
             original.technical.isolation = document.getElementById('edit-isolation').value;
 
+            // Sauvegarde des champs contractuels
+            if (!original.contract) original.contract = {};
+            original.contract.provider = document.getElementById('edit-provider').value;
+            original.contract.segment = document.getElementById('edit-segment').value;
+            original.contract.end_date = document.getElementById('edit-end-date').value;
+
             try {
                 const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
-                if((await res.json()).success) { document.getElementById('edit-modal').classList.add('hidden'); App.toast("Patrimoine enregistré !"); loadFleet(); openDetail(id); }
-            } catch(e) { App.toast("Erreur réseau", "error"); }
+                if((await res.json()).success) { 
+                    document.getElementById('edit-modal').classList.add('hidden'); 
+                    App.toast("Patrimoine et Contrats enregistrés avec succès !"); 
+                    loadFleet(); 
+                    openDetail(id); 
+                }
+            } catch(e) { App.toast("Erreur réseau lors de la sauvegarde.", "error"); }
         }
 
     </script>
