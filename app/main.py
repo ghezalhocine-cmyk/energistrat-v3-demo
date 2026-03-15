@@ -465,7 +465,7 @@ async def api_create_crm_lead_and_convert(payload: CRMCompany3DModel, user = Dep
     """
     Création CRM 3D avec Auto-Fill Gouvernemental et Télémétrie Solvabilité.
     """
-    if not user or user.get("role") != "ADMIN": 
+    if not user: 
         return JSONResponse({"error": "Non autorisé"}, 401)
         
     owner_id = user.get("uid")
