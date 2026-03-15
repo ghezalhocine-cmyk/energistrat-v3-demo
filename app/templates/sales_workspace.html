@@ -24,7 +24,7 @@
         .bento-card { background-color: #001D3D; border: 1px solid rgba(0, 229, 255, 0.1); border-radius: 1rem; }
         
         /* Sidebar */
-        .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; color: #9CA3AF; font-size: 13px; font-weight: 500; border-radius: 8px; transition: all 0.2s; cursor: pointer; }
+        .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; color: #9CA3AF; font-size: 13px; font-weight: 500; border-radius: 8px; transition: all 0.2s; cursor: pointer; text-decoration: none; }
         .sidebar-item:hover { color: #ffffff; background: rgba(255,255,255,0.05); }
         .sidebar-item.active { color: #00E5FF; background: rgba(0, 229, 255, 0.1); border-left: 3px solid #00E5FF; }
 
@@ -50,6 +50,10 @@
         .action-tab { padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; color: #9CA3AF; transition: all 0.2s; }
         .action-tab:hover { color: #fff; }
         .action-tab.active { color: #00E5FF; border-bottom-color: #00E5FF; }
+
+        /* Dropzone GED */
+        .drop-zone { border: 2px dashed rgba(0, 229, 255, 0.3); border-radius: 1rem; padding: 1.5rem; text-align: center; transition: all 0.3s ease; cursor: pointer; background: rgba(0,0,0,0.2); }
+        .drop-zone:hover { background: rgba(0, 229, 255, 0.05); border-color: #00E5FF; }
 
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -78,7 +82,7 @@
                 <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 px-2">Opérationnel</p>
                 <div class="space-y-1">
                     <a href="/sales_workspace" class="sidebar-item active"><i class="ph ph-kanban text-lg"></i> CRM & Deals</a>
-                    <div class="sidebar-item"><i class="ph ph-map-trifold text-lg"></i> War Room (Carte)</div>
+                    <a href="#" class="sidebar-item"><i class="ph ph-map-trifold text-lg"></i> War Room (Carte)</a>
                 </div>
             </div>
             <div>
@@ -121,8 +125,8 @@
             <div class="flex items-center gap-6">
                 <!-- Toggle Vue -->
                 <div class="flex items-center bg-panel border border-cyan/20 rounded-lg p-1">
-                    <button onclick="switchView('kanban')" id="view-kanban" class="px-3 py-1 text-sm font-bold rounded bg-cyan/20 text-cyan"><i class="ph ph-kanban"></i> Kanban</button>
-                    <button onclick="switchView('list')" id="view-list" class="px-3 py-1 text-sm font-bold rounded text-gray-400 hover:text-white"><i class="ph ph-list-bullets"></i> Liste</button>
+                    <button onclick="switchView('kanban')" id="view-kanban" class="px-3 py-1 text-sm font-bold rounded bg-cyan/20 text-cyan transition"><i class="ph ph-kanban"></i> Kanban</button>
+                    <button onclick="switchView('list')" id="view-list" class="px-3 py-1 text-sm font-bold rounded text-gray-400 hover:text-white transition"><i class="ph ph-list-bullets"></i> Liste</button>
                 </div>
                 
                 <div class="text-right border-l border-cyan/20 pl-6">
@@ -130,7 +134,7 @@
                     <h2 class="text-xl font-bold text-white" id="pipe-total-value">0 €</h2>
                 </div>
                 <button onclick="openNewLeadModal()" class="px-6 py-2.5 bg-cyan text-abysse text-sm font-bold rounded-xl hover:bg-white transition-colors flex items-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.3)]">
-                    <i class="ph ph-plus-circle text-lg"></i> CRÉER
+                    <i class="ph ph-plus-circle text-lg"></i> NOUVEL ENTITÉ
                 </button>
             </div>
         </header>
@@ -139,21 +143,18 @@
         <div class="flex-grow overflow-hidden relative p-6">
             
             <!-- VUE KANBAN -->
-            <div id="kanban-container" class="flex gap-6 h-full min-w-max overflow-x-auto pb-4 transition-opacity duration-300">
+            <div id="kanban-board" class="flex gap-6 h-full min-w-max overflow-x-auto pb-4 transition-opacity duration-300">
                 <!-- Colonnes injectées via JS -->
             </div>
 
             <!-- VUE LISTE (Data Grid) -->
             <div id="list-container" class="hidden flex-col h-full bg-abysse border border-cyan/10 rounded-xl overflow-hidden transition-opacity duration-300">
-                <!-- Barre de Recherche Omnibox -->
                 <div class="p-4 bg-panel/50 border-b border-cyan/10 flex gap-4 items-center">
                     <div class="relative flex-grow">
                         <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-cyan"></i>
                         <input type="text" id="search-list" onkeyup="filterList()" class="w-full bg-abysse border border-cyan/20 rounded-lg py-2 pl-10 pr-4 text-white text-sm focus:border-cyan outline-none font-mono" placeholder="Rechercher Raison Sociale, SIREN, PDL...">
                     </div>
-                    <button class="px-4 py-2 border border-cyan/20 text-cyan text-sm rounded-lg hover:bg-cyan/10"><i class="ph ph-funnel"></i> Filtrer</button>
                 </div>
-                <!-- Table -->
                 <div class="flex-grow overflow-auto">
                     <table class="w-full text-left text-sm whitespace-nowrap">
                         <thead class="bg-panel sticky top-0 z-10 text-xs font-mono text-gray-400 border-b border-cyan/20 uppercase tracking-wider">
@@ -206,17 +207,26 @@
         </header>
 
         <!-- Les 3 Colonnes Bento -->
-        <div class="flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 overflow-hidden">
+        <div class="flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
             
-            <!-- COLONNE 1 : DATA 3D (Identité & Sites) -->
+            <!-- COLONNE 1 : DATA 3D (Identité, Web & Sites) -->
             <div class="lg:col-span-3 flex flex-col gap-6 overflow-y-auto pr-2">
                 <div class="bento-card p-5">
                     <h3 class="text-xs font-bold text-gray-400 font-mono uppercase mb-4 flex items-center gap-2 border-b border-cyan/10 pb-2"><i class="ph ph-buildings text-cyan"></i> Identité & Siège</h3>
                     <div class="space-y-3 text-sm">
                         <div class="flex justify-between items-center"><span class="text-gray-500">SIREN</span><span class="font-mono text-white" id="fs-siren">---</span></div>
                         <div class="flex justify-between items-center editable-group group"><span class="text-gray-500">NAF</span><div class="flex items-center"><span class="font-mono text-cyan bg-cyan/10 px-2 py-0.5 rounded" id="fs-naf">---</span><i class="ph ph-pencil-simple edit-icon" onclick="startInlineEdit('fs-naf', 'company', 'naf')"></i></div></div>
+                        <div class="flex justify-between items-center editable-group group"><span class="text-gray-500">Site Web</span><div class="flex items-center"><a href="#" id="fs-website-link" target="_blank" class="font-mono text-cyan hover:underline"><span id="fs-website">---</span></a><i class="ph ph-pencil-simple edit-icon" onclick="startInlineEdit('fs-website', 'company', 'website')"></i></div></div>
                         <div class="flex justify-between items-start editable-group group"><span class="text-gray-500">Adresse</span><div class="flex items-start text-right"><span class="text-white max-w-[200px]" id="fs-address">---</span><i class="ph ph-pencil-simple edit-icon mt-1" onclick="startInlineEdit('fs-address', 'company', 'address')"></i></div></div>
                     </div>
+                </div>
+
+                <div class="bento-card p-5">
+                    <div class="flex justify-between items-center border-b border-cyan/10 pb-2 mb-4">
+                        <h3 class="text-xs font-bold text-gray-400 font-mono uppercase flex items-center gap-2"><i class="ph ph-users text-cyan"></i> Contacts Référents</h3>
+                        <i class="ph ph-plus text-cyan cursor-pointer hover:text-white"></i>
+                    </div>
+                    <div id="fs-contacts-list" class="space-y-3"></div>
                 </div>
 
                 <div class="bento-card p-5">
@@ -226,14 +236,6 @@
                     </div>
                     <div id="fs-alerts-container" class="mb-3 hidden flex-col gap-2"></div>
                     <div class="text-[10px] text-gray-500 font-mono italic text-center">Synchronisation Data Unity active.</div>
-                </div>
-
-                <div class="bento-card p-5">
-                    <div class="flex justify-between items-center border-b border-cyan/10 pb-2 mb-4">
-                        <h3 class="text-xs font-bold text-gray-400 font-mono uppercase flex items-center gap-2"><i class="ph ph-users text-cyan"></i> Contacts</h3>
-                        <i class="ph ph-plus text-cyan cursor-pointer hover:text-white"></i>
-                    </div>
-                    <div id="fs-contacts-list" class="space-y-3"></div>
                 </div>
             </div>
 
@@ -280,7 +282,7 @@
                 
                 <!-- BIFURCATION FOURNITURE vs CATALOGUE -->
                 <div id="fs-tools-fourniture" class="hidden">
-                    <div class="bento-card p-6 border-t-4 border-success bg-gradient-to-b from-success/5 to-transparent text-center">
+                    <div class="bento-card p-6 border-t-4 border-success bg-gradient-to-b from-success/5 to-transparent text-center shadow-[0_0_20px_rgba(0,255,102,0.1)]">
                         <i class="ph ph-lightning text-4xl text-success mb-3 drop-shadow-[0_0_10px_rgba(0,255,102,0.5)]"></i>
                         <h3 class="text-lg font-bold text-white mb-2">Deal Desk Fourniture</h3>
                         <p class="text-xs text-gray-400 font-mono mb-4">Empilement Cost Stack, Shadow Pricing & Franchise CEE.</p>
@@ -320,37 +322,56 @@
     </div>
 
     <!-- ============================================================================== -->
-    <!-- MODAL : NOUVEAU LEAD (API GOUV)                                                -->
+    <!-- MODAL : NOUVELLE ENTITÉ 3D (API GOUV AVEC AUTO-FILL VISIBLE)                   -->
     <!-- ============================================================================== -->
     <div id="new-lead-modal" class="fixed inset-0 bg-abysse/90 backdrop-blur-md hidden items-center justify-center z-50 opacity-0 transition-opacity">
-        <div class="bento-card p-8 w-[500px] transform scale-95 transition-transform" id="new-lead-content">
-            <h2 class="text-2xl font-bold text-white mb-2 flex items-center gap-2"><i class="ph ph-buildings text-cyan"></i> Nouvelle Entité</h2>
-            <p class="text-xs text-gray-400 font-mono mb-6">Saisissez le SIREN. L'API Gouvernementale vérifiera la solvabilité et remplira la fiche.</p>
+        <div class="bento-card p-8 w-[550px] transform scale-95 transition-transform" id="new-lead-content">
+            <h2 class="text-2xl font-bold text-white mb-2 flex items-center gap-2"><i class="ph ph-buildings text-cyan"></i> Nouvelle Entité 3D</h2>
+            <p class="text-xs text-gray-400 font-mono mb-6">Saisissez le SIREN et cliquez sur Auto-Fill pour charger les données de l'État.</p>
             
             <form id="lead-form" onsubmit="createLead(event)" class="flex flex-col gap-4">
-                <div class="relative group">
-                    <label class="text-xs text-gray-400 font-mono mb-1 block">Numéro SIREN (9 chiffres)</label>
-                    <div class="relative">
-                        <input type="text" id="lead-siren" required pattern="[0-9 ]{9,11}" class="w-full bg-abysse border border-cyan/30 rounded-lg p-3 text-white font-mono text-xl tracking-[0.2em] pl-12 outline-none focus:border-cyan focus:shadow-[0_0_15px_rgba(0,229,255,0.3)] transition-all" placeholder="123 456 789">
-                        <i class="ph ph-magnifying-glass absolute left-4 top-3.5 text-cyan text-2xl group-focus-within:animate-pulse"></i>
+                
+                <!-- Zone SIREN avec Auto-Fill -->
+                <div class="p-4 bg-abysse/50 border border-cyan/20 rounded-xl">
+                    <label class="text-xs text-cyan font-bold font-mono mb-2 block uppercase tracking-widest"><i class="ph ph-magnifying-glass"></i> Recherche Légale</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="lead-siren" required pattern="[0-9 ]{9,11}" class="w-full bg-abysse border border-cyan/30 rounded-lg p-2.5 text-white font-mono text-lg tracking-[0.2em] outline-none focus:border-cyan transition-all" placeholder="SIREN (9 chiffres)">
+                        <button type="button" onclick="searchSirenAPI()" id="btn-search-siren" class="px-4 bg-cyan/20 text-cyan border border-cyan/50 rounded-lg hover:bg-cyan hover:text-abysse transition-colors font-bold flex items-center gap-2 whitespace-nowrap">
+                            Auto-Fill <i class="ph ph-magic-wand"></i>
+                        </button>
                     </div>
+                    <div id="siren-search-status" class="mt-2 text-[10px] font-mono h-4"></div>
                 </div>
+
+                <!-- Champs pré-remplis -->
                 <div class="grid grid-cols-2 gap-4 border-t border-cyan/10 pt-4 mt-2">
-                    <div><label class="text-xs text-gray-400 font-mono mb-1 block">Nom usuel (Holding)</label><input type="text" id="lead-company" class="w-full bg-abysse border border-cyan/20 rounded p-2 text-white outline-none focus:border-cyan text-sm"></div>
+                    <div class="col-span-2">
+                        <label class="text-xs text-gray-400 font-mono mb-1 block">Raison Sociale / Holding</label>
+                        <input type="text" id="lead-company" required class="w-full bg-abysse border border-cyan/20 rounded p-2 text-white outline-none focus:border-cyan text-sm shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]" placeholder="Nom de l'entreprise">
+                    </div>
                     <div>
-                        <label class="text-xs text-gray-400 font-mono mb-1 block">Pipeline</label>
+                        <label class="text-xs text-gray-400 font-mono mb-1 block">Pipeline Cible</label>
                         <select id="lead-pipeline" class="w-full bg-abysse border border-cyan/20 rounded p-2 text-white outline-none focus:border-cyan text-sm">
-                            <option value="saas">SaaS</option><option value="courtage">Courtage</option>
-                            <option value="fourniture">Fourniture</option><option value="fournisseurs">Grossistes</option>
+                            <option value="saas">SaaS (B2B)</option>
+                            <option value="courtage">Courtage</option>
+                            <option value="fourniture">Fourniture d'Énergie</option>
                         </select>
                     </div>
-                    <div><label class="text-xs text-gray-400 font-mono mb-1 block">Contact Principal</label><input type="text" id="lead-contact" required class="w-full bg-abysse border border-cyan/20 rounded p-2 text-white outline-none focus:border-cyan text-sm" placeholder="Prénom Nom"></div>
-                    <div><label class="text-xs text-gray-400 font-mono mb-1 block">Email</label><input type="email" id="lead-email" required class="w-full bg-abysse border border-cyan/20 rounded p-2 text-white outline-none focus:border-cyan text-sm"></div>
+                    <div>
+                        <label class="text-xs text-gray-400 font-mono mb-1 block">Rôle du Contact</label>
+                        <select id="lead-role" class="w-full bg-abysse border border-cyan/20 rounded p-2 text-white outline-none focus:border-cyan text-sm">
+                            <option>DAF / Direction</option>
+                            <option>Resp. Technique / Achat</option>
+                        </select>
+                    </div>
+                    <div><label class="text-xs text-gray-400 font-mono mb-1 block">Prénom Nom (Décideur)</label><input type="text" id="lead-contact" required class="w-full bg-abysse border border-cyan/20 rounded p-2 text-white outline-none focus:border-cyan text-sm" placeholder="Ex: Jean Dupont"></div>
+                    <div><label class="text-xs text-gray-400 font-mono mb-1 block">Email pro</label><input type="email" id="lead-email" required class="w-full bg-abysse border border-cyan/20 rounded p-2 text-white outline-none focus:border-cyan text-sm" placeholder="jean@entreprise.com"></div>
                 </div>
-                <div class="flex justify-end gap-3 mt-6">
+
+                <div class="flex justify-end gap-3 mt-4">
                     <button type="button" onclick="closeNewLeadModal()" class="px-4 py-2 rounded text-gray-400 hover:text-white text-sm font-bold">Annuler</button>
                     <button type="submit" id="btn-create-lead" class="px-6 py-2 bg-cyan text-abysse rounded-lg font-bold hover:bg-white transition-all text-sm flex items-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.4)]">
-                        <i class="ph ph-magic-wand"></i> Créer le Compte
+                        Créer le Compte <i class="ph ph-arrow-right"></i>
                     </button>
                 </div>
             </form>
@@ -358,11 +379,11 @@
     </div>
 
     <!-- ============================================================================== -->
-    <!-- LOGIQUE JAVASCRIPT (CORTEX ZERO MOCK)                                          -->
+    <!-- LOGIQUE JAVASCRIPT (CORTEX CRM 3D)                                             -->
     <!-- ============================================================================== -->
     <script>
         let currentPipeline = 'saas';
-        let currentView = 'kanban'; // 'kanban' ou 'list'
+        let currentView = 'kanban'; 
         let dealsData = {};
         let currentDealId = null;
 
@@ -379,7 +400,7 @@
             switchPipeline('saas');
         });
 
-        // --- GESTION PIPELINE & VUE ---
+        // --- 1. GESTION DU KANBAN & PIPELINES ---
         async function switchPipeline(type) {
             currentPipeline = type;
             document.querySelectorAll('.pipe-tab').forEach(t => {
@@ -401,7 +422,7 @@
             currentView = view;
             const btnK = document.getElementById('view-kanban');
             const btnL = document.getElementById('view-list');
-            const contK = document.getElementById('kanban-container');
+            const contK = document.getElementById('kanban-board');
             const contL = document.getElementById('list-container');
 
             if (view === 'kanban') {
@@ -429,7 +450,7 @@
                 if (data.success) {
                     dealsData = {};
                     let totalValue = 0;
-                    const columns = { LEAD:[], AUDIT: [], PROPOSAL: [], NEGOTIATION: [], WON: [], LOST:[] };
+                    const columns = { LEAD:[], AUDIT: [], PROPOSAL:[], NEGOTIATION: [], WON: [], LOST:[] };
                     
                     data.pipeline.forEach(deal => {
                         dealsData[deal.id] = deal;
@@ -446,7 +467,6 @@
             } catch (err) { console.error("Erreur", err); }
         }
 
-        // --- RENDU KANBAN ---
         function renderKanban(columns) {
             const board = document.getElementById('kanban-board');
             board.innerHTML = '';
@@ -494,7 +514,6 @@
             }
         }
 
-        // --- RENDU LISTE ---
         function renderList() {
             const tbody = document.getElementById('list-tbody');
             tbody.innerHTML = '';
@@ -556,7 +575,6 @@
         async function quickChangeStage(dealId, newStage) {
             if (dealsData[dealId] && dealsData[dealId].stage !== newStage) {
                 dealsData[dealId].stage = newStage;
-                // Re-render local
                 const columns = { LEAD: [], AUDIT:[], PROPOSAL:[], NEGOTIATION: [], WON: [], LOST:[] };
                 Object.values(dealsData).forEach(d => { if (columns[d.stage]) columns[d.stage].push(d); });
                 renderKanban(columns);
@@ -564,7 +582,7 @@
                 
                 try {
                     await fetch('/api/crm/deal/move', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({deal_id: dealId, new_stage: newStage}) });
-                    fetchActivities(dealId); // Met à jour l'historique si le panneau est ouvert
+                    fetchActivities(dealId); 
                 } catch (e) { console.error(e); }
             }
         }
@@ -577,23 +595,22 @@
 
             document.getElementById('fs-holding-name').innerText = deal.holding_name || "Groupe";
             
-            // Solvabilité
             const badge = document.getElementById('fs-solvency');
             if (deal.solvency_score === 'VERT') badge.className = "px-2 py-0.5 text-[10px] font-bold uppercase rounded border bg-success/20 text-success border-success";
             else if (deal.solvency_score === 'ORANGE') badge.className = "px-2 py-0.5 text-[10px] font-bold uppercase rounded border bg-warning/20 text-warning border-warning";
             else if (deal.solvency_score === 'ROUGE') badge.className = "px-2 py-0.5 text-[10px] font-bold uppercase rounded border bg-alert/20 text-alert border-alert animate-pulse";
             else badge.className = "px-2 py-0.5 text-[10px] font-bold uppercase rounded border bg-gray-800 text-gray-300";
-            badge.innerText = deal.solvency_msg;
+            badge.innerText = deal.solvency_msg || "Non vérifié";
 
-            // Identity
             document.getElementById('fs-siren').innerText = deal.company_id.replace("COMP_", "");
-            document.getElementById('fs-naf').innerText = deal.naf || "N/A";
-            document.getElementById('fs-address').innerText = deal.city ? deal.city : "Non renseigné";
+            document.getElementById('fs-naf').innerText = deal.naf || "---";
+            document.getElementById('fs-website').innerText = deal.website || "---";
+            if(deal.website) document.getElementById('fs-website-link').href = deal.website.startsWith('http') ? deal.website : `https://${deal.website}`;
+            document.getElementById('fs-address').innerText = deal.city ? deal.city : "---";
             document.getElementById('fs-sites-count').innerText = deal.sites_count || 0;
 
             document.getElementById('fs-stage-select').value = deal.stage;
 
-            // Alerte SaaS
             const alertsContainer = document.getElementById('fs-alerts-container');
             if (deal.saas_alerts && deal.saas_alerts.length > 0) {
                 alertsContainer.classList.remove('hidden');
@@ -604,7 +621,6 @@
                 alertsContainer.classList.remove('flex');
             }
 
-            // Pont CPQ Fourniture vs Catalogue
             if (currentPipeline === 'fourniture') {
                 document.getElementById('fs-tools-fourniture').classList.remove('hidden');
                 document.getElementById('fs-tools-standard').classList.add('hidden');
@@ -613,7 +629,6 @@
                 document.getElementById('fs-tools-standard').classList.remove('hidden');
             }
 
-            // Contacts
             const contactBox = document.getElementById('fs-contacts-list');
             contactBox.innerHTML = '';
             if (deal.all_contacts && deal.all_contacts.length > 0) {
@@ -622,11 +637,11 @@
                         <div class="flex items-center justify-between p-3 bg-abysse border border-cyan/10 rounded-lg">
                             <div class="flex items-center gap-3">
                                 <div class="w-8 h-8 rounded-full bg-cyan/20 text-cyan flex items-center justify-center font-bold text-xs">${c.firstname.charAt(0)}${c.lastname.charAt(0)}</div>
-                                <div><p class="text-sm font-bold text-white">${c.firstname} ${c.lastname}</p><p class="text-[10px] text-gray-500 font-mono">${c.role}</p></div>
+                                <div><p class="text-sm font-bold text-white">${c.firstname} ${c.lastname}</p><p class="text-[10px] text-gray-500 font-mono">${c.role || 'Contact'}</p></div>
                             </div>
                             <div class="text-right text-xs font-mono">
-                                <p class="text-gray-300 hover:text-cyan cursor-pointer transition"><i class="ph ph-envelope-simple"></i> ${c.email}</p>
-                                <p class="text-gray-500 hover:text-cyan cursor-pointer transition"><i class="ph ph-phone"></i> ${c.phone || '-'}</p>
+                                <p class="text-gray-300 hover:text-cyan cursor-pointer transition"><i class="ph ph-envelope-simple"></i> ${c.email || '---'}</p>
+                                <p class="text-gray-500 hover:text-cyan cursor-pointer transition"><i class="ph ph-phone"></i> ${c.phone || '---'}</p>
                             </div>
                         </div>`;
                 });
@@ -661,7 +676,7 @@
 
         async function fetchActivities(dealId) {
             const list = document.getElementById('fs-activities-list');
-            list.innerHTML = `<div class="text-center text-cyan text-xs font-mono"><i class="ph ph-spinner animate-spin"></i> Chargement de l'historique...</div>`;
+            list.innerHTML = `<div class="text-center text-cyan text-xs font-mono"><i class="ph ph-spinner animate-spin"></i> Chargement...</div>`;
             try {
                 const res = await fetch(`/api/crm/deal/${dealId}/activities`);
                 const data = await res.json();
@@ -694,7 +709,7 @@
                         `;
                     });
                 } else {
-                    list.innerHTML = `<p class="text-xs text-gray-500 font-mono italic text-center">Aucun historique pour ce deal.</p>`;
+                    list.innerHTML = `<p class="text-xs text-gray-500 font-mono italic text-center">Aucun historique.</p>`;
                 }
             } catch (e) { list.innerHTML = `<p class="text-xs text-alert">Erreur.</p>`; }
         }
@@ -735,7 +750,7 @@
                 document.getElementById('email-subject').value = '';
                 document.getElementById('email-body').value = '';
                 fetchActivities(currentDealId);
-            } catch (e) { alert("Erreur d'envoi SMTP."); }
+            } catch (e) { alert("Erreur SMTP."); }
             finally { btn.innerHTML = orig; btn.disabled = false; }
         }
 
@@ -792,27 +807,63 @@
             const content = document.getElementById('new-lead-content');
             modal.classList.add('opacity-0');
             content.classList.add('scale-95');
-            setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); document.getElementById('lead-form').reset(); }, 300);
+            setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); document.getElementById('lead-form').reset(); document.getElementById('siren-search-status').innerHTML = ''; }, 300);
+        }
+
+        async function searchSirenAPI() {
+            const sirenInput = document.getElementById('lead-siren');
+            const siren = sirenInput.value.replace(/\s/g, '');
+            const statusBox = document.getElementById('siren-search-status');
+            const btn = document.getElementById('btn-search-siren');
+            
+            if (siren.length < 9) {
+                statusBox.innerHTML = '<span class="text-alert">Le SIREN doit faire 9 chiffres.</span>';
+                return;
+            }
+
+            statusBox.innerHTML = '<span class="text-cyan"><i class="ph ph-spinner animate-spin inline-block"></i> Recherche INSEE en cours...</span>';
+            btn.classList.add('opacity-50', 'pointer-events-none');
+
+            try {
+                const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${siren}`);
+                const data = await res.json();
+                
+                if (data.results && data.results.length > 0) {
+                    const ent = data.results[0];
+                    document.getElementById('lead-company').value = ent.nom_complet || "";
+                    
+                    sirenInput.classList.remove('border-warning');
+                    sirenInput.classList.add('border-success', 'text-success');
+                    statusBox.innerHTML = '<span class="text-success font-bold"><i class="ph ph-check-circle"></i> Entreprise identifiée ! Remplissez le contact.</span>';
+                } else {
+                    sirenInput.classList.add('border-warning');
+                    statusBox.innerHTML = '<span class="text-warning"><i class="ph ph-warning-circle"></i> Introuvable dans l\'Open Data. Saisie manuelle.</span>';
+                }
+            } catch (e) {
+                statusBox.innerHTML = '<span class="text-alert">Erreur de connexion à l\'API Gouv.</span>';
+            } finally {
+                btn.classList.remove('opacity-50', 'pointer-events-none');
+            }
         }
 
         async function createLead(event) {
             event.preventDefault();
             const btn = document.getElementById('btn-create-lead');
             const orig = btn.innerHTML;
-            btn.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> Interrogation INSEE...';
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> Création...';
             btn.disabled = true;
 
             const nameParts = document.getElementById('lead-contact').value.split(' ');
             const payload = {
                 siren: document.getElementById('lead-siren').value,
-                company_name: document.getElementById('lead-company').value || "Auto-fill",
+                company_name: document.getElementById('lead-company').value || "Inconnu",
                 naf: "", city: "", address: "", 
                 holding_name: document.getElementById('lead-company').value,
                 source: "CRM 3D",
                 pipeline: document.getElementById('lead-pipeline').value,
                 contact_firstname: nameParts[0] || "",
                 contact_lastname: nameParts.slice(1).join(' ') || "Inconnu",
-                contact_role: "Référent",
+                contact_role: document.getElementById('lead-role').value,
                 contact_email: document.getElementById('lead-email').value,
                 contact_phone: ""
             };
