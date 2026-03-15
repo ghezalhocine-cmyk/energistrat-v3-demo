@@ -21,16 +21,20 @@
     <style>
         body { background-color: #001529; color: #ffffff; }
         .bento-card { background-color: #001D3D; border: 1px solid rgba(0, 229, 255, 0.1); border-radius: 1.5rem; }
-        input[type="number"], select { background: #001529; border: 1px solid rgba(0,229,255,0.2); color: white; border-radius: 0.5rem; padding: 0.5rem; width: 100%; outline: none; font-family: 'JetBrains Mono'; transition: border-color 0.3s ease; }
-        input[type="number"]:focus, select:focus { border-color: #00E5FF; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
-        .drop-zone { border: 2px dashed rgba(0, 229, 255, 0.3); border-radius: 1rem; padding: 1.5rem; text-align: center; transition: all 0.3s ease; cursor: pointer; }
+        input[type="number"], select, input[type="text"] { background: #001529; border: 1px solid rgba(0,229,255,0.2); color: white; border-radius: 0.5rem; padding: 0.5rem; width: 100%; outline: none; font-family: 'JetBrains Mono'; transition: border-color 0.3s ease; font-size: 0.875rem;}
+        input[type="number"]:focus, select:focus, input[type="text"]:focus { border-color: #00E5FF; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+        .drop-zone { border: 2px dashed rgba(0, 229, 255, 0.3); border-radius: 1rem; padding: 1.5rem; text-align: center; transition: all 0.3s ease; cursor: pointer; background: rgba(0,0,0,0.2); }
         .drop-zone:hover { background: rgba(0, 229, 255, 0.05); border-color: #00E5FF; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.2); border-radius: 10px; }
+        
+        /* Animation d'ajout au panier */
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        .basket-item { animation: slideIn 0.3s ease-out forwards; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col font-sans antialiased selection:bg-cyan selection:text-abysse">
+<body class="min-h-screen flex flex-col font-sans antialiased selection:bg-cyan selection:text-abysse bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
 
     <!-- TOP NAV -->
     <header class="w-full border-b border-cyan/10 bg-abysse/80 backdrop-blur-md sticky top-0 z-40">
@@ -41,7 +45,7 @@
                 </div>
                 <div>
                     <h1 class="font-mono font-bold text-xl tracking-wider">CORTEX<span class="text-cyan">CPQ</span></h1>
-                    <p class="text-xs text-gray-400">Deal Desk Commercial | Génération d'Offres</p>
+                    <p class="text-xs text-gray-400">Deal Desk Fourniture | Générateur Multi-Énergies</p>
                 </div>
             </div>
             <a href="/sales_workspace" class="text-sm font-medium text-gray-400 hover:text-cyan transition-colors flex items-center gap-2">
@@ -51,140 +55,266 @@
     </header>
 
     <!-- MAIN CONTENT -->
-    <main class="flex-grow max-w-5xl mx-auto w-full px-6 py-8 grid grid-cols-1 md:grid-cols-12 gap-6">
+    <main class="flex-grow max-w-7xl mx-auto w-full px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        <!-- COLONNE 1 : DÉFINITION DU BESOIN CLIENT -->
-        <div class="md:col-span-5 flex flex-col gap-4">
+        <!-- COLONNE 1 & 2 : LA FUSÉE À 3 ÉTAGES (Configuration) -->
+        <div class="lg:col-span-8 flex flex-col gap-6">
             
-            <!-- Ingestion Intelligente -->
-            <div class="bento-card p-5">
-                <h2 class="text-sm font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-2 mb-4 uppercase tracking-wider">
-                    <i class="ph ph-upload-simple text-cyan"></i> Fichier Client (Optionnel)
+            <div class="bento-card p-6 border-t-4 border-cyan">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-3 mb-5">
+                    <i class="ph ph-rocket text-cyan"></i> Structuration du Périmètre (Ajout au Panier)
                 </h2>
-                
-                <div class="flex flex-col gap-3">
-                    <label for="dqe-upload" class="drop-zone" id="dqe-drop-zone">
-                        <i class="ph ph-file-xls text-2xl text-cyan mb-2"></i>
-                        <p class="text-xs text-gray-400 font-mono">DQE / Excel (Appel d'Offres)</p>
-                        <input type="file" id="dqe-upload" class="hidden" accept=".xlsx,.xls" onchange="handleFileUpload(this, 'dqe')">
-                    </label>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- ÉTAGE 1 & 2 : Saisie Manuelle / SGE -->
+                    <div class="space-y-4">
+                        <div class="bg-abysse/50 p-4 rounded-xl border border-cyan/10">
+                            <h3 class="text-xs font-bold text-cyan font-mono uppercase mb-3"><i class="ph ph-lightning"></i> Mono/Petit Multi-sites</h3>
+                            
+                            <div class="mb-3">
+                                <label class="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Nom du Lot / Périmètre</label>
+                                <input type="text" id="item-name" placeholder="Ex: Usine Principale ou Bureaux">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 mb-3">
+                                <div>
+                                    <label class="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Énergie</label>
+                                    <select id="item-energy" onchange="updateSegmentOptions()">
+                                        <option value="elec">Électricité</option>
+                                        <option value="gaz">Gaz Naturel</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Segment</label>
+                                    <select id="item-segment">
+                                        <option value="C5">C5 (< 36 kVA)</option>
+                                        <option value="C4">C4 (Tarif Jaune)</option>
+                                        <option value="C3">C3 (Tarif Vert)</option>
+                                        <option value="C1">C1 (Hyper-Intensif)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Volume Annuel (MWh)</label>
+                                <input type="number" id="item-volume" placeholder="Ex: 150" class="text-lg text-cyan font-bold">
+                            </div>
+
+                            <button onclick="addToBasket('manual')" class="w-full py-2 bg-abysse border border-cyan text-cyan font-bold rounded-lg hover:bg-cyan hover:text-abysse transition-colors text-sm flex items-center justify-center gap-2">
+                                <i class="ph ph-plus"></i> Ajouter au Panier Global
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ÉTAGE 3 : Ingestion de Masse (Mairies/SDE) -->
+                    <div class="space-y-4">
+                        <div class="bg-abysse/50 p-4 rounded-xl border border-cyan/10 h-full flex flex-col">
+                            <h3 class="text-xs font-bold text-cyan font-mono uppercase mb-3"><i class="ph ph-files"></i> Appels d'Offres (DQE / SGE)</h3>
+                            
+                            <label for="dqe-upload" class="drop-zone flex-grow flex flex-col items-center justify-center mb-3" id="dqe-drop-zone">
+                                <i class="ph ph-file-xls text-3xl text-cyan mb-2"></i>
+                                <p class="text-sm text-gray-300 font-bold mb-1">Glissez le DQE Client</p>
+                                <p class="text-[10px] text-gray-500 font-mono">CORTEX extraira les lots automatiquement</p>
+                                <input type="file" id="dqe-upload" class="hidden" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(this)">
+                            </label>
+
+                            <div id="ingest-status" class="text-[10px] font-mono text-cyan hidden text-center animate-pulse mt-auto"></div>
+                        </div>
+                    </div>
                 </div>
-                <div id="ingest-status" class="mt-3 text-xs font-mono text-cyan hidden text-center animate-pulse"></div>
             </div>
 
-            <!-- Paramètres Commerciaux -->
-            <div class="bento-card p-5 flex flex-col gap-4">
-                <h2 class="text-sm font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-2 uppercase tracking-wider">
-                    <i class="ph ph-target text-cyan"></i> Paramètres de l'Offre
+            <!-- OPTIONS STRATÉGIQUES DU CONTRAT -->
+            <div class="bento-card p-6 border-t-4 border-success">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-3 mb-5">
+                    <i class="ph ph-sliders text-success"></i> Paramètres du Contrat Global
                 </h2>
-
-                <div>
-                    <label class="text-xs text-gray-400 font-mono mb-1 block">Volume Annuel (MWh)</label>
-                    <input type="number" id="cpq-volume" value="150" step="0.1" class="border-cyan/50 text-cyan font-bold text-lg">
-                </div>
-
-                <div class="grid grid-cols-2 gap-2">
+                
+                <div class="grid grid-cols-3 gap-6">
                     <div>
-                        <label class="text-xs text-gray-400 font-mono mb-1 block">Énergie</label>
-                        <select id="cpq-energy">
-                            <option value="elec">Électricité</option>
-                            <option value="gaz">Gaz Naturel</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="text-xs text-gray-400 font-mono mb-1 block">Segment Tarifaire</label>
-                        <select id="cpq-segment">
-                            <option value="C5">C5 / T1-T2</option>
-                            <option value="C4">C4 / T3</option>
-                            <option value="C3">C3 / T4</option>
-                            <option value="C1">C1 (Lourd)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-xs text-gray-400 font-mono mb-1 block">Durée du contrat</label>
-                        <select id="cpq-duration">
-                            <option value="1">1 an</option>
+                        <label class="text-xs text-gray-400 font-mono mb-2 block">Durée d'engagement</label>
+                        <select id="global-duration">
+                            <option value="1">1 an (Cal N+1)</option>
                             <option value="2">2 ans</option>
-                            <option value="3">3 ans</option>
+                            <option value="3">3 ans (Strip)</option>
                         </select>
                     </div>
                     <div>
-                        <label class="text-xs text-gray-400 font-mono mb-1 block">Option Verte</label>
-                        <select id="cpq-green">
-                            <option value="none">Gris (Standard)</option>
+                        <label class="text-xs text-gray-400 font-mono mb-2 block">Option Verte</label>
+                        <select id="global-green">
+                            <option value="none">Standard (Gris)</option>
                             <option value="standard">Garanties d'Origine</option>
                             <option value="premium">Vert Premium (PPA)</option>
                         </select>
                     </div>
+                    <div class="flex flex-col justify-center">
+                        <label class="text-xs text-gray-400 font-mono mb-2 block text-center">Franchise CEE (Sourcing)</label>
+                        <div class="flex justify-center">
+                            <label class="flex items-center cursor-pointer group">
+                                <div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
+                                    <input type="checkbox" id="global-franchise" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10" checked/>
+                                    <label for="global-franchise" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-600 cursor-pointer"></label>
+                                </div>
+                                <span class="ml-3 text-xs font-mono text-success">Activée</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
-
-                <button onclick="calculateQuote()" id="btn-calc" class="w-full py-4 mt-2 bg-cyan text-abysse font-bold rounded-xl hover:bg-white transition-colors shadow-[0_0_15px_rgba(0,229,255,0.4)] flex items-center justify-center gap-2">
-                    <i class="ph ph-magic-wand text-xl"></i> INTERROGER LE MARCHÉ
-                </button>
             </div>
+
         </div>
 
-        <!-- COLONNE 2 : L'ORACLE DE VENTE & PRIX FINAL -->
-        <div class="md:col-span-7 flex flex-col gap-4">
+        <!-- COLONNE 3 : LE PANIER & L'ORACLE DE MARGE -->
+        <div class="lg:col-span-4 flex flex-col gap-6">
             
-            <div id="result-placeholder" class="bento-card h-full flex flex-col items-center justify-center text-gray-500 font-mono text-sm p-10">
-                <i class="ph ph-robot text-4xl opacity-20 mb-4"></i>
-                <p>CORTEX attend les paramètres du client pour interroger la salle des marchés et formuler la meilleure offre.</p>
+            <!-- LE PANIER -->
+            <div class="bento-card p-6 flex flex-col h-[400px]">
+                <div class="flex justify-between items-center border-b border-cyan/10 pb-3 mb-4 flex-none">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="ph ph-shopping-bag text-cyan"></i> Panier Actuel
+                    </h2>
+                    <span id="basket-count" class="bg-cyan/20 text-cyan text-xs font-bold px-2 py-1 rounded">0 Lot</span>
+                </div>
+
+                <div id="basket-items" class="flex-grow overflow-y-auto space-y-3 pr-2">
+                    <div class="text-center text-gray-500 font-mono text-xs py-10" id="empty-basket-msg">
+                        Le panier est vide. Ajoutez des périmètres depuis la zone de gauche.
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-4 border-t border-cyan/10 flex justify-between items-center flex-none">
+                    <span class="text-xs text-gray-400 font-mono uppercase">Volume Total :</span>
+                    <span id="basket-total-vol" class="text-xl font-bold text-cyan">0.0 MWh</span>
+                </div>
             </div>
 
-            <div id="result-data" class="hidden flex-col gap-4 h-full">
+            <!-- ACTION : COTATION CORTEX -->
+            <div class="bento-card p-6 border-alert/30 shadow-[0_0_20px_rgba(0,229,255,0.05)] flex flex-col gap-4">
                 
-                <!-- ORACLE CORTEX (Conseil Commercial) -->
-                <div class="bento-card p-6 border-cyan/50 shadow-[0_0_20px_rgba(0,229,255,0.1)] relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan to-transparent"></div>
-                    
-                    <div class="flex justify-between items-start mb-4">
-                        <h2 class="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider">
-                            <i class="ph ph-robot text-cyan text-xl"></i> Recommandation CORTEX
-                        </h2>
-                        <span id="oracle-win-prob" class="px-3 py-1 text-xs font-bold rounded-full bg-success/20 text-success border border-success/30">
-                            85% CHANCE DE SUCCÈS
-                        </span>
-                    </div>
-                    
-                    <p id="oracle-insight" class="text-sm text-gray-300 font-mono leading-relaxed bg-abysse/50 p-4 rounded-xl border border-cyan/10">
-                        <!-- Message de l'IA -->
-                    </p>
-                </div>
+                <button onclick="runOraclePricing()" id="btn-oracle" class="w-full py-4 bg-cyan text-abysse font-bold rounded-xl hover:bg-white transition-all shadow-[0_0_15px_rgba(0,229,255,0.4)] flex items-center justify-center gap-2">
+                    <i class="ph ph-robot text-xl"></i> GÉNÉRER LE PRIX (ORACLE)
+                </button>
 
-                <!-- PRIX DE VENTE (Ce que le client va payer) -->
-                <div class="bento-card p-8 text-center flex-grow flex flex-col justify-center">
-                    <p class="text-xs text-gray-400 font-mono uppercase mb-2">Prix de Vente Conseillé (TTC)</p>
-                    <h3 class="text-5xl font-bold text-cyan drop-shadow-[0_0_12px_rgba(0,229,255,0.4)] mb-2" id="res-price">0.00 <span class="text-xl text-gray-500">€/MWh</span></h3>
-                    <p class="text-sm text-gray-400 font-mono">Budget Annuel Estimé: <span id="res-budget" class="text-white font-bold">0 €</span></p>
-                    
-                    <div class="mt-6 flex gap-4 justify-center">
-                        <button class="px-6 py-3 bg-abysse border border-cyan text-cyan font-bold rounded-xl hover:bg-cyan hover:text-abysse transition-colors flex items-center gap-2">
-                            <i class="ph ph-file-pdf"></i> Éditer le Devis PDF
-                        </button>
-                        <button class="px-6 py-3 bg-cyan text-abysse font-bold rounded-xl hover:bg-white transition-colors flex items-center gap-2">
-                            <i class="ph ph-paper-plane-right"></i> Envoyer au Client
-                        </button>
+                <!-- Résultat Oracle (Caché par défaut) -->
+                <div id="oracle-result" class="hidden flex-col gap-4 mt-2">
+                    <div class="bg-abysse border border-cyan/20 rounded-xl p-4 text-center">
+                        <p class="text-[10px] text-gray-400 font-mono uppercase mb-1">Prix de Vente Recommandé</p>
+                        <h3 class="text-3xl font-bold text-cyan" id="res-price">-- €/MWh</h3>
+                        <p class="text-xs text-gray-500 mt-1">Budget: <span id="res-budget" class="text-white">-- €</span></p>
                     </div>
-                </div>
 
+                    <div class="p-3 bg-success/10 border border-success/30 rounded text-xs text-success font-mono">
+                        <i class="ph ph-check-circle"></i> Win Probability: <strong id="res-prob">--%</strong><br>
+                        <span id="res-insight" class="text-gray-300 mt-1 block leading-relaxed"></span>
+                    </div>
+
+                    <button onclick="sendToTradingFloor()" id="btn-ticket" class="w-full py-3 bg-abysse border border-alert text-alert font-bold rounded-xl hover:bg-alert hover:text-white transition-colors flex items-center justify-center gap-2 mt-2">
+                        <i class="ph ph-paper-plane-tilt text-lg"></i> ENVOYER AU TRADING FLOOR
+                    </button>
+                    <p class="text-[9px] text-gray-500 text-center font-mono leading-tight">Pour figer ce prix et bloquer la marge, la validation du Middle-Office (Acheteur) est requise.</p>
+                </div>
             </div>
-        </div>
 
+        </div>
     </main>
 
+    <!-- ============================================================================== -->
+    <!-- LOGIQUE JAVASCRIPT (GESTION DU PANIER & API)                                   -->
+    <!-- ============================================================================== -->
     <script>
-        // === GESTION DE L'INGESTION INTELLIGENTE (DQE) ===
-        async function handleFileUpload(inputElement, type) {
+        let cpqBasket =[];
+
+        function updateSegmentOptions() {
+            const energy = document.getElementById('item-energy').value;
+            const segSelect = document.getElementById('item-segment');
+            segSelect.innerHTML = '';
+            if (energy === 'elec') {
+                segSelect.innerHTML = '<option value="C5">C5 (< 36 kVA)</option><option value="C4">C4 (Jaune)</option><option value="C3">C3 (Vert)</option><option value="C1">C1 (Intensif)</option>';
+            } else {
+                segSelect.innerHTML = '<option value="T2">T1/T2 (Petit)</option><option value="T3">T3 (Moyen)</option><option value="T4">T4 (Industriel)</option>';
+            }
+        }
+
+        // --- 1. GESTION DU PANIER ---
+        function addToBasket(mode, dqeData = null) {
+            document.getElementById('empty-basket-msg').style.display = 'none';
+
+            if (mode === 'manual') {
+                const name = document.getElementById('item-name').value || `Lot ${cpqBasket.length + 1}`;
+                const energy = document.getElementById('item-energy').value;
+                const segment = document.getElementById('item-segment').value;
+                const vol = parseFloat(document.getElementById('item-volume').value);
+
+                if (!vol || vol <= 0) { alert("Veuillez saisir un volume valide."); return; }
+
+                cpqBasket.push({ id: Date.now(), name, energy, segment, volume: vol });
+            } else if (mode === 'dqe' && dqeData) {
+                // Le smart mapping a trouvé des lots, on les ajoute
+                Object.entries(dqeData.suggested_lots).forEach(([lotName, vol]) => {
+                    // Heuristique simple pour le segment
+                    const isGas = lotName.toLowerCase().includes('gaz');
+                    const seg = isGas ? 'T2' : (lotName.includes('EP') ? 'C5' : 'C4');
+                    cpqBasket.push({ id: Date.now() + Math.random(), name: lotName, energy: isGas ? 'gaz' : 'elec', segment: seg, volume: vol });
+                });
+            }
+
+            renderBasket();
+            
+            // Reset input manuel
+            document.getElementById('item-name').value = '';
+            document.getElementById('item-volume').value = '';
+            // Reset de l'affichage du résultat si le panier change
+            document.getElementById('oracle-result').classList.add('hidden');
+        }
+
+        function removeFromBasket(id) {
+            cpqBasket = cpqBasket.filter(item => item.id !== id);
+            renderBasket();
+            if (cpqBasket.length === 0) {
+                document.getElementById('empty-basket-msg').style.display = 'block';
+                document.getElementById('oracle-result').classList.add('hidden');
+            }
+        }
+
+        function renderBasket() {
+            const container = document.getElementById('basket-items');
+            container.innerHTML = '';
+            let totalVol = 0;
+
+            cpqBasket.forEach(item => {
+                totalVol += item.volume;
+                const iconColor = item.energy === 'elec' ? 'text-gold' : 'text-blue-400';
+                const icon = item.energy === 'elec' ? 'ph-lightning' : 'ph-fire';
+                
+                container.innerHTML += `
+                    <div class="basket-item flex justify-between items-center p-3 bg-abysse border border-cyan/10 rounded-lg">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded bg-panel flex items-center justify-center ${iconColor}"><i class="ph ${icon}"></i></div>
+                            <div>
+                                <p class="text-xs font-bold text-white">${item.name}</p>
+                                <p class="text-[9px] text-gray-500 font-mono uppercase">${item.segment}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-sm font-bold text-cyan font-mono">${item.volume.toLocaleString('fr-FR')} MWh</span>
+                            <button onclick="removeFromBasket(${item.id})" class="text-gray-500 hover:text-alert transition"><i class="ph ph-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('basket-count').innerText = `${cpqBasket.length} Lot(s)`;
+            document.getElementById('basket-total-vol').innerText = `${totalVol.toLocaleString('fr-FR')} MWh`;
+        }
+
+        // --- 2. INGESTION DQE ---
+        async function handleFileUpload(inputElement) {
             const file = inputElement.files[0];
             if (!file) return;
 
             const statusBox = document.getElementById('ingest-status');
             statusBox.classList.remove('hidden');
-            statusBox.innerHTML = `<i class="ph ph-spinner animate-spin inline-block"></i> Lecture du DQE en cours...`;
+            statusBox.innerHTML = `<i class="ph ph-spinner animate-spin inline-block"></i> CORTEX analyse le DQE...`;
 
             const formData = new FormData();
             formData.append('file', file);
@@ -194,37 +324,46 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    const volField = document.getElementById('cpq-volume');
-                    volField.value = data.total_volume_mwh;
-                    
-                    volField.classList.add('bg-cyan/20');
-                    setTimeout(() => volField.classList.remove('bg-cyan/20'), 1500);
-
-                    statusBox.innerHTML = `<span class="text-success"><i class="ph ph-check-circle"></i> Fichier analysé : ${data.sites_detected} compteurs extraits.</span>`;
+                    statusBox.innerHTML = `<span class="text-success"><i class="ph ph-check-circle"></i> ${data.sites_detected} sites extraits. Ajout au panier...</span>`;
+                    setTimeout(() => {
+                        addToBasket('dqe', data);
+                        statusBox.classList.add('hidden');
+                    }, 1000);
                 } else {
-                    statusBox.innerHTML = `<span class="text-alert"><i class="ph ph-warning-circle"></i> Fichier non reconnu.</span>`;
+                    statusBox.innerHTML = `<span class="text-alert"><i class="ph ph-warning-circle"></i> Erreur: Format non reconnu.</span>`;
                 }
             } catch (err) {
-                statusBox.innerHTML = `<span class="text-alert"><i class="ph ph-warning-circle"></i> Erreur serveur.</span>`;
+                statusBox.innerHTML = `<span class="text-alert"><i class="ph ph-warning-circle"></i> Erreur serveur lors de l'extraction.</span>`;
             }
         }
 
-        // === INTERROGATION DU MOTEUR (API BACKEND) ===
-        async function calculateQuote() {
-            const btn = document.getElementById('btn-calc');
-            btn.innerHTML = `<i class="ph ph-spinner animate-spin"></i> ANALYSE EN COURS...`;
+        // --- 3. COTATION CORTEX (ORACLE) ---
+        async function runOraclePricing() {
+            if (cpqBasket.length === 0) { alert("Le panier est vide."); return; }
+
+            const btn = document.getElementById('btn-oracle');
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin text-xl"></i> CORTEX CALCULE...`;
             btn.classList.add('opacity-80', 'pointer-events-none');
 
-            // Le Frontend commercial n'envoie PAS de masque détaillé. 
-            // Le Backend appliquera les valeurs du marché réel et les optimisations (Franchise CEE, etc.) en silence.
+            // On agrège le volume total pour la démo (En prod on ferait un appel par lot)
+            let totalVol = 0;
+            let mainEnergy = 'elec';
+            let mainSegment = 'C4';
+            
+            cpqBasket.forEach(i => { 
+                totalVol += i.volume; 
+                mainEnergy = i.energy; // Prend le dernier pour simplifier l'appel API
+                mainSegment = i.segment;
+            });
+
             const payload = {
-                volume_mwh: parseFloat(document.getElementById('cpq-volume').value) || 0,
-                energy_type: document.getElementById('cpq-energy').value,
-                segment: document.getElementById('cpq-segment').value,
-                duration_years: parseInt(document.getElementById('cpq-duration').value),
-                green_option: document.getElementById('cpq-green').value,
-                franchise_cee: true, // Automatiquement géré par la strat de l'entreprise
-                mask: {} // Masque vide = Le moteur utilise ses algorithmes Trading natifs
+                volume_mwh: totalVol,
+                energy_type: mainEnergy,
+                segment: mainSegment,
+                duration_years: parseInt(document.getElementById('global-duration').value),
+                franchise_cee: document.getElementById('global-franchise').checked,
+                green_option: document.getElementById('global-green').value,
+                mask: {} // Masque vide = Le backend utilise ses data de marché live
             };
 
             try {
@@ -236,39 +375,42 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    // Bascule de l'interface
-                    document.getElementById('result-placeholder').classList.add('hidden');
-                    const resData = document.getElementById('result-data');
-                    resData.classList.remove('hidden');
-                    resData.classList.add('flex');
+                    const resDiv = document.getElementById('oracle-result');
+                    resDiv.classList.remove('hidden');
+                    resDiv.classList.add('flex');
 
                     const fmt = (num) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
 
-                    // Affichage de la reco CORTEX (Adaptée pour le commercial)
-                    const o = data.oracle;
-                    document.getElementById('oracle-insight').innerHTML = `
-                        <strong>Stratégie de l'Offre :</strong> ${o.insight}<br><br>
-                        CORTEX a verrouillé le risque météo et profilage. Vous pouvez soumettre ce prix en toute sécurité.
-                    `;
-                    
-                    const probBadge = document.getElementById('oracle-win-prob');
-                    probBadge.innerText = o.win_probability + "% WIN PROBABILITY";
-                    probBadge.className = `px-3 py-1 text-xs font-bold rounded-full border ${o.win_probability > 80 ? 'bg-success/20 text-success border-success/30' : (o.win_probability > 60 ? 'bg-warning/20 text-warning border-warning/30' : 'bg-alert/20 text-alert border-alert/30')}`;
-
-                    // Prix de Vente TTC (Le seul KPI qui intéresse le commercial pour le client)
-                    document.getElementById('res-price').innerHTML = `${fmt(data.kpis.prix_moyen_mwh)} <span class="text-xl text-gray-500">€/MWh</span>`;
+                    document.getElementById('res-price').innerText = `${fmt(data.kpis.prix_moyen_mwh)} €/MWh`;
                     document.getElementById('res-budget').innerText = `${fmt(data.kpis.budget_total_ht)} € HT`;
+                    document.getElementById('res-prob').innerText = `${data.oracle.win_probability}%`;
+                    document.getElementById('res-insight').innerText = data.oracle.insight;
 
                 } else {
-                    alert("Erreur CORTEX : " + data.error);
+                    alert("Erreur de tarification : " + data.error);
                 }
             } catch (error) {
-                console.error("Erreur API CPQ", error);
-                alert("Impossible de joindre la Salle des Marchés CORTEX.");
+                console.error("Erreur API", error);
+                alert("Le moteur CORTEX est injoignable.");
             } finally {
-                btn.innerHTML = `<i class="ph ph-magic-wand text-xl"></i> INTERROGER LE MARCHÉ`;
+                btn.innerHTML = `<i class="ph ph-robot text-xl"></i> ACTUALISER LE PRIX`;
                 btn.classList.remove('opacity-80', 'pointer-events-none');
             }
+        }
+
+        // --- 4. ENVOI AU TRADING FLOOR (TICKETING) ---
+        function sendToTradingFloor() {
+            const btn = document.getElementById('btn-ticket');
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin"></i> TRANSMISSION...`;
+            
+            // Simulation UX de la création du ticket (L'API sera branchée plus tard)
+            setTimeout(() => {
+                btn.classList.replace('bg-abysse', 'bg-success');
+                btn.classList.replace('border-alert', 'border-success');
+                btn.classList.replace('text-alert', 'text-abysse');
+                btn.innerHTML = `<i class="ph ph-check-circle text-lg"></i> TICKET ENVOYÉ AU MIDDLE-OFFICE`;
+                btn.disabled = true;
+            }, 1500);
         }
     </script>
 </body>
