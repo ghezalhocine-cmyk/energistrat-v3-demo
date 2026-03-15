@@ -2,257 +2,377 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>MARKET.WATCH | Pilotage Indices</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDDLE OFFICE | CORTEX V12.6</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: {
-                        abysse: '#050505',
-                        card: '#0F172A',
-                        cyan: '#00E5FF',
-                        gold: '#F59E0B',
-                        danger: '#EF4444',
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'monospace'],
-                    }
+                    colors: { abysse: '#050505', card: '#0F172A', cyan: '#00E5FF', gold: '#F59E0B', danger: '#EF4444', success: '#00FF66', panel: '#001D3D' },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
+                    borderRadius: { 'bento': '1.5rem', 'bento-lg': '2.5rem' }
                 }
             }
         }
     </script>
     <style>
         body { background-color: #050505; color: white; font-family: 'Inter', sans-serif; }
-        .bento-card {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 1.5rem;
-            backdrop-filter: blur(12px);
-        }
-        .input-market {
-            background: rgba(0,0,0,0.5);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: #00E5FF;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.5rem;
-            font-weight: bold;
-            text-align: center;
-            border-radius: 0.75rem;
-            transition: all 0.3s;
-        }
-        .input-market:focus {
-            border-color: #00E5FF;
-            box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
-            outline: none;
-        }
-        /* Variations de couleurs pour les inputs */
+        .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1.5rem; backdrop-filter: blur(12px); }
+        
+        /* Inputs Market Watch */
+        .input-market { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #00E5FF; font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; font-weight: bold; text-align: center; border-radius: 0.75rem; transition: all 0.3s; }
+        .input-market:focus { border-color: #00E5FF; box-shadow: 0 0 20px rgba(0, 229, 255, 0.2); outline: none; }
         .input-gold { color: #F59E0B; }
         .input-gold:focus { border-color: #F59E0B; box-shadow: 0 0 20px rgba(245, 158, 11, 0.2); }
         .input-danger { color: #EF4444; }
         .input-danger:focus { border-color: #EF4444; box-shadow: 0 0 20px rgba(239, 68, 68, 0.2); }
+
+        /* Inputs Trading Floor */
+        .input-trading { background: #050505; border: 1px solid rgba(0,229,255,0.2); color: white; border-radius: 0.5rem; padding: 0.5rem; width: 100%; outline: none; font-family: 'JetBrains Mono'; transition: border-color 0.3s ease; }
+        .input-trading:focus { border-color: #00E5FF; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+        
+        /* Custom Toggle */
+        .toggle-checkbox:checked { right: 0; border-color: #00E5FF; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #00E5FF; }
+        .toggle-checkbox:checked + .toggle-label:after { transform: translateX(100%); border-color: white; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.2); border-radius: 10px; }
+        
+        .tab-active { border-bottom: 2px solid #00E5FF; color: #00E5FF; font-weight: bold; }
+        .tab-inactive { border-bottom: 2px solid transparent; color: #6B7280; }
+        .tab-inactive:hover { color: #D1D5DB; }
     </style>
 </head>
 <body class="flex h-screen w-screen overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
 
     <!-- SIDEBAR -->
-    <aside class="w-20 bg-abysse border-r border-white/10 flex flex-col items-center py-6 gap-8 z-50">
-        <div class="text-cyan text-2xl"><i class="fa-solid fa-chart-simple"></i></div>
-        <a href="/" class="text-gray-500 hover:text-white transition"><i class="fa-solid fa-house"></i></a>
-        <a href="/dashboard/industry" class="text-gray-500 hover:text-white transition"><i class="fa-solid fa-industry"></i></a>
+    <aside class="w-20 bg-abysse border-r border-white/10 flex flex-col items-center py-6 gap-8 z-50 flex-none">
+        <div class="text-cyan text-2xl"><i class="ph ph-chart-line-up"></i></div>
+        <a href="/sales_workspace" class="text-gray-500 hover:text-white transition" title="CRM"><i class="ph ph-kanban text-xl"></i></a>
+        <a href="/ops_nexus" class="text-gray-500 hover:text-white transition" title="Nexus"><i class="ph ph-cube text-xl"></i></a>
     </aside>
 
     <!-- CONTENT -->
-    <main class="flex-1 flex flex-col relative">
+    <main class="flex-1 flex flex-col relative overflow-hidden">
         
-        <!-- HEADER -->
-        <div class="h-24 flex items-center justify-between px-10">
-            <div>
-                <h1 class="text-3xl font-black text-white tracking-wider">MARKET<span class="text-cyan">.WATCH</span></h1>
-                <p class="text-gray-500 text-xs font-mono mt-1">Pilotage des Indices de Référence (Triple Sentinelle)</p>
+        <!-- HEADER & TABS -->
+        <div class="h-auto flex flex-col px-10 pt-6 bg-abysse/80 backdrop-blur border-b border-white/10 z-40 flex-none">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h1 class="text-3xl font-black text-white tracking-wider">MIDDLE<span class="text-cyan">.OFFICE</span></h1>
+                    <p class="text-gray-500 text-xs font-mono mt-1">Trading Floor & Pilotage Indices</p>
+                </div>
             </div>
-            <div class="text-right">
-                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Dernière MàJ</div>
-                <div id="last-update" class="text-xl font-mono text-white">--/--/----</div>
+            <div class="flex gap-8 mt-2">
+                <button onclick="switchTab('market')" id="btn-tab-market" class="pb-3 text-sm tracking-wide tab-active transition-all flex items-center gap-2">
+                    <i class="ph ph-broadcast"></i> 1. MARKET WATCH (Indices)
+                </button>
+                <button onclick="switchTab('trading')" id="btn-tab-trading" class="pb-3 text-sm tracking-wide tab-inactive transition-all flex items-center gap-2">
+                    <i class="ph ph-scales"></i> 2. TRADING FLOOR (Shadow Pricing)
+                </button>
             </div>
         </div>
 
-        <!-- GRID -->
-        <div class="flex-1 p-10 grid grid-cols-3 gap-8 overflow-y-auto">
-
-            <!-- 1. BOURSE (EEX) -->
-            <div class="bento-card p-8 border-t-4 border-cyan">
-                <div class="flex justify-between items-center mb-8">
-                    <h2 class="text-lg font-bold text-cyan"><i class="fa-solid fa-bolt mr-2"></i> BOURSE (EEX)</h2>
-                    <i class="fa-solid fa-chart-line text-gray-600 text-2xl"></i>
+        <!-- ========================================================= -->
+        <!-- ONGLET 1 : MARKET WATCH (Indices Globaux)                 -->
+        <!-- ========================================================= -->
+        <div id="tab-market" class="flex-1 flex flex-col overflow-hidden">
+            <div class="flex-1 p-10 grid grid-cols-1 md:grid-cols-3 gap-8 overflow-y-auto">
+                <div class="bento-card p-8 border-t-4 border-cyan">
+                    <div class="flex justify-between items-center mb-8"><h2 class="text-lg font-bold text-cyan"><i class="fa-solid fa-bolt mr-2"></i> BOURSE (EEX)</h2><i class="fa-solid fa-chart-line text-gray-600 text-2xl"></i></div>
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CAL N+1</label><input type="number" id="eex-n1" class="input-market w-full py-2" value="85"></div>
+                            <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CAL N+2</label><input type="number" id="eex-n2" class="input-market w-full py-2" value="75"></div>
+                            <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CAL N+3</label><input type="number" id="eex-n3" class="input-market w-full py-2" value="65"></div>
+                        </div>
+                        <div class="h-px bg-white/10"></div>
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">PEG N+1</label><input type="number" id="peg-n1" class="input-market input-danger w-full py-2" value="35"></div>
+                            <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">PEG N+2</label><input type="number" id="peg-n2" class="input-market input-danger w-full py-2" value="32"></div>
+                            <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">PEG N+3</label><input type="number" id="peg-n3" class="input-market input-danger w-full py-2" value="30"></div>
+                        </div>
+                        <div class="mt-6">
+                            <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">Tendance Globale</label>
+                            <select id="trend" class="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white">
+                                <option value="bullish">HAUSSIER (Urgence)</option>
+                                <option value="bearish" selected>BAISSIER (Opportunité)</option>
+                                <option value="neutral">NEUTRE (Attente)</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                
-                <div class="space-y-6">
-                    <div class="grid grid-cols-3 gap-4 text-center">
-                        <div>
-                            <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CAL N+1</label>
-                            <input type="number" id="eex-n1" class="input-market w-full py-3" value="85">
-                        </div>
-                        <div>
-                            <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CAL N+2</label>
-                            <input type="number" id="eex-n2" class="input-market w-full py-3" value="75">
-                        </div>
-                        <div>
-                            <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CAL N+3</label>
-                            <input type="number" id="eex-n3" class="input-market w-full py-3" value="65">
-                        </div>
+
+                <div class="bento-card p-8 border-t-4 border-blue-600">
+                    <div class="flex justify-between items-center mb-8"><h2 class="text-lg font-bold text-blue-400"><i class="fa-solid fa-shield-halved mr-2"></i> TRVE (Public)</h2><i class="fa-solid fa-building-columns text-gray-600 text-2xl"></i></div>
+                    <div class="space-y-6">
+                        <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">ÉLEC - C5 (BLEU PRO)</label><input type="number" id="trve-c5" class="input-market w-full py-2 text-blue-400 border-blue-500/30" value="230"></div>
+                        <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">ÉLEC - C4 (JAUNE)</label><input type="number" id="trve-c4" class="input-market w-full py-2 text-blue-400 border-blue-500/30" value="180"></div>
+                        <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">GAZ - T1/T2 (REPÈRE)</label><input type="number" id="trve-gaz" class="input-market w-full py-2 text-blue-400 border-blue-500/30" value="95"></div>
                     </div>
+                </div>
 
-                    <div class="h-px bg-white/10"></div>
-
-                    <div class="grid grid-cols-3 gap-4 text-center">
-                        <div>
-                            <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">PEG N+1</label>
-                            <input type="number" id="peg-n1" class="input-market input-danger w-full py-3" value="35">
-                        </div>
-                        <div>
-                            <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">PEG N+2</label>
-                            <input type="number" id="peg-n2" class="input-market input-danger w-full py-3" value="32">
-                        </div>
-                        <div>
-                            <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">PEG N+3</label>
-                            <input type="number" id="peg-n3" class="input-market input-danger w-full py-3" value="30">
-                        </div>
-                    </div>
-
-                    <div class="mt-6">
-                        <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">Tendance Globale</label>
-                        <select id="trend" class="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white">
-                            <option value="bullish">HAUSSIER (Urgence)</option>
-                            <option value="bearish" selected>BAISSIER (Opportunité)</option>
-                            <option value="neutral">NEUTRE (Attente)</option>
-                        </select>
+                <div class="bento-card p-8 border-t-4 border-white">
+                    <div class="flex justify-between items-center mb-8"><h2 class="text-lg font-bold text-white"><i class="fa-solid fa-crosshairs mr-2"></i> CIBLES (Broker)</h2><i class="fa-solid fa-bullseye text-gray-600 text-2xl"></i></div>
+                    <div class="space-y-6">
+                        <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CIBLE C5 (PETITS SITES)</label><input type="number" id="target-c5" class="input-market input-gold w-full py-2" value="190"></div>
+                        <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CIBLE C4 (PME/INDUS)</label><input type="number" id="target-c4" class="input-market input-gold w-full py-2" value="140"></div>
+                        <div><label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CIBLE GAZ (GLOBAL)</label><input type="number" id="target-gaz" class="input-market input-gold w-full py-2" value="85"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- 2. TRVE (PUBLIC) -->
-            <div class="bento-card p-8 border-t-4 border-blue-600">
-                <div class="flex justify-between items-center mb-8">
-                    <h2 class="text-lg font-bold text-blue-400"><i class="fa-solid fa-shield-halved mr-2"></i> TRVE (Public)</h2>
-                    <i class="fa-solid fa-building-columns text-gray-600 text-2xl"></i>
-                </div>
-                
-                <div class="space-y-6">
-                    <div>
-                        <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">ÉLEC - C5 (BLEU PRO) €/MWh</label>
-                        <input type="number" id="trve-c5" class="input-market w-full py-3 text-blue-400 border-blue-500/30 focus:border-blue-500" value="230">
-                    </div>
-                    <div>
-                        <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">ÉLEC - C4 (JAUNE) €/MWh</label>
-                        <input type="number" id="trve-c4" class="input-market w-full py-3 text-blue-400 border-blue-500/30 focus:border-blue-500" value="180">
-                    </div>
-                    <div>
-                        <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">GAZ - T1/T2 (PRIX REPÈRE) €/MWh</label>
-                        <input type="number" id="trve-gaz" class="input-market w-full py-3 text-blue-400 border-blue-500/30 focus:border-blue-500" value="95">
-                    </div>
-                </div>
+            <div class="p-6 flex justify-between items-center bg-abysse/90 border-t border-white/10 flex-none">
+                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Dernière Diffusion : <span id="last-update" class="text-sm font-mono text-white ml-2">--/--/----</span></div>
+                <button onclick="broadcastRates()" id="btn-broadcast" class="bg-white text-black px-8 py-3 rounded-xl font-black text-sm hover:bg-cyan hover:scale-105 transition shadow-[0_0_30px_rgba(255,255,255,0.2)] flex items-center gap-3">
+                    <i class="fa-solid fa-tower-broadcast"></i> DIFFUSER LES RÉFÉRENCES
+                </button>
             </div>
-
-            <!-- 3. CIBLES (BROKER) -->
-            <div class="bento-card p-8 border-t-4 border-white">
-                <div class="flex justify-between items-center mb-8">
-                    <h2 class="text-lg font-bold text-white"><i class="fa-solid fa-crosshairs mr-2"></i> CIBLES (Broker)</h2>
-                    <i class="fa-solid fa-bullseye text-gray-600 text-2xl"></i>
-                </div>
-                
-                <div class="space-y-6">
-                    <div>
-                        <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CIBLE C5 (PETITS SITES)</label>
-                        <input type="number" id="target-c5" class="input-market input-gold w-full py-3" value="190">
-                    </div>
-                    <div>
-                        <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CIBLE C4 (PME/INDUSTRIE)</label>
-                        <input type="number" id="target-c4" class="input-market input-gold w-full py-3" value="140">
-                    </div>
-                    <div>
-                        <label class="text-[9px] text-gray-400 uppercase font-bold mb-2 block">CIBLE GAZ (TOUTES TAILLES)</label>
-                        <input type="number" id="target-gaz" class="input-market input-gold w-full py-3" value="85">
-                    </div>
-                </div>
-            </div>
-
         </div>
 
-        <!-- FOOTER ACTION -->
-        <div class="p-8 flex justify-end items-center gap-4 bg-abysse/90 border-t border-white/10 sticky bottom-0 z-50">
-            <span class="text-gray-500 text-xs font-bold uppercase mr-4">Retour Ops</span>
-            <button onclick="broadcastRates()" id="btn-broadcast" class="bg-white text-black px-8 py-4 rounded-xl font-black text-sm hover:bg-cyan hover:scale-105 transition shadow-[0_0_30px_rgba(255,255,255,0.2)] flex items-center gap-3">
-                <i class="fa-solid fa-tower-broadcast"></i> DIFFUSER LES RÉFÉRENCES
-            </button>
+        <!-- ========================================================= -->
+        <!-- ONGLET 2 : TRADING FLOOR (Shadow Pricing & Sourcing)      -->
+        <!-- ========================================================= -->
+        <div id="tab-trading" class="flex-1 flex-col overflow-hidden hidden">
+            <div class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto">
+                
+                <!-- COLONNE 1 : DEAL STRUCTURING -->
+                <div class="lg:col-span-3 flex flex-col gap-4 h-fit">
+                    <div class="bento-card p-5">
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-2 mb-4 uppercase tracking-wider"><i class="ph ph-crosshair text-cyan"></i> Position à couvrir</h2>
+                        <div>
+                            <label class="text-xs text-gray-400 font-mono mb-1 block">Volume Total (MWh)</label>
+                            <input type="number" id="cpq-volume" value="15000" class="input-trading border-danger/50 text-white font-bold text-lg bg-danger/5">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-4">
+                            <div>
+                                <label class="text-xs text-gray-400 font-mono mb-1 block">Énergie</label>
+                                <select id="cpq-energy" class="input-trading" onchange="updateDefaults()">
+                                    <option value="elec">Électricité</option><option value="gaz">Gaz</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 font-mono mb-1 block">Segment Dominant</label>
+                                <select id="cpq-segment" class="input-trading">
+                                    <option value="C1">C1 (Lourd)</option><option value="C3">C3/C4</option><option value="C5">C5</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <label class="text-xs text-gray-400 font-mono mb-1 block">Durée de couverture (Ans)</label>
+                            <input type="number" id="cpq-duration" class="input-trading" value="1" min="1" max="5">
+                        </div>
+                    </div>
+
+                    <div class="bento-card p-5 flex flex-col gap-4">
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-2 uppercase tracking-wider"><i class="ph ph-sliders text-cyan"></i> Leviers Achat</h2>
+                        <label class="flex items-center justify-between cursor-pointer group bg-black/50 p-3 rounded-lg border border-cyan/10 hover:border-cyan/50 transition-colors">
+                            <div class="flex items-center gap-2"><i class="ph ph-leaf text-success"></i><span class="text-sm font-mono text-gray-300">Franchise CEE (0€)</span></div>
+                            <div class="relative inline-block w-10 align-middle select-none">
+                                <input type="checkbox" id="cpq-franchise" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer z-10" checked/>
+                                <label for="cpq-franchise" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-600 cursor-pointer"></label>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- COLONNE 2 : SHADOW PRICING (Grossiste) -->
+                <div class="lg:col-span-5 flex flex-col gap-4 h-fit">
+                    <div class="bento-card p-6 flex flex-col gap-4 relative overflow-hidden border-t-4 border-danger">
+                        <div class="bg-danger/10 border border-danger/30 rounded-xl p-3 text-xs text-danger font-mono flex items-start gap-3">
+                            <i class="ph ph-warning-circle text-xl shrink-0 mt-0.5"></i>
+                            <p><strong>CORTEX Shadow Pricing.</strong> Saisissez les primes du Grossiste. Le Moteur calculera la toxicité de l'offre (marges cachées).</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mt-2">
+                            <div><label class="text-xs text-gray-400 font-mono mb-1 block flex justify-between">Marché de Gros (Base)</label><div class="flex items-center"><input type="number" id="mask-market" value="85.0" step="0.1" class="input-trading"><span class="text-xs ml-2 text-gray-500 w-8">€</span></div></div>
+                            <div><label class="text-xs text-cyan font-bold font-mono mb-1 block flex justify-between">Marge Nette ENERGISTRAT</label><div class="flex items-center"><input type="number" id="mask-markup" value="2.0" step="0.1" class="input-trading border-cyan/50"><span class="text-xs ml-2 text-cyan w-8">€</span></div></div>
+                            
+                            <div class="col-span-2 border-t border-cyan/10 my-2 relative"><span class="absolute -top-2 bg-[#0F172A] px-2 text-[10px] text-gray-500 uppercase tracking-widest">Primes du Grossiste (Sourcing)</span></div>
+                            
+                            <div><label class="text-xs text-gray-400 font-mono mb-1 block">Prime de Profilage</label><div class="flex items-center"><input type="number" id="mask-profiling" value="3.5" step="0.1" class="input-trading border-danger/30"><span class="text-xs ml-2 text-gray-500 w-8">€</span></div></div>
+                            <div><label class="text-xs text-gray-400 font-mono mb-1 block">Risque Écart (Balancing)</label><div class="flex items-center"><input type="number" id="mask-balancing" value="2.5" step="0.1" class="input-trading border-danger/30"><span class="text-xs ml-2 text-gray-500 w-8">€</span></div></div>
+                            <div><label class="text-xs text-gray-400 font-mono mb-1 block">Capacité / Garanties</label><div class="flex items-center"><input type="number" id="mask-capa" value="2.5" step="0.1" class="input-trading"><span class="text-xs ml-2 text-gray-500 w-8">€</span></div></div>
+                        </div>
+
+                        <button onclick="calculateTradingQuote()" id="btn-calc-trading" class="w-full py-4 mt-4 bg-danger text-white font-bold rounded-xl hover:bg-white hover:text-danger transition-colors flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+                            <i class="ph ph-scales text-xl"></i> AUDITER LE GROSSISTE
+                        </button>
+                    </div>
+
+                    <!-- RÉSULTAT DU SHADOW PRICING -->
+                    <div id="shadow-box" class="bento-card p-5 hidden flex-col gap-3 transition-all duration-500">
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider mb-2"><i class="ph ph-detective text-alert"></i> CORTEX Arbitrage</h2>
+                        <div class="flex justify-between items-center bg-black/30 p-3 rounded border border-cyan/10">
+                            <span class="text-sm text-gray-400 font-mono">Risque réel (Mathématique CORTEX)</span><span id="true-risk" class="text-cyan font-bold font-mono">0.00 €/MWh</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-black/30 p-3 rounded border border-white/10">
+                            <span class="text-sm text-gray-400 font-mono">Risque facturé (Grossiste)</span><span id="cp-risk" class="text-white font-bold font-mono">0.00 €/MWh</span>
+                        </div>
+                        <div class="mt-2 text-center p-3 rounded font-bold border" id="toxic-alert"></div>
+                    </div>
+                </div>
+
+                <!-- COLONNE 3 : P&L & EXECUTION -->
+                <div class="lg:col-span-4 bento-card p-6 flex flex-col gap-4 border-t-4 border-success">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2 border-b border-cyan/10 pb-3"><i class="ph ph-bank text-success text-xl"></i> 3. P&L Fournisseur</h2>
+                    
+                    <div id="trading-placeholder" class="text-center text-gray-500 font-mono text-sm py-16 flex flex-col items-center gap-2">
+                        <i class="ph ph-lock-key text-4xl opacity-20 mb-2"></i> En attente du calcul...
+                    </div>
+
+                    <div id="trading-data" class="hidden flex-col gap-4 h-full">
+                        <div class="bg-black/50 border border-success/30 rounded-xl p-5 text-center relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-success to-transparent"></div>
+                            <p class="text-xs text-gray-400 font-mono uppercase mb-2">Marge Nette (P&L Sécurisé)</p>
+                            <h3 class="text-4xl font-bold text-success drop-shadow-[0_0_8px_rgba(0,255,102,0.4)]" id="res-margin-total">0 €</h3>
+                            <p class="text-sm text-gray-400 mt-2 font-mono">Unitaire: <span id="res-margin-mwh" class="text-white font-bold">0.00 €/MWh</span></p>
+                        </div>
+
+                        <div class="space-y-2 mt-2 text-sm font-mono bg-black/30 p-4 rounded-xl border border-cyan/10">
+                            <p class="text-xs text-gray-500 uppercase tracking-widest mb-3 border-b border-cyan/10 pb-2">Cash-Out Approvisionnement</p>
+                            <div class="flex justify-between"><span class="text-gray-400">Électron (Molécule)</span><span id="res-mol" class="text-white">0 €</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Couverture Risques</span><span id="res-risk" class="text-white">0 €</span></div>
+                            <div class="flex justify-between pt-3 mt-2 border-t border-danger/20">
+                                <span class="text-danger font-bold flex items-center gap-2"><i class="ph ph-shopping-bag"></i> Dépense Totale</span><span id="res-sourcing" class="text-danger font-bold text-base">0 €</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-auto pt-4 space-y-3">
+                            <button class="w-full py-4 bg-success text-abysse font-bold rounded-xl hover:bg-white transition-colors flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,255,102,0.3)]">
+                                <i class="ph ph-check-square-offset text-xl"></i> EXÉCUTER LE HEDGE
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
     </main>
 
     <script>
-        // --- LOGIQUE DE TUYAUTERIE (CORRIGÉE) ---
+        function switchTab(tab) {
+            document.getElementById('tab-market').classList.add('hidden');
+            document.getElementById('tab-trading').classList.add('hidden');
+            document.getElementById('btn-tab-market').classList.replace('tab-active', 'tab-inactive');
+            document.getElementById('btn-tab-trading').classList.replace('tab-active', 'tab-inactive');
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('flex');
+            document.getElementById(`btn-tab-${tab}`).classList.replace('tab-inactive', 'tab-active');
+        }
 
         async function broadcastRates() {
             const btn = document.getElementById('btn-broadcast');
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> DIFFUSION EN COURS...';
             
-            // 1. CONSTRUCTION DU PAYLOAD (Format strict attendu par main.py)
             const payload = {
-                elec: {
-                    cal_n1: parseFloat(document.getElementById('eex-n1').value),
-                    cal_n2: parseFloat(document.getElementById('eex-n2').value),
-                    cal_n3: parseFloat(document.getElementById('eex-n3').value),
-                    trend: document.getElementById('trend').value
-                },
-                gaz: {
-                    peg_n1: parseFloat(document.getElementById('peg-n1').value),
-                    peg_n2: parseFloat(document.getElementById('peg-n2').value),
-                    peg_n3: parseFloat(document.getElementById('peg-n3').value)
-                },
-                trve: {
-                    elec_c5: parseFloat(document.getElementById('trve-c5').value),
-                    elec_c4: parseFloat(document.getElementById('trve-c4').value),
-                    gaz_ref: parseFloat(document.getElementById('trve-gaz').value)
-                },
-                targets: {
-                    c5: parseFloat(document.getElementById('target-c5').value),
-                    c4: parseFloat(document.getElementById('target-c4').value),
-                    gaz: parseFloat(document.getElementById('target-gaz').value)
+                elec: { cal_n1: parseFloat(document.getElementById('eex-n1').value), cal_n2: parseFloat(document.getElementById('eex-n2').value), cal_n3: parseFloat(document.getElementById('eex-n3').value), trend: document.getElementById('trend').value },
+                gaz: { peg_n1: parseFloat(document.getElementById('peg-n1').value), peg_n2: parseFloat(document.getElementById('peg-n2').value), peg_n3: parseFloat(document.getElementById('peg-n3').value) },
+                trve: { elec_c5: parseFloat(document.getElementById('trve-c5').value), elec_c4: parseFloat(document.getElementById('trve-c4').value), gaz_ref: parseFloat(document.getElementById('trve-gaz').value) },
+                targets: { c5: parseFloat(document.getElementById('target-c5').value), c4: parseFloat(document.getElementById('target-c4').value), gaz: parseFloat(document.getElementById('target-gaz').value) }
+            };
+
+            try {
+                const res = await fetch('/api/ops/market/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (res.ok) {
+                    const now = new Date();
+                    document.getElementById('last-update').innerText = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+                    document.getElementById('last-update').classList.add('text-green-400');
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> DIFFUSION RÉUSSIE';
+                    btn.classList.replace('bg-white', 'bg-green-500');
+                    setTimeout(() => { btn.innerHTML = originalText; btn.classList.replace('bg-green-500', 'bg-white'); }, 2000);
+                } else throw new Error();
+            } catch (e) {
+                alert("Erreur de connexion au Cerveau.");
+                btn.innerHTML = originalText;
+            }
+        }
+
+        function updateDefaults() {
+            const isGas = document.getElementById('cpq-energy').value === 'gaz';
+            document.getElementById('mask-market').value = isGas ? 35.0 : 85.0;
+            document.getElementById('mask-capa').value = isGas ? 0.0 : 2.5;
+            document.getElementById('mask-profiling').value = isGas ? 0.9 : 3.5;
+            document.getElementById('mask-balancing').value = isGas ? 0.8 : 2.5;
+        }
+
+        async function calculateTradingQuote() {
+            const btn = document.getElementById('btn-calc-trading');
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin"></i> ARBITRAGE...`;
+            btn.classList.add('opacity-80', 'pointer-events-none');
+
+            const payload = {
+                volume_mwh: parseFloat(document.getElementById('cpq-volume').value) || 0,
+                energy_type: document.getElementById('cpq-energy').value,
+                segment: document.getElementById('cpq-segment').value,
+                duration_years: parseInt(document.getElementById('cpq-duration').value),
+                franchise_cee: document.getElementById('cpq-franchise').checked,
+                green_option: "none",
+                mask: {
+                    market_price: parseFloat(document.getElementById('mask-market').value),
+                    markup: parseFloat(document.getElementById('mask-markup').value),
+                    cp_profiling: parseFloat(document.getElementById('mask-profiling').value),
+                    cp_balancing: parseFloat(document.getElementById('mask-balancing').value),
+                    cp_capa: parseFloat(document.getElementById('mask-capa').value)
                 }
             };
 
             try {
-                // 2. ENVOI AU SERVEUR
-                const res = await fetch('/api/ops/market/update', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                const response = await fetch('/api/v1/cpq/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await response.json();
 
-                if (res.ok) {
-                    // 3. SUCCÈS
-                    const now = new Date();
-                    document.getElementById('last-update').innerText = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
-                    document.getElementById('last-update').classList.add('text-green-400');
+                if (data.success) {
+                    const fmt = (num) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+
+                    const shadowBox = document.getElementById('shadow-box');
+                    shadowBox.classList.remove('hidden');
+                    shadowBox.classList.add('flex');
+
+                    const sp = data.shadow_pricing;
+                    document.getElementById('true-risk').innerText = `${fmt(sp.cortex_risk_total)} €/MWh`;
+                    document.getElementById('cp-risk').innerText = `${fmt(sp.cp_risk_total)} €/MWh`;
                     
-                    btn.innerHTML = '<i class="fa-solid fa-check"></i> DIFFUSION RÉUSSIE';
-                    btn.classList.replace('bg-white', 'bg-green-500');
-                    
-                    setTimeout(() => {
-                        btn.innerHTML = originalText;
-                        btn.classList.replace('bg-green-500', 'bg-white');
-                    }, 2000);
-                } else {
-                    throw new Error("Erreur Serveur");
-                }
-            } catch (e) {
-                console.error(e);
-                alert("Erreur de connexion au Cerveau.");
-                btn.innerHTML = originalText;
+                    const toxicAlert = document.getElementById('toxic-alert');
+                    if (!sp.is_fair) {
+                        toxicAlert.innerText = `🚨 TOXICITÉ DÉTECTÉE : +${fmt(sp.toxic_markup_detected)} €/MWh de vol`;
+                        toxicAlert.className = "mt-2 text-center p-3 rounded bg-danger/20 text-danger font-bold border border-danger";
+                        shadowBox.className = "bento-card p-5 flex flex-col gap-3 transition-all duration-500 border border-danger shadow-[0_0_15px_rgba(239,68,68,0.2)]";
+                    } else {
+                        toxicAlert.innerText = `✅ OFFRE FAIR-PLAY (Écart CORTEX : +${fmt(sp.toxic_markup_detected)} €)`;
+                        toxicAlert.className = "mt-2 text-center p-3 rounded bg-success/20 text-success font-bold border border-success";
+                        shadowBox.className = "bento-card p-5 flex flex-col gap-3 transition-all duration-500 border border-success shadow-[0_0_15px_rgba(0,255,102,0.2)]";
+                    }
+
+                    document.getElementById('trading-placeholder').classList.add('hidden');
+                    const resData = document.getElementById('trading-data');
+                    resData.classList.remove('hidden');
+                    resData.classList.add('flex');
+
+                    document.getElementById('res-margin-total').innerText = `${fmt(data.stack.margin_eur)} €`;
+                    document.getElementById('res-margin-mwh').innerText = `${fmt(data.kpis.marge_appliquee_mwh)} €/MWh`;
+
+                    const riskTotal = data.stack.sourcing_eur - (payload.volume_mwh * payload.duration_years * payload.mask.market_price);
+                    const molTotal = data.stack.sourcing_eur - riskTotal;
+
+                    document.getElementById('res-mol').innerText = `${fmt(molTotal)} €`;
+                    document.getElementById('res-risk').innerText = `${fmt(riskTotal)} €`;
+                    document.getElementById('res-sourcing').innerText = `${fmt(data.stack.sourcing_eur)} €`;
+
+                } else { alert("Erreur CORTEX : " + data.error); }
+            } catch (error) {
+                console.error("Erreur", error); alert("Erreur serveur.");
+            } finally {
+                btn.innerHTML = `<i class="ph ph-detective text-xl"></i> AUDITER LE GROSSISTE`;
+                btn.classList.remove('opacity-80', 'pointer-events-none');
             }
         }
     </script>
