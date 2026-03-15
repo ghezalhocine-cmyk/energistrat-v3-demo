@@ -539,7 +539,7 @@ async def api_create_crm_lead_and_convert(payload: CRMCompany3DModel, user = Dep
 @app.post("/api/crm/edit/{entity_type}/{entity_id}")
 async def api_inline_edit(entity_type: str, entity_id: str, payload: CRMInlineEditModel, user = Depends(get_current_user)):
     """Le backend du 'Stylo Cyan'. Permet la modification instantanée et tracée."""
-    if not user or user.get("role") != "ADMIN": 
+    if not user: 
         return JSONResponse({"error": "Non autorisé"}, 401)
         
     data = None
@@ -569,7 +569,7 @@ async def api_inline_edit(entity_type: str, entity_id: str, payload: CRMInlineEd
 @app.post("/api/crm/company/{company_id}/contact")
 async def api_add_contact_3d(company_id: str, payload: CRMContactModel, user = Depends(get_current_user)):
     """Ajout d'un contact rattaché au Siège ou à un Site"""
-    if not user or user.get("role") != "ADMIN": 
+    if not user: 
         return JSONResponse({"error": "Non autorisé"}, 401)
         
     contact_id = f"CONT_{uuid.uuid4().hex[:12]}"
@@ -591,7 +591,7 @@ async def api_add_contact_3d(company_id: str, payload: CRMContactModel, user = D
 @app.post("/api/crm/company/{company_id}/site")
 async def api_add_site_3d(company_id: str, payload: CRMSiteModel, user = Depends(get_current_user)):
     """Ajout d'un Jumeau Numérique SGE (Site) à une Entité Légale"""
-    if not user or user.get("role") != "ADMIN": 
+    if not user: 
         return JSONResponse({"error": "Non autorisé"}, 401)
         
     site_id = f"SITE_{payload.pdl_pce.replace(' ', '')}"
@@ -676,7 +676,8 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
 @app.post("/api/crm/contact/{contact_id}/linkedin")
 async def update_contact_linkedin(contact_id: str, payload: UpdateFieldModel, user = Depends(get_current_user)):
     """(Maintenu pour Zéro Régression sur les anciens calls)"""
-    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    if not user: 
+    return JSONResponse({"error": "Non autorisé"}, 401)
     contact = db.get_contact(contact_id)
     if contact:
         contact["linkedin"] = payload.value
@@ -692,7 +693,8 @@ async def update_contact_linkedin(contact_id: str, payload: UpdateFieldModel, us
 @app.post("/api/crm/company/{company_id}/website")
 async def update_company_website(company_id: str, payload: UpdateFieldModel, user = Depends(get_current_user)):
     """(Maintenu pour Zéro Régression)"""
-    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    if not user:
+        return JSONResponse({"error": "Non autorisé"}, 401)
     company = db.get_company(company_id)
     if company:
         company["website"] = payload.value
@@ -707,7 +709,8 @@ async def update_company_website(company_id: str, payload: UpdateFieldModel, use
 
 @app.post("/api/crm/deal/move")
 async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_user)):
-    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Accès refusé"}, 401)
+    if not user: 
+        return JSONResponse({"error": "Accès refusé"}, 401)
     deal_data = db.get_deal(payload.deal_id)
     if deal_data:
         deal_data["stage"] = payload.new_stage
