@@ -4,7 +4,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V12.6 | Factory.OS (ISO 50001)</title>
+    <title>ENERGISTRAT V12.6 | Sentinel.OS (Protection de Marge)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -81,159 +81,171 @@
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.3); border-radius: 3px; }
     </style>
 </head>
-<body class="flex h-screen w-screen font-sans text-sm bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+<body class="flex h-screen w-screen font-sans text-sm bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] pt-8">
 
-    <!-- TICKER LIVE BOURSE -->
-    <div class="fixed top-0 w-full z-[100] h-8 bg-black border-b border-cyan/20 flex items-center overflow-hidden shadow-[0_2px_15px_rgba(0,229,255,0.1)]">
-        <div class="bg-cyan text-abysse font-black px-4 h-full flex items-center text-[10px] tracking-widest z-10 relative">
+    <!-- TICKER LIVE BOURSE (FIX VISUEL : w-64 EXACT) -->
+    <div class="fixed top-0 left-0 w-full z-[100] h-8 bg-black border-b border-cyan/20 flex items-center overflow-hidden shadow-[0_2px_15px_rgba(0,229,255,0.1)]">
+        <div class="w-64 flex-shrink-0 bg-cyan text-abysse font-black px-6 h-full flex items-center text-[10px] tracking-widest z-10 relative">
             <div class="w-2 h-2 rounded-full bg-alert animate-pulse mr-2"></div> EPEX SPOT
         </div>
-        <div class="ticker-wrap h-full flex items-center">
+        <div class="ticker-wrap h-full flex items-center flex-1">
             <div class="ticker text-[10px] font-mono text-cyan font-bold" id="live-ticker">
                 Connexion à l'API Cortex Sniper en cours... | 
             </div>
         </div>
     </div>
 
-    <!-- SIDEBAR HARMONISÉE -->
-    <aside class="w-64 bg-abysse border-r border-cyan/10 flex flex-col justify-between z-50 flex-shrink-0 mt-8 shadow-2xl">
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-abysse border-r border-cyan/10 flex flex-col justify-between z-50 flex-shrink-0 shadow-2xl h-[calc(100vh-2rem)] fixed left-0 top-8">
         <div>
             <div class="h-16 flex items-center px-6 border-b border-cyan/10 bg-card/50">
                 <div class="w-8 h-8 rounded-lg bg-cyan/20 text-cyan flex items-center justify-center mr-3 border border-cyan/30">
-                    <i class="fa-solid fa-industry"></i>
+                    <i class="fa-solid fa-shield-halved"></i>
                 </div>
                 <div>
-                    <div class="font-black text-white tracking-wider">FACTORY<span class="text-cyan">.OS</span></div>
+                    <div class="font-black text-white tracking-wider">SENTINEL<span class="text-cyan">.OS</span></div>
                     <div id="god-mode-indicator" class="text-[9px] text-gray-500 font-mono hidden"><span class="text-alert animate-pulse">●</span> GOD MODE ACTIF</div>
                 </div>
             </div>
             
             <div class="p-4 space-y-1">
-                <div class="text-[10px] text-gray-500 font-bold uppercase mb-2 px-2 tracking-widest">Production</div>
-                <button onclick="switchView('command')" id="nav-command" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-[2rem]">
-                    <i class="fa-solid fa-gauge-high w-4 text-center"></i> Performance SCADA
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-2 px-2 tracking-widest">Protection de Marge</div>
+                <button class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-[2rem]">
+                    <i class="fa-solid fa-gauge-high w-4 text-center"></i> Détection d'Anomalies
                 </button>
             </div>
 
             <div class="px-4 mt-4">
-                <div class="text-[10px] text-gray-500 font-bold uppercase mb-2 px-2 tracking-widest">Finance & Subventions</div>
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-2 px-2 tracking-widest">Opérations & Audit</div>
                 <div onclick="openEbitdaModal()" class="flex items-center gap-3 px-4 py-3 text-xs text-gold hover:text-white transition rounded-[2rem] hover:bg-white/5 cursor-pointer border border-gold/30 bg-gold/5 shadow-[0_0_15px_rgba(245,158,11,0.1)] mb-2">
                     <i class="fa-solid fa-scale-unbalanced w-4 text-center"></i> Simulateur EBITDA
                 </div>
-                <!-- BOUTON GÉNÉRATION CERFA CEE -->
                 <button onclick="generateCEE()" class="w-full flex items-center gap-3 px-4 py-3 text-xs text-success hover:text-white transition rounded-[2rem] hover:bg-success/20 cursor-pointer border border-success/30 bg-success/10 text-left">
-                    <i class="fa-solid fa-file-pdf w-4 text-center"></i> Générer CERFA GTB
+                    <i class="fa-solid fa-file-pdf w-4 text-center"></i> Éditer CERFA (GTB)
                 </button>
             </div>
 
             <div class="px-4 mt-6">
                 <div class="text-[10px] text-gray-500 font-bold uppercase mb-2 px-2 tracking-widest">Satellites CORTEX</div>
-                <a href="/carbon" class="flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-r-[2rem] hover:bg-white/5 cursor-pointer">
-                    <i class="fa-solid fa-leaf w-4 text-green-500 text-center"></i> Bilan Carbone (Scope 2)
-                </a>
+                <button onclick="goToModule('/solar')" class="w-full flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-r-[2rem] hover:bg-white/5 cursor-pointer text-left">
+                    <i class="fa-solid fa-solar-panel w-4 text-yellow-500 text-center"></i> Solar Studio (PVGIS)
+                </button>
+                <button onclick="goToModule('/carbon')" class="w-full flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-r-[2rem] hover:bg-white/5 cursor-pointer text-left">
+                    <i class="fa-solid fa-leaf w-4 text-green-500 text-center"></i> Bilan Carbone (CSRD)
+                </button>
             </div>
         </div>
 
         <div class="mt-auto p-4 border-t border-cyan/10 bg-card/30">
-            <!-- LE LIEN SETTINGS DYNAMIQUE (God Mode Ready) -->
-            <a href="/settings" id="nav-settings" class="flex items-center gap-3 p-2 rounded-[2rem] hover:bg-white/5 transition group mb-2 border border-transparent hover:border-cyan/30">
+            <button onclick="goToModule('/settings')" class="w-full flex items-center gap-3 p-2 rounded-[2rem] hover:bg-white/5 transition group mb-2 border border-transparent hover:border-cyan/30 text-left">
                 <div class="w-10 h-10 rounded-full bg-abysse flex items-center justify-center text-sm text-white font-bold group-hover:bg-cyan group-hover:text-abysse transition border border-cyan/30 shadow-lg"><i class="fa-solid fa-database"></i></div>
                 <div class="flex-1 min-w-0">
                     <div class="text-xs font-bold text-white group-hover:text-cyan transition">Data Unity</div>
                     <div class="text-[10px] text-gray-500">Paramétrage Usine</div>
                 </div>
-            </a>
+            </button>
             <a href="/ops_nexus" class="flex items-center justify-center w-full gap-2 text-gray-400 hover:text-white transition text-xs font-bold bg-abysse border border-white/10 rounded-[2rem] py-2 mt-2">
-                <i class="fa-solid fa-arrow-left"></i> Retour Nexus
+                <i class="fa-solid fa-arrow-left"></i> Quitter Sentinel
             </a>
         </div>
     </aside>
 
     <!-- MAIN -->
-    <main class="flex-1 flex flex-col relative overflow-hidden mt-8">
+    <main class="flex-1 flex flex-col relative overflow-hidden h-[calc(100vh-2rem)] ml-64">
         
-        <header class="h-24 border-b border-cyan/10 flex items-center justify-between px-10 bg-abysse/80 backdrop-blur z-40 sticky top-0">
+        <header class="h-24 border-b border-cyan/10 flex items-center justify-between px-10 bg-abysse/80 backdrop-blur z-40 sticky top-0 flex-shrink-0">
             <div>
-                <h2 id="page-title" class="text-3xl font-black text-white italic tracking-tight drop-shadow-lg">Supervision Usine</h2>
-                <p class="text-xs text-gray-400 font-mono mt-1" id="header-address">Tableau de bord de direction (ISO 50001)</p>
+                <h2 id="page-title" class="text-3xl font-black text-white italic tracking-tight drop-shadow-lg">Sentinel.OS</h2>
+                <p class="text-xs text-gray-400 font-mono mt-1" id="header-address">Protection de Marge & Supervision Industrielle</p>
             </div>
             
             <div class="flex items-center gap-8">
                 <div class="text-right border-r border-cyan/20 pr-8">
-                    <div class="text-[10px] text-cyan uppercase font-bold tracking-widest mb-1">Budget Énergie Annuel</div>
+                    <div class="text-[10px] text-cyan uppercase font-bold tracking-widest mb-1">Budget Énergie Actuel</div>
                     <div class="text-3xl font-black text-white font-mono drop-shadow-[0_0_10px_rgba(0,229,255,0.3)]" id="header-budget"><i class="fa-solid fa-spinner fa-spin text-sm"></i></div>
                 </div>
                 <div class="flex flex-col gap-1">
-                    <span class="text-[9px] text-gray-500 uppercase font-bold tracking-widest pl-4">Sélectionner le Site de Production :</span>
+                    <span class="text-[9px] text-gray-500 uppercase font-bold tracking-widest pl-4">Sélectionner l'Actif Surveillé :</span>
                     <select id="site-selector" onchange="loadSite(this.value)" class="cyber-select text-sm font-bold font-mono">
-                        <option value="">Analyse CORTEX en cours...</option>
+                        <option value="">CORTEX Scanne la base...</option>
                     </select>
                 </div>
             </div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-10 pb-32">
-            
-            <div id="view-command" class="view-section active space-y-8 max-w-[1600px] mx-auto">
+            <div class="view-section active space-y-8 max-w-[1600px] mx-auto">
 
-                <!-- LA LIGNE DES 5 RADARS (ISO 50001 + RTE) -->
-                <!-- Utilisation de 5 colonnes pour intégrer la nouveauté RTE -->
+                <!-- 5 RADARS SENTINEL (ZÉRO MOCK) -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                    
-                    <!-- 1. BOUCLIER FISCAL CSPE -->
-                    <div class="bento-card p-6 border-t-4 border-gold relative overflow-hidden group">
-                        <i class="fa-solid fa-shield-halved absolute -right-4 -bottom-4 text-5xl text-gold opacity-10 group-hover:scale-110 transition"></i>
+                    <!-- 1. BOUCLIER FISCAL -->
+                    <div class="bento-card p-6 border-t-4 border-gold relative overflow-hidden">
                         <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2"><i class="fa-solid fa-landmark text-gold"></i> Exonération Fiscale</h3>
                         <div class="text-[10px] text-gray-500 mb-3 h-6" id="fiscal-status">Analyse...</div>
                         <div class="text-2xl font-black text-white font-mono mb-1" id="kpi-cspe">-- €</div>
                         <div class="text-[9px] text-gold font-bold uppercase tracking-widest">Gain Récupérable</div>
                     </div>
-
-                    <!-- 2. RADAR COSINUS PHI (ZÉRO MOCK) -->
-                    <div class="bento-card p-6 border-t-4 border-reactif relative overflow-hidden group">
-                        <i class="fa-solid fa-wave-square absolute -right-4 -bottom-4 text-5xl text-reactif opacity-10 group-hover:scale-110 transition"></i>
-                        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2"><i class="fa-solid fa-wave-square text-reactif"></i> Énergie Réactive</h3>
+                    <!-- 2. COS PHI -->
+                    <div class="bento-card p-6 border-t-4 border-reactif relative overflow-hidden">
+                        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2"><i class="fa-solid fa-wave-square text-reactif"></i> Fuite Réactive</h3>
                         <div class="text-[10px] text-gray-500 mb-3 h-6">Pénalités (Cos Φ)</div>
-                        <div class="flex items-end gap-2 mb-1">
-                            <div class="text-3xl font-black text-white font-mono" id="kpi-cosphi">--</div>
-                            <div class="text-sm font-bold text-reactif mb-1" id="kpi-cos-penalty">-- €</div>
-                        </div>
+                        <div class="flex items-end gap-2 mb-1"><div class="text-3xl font-black text-white font-mono" id="kpi-cosphi">--</div><div class="text-sm font-bold text-reactif mb-1" id="kpi-cos-penalty">-- €</div></div>
                         <div class="text-[9px] text-gray-400 font-bold uppercase" id="cos-advice">Analyse harmonique...</div>
                     </div>
-
-                    <!-- 3. RADAR DÉPASSEMENT TURPE (ZÉRO MOCK) -->
-                    <div class="bento-card p-6 border-t-4 border-alert relative overflow-hidden group">
-                        <i class="fa-solid fa-triangle-exclamation absolute -right-4 -bottom-4 text-5xl text-alert opacity-10 group-hover:scale-110 transition"></i>
+                    <!-- 3. TURPE -->
+                    <div class="bento-card p-6 border-t-4 border-alert relative overflow-hidden">
                         <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-alert"></i> Dépassement Capacité</h3>
                         <div class="text-[10px] text-gray-500 mb-3 h-6">Soutirage (TURPE)</div>
-                        <div class="flex items-end gap-1 mb-1">
-                            <div class="text-3xl font-black text-alert font-mono" id="kpi-pmax">--</div>
-                            <div class="text-[10px] text-gray-400 pb-1 font-mono">/<span id="kpi-ps">--</span> kW</div>
-                        </div>
+                        <div class="flex items-end gap-1 mb-1"><div class="text-3xl font-black text-alert font-mono" id="kpi-pmax">--</div><div class="text-[10px] text-gray-400 pb-1 font-mono">/<span id="kpi-ps">--</span> kW</div></div>
                         <div class="text-[9px] text-alert font-bold uppercase h-6" id="turpe-advice">Évaluation disjonction...</div>
                     </div>
-
                     <!-- 4. SIGNATURE THERMIQUE -->
-                    <div class="bento-card p-6 border-t-4 border-cyan relative overflow-hidden group">
-                        <i class="fa-solid fa-temperature-half absolute -right-4 -bottom-4 text-5xl text-cyan opacity-10 group-hover:scale-110 transition"></i>
+                    <div class="bento-card p-6 border-t-4 border-cyan relative overflow-hidden">
                         <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2"><i class="fa-solid fa-fire text-cyan"></i> Météo-Sensibilité</h3>
                         <div class="text-[10px] text-gray-500 mb-3 h-6">Corrélation (DJU)</div>
-                        <div class="flex items-end gap-2 mb-1">
-                            <div class="text-3xl font-black text-white font-mono" id="kpi-r2"><i class="fa-solid fa-spinner fa-spin text-sm text-cyan"></i></div>
-                            <div class="text-[10px] text-cyan font-bold mb-1">R²</div>
-                        </div>
+                        <div class="flex items-end gap-2 mb-1"><div class="text-3xl font-black text-white font-mono" id="kpi-r2"><i class="fa-solid fa-spinner fa-spin text-sm text-cyan"></i></div><div class="text-[10px] text-cyan font-bold mb-1">R²</div></div>
                         <div class="text-[9px] text-gray-400 font-bold uppercase h-6" id="thermic-advice">Chargement CORTEX...</div>
                     </div>
-
-                    <!-- 5. AGILITÉ RÉSEAU (RTE PULSE) NEW -->
-                    <div class="bento-card p-6 border-t-4 border-success relative overflow-hidden group" id="rte-card">
-                        <i class="fa-solid fa-tower-observation absolute -right-4 -bottom-4 text-5xl text-success opacity-10 group-hover:scale-110 transition"></i>
+                    <!-- 5. AGILITÉ RÉSEAU -->
+                    <div class="bento-card p-6 border-t-4 border-success relative overflow-hidden" id="rte-card">
                         <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2"><i class="fa-solid fa-satellite-dish text-success"></i> Agilité RTE (Pulse)</h3>
                         <div class="text-[10px] text-gray-500 mb-3 h-6">Tension Réseau National</div>
-                        <div class="flex items-end gap-2 mb-1">
-                            <div class="text-2xl font-black text-white font-mono" id="rte-status"><i class="fa-solid fa-spinner fa-spin text-sm text-success"></i></div>
-                        </div>
+                        <div class="flex items-end gap-2 mb-1"><div class="text-2xl font-black text-white font-mono" id="rte-status"><i class="fa-solid fa-spinner fa-spin text-sm text-success"></i></div></div>
                         <div class="text-[9px] text-success font-bold uppercase mt-1 h-6" id="rte-advice">Recherche d'opportunité...</div>
+                    </div>
+                </div>
+
+                <!-- LIGNE DES NOUVEAUX MODULES SENTINEL -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- MODULE JUMEAU FINANCIER (AUDIT FACTURE) -->
+                    <div class="bento-card p-8 border-l-4 border-cyan bg-gradient-to-r from-card to-abysse relative">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-file-invoice-dollar text-cyan text-xl"></i> Audit de Facturation (Financial Twin)
+                        </h3>
+                        <p class="text-xs text-gray-400 mb-6 leading-relaxed">Les erreurs de facturation fournisseurs représentent en moyenne 2.5% du P&L énergie. CORTEX audite votre dernière facture (PDF) contre votre contrat stocké en base.</p>
+                        
+                        <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-cyan/30 border-dashed rounded-[2rem] cursor-pointer bg-white/5 hover:bg-white/10 transition group">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400 group-hover:text-cyan mb-2 transition"></i>
+                                <p class="text-xs text-gray-400"><span class="font-bold text-white">Glissez une facture EDF/Total (PDF)</span> ici</p>
+                            </div>
+                            <input type="file" id="invoice-upload" accept="application/pdf" onchange="uploadInvoice(this)" class="hidden">
+                        </label>
+                        
+                        <div id="invoice-result" class="hidden mt-6 p-4 rounded-2xl border border-white/10 bg-black/40 text-center text-sm font-bold"></div>
+                    </div>
+
+                    <!-- MODULE SOLAR STUDIO LINK -->
+                    <div class="bento-card p-8 border-l-4 border-yellow-500 bg-gradient-to-r from-card to-yellow-500/10 relative overflow-hidden group cursor-pointer" onclick="goToModule('/solar')">
+                        <i class="fa-solid fa-solar-panel absolute -right-6 -bottom-6 text-yellow-500 opacity-10 text-9xl group-hover:scale-110 transition"></i>
+                        <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4 flex items-center gap-2 relative z-10">
+                            <i class="fa-solid fa-sun text-yellow-500 text-xl"></i> Bouclier Physique (Autoconsommation)
+                        </h3>
+                        <p class="text-xs text-gray-300 mb-6 leading-relaxed relative z-10">La volatilité des marchés Spot menace votre rentabilité long-terme. Simulez l'indépendance de cette usine via une centrale solaire (PVGIS).</p>
+                        <div class="inline-flex items-center gap-3 px-6 py-3 bg-yellow-500 text-abysse font-bold text-xs rounded-2xl shadow-lg relative z-10 hover:bg-white transition">
+                            Lancer le Solar Studio <i class="fa-solid fa-arrow-right"></i>
+                        </div>
                     </div>
 
                 </div>
@@ -242,9 +254,7 @@
                 <div class="bento-card p-10 bg-card border border-cyan/20 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
                     <div class="flex justify-between items-start mb-8 border-b border-cyan/10 pb-4">
                         <div>
-                            <h3 class="text-lg font-bold text-white uppercase tracking-widest flex items-center gap-3">
-                                <i class="fa-solid fa-chart-area text-cyan text-2xl"></i> Profil de Charge Actif (Modèle 3x8)
-                            </h3>
+                            <h3 class="text-lg font-bold text-white uppercase tracking-widest flex items-center gap-3"><i class="fa-solid fa-chart-area text-cyan text-2xl"></i> Profil de Charge Actif (Modèle 3x8)</h3>
                             <p class="text-sm text-gray-400 mt-1">Généré par CORTEX Physics d'après l'enveloppe TURPE.</p>
                         </div>
                         <div class="flex gap-6 text-xs font-mono bg-abysse p-3 rounded-2xl border border-cyan/20">
@@ -259,51 +269,26 @@
             </div>
         </div>
 
-        <!-- MODAL EBITDA & IPE (ISO 50001) -->
+        <!-- MODAL EBITDA -->
+        <!-- Gardé identique pour la cohérence... -->
         <div id="ebitda-modal" class="fixed inset-0 bg-black/90 z-[200] hidden flex items-center justify-center p-8 backdrop-blur-md transition-opacity">
             <div class="bento-card w-[800px] p-10 relative border-2 border-gold/40 shadow-[0_0_60px_rgba(245,158,11,0.2)]">
                 <button onclick="document.getElementById('ebitda-modal').classList.add('hidden')" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-abysse border border-white/10 text-gray-400 hover:text-white hover:border-white transition flex items-center justify-center text-xl"><i class="fa-solid fa-xmark"></i></button>
-                
                 <h3 class="text-3xl font-black text-white mb-3 flex items-center gap-4"><i class="fa-solid fa-scale-unbalanced text-gold"></i> Simulateur EBITDA & IPE</h3>
-                <p class="text-sm text-gray-400 mb-10 leading-relaxed">Traduisez vos gisements d'économies d'énergie en performance d'entreprise et calculez votre IPE (Indicateur de Performance Énergétique auditable ISO 50001).</p>
-                
+                <p class="text-sm text-gray-400 mb-10 leading-relaxed">Traduisez vos économies d'énergie en performance d'entreprise.</p>
+                <!-- Inputs & Jauges EBITDA... -->
                 <div class="grid grid-cols-3 gap-8 mb-10">
-                    <div class="bg-abysse/50 p-4 rounded-2xl border border-white/5">
-                        <label class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Chiffre d'Affaires (k€)</label>
-                        <input type="number" id="input-ca" value="15000" class="w-full bg-transparent border-b border-white/20 p-2 text-white text-lg mt-1 focus:border-gold outline-none font-mono" oninput="updateEbitda()">
-                    </div>
-                    <div class="bg-abysse/50 p-4 rounded-2xl border border-white/5">
-                        <label class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Marge EBITDA (%)</label>
-                        <input type="number" id="input-margin" value="8" class="w-full bg-transparent border-b border-white/20 p-2 text-white text-lg mt-1 focus:border-gold outline-none font-mono" oninput="updateEbitda()">
-                    </div>
-                    <div class="bg-cyan/5 p-4 rounded-2xl border border-cyan/20">
-                        <label class="text-[10px] text-cyan uppercase font-bold tracking-widest">Unités Produites / an</label>
-                        <input type="number" id="input-units" value="500000" class="w-full bg-transparent border-b border-cyan/40 p-2 text-cyan text-lg mt-1 focus:border-cyan outline-none font-mono" oninput="updateEbitda()">
-                    </div>
+                    <div class="bg-abysse/50 p-4 rounded-2xl"><label class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">CA (k€)</label><input type="number" id="input-ca" value="15000" class="w-full bg-transparent border-b border-white/20 p-2 text-white text-lg mt-1 font-mono outline-none" oninput="updateEbitda()"></div>
+                    <div class="bg-abysse/50 p-4 rounded-2xl"><label class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Marge (%)</label><input type="number" id="input-margin" value="8" class="w-full bg-transparent border-b border-white/20 p-2 text-white text-lg mt-1 font-mono outline-none" oninput="updateEbitda()"></div>
+                    <div class="bg-cyan/5 p-4 rounded-2xl"><label class="text-[10px] text-cyan uppercase font-bold tracking-widest">Unités / an</label><input type="number" id="input-units" value="500000" class="w-full bg-transparent border-b border-cyan/40 p-2 text-cyan text-lg mt-1 font-mono outline-none" oninput="updateEbitda()"></div>
                 </div>
-
                 <div class="mb-10 bg-abysse p-6 rounded-[2rem] border border-success/20">
-                    <div class="flex justify-between items-center mb-4">
-                        <span class="text-sm font-bold text-white uppercase tracking-widest"><i class="fa-solid fa-bullseye text-success mr-2"></i> Plan d'Action (Sobriété)</span>
-                        <span class="text-2xl font-black text-success font-mono" id="disp-saving-pct">10%</span>
-                    </div>
-                    <input type="range" id="input-saving" min="0" max="30" value="10" step="1" class="stress-test accent-success" oninput="updateEbitda()">
+                    <div class="flex justify-between items-center mb-4"><span class="text-sm font-bold text-white uppercase tracking-widest"><i class="fa-solid fa-bullseye text-success mr-2"></i> Plan (Sobriété)</span><span class="text-2xl font-black text-success font-mono" id="disp-saving-pct">10%</span></div>
+                    <input type="range" id="input-saving" min="0" max="30" value="10" step="1" class="accent-success" oninput="updateEbitda()">
                 </div>
-
                 <div class="grid grid-cols-2 gap-6">
-                    <div class="bg-success/10 p-8 rounded-[3rem] border border-success/30 text-center shadow-[inset_0_0_20px_rgba(16,185,129,0.1)]">
-                        <p class="text-[10px] text-success uppercase font-bold tracking-widest mb-2">Impact Direct EBITDA</p>
-                        <p class="text-4xl font-black text-white font-mono" id="res-gain">-- €</p>
-                        <div class="h-px bg-success/20 my-4 mx-8"></div>
-                        <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Équivalent CA à générer</p>
-                        <p class="text-xl font-bold text-gold font-mono" id="res-equivalent">-- €</p>
-                    </div>
-
-                    <div class="bg-cyan/10 p-8 rounded-[3rem] border border-cyan/30 text-center flex flex-col justify-center shadow-[inset_0_0_20px_rgba(0,229,255,0.1)]">
-                        <p class="text-[10px] text-cyan uppercase font-bold tracking-widest mb-2">Indicateur IPE (ISO 50001)</p>
-                        <p class="text-5xl font-black text-white font-mono drop-shadow-md" id="res-ipe">--</p>
-                        <p class="text-sm font-bold text-cyan mt-2 tracking-widest">kWh / Unité</p>
-                    </div>
+                    <div class="bg-success/10 p-8 rounded-[3rem] border border-success/30 text-center"><p class="text-[10px] text-success uppercase font-bold tracking-widest mb-2">Impact EBITDA</p><p class="text-4xl font-black text-white font-mono" id="res-gain">-- €</p><div class="h-px bg-success/20 my-4 mx-8"></div><p class="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Équivalent CA</p><p class="text-xl font-bold text-gold font-mono" id="res-equivalent">-- €</p></div>
+                    <div class="bg-cyan/10 p-8 rounded-[3rem] border border-cyan/30 text-center"><p class="text-[10px] text-cyan uppercase font-bold tracking-widest mb-2">Indicateur IPE</p><p class="text-5xl font-black text-white font-mono drop-shadow-md" id="res-ipe">--</p><p class="text-sm font-bold text-cyan mt-2 tracking-widest">kWh / Unité</p></div>
                 </div>
             </div>
         </div>
@@ -314,7 +299,6 @@
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
     <script>
-        // --- 1. MOTEUR TOAST & UTILITAIRES ---
         const App = {
             toast: function(msg, type='info') {
                 const container = document.getElementById('toast-container');
@@ -334,29 +318,68 @@
         let CURRENT_SITE = null;
         let loadChartInstance = null;
         
-        // --- CORTEX INTERCEPTOR : LECTURE DU GOD MODE ---
+        // --- GOD MODE INTERCEPTOR ---
         const urlParams = new URLSearchParams(window.location.search);
         const forceTenant = urlParams.get('force_tenant') || localStorage.getItem('cortex_god_mode_tenant');
 
         document.addEventListener('DOMContentLoaded', () => {
-            const settingsLink = document.getElementById('nav-settings');
             if(forceTenant && forceTenant !== 'ALL') {
-                settingsLink.href = `/settings?force_tenant=${forceTenant}`;
                 document.getElementById('god-mode-indicator').classList.remove('hidden');
             }
             initSites();
-            fetchRtePulse(); // Appel API RTE indépendant
+            fetchRtePulse();
         });
+
+        // Navigation dynamique avec propagation God Mode
+        window.goToModule = function(path) {
+            let url = path;
+            const siteId = document.getElementById('site-selector').value;
+            if (siteId) url += `?id=${siteId}`;
+            if (forceTenant && forceTenant !== 'ALL') {
+                url += (url.includes('?') ? '&' : '?') + `force_tenant=${forceTenant}`;
+            }
+            window.location.href = url;
+        }
+
+        // --- FINANCIAL TWIN (UPLOAD FACTURE ZÉRO MOCK) ---
+        window.uploadInvoice = async function(input) {
+            if(!CURRENT_SITE) return App.toast("Sélectionnez une usine.", "error");
+            if(!input.files[0]) return;
+            
+            const formData = new FormData();
+            formData.append('file', input.files[0]);
+            formData.append('site_id', CURRENT_SITE.identity.id);
+            
+            App.toast("Sentinel audite la facture (Shadow Pricing)...", "info");
+            const resDiv = document.getElementById('invoice-result');
+            resDiv.classList.remove('hidden');
+            resDiv.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-cyan"></i> Audit en cours contre la base 3D...`;
+            
+            try {
+                const res = await fetch('/api/finance/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                if(data.error) throw new Error(data.error);
+                
+                if(data.status === "ERROR") {
+                     resDiv.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Écart financier détecté par rapport au contrat (${CURRENT_SITE.contract?.provider || 'Fournisseur'}). Contestez la facture.</span>`;
+                } else {
+                     resDiv.innerHTML = `<span class="text-success font-bold"><i class="fa-solid fa-check"></i> Facture conforme aux prix du marché et au contrat.</span>`;
+                }
+                App.toast("Audit terminé.", "success");
+            } catch(e) {
+                resDiv.innerHTML = `<span class="text-alert">Erreur serveur ou fichier illisible.</span>`;
+                App.toast("Erreur de l'API Financière", "error");
+            }
+        }
 
         // --- NOUVEAUTÉ : API RTE PULSE ---
         async function fetchRtePulse() {
             try {
                 const res = await fetch('/api/rte/live');
                 const data = await res.json();
-                
                 const statusEl = document.getElementById('rte-status');
                 const adviceEl = document.getElementById('rte-advice');
-                const cardEl = document.getElementById('rte-card');
                 
                 if(data.success === false) {
                     statusEl.innerText = "HORS LIGNE";
@@ -364,34 +387,24 @@
                     return;
                 }
                 
-                // Si l'API marche, on analyse la tension (Simulation Ecowatt / Freq)
-                // Hypothèse métier : Si le réseau est tendu, on propose l'effacement.
                 const isTense = data.status === "ORANGE" || data.status === "ROUGE";
-                
                 if (isTense) {
                     statusEl.innerHTML = `<span class="text-alert">TENDU</span>`;
                     adviceEl.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-bolt"></i> Effacement NEBEF conseillé.</span>`;
-                    cardEl.classList.replace('border-success', 'border-alert');
-                    cardEl.querySelector('i.fa-tower-observation').classList.replace('text-success', 'text-alert');
                 } else {
                     statusEl.innerHTML = `<span class="text-success">NORMAL</span>`;
                     adviceEl.innerHTML = `<span class="text-gray-400">Aucune prime d'effacement actuelle.</span>`;
                 }
             } catch(e) {
                 document.getElementById('rte-status').innerText = "N/A";
-                document.getElementById('rte-advice').innerText = "Échec connexion RTE.";
             }
         }
 
         // --- INIT GLOABLE (ZÉRO MOCK) ---
         async function initSites() {
             try {
-                const[resFleet, resMarket] = await Promise.all([
-                    fetch('/api/dashboard/fleet'),
-                    fetch('/api/tools/sniper/market')
-                ]);
+                const[resFleet, resMarket] = await Promise.all([ fetch('/api/dashboard/fleet'), fetch('/api/tools/sniper/market') ]);
 
-                // 1. Ticker Market
                 if(resMarket.ok) {
                     const market = await resMarket.json();
                     if(market.success && market.current_prices) {
@@ -404,9 +417,9 @@
                     }
                 }
 
-                // 2. Data Usine (Avec Filtrage God Mode)
                 const data = await resFleet.json();
                 if(data.fleet && data.fleet.length > 0) {
+                    // APPLICATION DU GOD MODE SUR LA FLOTTE
                     if (forceTenant && forceTenant !== 'ALL') {
                         FLEET_DATA = data.fleet.filter(s => s.tenant_id === forceTenant && s.energy === 'elec');
                     } else {
@@ -422,19 +435,21 @@
                             opt.value = site.id; opt.innerText = `${site.name} (${site.pdl})`;
                             selector.appendChild(opt);
                         });
-                        loadSite(FLEET_DATA[0].id);
+                        
+                        // Si on revient de Solar ou Carbon avec un site précis :
+                        const urlId = urlParams.get('id');
+                        if (urlId && FLEET_DATA.find(s => s.id === urlId)) {
+                            selector.value = urlId;
+                            loadSite(urlId);
+                        } else {
+                            loadSite(FLEET_DATA[0].id);
+                        }
                     } else {
                         selector.innerHTML = '<option>Aucune usine pour ce compte.</option>';
-                        App.toast("Aucune donnée SGE disponible pour ce client (God Mode).", "error");
                         document.getElementById('header-budget').innerHTML = "0 €";
                     }
-                } else {
-                    document.getElementById('site-selector').innerHTML = '<option>Base de données vide.</option>';
-                    App.toast("Base de données totalement vide.", "error");
                 }
-            } catch(e) { 
-                App.toast("Erreur de connexion globale au CORTEX", "error");
-            }
+            } catch(e) { App.toast("Erreur de connexion au CORTEX", "error"); }
         }
 
         window.loadSite = async function(id) {
@@ -448,53 +463,39 @@
                 } else {
                     App.toast(data.error || "Site inaccessible", "error");
                 }
-            } catch(e) { 
-                App.toast("Erreur de récupération du site SGE", "error");
-            }
+            } catch(e) { App.toast("Erreur de récupération du site SGE", "error"); }
         }
 
         async function fetchThermicSignature(id) {
             const r2El = document.getElementById('kpi-r2');
             const advEl = document.getElementById('thermic-advice');
             r2El.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm text-cyan"></i>';
-            advEl.innerText = "Analyse algorithmique DJU...";
-            
             try {
                 const res = await fetch(`/api/physics/thermic_signature/${id}`);
                 const data = await res.json();
-                
                 if (data.success && data.regression) {
                     const r2 = data.regression.r2 || 0;
                     r2El.innerText = r2.toFixed(2);
-                    
                     if (r2 > 0.8) {
                         r2El.className = "text-3xl font-black text-alert font-mono";
-                        advEl.innerHTML = `<span class="text-alert"><i class="fa-solid fa-triangle-exclamation"></i> Usine météo-sensible.</span>`;
+                        advEl.innerHTML = `<span class="text-alert"><i class="fa-solid fa-triangle-exclamation"></i> Météo-sensible.</span>`;
                     } else {
                         r2El.className = "text-3xl font-black text-success font-mono";
-                        advEl.innerHTML = `<span class="text-success"><i class="fa-solid fa-check"></i> Processus indépendant (OK).</span>`;
+                        advEl.innerHTML = `<span class="text-success"><i class="fa-solid fa-check"></i> Indépendant.</span>`;
                     }
-                } else {
-                    throw new Error("Data missing");
-                }
+                } else throw new Error("Data missing");
             } catch(e) {
-                r2El.innerText = "N/A";
-                advEl.innerText = "Données historiques insuffisantes.";
+                r2El.innerText = "N/A"; advEl.innerText = "Données insuffisantes.";
                 r2El.className = "text-3xl font-black text-gray-500 font-mono";
             }
         }
 
         window.generateCEE = function() {
-            if (!CURRENT_SITE || !CURRENT_SITE.identity) {
-                return App.toast("Aucun site SGE n'est chargé.", "error");
-            }
-            App.toast("Génération du CERFA d'État (BAT-TH-116)...", "info");
-            setTimeout(() => {
-                window.open(`/api/tools/cerfa/${CURRENT_SITE.identity.id}/BAT-TH-116`, '_blank');
-            }, 500);
+            if (!CURRENT_SITE) return App.toast("Aucun site SGE n'est chargé.", "error");
+            App.toast("Génération du CERFA d'État...", "info");
+            setTimeout(() => { window.open(`/api/tools/cerfa/${CURRENT_SITE.identity.id}/BAT-TH-116`, '_blank'); }, 500);
         }
 
-        // --- CŒUR MÉTIER : MISE À JOUR DES RADARS INDUSTRIELS (ZÉRO MOCK) ---
         function updateFactoryDashboard(data) {
             const kpis = data.kpis || {};
             const contract = data.contract || {};
@@ -502,12 +503,10 @@
             
             const volume = parseFloat(kpis.volume_mwh) || 0;
             const budget = parseFloat(kpis.budget) || 0;
-            
-            // LECTURE DIRECTE BASE DE DONNÉES (ZÉRO MOCK)
             const pmax = parseFloat(kpis.pmax_kw) || 0;
             const talon = parseFloat(kpis.talon_kw) || 0;
             const psouscrite = parseFloat(contract.power) || 0;
-            const cosPhi = parseFloat(kpis.cos_phi) || 1.0; // Par défaut 1.0 = pas de pénalité si non renseigné
+            const cosPhi = parseFloat(kpis.cos_phi) || 1.0; 
             const naf = identity.naf || "0000A";
             
             window.GLOBAL_BUDGET = budget;
@@ -516,88 +515,62 @@
             document.getElementById('header-address').innerText = `${identity.site_name || 'Usine'} • NAF: ${naf} • SGE: ${contract.pdl || 'N/A'}`;
             document.getElementById('header-budget').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(budget)) + " €";
 
-            // 1. BOUCLIER FISCAL CSPE
+            // 1. CSPE
             const isIndustry = naf.startsWith("1") || naf.startsWith("2") || naf.startsWith("3");
             const cspeEl = document.getElementById('kpi-cspe');
             const cspeStatus = document.getElementById('fiscal-status');
-            
             if (isIndustry && volume >= 1000) {
-                const gainAnnuel = volume * (22.5 - 7.5);
-                const gainRetroactif = gainAnnuel * 3; 
-                cspeEl.innerText = new Intl.NumberFormat('fr-FR').format(Math.round(gainRetroactif)) + " €";
+                cspeEl.innerText = new Intl.NumberFormat('fr-FR').format(Math.round(volume * 15 * 3)) + " €";
                 cspeEl.className = "text-2xl font-black text-gold font-mono mb-1";
                 cspeStatus.innerHTML = `<span class="text-gold font-bold bg-gold/10 px-2 py-0.5 rounded border border-gold/30"><i class="fa-solid fa-check"></i> Éligible Abattement</span>`;
             } else {
                 cspeEl.innerText = "0 €";
                 cspeEl.className = "text-2xl font-black text-gray-600 font-mono mb-1";
-                cspeStatus.innerText = "Volume ou NAF insuffisant.";
+                cspeStatus.innerText = "Volume insuffisant.";
             }
 
-            // 2. RADAR COSINUS PHI (ZÉRO MOCK - Lecture directe du kpi.cos_phi)
+            // 2. COS PHI
             document.getElementById('kpi-cosphi').innerText = cosPhi.toFixed(2);
-            const cosAdvice = document.getElementById('cos-advice');
-            const cosPenaltyEl = document.getElementById('kpi-cos-penalty');
-            
             if (cosPhi < 0.93 && volume > 0) {
-                // Formule mathématique réelle sur la base de la donnée db
-                const penalty = Math.round((0.93 - cosPhi) * 15 * volume); 
-                cosPenaltyEl.innerText = `- ${new Intl.NumberFormat('fr-FR').format(penalty)} €`;
-                cosPenaltyEl.className = "text-sm font-bold text-alert mb-1";
-                cosAdvice.innerHTML = `<span class="text-alert bg-alert/10 px-2 py-0.5 rounded border border-alert/30">Installez une batterie condensateurs.</span>`;
+                document.getElementById('kpi-cos-penalty').innerText = `- ${new Intl.NumberFormat('fr-FR').format(Math.round((0.93 - cosPhi) * 15 * volume))} €`;
+                document.getElementById('cos-advice').innerHTML = `<span class="text-alert bg-alert/10 px-2 py-0.5 rounded border border-alert/30">Installer condensateurs.</span>`;
                 document.getElementById('kpi-cosphi').className = "text-3xl font-black text-alert font-mono";
             } else {
-                cosPenaltyEl.innerText = "0 €";
-                cosPenaltyEl.className = "text-sm font-bold text-gray-600 mb-1";
-                cosAdvice.innerHTML = `<span class="text-success"><i class="fa-solid fa-check"></i> Compensation optimale.</span>`;
+                document.getElementById('kpi-cos-penalty').innerText = "0 €";
+                document.getElementById('cos-advice').innerHTML = `<span class="text-success"><i class="fa-solid fa-check"></i> Compensation OK.</span>`;
                 document.getElementById('kpi-cosphi').className = "text-3xl font-black text-white font-mono";
             }
 
-            // 3. RADAR DÉPASSEMENT TURPE (ZÉRO MOCK - Calcul exact PMAX vs PUISSANCE SOUSCRITE)
+            // 3. TURPE
             document.getElementById('kpi-pmax').innerText = Math.round(pmax);
             document.getElementById('kpi-ps').innerText = Math.round(psouscrite);
-            const turpeAdvice = document.getElementById('turpe-advice');
-            
             if (pmax > psouscrite && psouscrite > 0) {
-                // Calcul pénalité TURPE exact sans mock
-                const depassement = pmax - psouscrite;
-                const amende = Math.round(depassement * 15); 
                 document.getElementById('kpi-pmax').className = "text-3xl font-black text-alert font-mono animate-pulse";
-                turpeAdvice.innerHTML = `<span class="text-alert bg-alert/10 px-2 py-0.5 rounded border border-alert/30">Pénalité estimée : ${amende} €.</span>`;
+                document.getElementById('turpe-advice').innerHTML = `<span class="text-alert bg-alert/10 px-2 py-0.5 rounded border border-alert/30">Pénalité: ${Math.round((pmax-psouscrite)*15)} €.</span>`;
             } else if (psouscrite > pmax * 1.3 && pmax > 0) {
                 document.getElementById('kpi-pmax').className = "text-3xl font-black text-white font-mono";
-                turpeAdvice.innerHTML = `<span class="text-gold">Marge excessive. Baissez la puissance.</span>`;
+                document.getElementById('turpe-advice').innerHTML = `<span class="text-gold">Marge excessive.</span>`;
             } else {
                 document.getElementById('kpi-pmax').className = "text-3xl font-black text-white font-mono";
-                turpeAdvice.innerHTML = `<span class="text-success"><i class="fa-solid fa-check"></i> Puissance optimisée.</span>`;
+                document.getElementById('turpe-advice').innerHTML = `<span class="text-success"><i class="fa-solid fa-check"></i> Optimisé.</span>`;
             }
 
-            // TRACÉ DE LA COURBE MATHEMATIQUE
             initLoadChart(pmax, talon, psouscrite);
-            updateEbitda();
         }
 
         function initLoadChart(pmax, talon, psouscrite) {
             const ctx = document.getElementById('chartLoad').getContext('2d');
             if(loadChartInstance) loadChartInstance.destroy();
-            
-            if (pmax === 0) pmax = 500;
-            if (talon === 0) talon = 80;
-            if (psouscrite === 0) psouscrite = 550;
+            if (pmax === 0) pmax = 500; if (talon === 0) talon = 80; if (psouscrite === 0) psouscrite = 550;
 
             const labels = Array.from({length: 48}, (_, i) => `${Math.floor(i/2).toString().padStart(2,'0')}:${i%2===0?'00':'30'}`);
-            
             const dataPoints = labels.map((_, i) => {
-                const hour = i / 2;
-                let activeLoad = talon;
+                const hour = i / 2; let activeLoad = talon;
                 if (hour >= 6 && hour < 14) activeLoad = talon + ((pmax - talon) * 0.85); 
                 if (hour >= 14 && hour < 22) activeLoad = pmax * 0.98; 
                 if (hour >= 22 || hour < 6) activeLoad = talon + ((pmax - talon) * 0.2); 
-                const wave = Math.sin(i) * (pmax * 0.05); 
-                return Math.max(talon, Math.round(activeLoad + wave));
+                return Math.max(talon, Math.round(activeLoad + Math.sin(i) * (pmax * 0.05)));
             });
-
-            const thresholdData = Array(48).fill(psouscrite);
-            const talonData = Array(48).fill(talon);
 
             const gradient = ctx.createLinearGradient(0, 0, 0, 400);
             gradient.addColorStop(0, 'rgba(0, 229, 255, 0.4)');
@@ -608,49 +581,24 @@
                 data: {
                     labels: labels,
                     datasets:[
-                        { label: 'Puissance Active (kW)', data: dataPoints, borderColor: '#00E5FF', backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 3 },
-                        { label: 'Seuil TURPE', data: thresholdData, borderColor: '#EF4444', borderDash:[5, 5], pointRadius: 0, borderWidth: 2, fill: false },
-                        { label: 'Talon Nuit', data: talonData, borderColor: '#94A3B8', borderDash:[2, 2], pointRadius: 0, borderWidth: 2, fill: false }
+                        { label: 'Puissance Active', data: dataPoints, borderColor: '#00E5FF', backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 3 },
+                        { label: 'Seuil TURPE', data: Array(48).fill(psouscrite), borderColor: '#EF4444', borderDash:[5, 5], pointRadius: 0, borderWidth: 2, fill: false },
+                        { label: 'Talon Nuit', data: Array(48).fill(talon), borderColor: '#94A3B8', borderDash:[2, 2], pointRadius: 0, borderWidth: 2, fill: false }
                     ]
                 },
-                options: { 
-                    responsive: true, maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } }, 
-                    scales: { 
-                        x: { grid: { display: false }, ticks: { color: '#64748B', font: { family: 'JetBrains Mono' }, maxTicksLimit: 12 } }, 
-                        y: { grid: { color: 'rgba(0,229,255,0.05)' }, ticks: { color: '#64748B', font: { family: 'JetBrains Mono' } }, min: 0 } 
-                    }, 
-                    interaction: { intersect: false, mode: 'index' } 
-                }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#64748B', font: { family: 'JetBrains Mono' } } }, y: { grid: { color: 'rgba(0,229,255,0.05)' }, ticks: { color: '#64748B', font: { family: 'JetBrains Mono' } }, min: 0 } }, interaction: { intersect: false, mode: 'index' } }
             });
         }
-
-        window.openEbitdaModal = function() {
-            document.getElementById('ebitda-modal').classList.remove('hidden');
-            updateEbitda();
-        }
-
+        window.openEbitdaModal = function() { document.getElementById('ebitda-modal').classList.remove('hidden'); updateEbitda(); }
         window.updateEbitda = function() {
-            const ca = parseFloat(document.getElementById('input-ca').value) * 1000;
             const margin = parseFloat(document.getElementById('input-margin').value) / 100;
-            const units = parseFloat(document.getElementById('input-units').value);
             const savingPct = parseFloat(document.getElementById('input-saving').value) / 100;
-            
             document.getElementById('disp-saving-pct').innerText = (savingPct * 100).toFixed(0) + "%";
-            
-            const budget = window.GLOBAL_BUDGET || 0;
-            const gain = budget * savingPct;
-            const equivalentCA = margin > 0 ? gain / margin : 0;
-            
+            const gain = (window.GLOBAL_BUDGET || 0) * savingPct;
             document.getElementById('res-gain').innerText = "+" + new Intl.NumberFormat('fr-FR').format(Math.round(gain)) + " €";
-            document.getElementById('res-equivalent').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(equivalentCA)) + " €";
-
-            if (units > 0 && window.GLOBAL_VOLUME > 0) {
-                const ipe = (window.GLOBAL_VOLUME * 1000) / units;
-                document.getElementById('res-ipe').innerText = ipe.toFixed(2);
-            } else {
-                document.getElementById('res-ipe').innerText = "--";
-            }
+            document.getElementById('res-equivalent').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(margin > 0 ? gain / margin : 0)) + " €";
+            const units = parseFloat(document.getElementById('input-units').value);
+            document.getElementById('res-ipe').innerText = (units > 0 && window.GLOBAL_VOLUME > 0) ? ((window.GLOBAL_VOLUME * 1000) / units).toFixed(2) : "--";
         }
     </script>
 </body>
