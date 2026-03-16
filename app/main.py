@@ -25,11 +25,22 @@ try:
 except ImportError:
     PANDAS_READY = False
 
+# ==============================================================================
+# LE MOTEUR PDF DE SECOURS (ANTI-CRASH)
+# ==============================================================================
 class FallbackPDFBuilder:
-    def __init__(self): self.logo_svg = """<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="30" rx="8" y="5" fill="#00E5FF"/><path d="M10 15L20 15L15 25Z" fill="#001529"/><text x="40" y="27" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#001529">ENERGISTRAT</text></svg>"""
-    def generate_bilan_ag(self, client_id, data, fin, kpis): return "<h1>Générateur PDF de Secours</h1>"
-    def generate_bilan_ag_cluster(self, cluster_name, site_count, vol_total, budget_total, vol_elec, vol_gaz, ghost_total): return "<h1>Générateur PDF Grappe</h1>"
+    def __init__(self):
+        self.logo_svg = """<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="30" rx="8" y="5" fill="#00E5FF"/><path d="M10 15L20 15L15 25Z" fill="#001529"/><text x="40" y="27" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#001529">ENERGISTRAT</text></svg>"""
+    
+    def generate_bilan_ag(self, client_id, data, fin, kpis): 
+        return "<h1>Générateur PDF de Secours</h1>"
+    
+    def generate_bilan_ag_cluster(self, cluster_name, site_count, vol_total, budget_total, vol_elec, vol_gaz, ghost_total): 
+        return "<h1>Générateur PDF Grappe</h1>"
 
+# ==============================================================================
+# FALLBACK MOCKS (SÉCURITÉ CLOUD RUN)
+# ==============================================================================
 class MockAuth:
     def verify_token(self, t): return {"uid": "mock", "email": "admin@energistrat.com", "role": "ADMIN", "sub": "admin"}
 
@@ -41,9 +52,9 @@ class MockDB:
     def get_setting(self, n): return {}
     def save_setting(self, n, d): return True
     def get_all_leads(self): return[]
-    def get_all_companies(self): return[]
+    def get_all_companies(self): return []
     def get_all_contacts(self): return[]
-    def get_all_deals(self): return[]
+    def get_all_deals(self): return []
     def get_all_products(self): return[]
     def save_lead(self, i, d): return True
     def save_company(self, i, d): return True
@@ -108,14 +119,20 @@ class MockAcademy:
 class MockPricer:
     def build_quote(self, payload): return {"success": False, "error": "CORTEX Pricer Offline."}
 
+# ==============================================================================
+# AUTO-LOADER CORTEX ROBUSTE (ISOLEMENT ANTI-DOMINO)
+# ==============================================================================
 def load_module(mod_name, obj_name, mock_instance=None):
     paths =[f"app.core.{mod_name}", f"core.{mod_name}", mod_name]
     for path in paths:
         try:
             mod = importlib.import_module(path)
             return getattr(mod, obj_name)
-        except ModuleNotFoundError: continue
-        except Exception as e: print(f"⚠️ Erreur chargement {path} : {e}"); continue
+        except ModuleNotFoundError:
+            continue
+        except Exception as e:
+            print(f"⚠️ Erreur chargement {path} : {e}")
+            continue
     print(f"🔴 Auto-Loader: Impossible de trouver {mod_name}. Fallback Mock activé.")
     return mock_instance
 
@@ -137,18 +154,35 @@ pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 
 app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.6-SECURE")
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=["*"], 
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"],
+)
 
+# === SETUP DIRECTORIES ===
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
-if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
+if not os.path.exists(DATA_DIR): 
+    os.makedirs(DATA_DIR, exist_ok=True)
+    
 TEMPLATE_DIR = os.path.join(BASE_DIR, "app/templates")
-if not os.path.exists(TEMPLATE_DIR): TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
+if not os.path.exists(TEMPLATE_DIR): 
+    TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
+    
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-if not os.path.exists(STATIC_DIR): STATIC_DIR = os.path.join(BASE_DIR, "app/static")
-if os.path.exists(STATIC_DIR): app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+if not os.path.exists(STATIC_DIR): 
+    STATIC_DIR = os.path.join(BASE_DIR, "app/static")
+if os.path.exists(STATIC_DIR): 
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# ==============================================================================
+# PYDANTIC MODELS (DATA UNITY 3D)
+# ==============================================================================
 class SessionRequest(BaseModel): id_token: str
 class MarketUpdateModel(BaseModel): elec: Dict[str, Any]; gaz: Dict[str, Any]; trve: Optional[Dict[str, Any]] = None; targets: Optional[Dict[str, Any]] = None
 class StrategyRequest(BaseModel): site_id: str; bloc_kw: float
@@ -178,14 +212,16 @@ class AcademyAnswerRequest(BaseModel): question_id: str; is_correct: bool
 class CPQQuoteRequest(BaseModel): site_id: Optional[str] = None; volume_mwh: float; energy_type: str; segment: str; duration_years: int = 1; franchise_cee: bool = False; green_option: str = "none"; mask: Dict[str, Any] = {}
 class NewContactModel(BaseModel): firstname: str; lastname: str; role: str; email: str; phone: str
 
+# === UTILS ===
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
-    elif isinstance(data, list): return[json_compliant(v) for v in data]
+    elif isinstance(data, list): return [json_compliant(v) for v in data]
     elif isinstance(data, float):
         if math.isnan(data) or math.isinf(data): return 0.0
     return data
 
-def get_safe_id(raw_id): return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
+def get_safe_id(raw_id): 
+    return str(raw_id).replace('/', '_').replace(' ', '_').replace('+', '').replace(',', '').strip()
 
 def get_market_ref():
     m = db.get_setting("Market")
@@ -198,15 +234,21 @@ async def get_current_user(request: Request):
     if t.startswith("Bearer "): t = t.split(" ")[1]
     return auth.verify_token(t)
 
+# ==============================================================================
+# OUTILS (API GOUVERNEMENT & ADEME)
+# ==============================================================================
 def fetch_company_info_api_gouv(siren: str) -> dict:
+    """Interroge l'API Recherche Entreprises de l'État (Gratuit & Zéro Mock)"""
     clean_siren = str(siren).replace(" ", "").strip()
     if len(clean_siren) != 9: return {"success": False, "error": "SIREN invalide"}
+        
     url = f"https://recherche-entreprises.api.gouv.fr/search?q={clean_siren}"
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Energistrat-SaaS/12.6'})
         with urllib.request.urlopen(req, timeout=5) as response:
             data = json.loads(response.read().decode())
             if not data.get("results"): return {"success": False, "error": "Entreprise introuvable"}
+            
             ent = data["results"][0]
             etat = ent.get("etat_administratif", "A")
             solvency_score = "VERT" if etat != "C" else "ROUGE"
@@ -219,12 +261,31 @@ def fetch_company_info_api_gouv(siren: str) -> dict:
             }
     except Exception as e: return {"success": False, "error": str(e)}
 
+def fetch_surface_ademe(address: str, zip_code: str = "") -> float:
+    """API ADEME (DPE Tertiaire) pour déduire la surface automatiquement sans clé API."""
+    if not address: return 0.0
+    try:
+        query = urllib.parse.quote(f"{address} {zip_code}".strip())
+        url = f"https://data.ademe.fr/data-fair/api/v1/datasets/dpe-v2-tertiaire-2/lines?q={query}&size=1&select=surface_utile"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Energistrat-SaaS/12.6'})
+        with urllib.request.urlopen(req, timeout=3) as response:
+            data = json.loads(response.read().decode())
+            if data.get("results") and len(data["results"]) > 0:
+                return float(data["results"][0].get("surface_utile", 0.0))
+    except Exception: pass
+    return 0.0
+
+# ==========================================
+# AUTHENTIFICATION & ROUTAGE INTELLIGENT
+# ==========================================
 @app.get("/login", response_class=HTMLResponse)
 async def view_login(request: Request, user = Depends(get_current_user)):
     if user: 
         if user.get("role") == "ADMIN": return RedirectResponse(url="/ops_nexus")
         return RedirectResponse(url=f"/{user.get('role', 'settings')}")
-    res = templates.TemplateResponse("login.html", {"request": request}); res.delete_cookie("access_token"); return res
+    res = templates.TemplateResponse("login.html", {"request": request})
+    res.delete_cookie("access_token")
+    return res
 
 @app.post("/api/auth/session")
 async def api_session(payload: SessionRequest, response: Response):
@@ -239,7 +300,11 @@ async def api_session(payload: SessionRequest, response: Response):
 
 @app.get("/logout")
 async def logout(response: Response):
-    response.delete_cookie("access_token"); return RedirectResponse(url="/login")
+    response.delete_cookie("access_token")
+    return RedirectResponse(url="/login")
+    # ==============================================================================
+# ENERGISTRAT V12.6 - MAIN.PY (PARTIE 2/2)
+# ==============================================================================
 
 # ==============================================================================
 # TRADUCTEUR UNIVERSEL (SMART MAPPER 3D - ELEC & GAZ)
@@ -255,7 +320,7 @@ def normalize_full_data(data, tenant_id=None):
     
     # 1. Identité Primaire
     if not data['identity'].get('id'):
-        data['identity']['id'] = str(data.get('PDL') or data.get('PCE') or data.get('COMPTEUR_PDL') or data.get('pdl') or data.get('id') or f"GEN_{uuid.uuid4().hex[:8]}")
+        data['identity']['id'] = str(data.get('COMPTEUR_PDL') or data.get('PDL') or data.get('pdl') or data.get('PCE') or data.get('pce') or data.get('id') or f"GEN_{uuid.uuid4().hex[:8]}")
         data['id'] = data['identity']['id']
 
     if tenant_id: data['identity']['tenant_id'] = tenant_id
@@ -272,7 +337,7 @@ def normalize_full_data(data, tenant_id=None):
     data['location']['insee'] = str(data.get('INSEE') or data.get('insee') or "")
     data['location']['typologie'] = str(data.get('TYPOLOGIE') or data.get('typologie') or "")
     
-    try: data['location']['surface'] = float(data.get('SURFACE_M2') or data.get('surface') or 0.0)
+    try: data['location']['surface'] = float(str(data.get('SURFACE_M2') or data.get('surface') or 0.0).replace(',', '.'))
     except: data['location']['surface'] = 0.0
 
     # 3. Contrat et Énergie
@@ -348,7 +413,469 @@ def normalize_full_data(data, tenant_id=None):
         data['volume_mwh'] = vol 
     except: pass
 
+    try: data['kpis']['pmax_kw'] = float(str(data.get('PUISSANCE_POINTE_MAX') or data.get('pmax_kw') or 0).replace(',', '.'))
+    except: pass
+
     return data
+
+# ==========================================
+# API CRM V12.6 (MODÈLE 3D, SOLVABILITÉ & INLINE EDIT)
+# ==========================================
+
+@app.post("/api/crm/lead")
+async def api_create_crm_lead_and_convert(payload: CRMCompany3DModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+        
+    owner_id = user.get("uid")
+    now = datetime.now().isoformat()
+
+    gouv_data = fetch_company_info_api_gouv(payload.siren)
+    
+    solvency_score = "INCONNU"
+    solvency_msg = "Non vérifié"
+    final_name = payload.company_name
+    final_address = payload.address
+    final_city = payload.city
+    final_naf = payload.naf
+    
+    if gouv_data.get("success"):
+        solvency_score = gouv_data["solvency_score"]
+        solvency_msg = gouv_data["solvency_msg"]
+        final_name = gouv_data["name"] or final_name
+        final_address = gouv_data["address"] or final_address
+        final_city = gouv_data["city"] or final_city
+        final_naf = gouv_data["naf"] or final_naf
+
+    company_id = f"COMP_{payload.siren.replace(' ', '') if payload.siren else uuid.uuid4().hex[:8]}"
+    company_data = {
+        "siren": payload.siren, "name": final_name, "holding_name": payload.holding_name or final_name,
+        "naf": final_naf, "address": final_address, "city": final_city, "website": "", "logo": "", 
+        "solvency_score": solvency_score, "solvency_msg": solvency_msg, "created_at": now, "owner_id": owner_id, "source": payload.source
+    }
+    db.save_company(company_id, company_data)
+
+    deal_id = f"DEAL_{uuid.uuid4().hex[:12]}"
+    deal_data = {
+        "company_id": company_id, "name": f"{final_name} - {payload.pipeline.upper()}", "pipeline": payload.pipeline, 
+        "stage": "LEAD", "volume_est": 0.0, "commission_est": 0.0, "products":[], "documents":[],
+        "created_at": now, "owner_id": owner_id
+    }
+    db.save_deal(deal_id, deal_data)
+
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {
+        "deal_id": deal_id, "type": "SYSTEM", "title": "Création Entité 3D", 
+        "description": f"Pipeline: {payload.pipeline} | Solvabilité: {solvency_score}", "timestamp": now, "owner_id": owner_id
+    })
+    
+    return JSONResponse({"success": True, "deal_id": deal_id, "company_id": company_id, "solvency": solvency_score})
+
+@app.post("/api/crm/edit/{entity_type}/{entity_id}")
+async def api_inline_edit(entity_type: str, entity_id: str, payload: CRMInlineEditModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+        
+    data = None
+    if entity_type == "company": data = db.get_company(entity_id); save_func = db.save_company
+    elif entity_type == "contact": data = db.get_contact(entity_id); save_func = db.save_contact
+    elif entity_type == "site": data = db.get_site(entity_id); save_func = db.save_site
+        
+    if not data: return JSONResponse({"success": False, "error": "Entité introuvable."})
+        
+    data[payload.field] = payload.value
+    data[f"{payload.field}_manual_override"] = True 
+    save_func(entity_id, data)
+    return JSONResponse({"success": True, "message": "Mise à jour synchronisée."})
+
+@app.post("/api/crm/company/{company_id}/contact")
+async def api_add_contact_3d(company_id: str, payload: CRMContactModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+        
+    contact_id = f"CONT_{uuid.uuid4().hex[:12]}"
+    contact_data = {
+        "company_id": company_id, "site_id": payload.site_id, "firstname": payload.firstname, "lastname": payload.lastname,
+        "role": payload.role, "email": payload.email, "phone": payload.phone, "linkedin": "", 
+        "created_at": datetime.now().isoformat(), "owner_id": user.get("uid")
+    }
+    db.save_contact(contact_id, contact_data)
+    return JSONResponse({"success": True, "contact_id": contact_id})
+
+@app.post("/api/crm/company/{company_id}/site")
+async def api_add_site_3d(company_id: str, payload: CRMSiteModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+        
+    site_id = f"SITE_{payload.pdl_pce.replace(' ', '')}"
+    site_data = {
+        "identity": {"id": site_id, "tenant_id": company_id, "site_name": payload.site_name},
+        "location": {"address": payload.address},
+        "contract": {"pdl": payload.pdl_pce if payload.energy_type == "elec" else "", "pce": payload.pdl_pce if payload.energy_type == "gaz" else "", "power": payload.power_kva, "fta": payload.fta, "profil": payload.profile},
+        "kpis": {"volume_mwh": payload.car_mwh},
+        "meta": {"is_gas": payload.energy_type == "gaz", "is_active": payload.is_active}
+    }
+    db.save_site(site_id, site_data)
+    return JSONResponse({"success": True, "site_id": site_id})
+
+@app.get("/api/crm/pipeline/{pipe_type}")
+async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Accès réservé"}, 401)
+    
+    all_deals = db.get_all_deals()
+    all_comps = {c.get("id"): c for c in db.get_all_companies()}
+    all_conts = {c.get("id"): c for c in db.get_all_contacts()}
+    real_sites = db.get_all_sites()
+
+    try:
+        old_leads = db.get_all_leads()
+        for old in old_leads:
+            old_pipe = str(old.get("pipeline") or "saas").lower()
+            if old_pipe == pipe_type.lower():
+                all_deals.append({
+                    "id": old.get("id"), "legacy": True, "name": old.get("company_name", "Ancien Lead"), 
+                    "stage": old.get("stage", "LEAD"), "volume_est": float(old.get("volume_est") or 0.0), 
+                    "commission_est": float(old.get("commission_est") or 0.0), "pipeline": old_pipe, 
+                    "products": old.get("products",[]), "documents": old.get("documents",[]), "_old_data": old
+                })
+    except: pass
+
+    formatted_deals =[]
+    
+    for deal in all_deals:
+        deal_pipe = str(deal.get("pipeline") or "saas").lower()
+        if deal_pipe != pipe_type.lower(): continue
+            
+        if not deal.get("legacy"):
+            comp = all_comps.get(deal.get("company_id"), {})
+            deal_contacts =[c for c in all_conts.values() if c.get("company_id") == comp.get("id")]
+            company_sites =[s for s in real_sites if s.get("identity", {}).get("tenant_id") == comp.get("id")]
+            total_vol = sum([float(s.get("kpis", {}).get("volume_mwh", 0)) for s in company_sites])
+            
+            saas_alerts =[]
+            for s in company_sites:
+                if s.get("kpis", {}).get("is_alert"): saas_alerts.append(f"⚠️ Dépassement détecté sur {s.get('identity', {}).get('site_name', 'Site')}")
+
+            vol = float(deal.get("volume_est") or total_vol)
+            naf = comp.get("naf", "DEFAULT")
+            intel = crm_engine.generate_icebreaker(naf, pipe_type) 
+            comms = float(deal.get("commission_est") or crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299))
+            
+            formatted_deals.append({
+                "id": deal.get("id"), "company_id": comp.get("id"), "holding_name": comp.get("holding_name") or comp.get("name", "Inconnu"),
+                "name": deal.get("name", "Inconnu"), "city": comp.get("city", ""),
+                "solvency_score": comp.get("solvency_score", "INCONNU"), "solvency_msg": comp.get("solvency_msg", "Non vérifié"),
+                "naf": naf, "volume": vol, "stage": deal.get("stage", "LEAD"), "all_contacts": deal_contacts, "sites_count": len(company_sites),
+                "saas_alerts": saas_alerts, "intelligence": intel, "commission_est": comms, "products": deal.get("products",[]), "documents": deal.get("documents",[])
+            })
+        else:
+            old = deal.get("_old_data", {})
+            vol = float(deal.get("volume_est", 0.0))
+            naf = old.get("naf", "DEFAULT")
+            comms = float(deal.get("commission_est") or crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299))
+            fake_contact = {
+                "id": old.get("id"), "firstname": str(old.get("contact_firstname", "")).strip(),
+                "lastname": str(old.get("contact_lastname", "")).strip(), "role": old.get("contact_role", "Contact"), 
+                "phone": old.get("contact_phone", ""), "email": old.get("contact_email", ""), "linkedin": old.get("linkedin", "")
+            }
+            formatted_deals.append({
+                "id": old.get("id"), "company_id": old.get("id"), "holding_name": old.get("company_name", "Ancien Client"),
+                "name": deal.get("name", "Ancien Deal"), "city": old.get("city", ""),
+                "solvency_score": "INCONNU", "solvency_msg": "Legacy (Créé avant API)",
+                "naf": naf, "volume": vol, "stage": old.get("stage", "LEAD"), "all_contacts":[fake_contact], "sites_count": 0, "saas_alerts":[],
+                "intelligence": crm_engine.generate_icebreaker(naf, pipe_type), "commission_est": comms, "products": deal.get("products",[]), "documents": deal.get("documents",[])
+            })
+
+    return JSONResponse(json_compliant({"success": True, "pipeline": formatted_deals}))
+
+@app.post("/api/crm/contact/{contact_id}/linkedin")
+async def update_contact_linkedin(contact_id: str, payload: UpdateFieldModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    contact = db.get_contact(contact_id)
+    if contact:
+        contact["linkedin"] = payload.value; db.save_contact(contact_id, contact); return JSONResponse({"success": True})
+    legacy = db.get_setting(contact_id)
+    if legacy: legacy["linkedin"] = payload.value; db.save_setting(contact_id, legacy); return JSONResponse({"success": True}) 
+    return JSONResponse({"success": False, "error": "Introuvable"})
+
+@app.post("/api/crm/company/{company_id}/website")
+async def update_company_website(company_id: str, payload: UpdateFieldModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    company = db.get_company(company_id)
+    if company:
+        company["website"] = payload.value; db.save_company(company_id, company); return JSONResponse({"success": True})
+    legacy = db.get_setting(company_id)
+    if legacy:
+        legacy["website"] = payload.value; db.save_setting(company_id, legacy); return JSONResponse({"success": True})
+    return JSONResponse({"success": False, "error": "Introuvable"})
+
+@app.post("/api/crm/deal/move")
+async def api_move_crm_deal(payload: DealMoveModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Accès refusé"}, 401)
+    deal_data = db.get_deal(payload.deal_id)
+    if deal_data:
+        deal_data["stage"] = payload.new_stage
+        db.save_deal(payload.deal_id, deal_data)
+        db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": payload.deal_id, "type": "STAGE_CHANGE", "title": f"Passage à l'étape {payload.new_stage}", "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
+        return JSONResponse({"success": True})
+    return JSONResponse({"success": False, "error": "Deal introuvable"})
+
+@app.post("/api/crm/email/send")
+async def api_send_crm_email(payload: EmailRequestModel, background_tasks: BackgroundTasks, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    deal_data = db.get_deal(payload.deal_id)
+    to_email = "test@energistrat.com"
+    if deal_data and deal_data.get("primary_contact_id"):
+        cont = db.get_contact(deal_data["primary_contact_id"])
+        if cont: to_email = cont.get("email", to_email)
+    background_tasks.add_task(crm_engine.send_sales_email, to_email=to_email, subject=payload.subject, html_content=payload.body, lead_id=payload.deal_id)
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": payload.deal_id, "type": "EMAIL", "title": f"Email: {payload.subject}", "description": payload.body, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
+    return JSONResponse({"success": True, "message": "Email placé en file d'attente."})
+
+@app.get("/api/crm/track/open/{deal_id}")
+async def api_track_email_open(deal_id: str):
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "TRACKING", "title": "Le client a ouvert un email", "timestamp": datetime.now().isoformat(), "owner_id": "SYSTEM"})
+    pixel = base64.b64decode("R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
+    return Response(content=pixel, media_type="image/gif")
+
+@app.post("/api/crm/activity")
+async def api_create_crm_activity(payload: CRMActivityModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": payload.deal_id, "type": payload.type, "title": payload.type, "description": payload.description, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
+    return JSONResponse({"success": True})
+
+@app.get("/api/crm/deal/{deal_id}/activities")
+async def api_get_crm_activities(deal_id: str, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Accès réservé"}, 401)
+    return JSONResponse({"success": True, "activities": db.get_deal_activities(deal_id)})
+
+@app.get("/api/crm/products")
+async def api_get_products(user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Accès réservé"}, 401)
+    return JSONResponse({"success": True, "products": db.get_all_products()})
+
+@app.post("/api/crm/products")
+async def api_save_product(payload: ProductModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    prod_id = f"PROD_{uuid.uuid4().hex[:8]}"
+    db.save_product(prod_id, payload.dict())
+    return JSONResponse({"success": True, "product_id": prod_id})
+
+@app.delete("/api/crm/products/{prod_id}")
+async def api_delete_product(prod_id: str, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    db.delete_product(prod_id)
+    return JSONResponse({"success": True})
+
+@app.post("/api/crm/deal/{deal_id}/products")
+async def api_update_deal_products(deal_id: str, payload: DealProductsUpdateModel, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    deal = db.get_deal(deal_id)
+    is_legacy = False
+    if not deal:
+        deal = db.get_setting(deal_id)
+        is_legacy = True
+        if not deal: return JSONResponse({"error": "Deal introuvable."}, 404)
+
+    all_prods = {p["id"]: p for p in db.get_all_products()}
+    total_vol = 0.0
+    total_comm = 0.0
+    detailed_lines =[]
+
+    for item in payload.items:
+        prod = all_prods.get(item.product_id)
+        if not prod: continue
+        cat = prod.get("category", "SERVICE")
+        price = float(prod.get("unit_price", 0.0))
+        qty = float(item.quantity)
+        rate = float(prod.get("comm_rate", 1.0))
+        line_comm = price * qty * rate 
+        if cat == "COURTAGE": total_vol += qty
+        total_comm += line_comm
+        detailed_lines.append({"product_id": prod["id"], "name": prod["name"], "category": cat, "quantity": qty, "unit_price": price, "line_comm": line_comm})
+
+    deal["products"] = detailed_lines
+    deal["volume_est"] = total_vol
+    deal["commission_est"] = total_comm
+    if is_legacy: db.save_setting(deal_id, deal)
+    else: db.save_deal(deal_id, deal)
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "SYSTEM", "title": "Devis (CPQ) mis à jour", "description": f"Nouvelle commission : {total_comm:,.2f} €", "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
+    return JSONResponse({"success": True})
+
+@app.post("/api/crm/deal/{deal_id}/upload")
+async def api_upload_deal_file(deal_id: str, file: UploadFile = File(...), user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    deal = db.get_deal(deal_id)
+    is_legacy = False
+    if not deal:
+        deal = db.get_setting(deal_id)
+        is_legacy = True
+        if not deal: return JSONResponse({"error": "Deal introuvable"}, 404)
+    
+    file_meta = {"id": f"DOC_{uuid.uuid4().hex[:8]}", "name": file.filename, "size": f"{round(len(await file.read()) / 1024)} KB", "uploaded_at": datetime.now().isoformat()}
+    if "documents" not in deal: deal["documents"] =[]
+    deal["documents"].append(file_meta)
+    if is_legacy: db.save_setting(deal_id, deal)
+    else: db.save_deal(deal_id, deal)
+    
+    db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "DOCUMENT", "title": "Document ajouté", "description": file.filename, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
+    return JSONResponse({"success": True, "document": file_meta})
+
+# ==========================================
+# API CORTEX ACADEMY, PRICER & OUTILS OPS
+# ==========================================
+
+@app.get("/api/v1/academy/modules")
+async def api_get_academy_modules(user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    return JSONResponse({"success": True, "modules": db.get_all_lms_modules()})
+
+@app.get("/api/v1/academy/progress")
+async def api_get_lms_progress(user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    return JSONResponse({"success": True, "progress": db.get_user_lms_progress(user.get("uid"))})
+
+@app.get("/api/v1/academy/arena")
+async def api_get_arena_training(user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    return JSONResponse({"success": True, "questions": academy_engine.get_daily_training(user.get("uid"))})
+
+@app.post("/api/v1/academy/answer")
+async def api_post_academy_answer(payload: AcademyAnswerRequest, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    return JSONResponse(academy_engine.process_answer(user.get("uid"), payload.question_id, payload.is_correct))
+
+@app.post("/api/v1/cpq/quote")
+async def api_generate_cpq_quote(payload: CPQQuoteRequest, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    if not pricer_engine: return JSONResponse({"success": False, "error": "Moteur Pricer hors ligne."})
+    return JSONResponse(pricer_engine.build_quote(payload.dict()))
+
+@app.post("/api/v1/cpq/ingest_dqe")
+async def api_ingest_dqe(file: UploadFile = File(...), user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    if not PANDAS_READY: return JSONResponse({"error": "Pandas introuvable sur le serveur."}, 500)
+    try:
+        content = await file.read()
+        df = pd.read_excel(io.BytesIO(content))
+        pdl_col = next((c for c in df.columns if any(k in str(c).lower() for k in["pdl", "pce", "point de", "référence"])), None)
+        vol_col = next((c for c in df.columns if any(k in str(c).lower() for k in["volume", "conso", "kwh", "mwh", "quantité"])), None)
+        type_col = next((c for c in df.columns if any(k in str(c).lower() for k in["type", "usage", "ep", "bat", "catégorie"])), None)
+        
+        if not pdl_col or not vol_col: return JSONResponse({"success": False, "error": "Impossible d'identifier les colonnes PDL et Volume dans ce fichier."})
+            
+        lots = {"EP (Éclairage Public)": 0, "BAT (Bâtiments)": 0, "Non Classifié": 0}
+        sites_count = 0
+        for idx, row in df.iterrows():
+            vol = row[vol_col]
+            try: vol_val = float(vol)
+            except: continue
+            
+            usage = str(row[type_col]).upper() if type_col else ""
+            if "EP" in usage or "ECLAIRAGE" in usage: lots["EP (Éclairage Public)"] += vol_val
+            elif "BAT" in usage or "MAIRIE" in usage or "ECOLE" in usage: lots["BAT (Bâtiments)"] += vol_val
+            else: lots["Non Classifié"] += vol_val
+            sites_count += 1
+            
+        total_mwh = sum(lots.values())
+        if total_mwh > 50000: lots = {k: v/1000 for k, v in lots.items()}
+            
+        return JSONResponse({"success": True, "filename": file.filename, "sites_detected": sites_count, "total_volume_mwh": round(sum(lots.values()), 2), "suggested_lots": {k: round(v, 2) for k, v in lots.items() if v > 0}})
+    except Exception as e: return JSONResponse({"success": False, "error": f"Erreur Smart-Mapping : {str(e)}"})
+
+@app.post("/api/v1/cpq/ingest_curves")
+async def api_ingest_curves(files: List[UploadFile] = File(...), user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    if not PANDAS_READY: return JSONResponse({"error": "Pandas introuvable."}, 500)
+    
+    total_volume_mwh = 0
+    max_power_kw = 0
+    processed_count = 0
+    for file in files:
+        try:
+            content = await file.read()
+            df = pd.read_csv(io.BytesIO(content), sep=';', on_bad_lines='skip', nrows=5000)
+            val_col = next((c for c in df.columns if "valeur" in str(c).lower() or "conso" in str(c).lower()), None)
+            if val_col:
+                vol = (pd.to_numeric(df[val_col], errors='coerce').sum() / 6) / 1000
+                pmax = pd.to_numeric(df[val_col], errors='coerce').max()
+                if vol > 0:
+                    total_volume_mwh += vol
+                    max_power_kw = max(max_power_kw, pmax)
+                    processed_count += 1
+        except: continue
+    return JSONResponse({"success": True, "files_processed": processed_count, "aggregated_volume_mwh": round(total_volume_mwh, 2), "aggregated_peak_kw": round(max_power_kw, 2)})
+
+@app.get("/api/ops/sentinel/alerts")
+async def api_get_sentinel_alerts(): return db.get_sentinel_alerts()
+
+@app.post("/api/ops/sentinel/run")
+async def api_run_sentinel_scan(user = Depends(get_current_user)): return JSONResponse({"success": True, "message": "Scan SGE déclenché."})
+
+@app.get("/api/tools/sniper/market")
+async def api_sniper_market(user = Depends(get_current_user)):
+    if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
+    return JSONResponse(rte.get_wholesale_market())
+
+@app.get("/api/rte/live")
+async def get_rte_live_data(user = Depends(get_current_user)):
+    if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
+    return JSONResponse(rte.get_pulse_dashboard_data())
+
+@app.post("/api/dealdesk/analyze")
+async def api_dealdesk_analyze(request: Request):
+    b = await request.json()
+    q = str(b.get('query', '')).strip().lower()
+    if not q: return JSONResponse({"success": False, "error": "Requête vide."})
+    
+    sd = next((s for s in db.get_all_sites() if q in str(s.get('contract', {}).get('pdl', '')).strip() or q in str(s.get('identity', {}).get('site_name', '')).strip().lower()), None)
+    if not sd: return JSONResponse({"success": False, "error": "Introuvable."})
+    
+    try: vol = cortex.enrich_site_financials(sd).get('volume_mwh', 0)
+    except: vol = 0
+        
+    p = float(sd.get('contract', {}).get('power', 0))
+    is_micro = vol < 36 and p <= 36
+    return JSONResponse({"success": True, "site": { "name": sd.get('identity',{}).get('site_name', 'Inconnu'), "pdl": sd.get('contract',{}).get('pdl', 'N/A'), "volume": round(vol, 2), "power": p }, "segment": "B2B_HEAVY" if vol > 5000 else ("C4_MID" if p > 36 or vol > 250 else "C5_MASS"), "legal": {"is_micro": is_micro}})
+
+@app.get("/api/ops/orphans")
+async def api_get_orphans(keyword: str = "", user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    orphans =[]
+    kw = keyword.lower().strip()
+    for s in db.get_all_sites():
+        identity = s.get('identity', {})
+        tenant_id = identity.get('tenant_id')
+        name = str(identity.get('site_name', '')).lower()
+        if not tenant_id or tenant_id == "ORPHELIN" or tenant_id == "" or (kw and kw in name):
+            orphans.append({"id": get_safe_id(identity.get('id', '')), "name": identity.get('site_name', 'Inconnu'), "pdl": str(s.get('contract', {}).get('pdl', '')), "city": s.get('location', {}).get('city', ''), "current_tenant": tenant_id or "Aucun"})
+    return JSONResponse({"success": True, "orphans": orphans})
+
+@app.post("/api/ops/adopt")
+async def api_adopt_sites(payload: AdoptionRequest, user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    updated_count = 0
+    for site_id in payload.site_ids:
+        data = db.get_site(site_id)
+        if data:
+            if 'identity' not in data: data['identity'] = {}
+            data['identity']['tenant_id'] = payload.target_tenant_id
+            if db.save_site(site_id, data): updated_count += 1
+    return JSONResponse({"success": True, "updated_count": updated_count})
+
+@app.get("/api/ops/tenants")
+async def api_get_tenants(user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    return JSONResponse({"success": True, "tenants": db.get_all_users()})
+
+@app.post("/api/ops/create_tenant")
+async def api_create_tenant(payload: TenantCreateRequest, user = Depends(get_current_user)):
+    if not user or user.get("role") != "ADMIN": return JSONResponse({"error": "Non autorisé"}, 401)
+    try:
+        tenant_id = str(payload.siret).replace(" ", "")
+        data = { "tenant_id": tenant_id, "siret": tenant_id, "name": payload.name, "created_by": "ADMIN" }
+        db.save_user_profile(f"TENANT_{tenant_id}", data)
+        return JSONResponse({"success": True, "tenant": data})
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
+
+# ==========================================
+# API : DATA UNITY & IMPORT MASSIF (ZERO MOCK / 36 COLONNES)
+# ==========================================
 
 @app.post("/api/settings/save_client")
 async def api_save_client(request: Request, user = Depends(get_current_user)):
@@ -362,7 +889,7 @@ async def api_save_client(request: Request, user = Depends(get_current_user)):
             tenant_id = raw_data["forced_tenant_id"]
 
         data = normalize_full_data(raw_data, tenant_id)
-        raw_id = data.get("identity", {}).get("id") or data.get("id") or f"CLI_{uuid.uuid4().hex[:8]}"
+        raw_id = data.get("identity", {}).get("id") or data.get("id") or data.get("siret") or f"CLI_{uuid.uuid4().hex[:8]}"
         data["identity"]["id"] = str(raw_id)
         safe_id = get_safe_id(raw_id)
         
@@ -420,10 +947,41 @@ async def api_import_csv(file: UploadFile = File(...), user = Depends(get_curren
         return JSONResponse({"success": True, "imported": len(sites_raw), "saved": saved_count})
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
+# ==========================================
+# API : RSE (LOI ELAN / CSRD) ET BUDGETS M57 (SDE/MAIRIE)
+# ==========================================
+@app.get("/api/settings/m57")
+async def api_get_m57(user = Depends(get_current_user)):
+    tenant_id = db.get_user_profile(user.get("uid")).get("tenant_id", "DEFAULT") if user else "DEFAULT"
+    data = db.get_setting(f"M57_{tenant_id}")
+    return JSONResponse(data if data else {"bp_elec": 0, "bp_gaz": 0, "consumed_elec": 0, "consumed_gaz": 0})
+
+@app.post("/api/settings/m57")
+async def api_save_m57(payload: M57SettingsModel, user = Depends(get_current_user)):
+    tenant_id = db.get_user_profile(user.get("uid")).get("tenant_id", "DEFAULT") if user else "DEFAULT"
+    db.save_setting(f"M57_{tenant_id}", payload.dict())
+    return JSONResponse({"success": True})
+
+@app.get("/api/settings/carbon")
+async def api_get_carbon(user = Depends(get_current_user)):
+    tenant_id = db.get_user_profile(user.get("uid")).get("tenant_id", "DEFAULT") if user else "DEFAULT"
+    data = db.get_setting(f"CARBON_{tenant_id}")
+    return JSONResponse(data if data else {"baseline_year": 2010, "baseline_kwh_sqm": 0.0})
+
+@app.post("/api/settings/carbon")
+async def api_save_carbon(payload: CarbonSettingsModel, user = Depends(get_current_user)):
+    tenant_id = db.get_user_profile(user.get("uid")).get("tenant_id", "DEFAULT") if user else "DEFAULT"
+    db.save_setting(f"CARBON_{tenant_id}", payload.dict())
+    return JSONResponse({"success": True})
+
+# ==========================================
+# API : DASHBOARD & FLEET (LE COEUR DU SYSTÈME 3D)
+# ==========================================
 @app.get("/api/dashboard/fleet")
 async def get_fleet_data(response: Response, user = Depends(get_current_user)):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    
     profile = db.get_user_profile(user.get("uid"))
     tenant_id = profile.get("tenant_id", "ORPHELIN")
     is_admin = user.get("role") == "ADMIN"
@@ -432,7 +990,6 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
     filtered_sites =[s for s in raw_sites if "CLI_" not in str(s.get('identity', {}).get('id', '')) and (is_admin or s.get("identity", {}).get("tenant_id") == tenant_id)]
     
     for s in filtered_sites:
-        # Migration silencieuse à la volée pour le dashboard
         s = normalize_full_data(s, s.get("identity", {}).get("tenant_id"))
         if cortex: s['computed_financials'] = cortex.enrich_site_financials(s)
     
@@ -463,25 +1020,17 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
         fleet_list.append({
             "id": get_safe_id(identity.get('id', '')), 
             "name": fin.get('meta', {}).get('site_label') or identity.get('site_name') or 'Inconnu', 
-            "city": city, 
-            "zip": loc.get('zip_code', ''),
-            "volume": final_vol, 
+            "city": city, "zip": loc.get('zip_code', ''), "volume": final_vol, 
             "energy": "gaz" if contract.get('energy_type') == 'gaz' else "elec", 
             "segment": contract.get('segment') or identity.get('lot_name') or '-',
-            "provider": prov, 
-            "budget": final_budget, 
-            "ghost_savings": float(kpis.get('ghost_savings', 0)), 
-            "power": contract.get('power', 0), 
-            "pdl": contract.get('pdl') or contract.get('pce', '-'), 
-            "surface": loc.get('surface', 0),
-            "tenant_id": identity.get('tenant_id', 'Orphelin'),
-            "naf": identity.get('naf', 'DEFAULT')
+            "provider": prov, "budget": final_budget, "ghost_savings": float(kpis.get('ghost_savings', 0)), 
+            "power": contract.get('power', 0), "pdl": contract.get('pdl') or contract.get('pce', '-'), 
+            "surface": loc.get('surface', 0), "tenant_id": identity.get('tenant_id', 'Orphelin'), "naf": identity.get('naf', 'DEFAULT')
         })
     return JSONResponse(json_compliant({"fleet": fleet_list, "count": len(fleet_list)}))
 
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str, response: Response, user = Depends(get_current_user)):
-    """ LA MAGIE DE LA GUÉRISON SILENCIEUSE """
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     if not user: return JSONResponse({"error": "Non autorisé"}, 401)
     
@@ -490,11 +1039,8 @@ async def get_dashboard_data(client_id: str, response: Response, user = Depends(
     
     profile = db.get_user_profile(user.get("uid"))
     is_admin = user.get("role") == "ADMIN"
-    site_tenant = data.get("identity", {}).get("tenant_id")
     
-    # On force la migration 3D sur le dictionnaire "plat"
-    # Si le tenant n'est pas dans l'identity, on le cherche à la racine, sinon on prend celui du user
-    t_id = site_tenant or data.get("tenant_id") or profile.get("tenant_id", "ORPHELIN")
+    t_id = data.get("identity", {}).get("tenant_id") or data.get("tenant_id") or profile.get("tenant_id", "ORPHELIN")
     data = normalize_full_data(data, t_id)
     
     if not is_admin and data["identity"]["tenant_id"] != profile.get("tenant_id", "ORPHELIN"):
@@ -503,9 +1049,7 @@ async def get_dashboard_data(client_id: str, response: Response, user = Depends(
     financials = cortex.enrich_site_financials(data) if cortex else {'meta':{'is_gas':False}, 'kpis':{'unit_price_kwh':0, 'pmc_eur_mwh':0, 'ghost_savings':0}, 'volume_mwh':0, 'budget_annual':0, 'pricing_details':{}}
     mr = get_market_ref()
     ma = cortex.analyze_market_position(financials['kpis']['unit_price_kwh'], mr, is_gas=financials['meta']['is_gas']) if cortex else {"status": "ANALYSE"}
-    
-    if 'ref_price' not in ma: 
-        ma = {"status": "ANALYSE", "ref_price": mr['gaz']['peg_n1'] if financials['meta']['is_gas'] else mr['elec']['cal_n1'], "details": {"market_label": "PEG N+1" if financials['meta']['is_gas'] else "CAL N+1"}}
+    if 'ref_price' not in ma: ma = {"status": "ANALYSE", "ref_price": mr['gaz']['peg_n1'] if financials['meta']['is_gas'] else mr['elec']['cal_n1'], "details": {"market_label": "PEG N+1" if financials['meta']['is_gas'] else "CAL N+1"}}
 
     contract = data.get('contract', {})
     pricing = financials['pricing_details'] or data.get('pricing', {})
@@ -529,30 +1073,17 @@ async def get_dashboard_data(client_id: str, response: Response, user = Depends(
     if not contract.get('ps_hpe'): contract['ps_hpe'] = pd_details.get('hpe') or "-"
     if not contract.get('ps_hce'): contract['ps_hce'] = pd_details.get('hce') or "-"
 
-    # Renvoi JSON Ultra propre
     return JSONResponse(json_compliant({
         "energy_type": "gaz" if contract.get('energy_type') == 'gaz' else "elec", 
-        "identity": data.get('identity', {}), 
-        "location": data.get('location', {}), 
-        "technical": data.get('technical', {}), 
-        "financials": data.get('financials', {}),
+        "identity": data.get('identity', {}), "location": data.get('location', {}), 
+        "technical": data.get('technical', {}), "financials": data.get('financials', {}),
         "contract": {
-            "pdl": contract.get('pdl'), 
-            "pce": contract.get('pce'), 
-            "provider": contract.get('provider', 'Inconnu'), 
-            "segment": display_segment or contract.get('segment', '-'), 
-            "start_date": contract.get('start_date'), 
-            "end_date": contract.get('end_date'), 
-            "power": contract.get('power'), 
-            "cja": contract.get('cja'),
-            "p_max": contract.get('p_max'), 
-            "fta": contract.get('fta'), 
-            "profil": contract.get('profil'), 
-            "power_details": pd_details, 
-            "ps_hph": contract.get('ps_hph'), 
-            "ps_hch": contract.get('ps_hch'), 
-            "ps_hpe": contract.get('ps_hpe'), 
-            "ps_hce": contract.get('ps_hce')
+            "pdl": contract.get('pdl'), "pce": contract.get('pce'), "provider": contract.get('provider', 'Inconnu'), 
+            "segment": display_segment or contract.get('segment', '-'), "start_date": contract.get('start_date'), 
+            "end_date": contract.get('end_date'), "power": contract.get('power'), "cja": contract.get('cja'),
+            "p_max": contract.get('p_max'), "fta": contract.get('fta'), "profil": contract.get('profil'), 
+            "power_details": pd_details, "ps_hph": contract.get('ps_hph'), "ps_hch": contract.get('ps_hch'), 
+            "ps_hpe": contract.get('ps_hpe'), "ps_hce": contract.get('ps_hce')
         },
         "pricing": pricing, 
         "kpis": {
@@ -591,8 +1122,7 @@ async def generate_tender(request: Request, user = Depends(get_current_user)):
             if not df_el.empty: 
                 df_el.to_excel(w, index=False, sheet_name="DATA_ELEC")
                 df_el[["PDL", "Nom du site", "CP", "Ville", "Segment", "Vol. Annuel"]].assign(OFFRE_NOM="", PRIX_HPH_EUR_KWH="", ABONNEMENT_EUR_AN="").to_excel(w, index=False, sheet_name="REPONSE_ELEC")
-            if not df_gz.empty: 
-                df_gz.to_excel(w, index=False, sheet_name="DATA_GAZ")
+            if not df_gz.empty: df_gz.to_excel(w, index=False, sheet_name="DATA_GAZ")
         stream.seek(0)
         return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=DQE_{datetime.now().strftime('%Y%m%d')}.xlsx"})
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
@@ -651,1050 +1181,3 @@ async def catch_all_deep(request: Request, full_path: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
-```
-
-### 2. Remplace l'intégralité de ton `settings.html` par la nouvelle Data Unity :
-
-```html
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V12.6 | Data Unity (Settings & Conformité)</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: { 
-                        abysse: '#001529', card: '#001D3D', sidebar: '#001529', 
-                        cyan: '#00E5FF', success: '#10B981', alert: '#EF4444', 
-                        gold: '#F59E0B', purple: '#A855F7', gas: '#F97316'
-                    },
-                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] }
-                }
-            }
-        }
-    </script>
-    <style>
-        body { background-color: #001529; color: #e2e8f0; overflow: hidden; font-family: 'Inter', sans-serif; }
-        
-        .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 255, 0.1); border-radius: 3rem; transition: all 0.3s ease; }
-        .bento-card:hover { border-color: rgba(0, 229, 255, 0.4); box-shadow: 0 10px 30px -10px rgba(0, 229, 255, 0.2); }
-        
-        .nav-item.active { background: rgba(0, 229, 255, 0.1); border-right: 4px solid #00E5FF; color: white; }
-        
-        .input-edit { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,229,255,0.2); color: white; padding: 14px 20px; border-radius: 2rem; width: 100%; font-family: 'Inter', sans-serif; outline: none; transition: all 0.3s; font-size: 0.875rem; }
-        .input-edit:focus { border-color: #00E5FF; box-shadow: 0 0 15px rgba(0,229,255,0.3); background: rgba(0,229,255,0.05); }
-        .input-mono { font-family: 'JetBrains Mono', monospace; font-weight: bold; color: #00E5FF; }
-
-        .toggle-checkbox:checked { right: 0; border-color: #00E5FF; }
-        .toggle-checkbox:checked + .toggle-label { background-color: #00E5FF; }
-        .toggle-checkbox { right: 0; z-index: 1; border-color: #e2e8f0; transition: all 0.3s; }
-        .toggle-label { background-color: #334155; transition: all 0.3s; }
-
-        .suggestions-list { position: absolute; background: #001D3D; border: 1px solid #00E5FF; width: 100%; z-index: 100; max-height: 200px; overflow-y: auto; border-radius: 1rem; margin-top: 5px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .suggestion-item { padding: 12px 20px; cursor: pointer; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .suggestion-item:hover { background: #00E5FF; color: #001529; font-weight: bold; }
-
-        .view-section { display: none; } .view-section.active { display: block; animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-        
-        ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #00E5FF; border-radius: 3px; }
-    </style>
-</head>
-<body class="flex h-screen w-screen font-sans bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
-
-    <!-- SIDEBAR -->
-    <aside class="w-64 bg-abysse border-r border-cyan/10 flex flex-col flex-shrink-0 z-50 shadow-2xl h-screen">
-        <div class="h-24 flex items-center px-6 border-b border-cyan/10 bg-card/50">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan to-blue-800 flex items-center justify-center text-abysse font-black shadow-[0_0_15px_rgba(0,229,255,0.5)] text-xl mr-3">
-                <i class="fa-solid fa-database text-abysse"></i>
-            </div>
-            <div>
-                <div class="font-black tracking-tight text-white leading-none text-lg">DATA <span class="text-cyan">UNITY</span></div>
-                <div id="god-mode-indicator" class="text-[9px] text-alert font-mono mt-1 hidden animate-pulse font-bold bg-alert/20 px-2 py-0.5 rounded border border-alert/50 inline-block">● GOD MODE ACTIF</div>
-                <div class="text-[9px] text-gray-500 font-mono mt-1 tracking-widest uppercase">Settings V12.6</div>
-            </div>
-        </div>
-        
-        <nav class="flex-1 overflow-y-auto py-6 space-y-1">
-            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-widest mb-2 px-6">Identité & Parc</div>
-            <button onclick="switchView('general')" id="nav-general" class="nav-item active w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-building w-5 text-center"></i> Master Tenant
-            </button>
-            <button onclick="switchView('perimetre')" id="nav-perimetre" class="nav-item w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-sitemap w-5 text-center text-cyan"></i> Base 3D & Contrats
-            </button>
-            <button onclick="switchView('import')" id="nav-import" class="nav-item w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-file-excel w-5 text-center text-success"></i> Smart Importer Excel
-            </button>
-
-            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-widest mb-2 mt-6 px-6">Conformité & Ops</div>
-            <button onclick="switchView('rgpd')" id="nav-rgpd" class="nav-item w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-shield-halved w-5 text-center text-gold"></i> Mandats (API SGE)
-            </button>
-            <button onclick="switchView('support')" id="nav-support" class="nav-item w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-headset w-5 text-center text-purple"></i> Guichet Support Ops
-            </button>
-            <button onclick="switchView('equipe')" id="nav-equipe" class="nav-item w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-users w-5 text-center text-gray-300"></i> Rôles & Sécurité
-            </button>
-        </nav>
-        
-        <div class="p-4 border-t border-cyan/10 bg-card/30">
-            <button onclick="history.back()" class="flex items-center justify-center w-full gap-2 text-gray-400 hover:text-white transition text-xs font-bold bg-abysse border border-white/10 hover:border-cyan/50 rounded-[2rem] py-3 shadow-lg">
-                <i class="fa-solid fa-arrow-left"></i> Quitter les Paramètres
-            </button>
-        </div>
-    </aside>
-
-    <main class="flex-1 flex flex-col relative bg-transparent overflow-hidden">
-        
-        <!-- HEADER GLOABL & HEALTH SCORE -->
-        <header class="h-24 border-b border-cyan/10 flex items-center justify-between px-10 bg-abysse/90 backdrop-blur sticky top-0 z-40 flex-shrink-0 shadow-lg">
-            <div>
-                <h2 id="page-title" class="text-3xl font-black text-white italic tracking-tight drop-shadow-lg">Mon Entreprise</h2>
-                <p class="text-xs text-gray-400 font-mono mt-1" id="header-subtitle">Identité juridique et Master Tenant</p>
-            </div>
-            
-            <div class="flex items-center gap-6">
-                <div class="bg-card/50 border border-white/10 px-6 py-3 rounded-[2rem] flex items-center gap-4 shadow-inner">
-                    <div class="text-right">
-                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Data Health Score</div>
-                        <div class="text-xs font-bold text-white">Qualité de la base</div>
-                    </div>
-                    <div class="relative w-16 h-16 flex items-center justify-center bg-abysse rounded-full border-4 border-cyan/20 shadow-[0_0_15px_rgba(0,229,255,0.2)]">
-                        <span class="text-cyan font-black font-mono text-lg" id="global-health">0%</span>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <div class="flex-1 overflow-y-auto p-10 pb-32">
-
-            <!-- VUE 1 : MON ENTREPRISE (IDENTITÉ 3D) -->
-            <div id="view-general" class="view-section active max-w-[1200px] mx-auto space-y-8">
-                <div class="flex justify-between items-end mb-6">
-                    <div>
-                        <h3 class="text-2xl font-black text-white">Master Tenant (Niveau 1)</h3>
-                        <p class="text-sm text-gray-400 mt-2 font-mono">C'est la racine de votre base 3D. Tous vos sites y seront rattachés.</p>
-                    </div>
-                    <button onclick="savePartnerConfig()" class="bg-cyan text-abysse font-black px-8 py-4 rounded-[2rem] hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.4)] uppercase tracking-widest text-xs flex items-center gap-2">
-                        <i class="fa-solid fa-save text-lg"></i> Verrouiller l'Identité
-                    </button>
-                </div>
-
-                <div class="bento-card p-10 border-t-4 border-cyan shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block"><i class="fa-solid fa-magnifying-glass text-cyan mr-1"></i> SIREN / SIRET (Recherche API Gouv)</label>
-                            <div class="relative">
-                                <input type="text" id="partner-siret" placeholder="Saisir 9 à 14 chiffres..." class="input-edit input-mono text-lg" onblur="checkPartnerIdentity()">
-                                <div id="partner-status" class="absolute right-6 top-1/2 -translate-y-1/2 text-xl"></div>
-                            </div>
-                        </div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Raison Sociale Officielle</label><input type="text" id="partner-name" class="input-edit font-bold text-white bg-white/5 border-dashed" readonly></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Code NAF (Benchmarking Sectoriel)</label><input type="text" id="partner-naf" class="input-edit input-mono text-gray-400 bg-white/5" readonly></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">TVA Intracommunautaire (Auto)</label><input type="text" id="partner-tva" class="input-edit input-mono text-gray-400 bg-white/5" readonly></div>
-                        <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Adresse du Siège</label><input type="text" id="partner-address" class="input-edit text-gray-300"></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Code Postal</label><input type="text" id="partner-zip" class="input-edit input-mono text-gray-300"></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Ville</label><input type="text" id="partner-city" class="input-edit text-gray-300 font-bold"></div>
-                    </div>
-                </div>
-
-                <div class="bento-card p-8 border border-white/5 bg-gradient-to-r from-card to-abysse text-center">
-                    <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-2"><i class="fa-solid fa-leaf text-success mr-2"></i> Année de Référence Carbone (Loi ELAN)</h4>
-                    <p class="text-xs text-gray-400 mb-6">Paramètre central pour générer les trajectoires de sobriété (-40% en 2030) sur vos tableaux de bord.</p>
-                    <select id="partner-baseline-year" class="bg-abysse border border-success/30 text-success font-bold font-mono text-lg rounded-[2rem] px-8 py-3 outline-none cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                        <option value="2010">2010 (Par défaut Légal)</option>
-                        <option value="2018">2018</option>
-                        <option value="2019">2019</option>
-                        <option value="2022">2022</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- VUE 2 : MON PÉRIMÈTRE (L'ARBRE 3D ET LA DÉGRADATION GRACIEUSE) -->
-            <div id="view-perimetre" class="view-section max-w-[1600px] mx-auto space-y-6 h-full">
-                <div class="flex justify-between items-end mb-6">
-                    <div>
-                        <h3 class="text-2xl font-black text-white">Patrimoine & Contrats</h3>
-                        <p class="text-sm text-gray-400 mt-2 font-mono">Base de données 3D (Sites > Bâtiments > Compteurs)</p>
-                    </div>
-                    <button onclick="resetSiteForm()" class="bg-white/10 text-white font-bold px-6 py-3 rounded-[2rem] hover:bg-white/20 transition text-xs flex items-center gap-2 border border-white/20 uppercase tracking-widest">
-                        <i class="fa-solid fa-plus text-cyan"></i> Ajouter un Compteur Manuel
-                    </button>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[700px]">
-                    <!-- COL 1 : ARBRE DES SITES -->
-                    <div class="col-span-4 bento-card p-0 flex flex-col overflow-hidden shadow-2xl">
-                        <div class="p-6 border-b border-white/10 bg-card/50">
-                            <div class="relative w-full">
-                                <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
-                                <input type="text" id="search-site" oninput="renderSiteTree()" placeholder="Rechercher un PDL, un site..." class="w-full bg-abysse border border-white/10 rounded-[2rem] py-3 pl-12 pr-4 text-xs text-white focus:border-cyan outline-none transition font-mono">
-                            </div>
-                        </div>
-                        <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-abysse/30" id="site-tree-container">
-                            <div class="text-center py-10 text-gray-500 font-mono text-xs"><i class="fa-solid fa-spinner fa-spin text-cyan mb-2 text-2xl block"></i> Chargement de l'arborescence 3D...</div>
-                        </div>
-                    </div>
-
-                    <!-- COL 2 : L'ÉDITEUR INTELLIGENT (ELEC vs GAZ) -->
-                    <div class="col-span-8 bento-card p-0 flex flex-col overflow-hidden relative shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
-                        <div id="site-editor-overlay" class="absolute inset-0 bg-abysse/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center">
-                            <i class="fa-solid fa-sitemap text-6xl text-gray-600 mb-4 opacity-50"></i>
-                            <h3 class="text-xl font-bold text-white">Éditeur de Patrimoine</h3>
-                            <p class="text-xs text-gray-400 mt-2">Sélectionnez un site dans l'arborescence à gauche ou créez-en un nouveau.</p>
-                        </div>
-
-                        <div class="flex-1 overflow-y-auto p-10 space-y-8 relative">
-                            <div class="flex justify-between items-start border-b border-white/10 pb-6">
-                                <div>
-                                    <h3 class="text-2xl font-black text-white flex items-center gap-3" id="site-editor-title">Nouvelle Entité</h3>
-                                    <div class="text-[10px] text-gray-500 font-mono mt-2 tracking-widest uppercase">Identifiant Système : <span id="site-editor-id" class="text-cyan">NEW</span></div>
-                                </div>
-                                <div class="bg-black/40 px-4 py-2 rounded-2xl border border-white/5 text-center shadow-inner cursor-help" title="Le score augmente quand vous renseignez la Surface, le Prix, le PDL...">
-                                    <div class="text-[9px] text-gray-400 uppercase font-bold tracking-widest mb-1 flex items-center gap-2"><i class="fa-solid fa-heart-pulse text-alert"></i> Score Donnée</div>
-                                    <div class="text-lg font-black font-mono text-cyan" id="site-health-score">0%</div>
-                                </div>
-                            </div>
-
-                            <!-- BLOC 1 : IDENTITÉ & LOCALISATION -->
-                            <div class="bg-abysse/50 p-8 rounded-[2rem] border border-white/5 space-y-6">
-                                <h4 class="text-sm font-bold text-white uppercase tracking-widest border-b border-white/10 pb-2"><i class="fa-solid fa-location-dot text-cyan mr-2"></i> Identité & Bâtiment</h4>
-                                <div class="grid grid-cols-2 gap-6 relative">
-                                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block text-cyan">Nom du Site / Bâtiment *</label><input type="text" id="site-name" class="input-edit font-bold text-white border-cyan/50 bg-cyan/5 shadow-inner" placeholder="Ex: Mairie Centrale"></div>
-                                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block">Lot / Entité de regroupement</label><input type="text" id="site-lot" class="input-edit" placeholder="Ex: Lot 1 - Bâtiments > 36kVA"></div>
-                                    
-                                    <!-- AUTOCOMPLÉTION ADRESSE AVEC INSEE CACHÉ -->
-                                    <div class="col-span-2 relative">
-                                        <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block">Adresse (Voie)</label>
-                                        <input type="text" id="address-input" class="input-edit w-full" placeholder="Commencez à taper l'adresse..." oninput="searchAddress()">
-                                        <input type="hidden" id="site-insee">
-                                        <div id="address-suggestions" class="suggestions-list hidden"></div>
-                                    </div>
-                                    
-                                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block">Code Postal</label><input type="text" id="zip-input" class="input-edit font-mono"></div>
-                                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block">Ville</label><input type="text" id="city-input" class="input-edit font-bold"></div>
-
-                                    <div>
-                                        <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block flex justify-between"><span>Surface (m²)</span> <span class="text-tertiaire text-[9px]"><i class="fa-solid fa-leaf mr-1"></i>Décret Tertiaire</span></label>
-                                        <input type="number" id="site-surface" class="input-edit input-mono text-tertiaire border-tertiaire/30 bg-tertiaire/5" placeholder="0">
-                                    </div>
-                                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block">Typologie (Usage)</label><input type="text" id="inp-type" class="input-edit" placeholder="Ex: Ecole, Sport, EP..."></div>
-                                </div>
-                            </div>
-
-                            <!-- BLOC 2 : CONTRAT ET HEUROSAISONNALITÉ -->
-                            <div class="bg-card/80 p-8 rounded-[2rem] border-l-4 border-cyan shadow-lg space-y-6 transition-colors duration-500" id="contract-block">
-                                <div class="flex justify-between items-center border-b border-white/10 pb-4">
-                                    <h4 class="text-sm font-bold text-white uppercase tracking-widest"><i class="fa-solid fa-file-signature text-gray-400 mr-2"></i> Contrat & Structure Tarifaire</h4>
-                                    <div class="flex bg-black/50 p-1 rounded-[2rem] border border-white/5">
-                                        <button onclick="setSiteEnergy('elec')" id="btn-site-elec" class="px-6 py-2 rounded-[2rem] text-xs font-bold bg-cyan text-abysse transition shadow-md">ÉLEC</button>
-                                        <button onclick="setSiteEnergy('gaz')" id="btn-site-gaz" class="px-6 py-2 rounded-[2rem] text-xs font-bold text-gray-400 hover:text-white transition">GAZ</button>
-                                    </div>
-                                </div>
-
-                                <!-- CHAMPS COMMUNS CONTRAT -->
-                                <div class="grid grid-cols-12 gap-6">
-                                    <div class="col-span-4"><label id="lbl-primary" class="text-[10px] text-cyan uppercase font-bold tracking-widest pl-2 mb-1 block">PDL / PRM (14) *</label><input type="text" id="site-pdl" class="input-edit input-mono text-lg text-cyan border-cyan/30 bg-cyan/5" placeholder="3000..."></div>
-                                    <div class="col-span-4"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block">Fournisseur Actuel</label><input type="text" id="site-provider" class="input-edit" placeholder="Ex: EDF, Total..."></div>
-                                    <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block">Début Marché</label><input type="date" id="site-start-date" class="input-edit text-gray-400 cursor-pointer" style="color-scheme: dark;"></div>
-                                    <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block text-alert">Fin de marché</label><input type="date" id="site-end-date" class="input-edit text-gray-300 cursor-pointer" style="color-scheme: dark;"></div>
-                                </div>
-
-                                <!-- LE MOTEUR DE PRIX DYNAMIQUE -->
-                                <div class="bg-abysse p-6 rounded-3xl border border-white/5 relative mt-4 shadow-inner">
-                                    
-                                    <!-- GRILLE ÉLEC (4 Cadrans) -->
-                                    <div id="pricing-elec-grid" class="space-y-4">
-                                        <div class="flex justify-between items-center mb-6">
-                                            <span class="text-[10px] font-bold text-white uppercase tracking-widest"><i class="fa-solid fa-bolt text-cyan mr-1"></i> Acheminement & Énergie (€/MWh HT)</span>
-                                            <div class="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10" id="toggle-quadrants-container">
-                                                <span class="text-[9px] text-gray-400 uppercase font-bold tracking-widest">Tarif Unique (C5)</span>
-                                                <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
-                                                    <input type="checkbox" id="quadrant-toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" onchange="toggleQuadrants()"/>
-                                                    <label for="quadrant-toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-600 cursor-pointer"></label>
-                                                </div>
-                                                <span class="text-[9px] text-cyan uppercase font-bold tracking-widest">Heurosaisonnier (C4/C3)</span>
-                                            </div>
-                                        </div>
-
-                                        <div class="grid grid-cols-4 gap-4">
-                                            <div class="col-span-4 border-b border-white/10 pb-2 mb-2"><span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Puissances Souscrites (kW)</span></div>
-                                            <div class="quad-advanced"><label class="text-[9px] text-gray-400 uppercase font-bold pl-2 mb-1 block">PS - HPH</label><input type="number" id="ps-hph" class="input-edit input-mono text-center"></div>
-                                            <div class="quad-advanced"><label class="text-[9px] text-gray-400 uppercase font-bold pl-2 mb-1 block">PS - HCH</label><input type="number" id="ps-hch" class="input-edit input-mono text-center"></div>
-                                            <div class="quad-advanced"><label class="text-[9px] text-cyan uppercase font-bold pl-2 mb-1 block">PS - HPE</label><input type="number" id="ps-hpe" class="input-edit input-mono text-center border-cyan/30 text-cyan"></div>
-                                            <div class="quad-advanced"><label class="text-[9px] text-gray-400 uppercase font-bold pl-2 mb-1 block">PS - HCE</label><input type="number" id="ps-hce" class="input-edit input-mono text-center"></div>
-                                            <div class="quad-simple col-span-4"><label class="text-[9px] text-cyan uppercase font-bold pl-2 mb-1 block">Puissance Unique (kVA)</label><input type="number" id="ps-unique" class="input-edit input-mono text-cyan w-1/3"></div>
-
-                                            <div class="col-span-4 border-b border-white/10 pb-2 mb-2 mt-4"><span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Prix Molécule (€/MWh HT)</span></div>
-                                            <div class="quad-advanced"><label class="text-[9px] text-white uppercase font-bold pl-2 mb-1 block">Prix HPH</label><input type="number" step="0.01" id="px-hph" class="input-edit input-mono text-center border-white/30 text-white"></div>
-                                            <div class="quad-advanced"><label class="text-[9px] text-gray-400 uppercase font-bold pl-2 mb-1 block">Prix HCH</label><input type="number" step="0.01" id="px-hch" class="input-edit input-mono text-center"></div>
-                                            <div class="quad-advanced"><label class="text-[9px] text-cyan uppercase font-bold pl-2 mb-1 block">Prix HPE</label><input type="number" step="0.01" id="px-hpe" class="input-edit input-mono text-center border-cyan/30 text-cyan"></div>
-                                            <div class="quad-advanced"><label class="text-[9px] text-gray-400 uppercase font-bold pl-2 mb-1 block">Prix HCE</label><input type="number" step="0.01" id="px-hce" class="input-edit input-mono text-center"></div>
-                                            <div class="quad-simple col-span-4"><label class="text-[9px] text-cyan uppercase font-bold pl-2 mb-1 block">Prix Unique Base (€/MWh)</label><input type="number" step="0.01" id="px-unique" class="input-edit input-mono text-cyan border-cyan/50 bg-cyan/5 w-1/3 text-lg"></div>
-
-                                            <div class="col-span-4 border-b border-white/10 pb-2 mb-2 mt-4"><span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Abonnement & Taxes Réglementaires</span></div>
-                                            <div class="col-span-2"><label class="text-[9px] text-gold uppercase font-bold pl-2 mb-1 block">Abonnement Annuel (€)</label><input type="number" step="0.1" id="px-fix" class="input-edit input-mono text-gold border-gold/30 text-center"></div>
-                                            <div class="col-span-2"><label class="text-[9px] text-gray-400 uppercase font-bold pl-2 mb-1 block">CSPE / TICFE (€/MWh)</label><input type="number" step="0.1" id="px-tax" class="input-edit input-mono text-gray-400 text-center" value="22.5"></div>
-                                        </div>
-                                    </div>
-
-                                    <!-- GRILLE GAZ (Métrique Gaz Naturel) -->
-                                    <div id="pricing-gaz-grid" class="hidden space-y-4">
-                                        <div class="flex justify-between items-center mb-6">
-                                            <span class="text-[10px] font-bold text-white uppercase tracking-widest"><i class="fa-solid fa-fire text-gas mr-1"></i> Acheminement & Énergie Gaz</span>
-                                        </div>
-                                        <div class="grid grid-cols-3 gap-6">
-                                            <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-1 block">Profil GRDF (ex: T1, T2, P12)</label><input type="text" id="site-profil-gaz" class="input-edit font-mono text-center uppercase" placeholder="P12"></div>
-                                            <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-1 block">Capacité Journalière (CJA)</label><input type="number" id="ps-gaz-cja" class="input-edit input-mono text-center" placeholder="MWh/j"></div>
-                                            <div><label class="text-[10px] text-gas uppercase font-bold pl-2 mb-1 block">Volume CAR (MWh)</label><input type="number" id="ps-gaz-car" class="input-edit input-mono text-gas border-gas/30 bg-gas/5 text-center text-lg" placeholder="MWh"></div>
-                                            
-                                            <div class="col-span-3 border-b border-white/10 pb-2 mb-2 mt-4"><span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Pricing & Taxes</span></div>
-                                            <div><label class="text-[10px] text-white uppercase font-bold pl-2 mb-1 block">Prix Molécule (€/MWh)</label><input type="number" step="0.01" id="px-gaz-mol" class="input-edit input-mono text-white text-center text-2xl bg-white/5 border-white/30"></div>
-                                            <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-1 block">Abonnement Annuel (€)</label><input type="number" step="0.1" id="px-gaz-fix" class="input-edit input-mono text-center text-lg"></div>
-                                            <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-1 block">Terme de Stockage (€/MWh)</label><input type="number" step="0.01" id="px-gaz-stock" class="input-edit input-mono text-center"></div>
-                                            <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-1 block">TICGN (€/MWh)</label><input type="number" step="0.1" id="px-gaz-tax" class="input-edit input-mono text-center" value="8.44"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- BARRE D'ACTION ÉDITEUR -->
-                        <div class="p-6 bg-abysse border-t border-cyan/20 flex justify-end gap-4 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] z-10">
-                            <button onclick="closeSiteEditor()" class="px-8 py-3 rounded-[2rem] text-gray-400 hover:text-white font-bold text-xs transition uppercase tracking-widest">Annuler</button>
-                            <button onclick="saveSiteData()" id="btn-save-site" class="bg-cyan text-abysse px-10 py-3 rounded-[2rem] text-sm font-black hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.4)] uppercase tracking-widest flex items-center gap-2">
-                                <i class="fa-solid fa-save"></i> Synchroniser Base 3D
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- VUE 3 : IMPORT MASSIF EXCEL (SMART TEMPLATE 36 COLONNES) -->
-            <div id="view-import" class="view-section max-w-[1200px] mx-auto space-y-8 mt-10">
-                <div class="text-center mb-16">
-                    <h2 class="text-5xl font-black text-white italic tracking-tight mb-6">IMPORT <span class="text-success">MASSIF</span></h2>
-                    <p class="text-base text-gray-400 font-mono leading-relaxed max-w-3xl mx-auto">Peuplez votre War Room en un clic. Téléchargez la matrice V12.6, remplissez vos compteurs Élec & Gaz, et glissez le fichier ci-dessous. L'IA CORTEX classera chaque donnée dans le bon tiroir 3D.</p>
-                </div>
-
-                <div class="grid grid-cols-2 gap-10">
-                    <div class="bento-card p-12 border-t-4 border-cyan text-center shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col justify-center items-center">
-                        <i class="fa-solid fa-file-excel text-7xl text-cyan mb-8 drop-shadow-lg"></i>
-                        <h3 class="text-2xl font-black text-white mb-4">1. Télécharger la Matrice</h3>
-                        <p class="text-sm text-gray-400 mb-10 leading-relaxed">Fichier normé (36 colonnes) adapté aux marchés publics et industriels. Gère l'heurosaisonnalité, le Gaz, le code INSEE et la loi ELAN.</p>
-                        <button onclick="downloadTemplate()" class="w-full bg-abysse border-2 border-cyan/50 text-cyan font-black py-5 rounded-[2rem] hover:bg-cyan hover:text-abysse transition shadow-[0_0_20px_rgba(0,229,255,0.2)] text-sm uppercase tracking-widest flex justify-center items-center gap-3">
-                            <i class="fa-solid fa-download text-lg"></i> Matrice V12.6 (.CSV)
-                        </button>
-                    </div>
-
-                    <div class="bento-card p-12 border-t-4 border-success text-center shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col justify-center items-center group hover:border-success/80 transition duration-500">
-                        <i class="fa-solid fa-cloud-arrow-up text-7xl text-gray-600 group-hover:text-success mb-8 transition duration-500"></i>
-                        <h3 class="text-2xl font-black text-white mb-4">2. Ingestion CORTEX</h3>
-                        <p class="text-sm text-gray-400 mb-10 leading-relaxed">Glissez votre fichier complété. L'IA rattachera tous les compteurs à votre SIRET maître (<span class="text-success font-bold" id="import-tenant-id">--</span>).</p>
-                        <label class="w-full block bg-success text-abysse font-black py-5 rounded-[2rem] cursor-pointer hover:bg-white transition shadow-[0_0_30px_rgba(16,185,129,0.4)] text-sm uppercase tracking-widest">
-                            <i class="fa-solid fa-upload mr-2 text-lg"></i> Injecter les Données
-                            <input type="file" id="csv-upload" class="hidden" accept=".csv,.xlsx" onchange="processImport(this)">
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- VUE 4 : RGPD & CONFORMITÉ LÉGALE -->
-            <div id="view-rgpd" class="view-section max-w-[1200px] mx-auto space-y-8">
-                <div class="flex justify-between items-end mb-10">
-                    <div>
-                        <h2 class="text-4xl font-black text-white italic tracking-tight">Tiers de <span class="text-gold">Confiance</span></h2>
-                        <p class="text-sm text-gray-400 mt-2 font-mono">Contrôle des flux API (SGE) et registre RGPD.</p>
-                    </div>
-                    <div class="bg-card/50 border border-white/10 px-8 py-4 rounded-[2rem] flex items-center gap-4 shadow-lg">
-                        <span class="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Rétention Légale</span>
-                        <span class="text-base font-black text-white bg-abysse px-4 py-2 rounded-full border border-white/20">5 Ans</span>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-10">
-                    <div class="bento-card p-10 border-l-4 border-gold shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
-                        <h3 class="text-xl font-black text-white mb-8 flex items-center gap-3"><i class="fa-solid fa-plug-circle-check text-gold text-2xl"></i> Monitoring API Distributeurs</h3>
-                        <div class="space-y-6">
-                            <div class="bg-abysse/50 p-6 rounded-[2rem] border border-white/5 flex justify-between items-center shadow-inner">
-                                <div class="flex items-center gap-6">
-                                    <div class="w-14 h-14 rounded-full bg-cyan/10 flex items-center justify-center border border-cyan/30 text-cyan text-2xl shadow-lg"><i class="fa-solid fa-bolt"></i></div>
-                                    <div><div class="font-bold text-white text-lg">Passerelle ENEDIS</div><div class="text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-widest">Synchro : Aujourd'hui, 06h12</div></div>
-                                </div>
-                                <div class="bg-success/20 text-success border border-success/30 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-success animate-pulse"></div> Actif</div>
-                            </div>
-                            <div class="bg-abysse/50 p-6 rounded-[2rem] border border-white/5 flex justify-between items-center opacity-50">
-                                <div class="flex items-center gap-6">
-                                    <div class="w-14 h-14 rounded-full bg-gas/10 flex items-center justify-center border border-gas/30 text-gas text-2xl"><i class="fa-solid fa-fire"></i></div>
-                                    <div><div class="font-bold text-white text-lg">Passerelle GRDF</div><div class="text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-widest">Aucun compteur gaz détecté</div></div>
-                                </div>
-                                <div class="bg-gray-800 text-gray-400 border border-gray-600 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest">En veille</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bento-card p-10 border-l-4 border-cyan shadow-[0_20px_50px_rgba(0,0,0,0.3)] text-center flex flex-col justify-center relative overflow-hidden">
-                        <i class="fa-solid fa-file-signature absolute -right-4 -bottom-4 text-[150px] text-cyan opacity-5"></i>
-                        <h3 class="text-2xl font-black text-white mb-4 relative z-10">Mandat Unique de Collecte</h3>
-                        <p class="text-sm text-gray-400 mb-10 leading-relaxed max-w-md mx-auto relative z-10">
-                            Pour permettre à CORTEX de collecter et d'analyser vos courbes de charge en continu, vous devez approuver le mandat de délégation SGE. Un certificat PDF sera horodaté dans la blockchain interne.
-                        </p>
-                        <div class="flex items-center justify-center gap-4 mb-10 relative z-10 bg-abysse/50 p-4 rounded-[2rem] border border-white/5 w-max mx-auto">
-                            <input type="checkbox" id="legal-check" class="w-6 h-6 accent-cyan cursor-pointer shadow-[0_0_10px_#00E5FF]">
-                            <label for="legal-check" class="text-sm font-bold text-white cursor-pointer select-none">J'agis en qualité de représentant légal et j'approuve.</label>
-                        </div>
-                        <button onclick="approveMandate()" id="btn-mandate" class="w-full bg-cyan text-abysse font-black py-4 rounded-[2rem] shadow-[0_0_20px_rgba(0,229,255,0.4)] hover:bg-white transition flex justify-center items-center gap-3 uppercase tracking-widest text-sm relative z-10">
-                            <i class="fa-solid fa-stamp text-lg"></i> Signer le Mandat Électronique
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- VUE 5 : GUICHET OPS & SAGE TIMELINE -->
-            <div id="view-support" class="view-section max-w-[1600px] mx-auto space-y-8 h-full">
-                <div class="flex justify-between items-end mb-6">
-                    <div>
-                        <h3 class="text-4xl font-black text-white italic tracking-tight">GUICHET <span class="text-purple">OPS</span></h3>
-                        <p class="text-sm text-gray-400 mt-2 font-mono">Service Desk & Timeline d'Expertise (SAGE)</p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 h-[700px]">
-                    <!-- NOUVELLE REQUÊTE (PONT CRM) -->
-                    <div class="col-span-5 bento-card p-10 border-t-4 border-cyan flex flex-col shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
-                        <h4 class="text-lg font-black text-white uppercase tracking-widest mb-4 flex items-center gap-3"><i class="fa-solid fa-paper-plane text-cyan text-2xl"></i> Ouvrir un Ticket Support</h4>
-                        <p class="text-sm text-gray-400 mb-8 leading-relaxed">Votre demande sera poussée directement dans la War Room de nos experts opérationnels.</p>
-                        
-                        <div class="space-y-6 flex-1">
-                            <select id="ticket-type" class="input-edit appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_20px_center] bg-[length:12px_auto] cursor-pointer font-bold text-base py-5">
-                                <option value="ACHAT">Demande de cotation (Nouveau Bâtiment)</option>
-                                <option value="FACTURE">Contestation d'une facture</option>
-                                <option value="TECH">Problème sur un PDL SGE</option>
-                                <option value="RSE">Question Décret Tertiaire / CEE</option>
-                            </select>
-                            <textarea id="ticket-desc" class="input-edit h-64 resize-none font-sans text-sm p-6" placeholder="Détaillez votre besoin ici..."></textarea>
-                        </div>
-                        <button onclick="sendOpsTicket()" class="w-full bg-cyan text-abysse font-black py-5 rounded-[2rem] hover:bg-white transition shadow-[0_0_30px_rgba(0,229,255,0.4)] mt-6 uppercase tracking-widest text-sm flex items-center justify-center gap-3">
-                            <i class="fa-solid fa-paper-plane"></i> Envoyer la requête
-                        </button>
-                    </div>
-
-                    <!-- TIMELINE SAGE (PREUVE DE TRAVAIL) -->
-                    <div class="col-span-7 bento-card p-0 flex flex-col border-t-4 border-purple overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
-                        <div class="p-8 border-b border-white/5 bg-card/50">
-                            <h4 class="text-lg font-black text-white uppercase tracking-widest flex items-center gap-3"><i class="fa-solid fa-user-tie text-purple text-2xl"></i> Journal d'Expertise (SAGE)</h4>
-                            <p class="text-xs text-gray-400 mt-2 font-mono">Retrouvez ici toutes les recommandations rédigées par nos experts ou l'Économe de flux de votre syndicat.</p>
-                        </div>
-                        <div class="flex-1 overflow-y-auto p-10 space-y-8 bg-abysse/30 relative" id="sage-timeline-container">
-                            <div class="absolute left-14 top-0 bottom-0 w-px bg-white/10 z-0"></div>
-                            <div class="text-center py-20 text-gray-500 font-mono text-sm relative z-10"><i class="fa-solid fa-spinner fa-spin text-purple mb-4 text-4xl block"></i> Analyse de la base 3D...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- VUE 6 : ÉQUIPE & ACCÈS -->
-            <div id="view-equipe" class="view-section max-w-[1200px] mx-auto space-y-8">
-                <div class="flex justify-between items-end mb-10">
-                    <div>
-                        <h2 class="text-4xl font-black text-white italic tracking-tight">Rôle & <span class="text-gray-400">Sécurité</span></h2>
-                        <p class="text-sm text-gray-400 mt-2 font-mono">Gestion des accès à l'Hyperviseur.</p>
-                    </div>
-                    <button onclick="App.toast('Invitation envoyée !', 'success')" class="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-8 py-4 rounded-[2rem] text-sm font-black transition flex items-center gap-3 uppercase tracking-widest shadow-lg">
-                        <i class="fa-solid fa-user-plus text-cyan"></i> Inviter un collaborateur
-                    </button>
-                </div>
-                
-                <div class="bento-card overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/5">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-abysse text-[10px] text-gray-500 uppercase tracking-widest border-b border-white/10">
-                            <tr><th class="p-8">Utilisateur</th><th class="p-8">Rôle (RBAC)</th><th class="p-8 text-center">Statut</th><th class="p-8 text-right">Action</th></tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5 bg-card/30">
-                            <tr class="hover:bg-white/5 transition">
-                                <td class="p-8 font-bold text-white flex items-center gap-4 text-base"><div class="w-12 h-12 rounded-full bg-cyan/20 text-cyan flex items-center justify-center text-xl shadow-inner"><i class="fa-solid fa-user"></i></div> Vous (Admin)</td>
-                                <td class="p-8 text-cyan font-mono text-sm font-bold">Propriétaire</td>
-                                <td class="p-8 text-center"><span class="bg-success/20 border border-success/30 text-success px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest shadow-[0_0_10px_rgba(16,185,129,0.2)]">Actif</span></td>
-                                <td class="p-8 text-right text-gray-600">-</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-        </div>
-    </main>
-
-    <!-- TOAST ENGINE -->
-    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
-
-    <script>
-        const App = {
-            toast: function(msg, type='info') {
-                const container = document.getElementById('toast-container');
-                if(!container) return;
-                const colors = { success: 'bg-green-600 border-green-500 text-white', error: 'bg-alert border-alert text-white', info: 'bg-cyan border-cyan text-abysse', sage: 'bg-purple border-purple text-white' };
-                const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
-                const el = document.createElement('div');
-                el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
-                el.innerHTML = `<i class="fa-solid ${icon} text-lg"></i> <span>${msg}</span>`;
-                container.appendChild(el);
-                requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
-                setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
-            }
-        };
-
-        // --- MOTEUR GOD MODE ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const forceTenant = urlParams.get('force_tenant') || localStorage.getItem('cortex_god_mode_tenant');
-
-        let SITES =[];
-        let CURRENT_SITE_ID = null;
-        let CURRENT_ENERGY_FORM = 'elec';
-        let GLOBAL_TENANT_ID = forceTenant !== 'ALL' ? forceTenant : "TENANT_DEFAULT";
-
-        document.addEventListener('DOMContentLoaded', () => {
-            if(forceTenant && forceTenant !== 'ALL') {
-                document.getElementById('god-mode-indicator').classList.remove('hidden');
-                document.getElementById('import-tenant-id').innerText = forceTenant;
-            }
-            switchView('general'); 
-        });
-
-        window.switchView = function(viewId) {
-            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
-            const btn = document.getElementById('nav-' + viewId);
-            if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
-            
-            const views =['view-general', 'view-perimetre', 'view-import', 'view-rgpd', 'view-support', 'view-equipe'];
-            views.forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('active'); });
-            
-            const target = document.getElementById('view-' + viewId);
-            if(target) target.classList.add('active');
-
-            if(viewId === 'general') loadPartnerConfig();
-            if(viewId === 'perimetre') { loadFleet(); resetSiteForm(); }
-            if(viewId === 'support') loadSageTimeline();
-        }
-
-        // ==========================================
-        // VUE 1 : MON ENTREPRISE (MASTER TENANT)
-        // ==========================================
-        async function loadPartnerConfig() {
-            try {
-                const res = await fetch('/api/partner/get_config');
-                const j = await res.json();
-                if(j.success && j.data) {
-                    if (forceTenant && forceTenant !== 'ALL') {
-                        document.getElementById('partner-siret').value = forceTenant;
-                        checkPartnerIdentity(); 
-                    } else {
-                        document.getElementById('partner-siret').value = j.data.siret || "";
-                        document.getElementById('partner-name').value = j.data.name || "";
-                        document.getElementById('partner-address').value = j.data.address || "";
-                        document.getElementById('partner-zip').value = j.data.zip || "";
-                        document.getElementById('partner-city').value = j.data.city || "";
-                        // Remplissage du NAF
-                        document.getElementById('partner-naf').value = j.data.naf || "";
-                    }
-                }
-            } catch(e) {}
-        }
-
-        async function checkPartnerIdentity() {
-            const val = document.getElementById('partner-siret').value.replace(/\s/g, '');
-            const status = document.getElementById('partner-status');
-            if(val.length >= 9) {
-                status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i>';
-                try {
-                    const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${val}`);
-                    const data = await res.json();
-                    if(data.results && data.results.length > 0) {
-                        const etab = data.results[0];
-                        status.innerHTML = '<i class="fa-solid fa-check-circle text-success shadow-[0_0_10px_#10B981] rounded-full"></i>';
-                        
-                        const nom = etab.nom_complet || etab.nom_raison_sociale || "Entité Publique";
-                        document.getElementById('partner-name').value = nom;
-                        
-                        // AUTOCOMPLETION NAF
-                        document.getElementById('partner-naf').value = etab.activite_principale || "Inconnu";
-                        
-                        GLOBAL_TENANT_ID = val; 
-                        
-                        try { document.getElementById('partner-tva').value = "FR" + (12 + 3 * (parseInt(val.substring(0,9)) % 97)) % 97 + val.substring(0, 9); } catch(e) {}
-                        
-                        if(etab.siege && etab.siege.adresse) {
-                            document.getElementById('partner-address').value = etab.siege.adresse;
-                            document.getElementById('partner-zip').value = etab.siege.code_postal;
-                            document.getElementById('partner-city').value = etab.siege.libelle_commune;
-                        }
-                    } else { status.innerHTML = '<i class="fa-solid fa-xmark-circle text-alert"></i>'; }
-                } catch(e) { status.innerHTML = '?'; }
-            }
-        }
-
-        async function savePartnerConfig() {
-            const data = {
-                siret: document.getElementById('partner-siret').value,
-                name: document.getElementById('partner-name').value,
-                naf: document.getElementById('partner-naf').value, // Sauvegarde du NAF
-                address: document.getElementById('partner-address').value,
-                zip: document.getElementById('partner-zip').value,
-                city: document.getElementById('partner-city').value,
-                baseline_year: parseInt(document.getElementById('partner-baseline-year').value) || 2010
-            };
-            try {
-                await fetch('/api/partner/save_config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-                await fetch('/api/settings/carbon', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ baseline_year: data.baseline_year, baseline_kwh_sqm: 0.0 }) });
-                App.toast("Identité Master Tenant verrouillée.", "success");
-            } catch(e) { App.toast("Erreur sauvegarde.", "error"); }
-        }
-
-        // ==========================================
-        // VUE 2 : MON PÉRIMÈTRE (L'ARBRE 3D & L'ÉDITEUR)
-        // ==========================================
-        async function loadFleet() {
-            try {
-                const res = await fetch('/api/dashboard/fleet');
-                const data = await res.json();
-                if(data.fleet) {
-                    if (forceTenant && forceTenant !== 'ALL') {
-                        SITES = data.fleet.filter(s => s.tenant_id === forceTenant);
-                    } else {
-                        SITES = data.fleet;
-                    }
-                    renderSiteTree();
-                    updateGlobalHealth();
-                }
-            } catch(e) { document.getElementById('site-tree-container').innerHTML = '<div class="text-alert text-xs text-center mt-10">Erreur de chargement.</div>'; }
-        }
-
-        function updateGlobalHealth() {
-            if(SITES.length === 0) return;
-            let totalScore = 0;
-            SITES.forEach(s => totalScore += calculateHealthScoreInternal(s));
-            const avg = Math.round(totalScore / SITES.length);
-            const el = document.getElementById('global-health');
-            el.innerText = `${avg}%`;
-            el.className = `text-xl font-black font-mono ${avg === 100 ? 'text-success' : (avg > 60 ? 'text-cyan' : 'text-alert')}`;
-        }
-
-        // ALGORITHME DE RÉPARARTION (DOUBLE FOND)
-        function calculateHealthScoreInternal(s) {
-            let score = 0;
-            if(s.pdl || s.id) score += 25;
-            // Lecture V12.6 ou fallback V12.4
-            if(s.surface || s.SURFACE_M2) score += 25;
-            if(s.provider || s.FOURNISSEUR) score += 15;
-            if(s.budget > 0 || s.prix_hph || s.price_kwh || s.PRIX_HPH || s.PRIX_MOL_EUR_MWH) score += 20;
-            if(s.end_date || s.FIN_MARCHE_YYYYMMDD) score += 15;
-            return Math.min(score, 100);
-        }
-
-        window.renderSiteTree = function() {
-            const term = (document.getElementById('search-site').value || "").toLowerCase();
-            const container = document.getElementById('site-tree-container');
-            container.innerHTML = '';
-            
-            let filtered = SITES.filter(s => {
-                const name = (s.name || "").toLowerCase();
-                const pdl = (s.pdl || s.id || "").toLowerCase();
-                return name.includes(term) || pdl.includes(term);
-            });
-
-            const grouped = {};
-            filtered.forEach(s => {
-                const city = s.city && s.city.trim() !== "" ? s.city : "Non Localisé";
-                if(!grouped[city]) grouped[city] = [];
-                grouped[city].push(s);
-            });
-
-            for (const city in grouped) {
-                const cityDiv = document.createElement('div');
-                cityDiv.className = "mb-6";
-                cityDiv.innerHTML = `<div class="text-sm font-bold text-white mb-3 flex items-center gap-3"><i class="fa-solid fa-map-location-dot text-cyan text-lg"></i> ${city.toUpperCase()} <span class="text-[10px] text-gray-400 bg-black/40 px-3 py-1 rounded-full border border-white/5">${grouped[city].length} actifs</span></div>`;
-                
-                const list = document.createElement('div');
-                list.className = "pl-4 border-l-2 border-white/10 space-y-3 ml-2";
-
-                grouped[city].forEach(s => {
-                    const div = document.createElement('div');
-                    const isActive = CURRENT_SITE_ID === s.id;
-                    div.className = `p-4 rounded-2xl cursor-pointer transition flex items-center justify-between border ${isActive ? 'bg-cyan/10 border-cyan text-white shadow-[0_0_15px_rgba(0,229,255,0.2)]' : 'bg-card/50 border-white/5 text-gray-400 hover:bg-white/10 hover:text-white'}`;
-                    div.onclick = () => loadSiteForm(s.id);
-                    
-                    const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire text-gas text-xl"></i>' : '<i class="fa-solid fa-bolt text-cyan text-xl"></i>';
-                    const score = calculateHealthScoreInternal(s);
-                    let dot = score === 100 ? 'bg-success shadow-[0_0_8px_#10B981]' : (score > 60 ? 'bg-gold shadow-[0_0_8px_#F59E0B]' : 'bg-alert animate-pulse shadow-[0_0_10px_#EF4444]');
-
-                    div.innerHTML = `
-                        <div class="flex items-center gap-4 truncate">
-                            ${icon}
-                            <div class="truncate">
-                                <div class="font-bold text-sm truncate text-white">${s.name || 'Site sans nom'}</div>
-                                <div class="text-[10px] font-mono mt-1 opacity-70 uppercase tracking-widest">${s.pdl || s.id || 'PDL manquant'}</div>
-                            </div>
-                        </div>
-                        <div class="w-3 h-3 rounded-full ${dot} flex-shrink-0" title="Data Health Score: ${score}%"></div>
-                    `;
-                    list.appendChild(div);
-                });
-                cityDiv.appendChild(list);
-                container.appendChild(cityDiv);
-            }
-            if(filtered.length === 0) container.innerHTML = '<div class="text-gray-500 text-sm font-mono text-center py-10">Aucun site trouvé.</div>';
-        }
-
-        async function loadSiteForm(id) {
-            CURRENT_SITE_ID = id;
-            renderSiteTree(); 
-            document.getElementById('site-editor-overlay').classList.add('hidden');
-            document.getElementById('site-editor-title').innerText = "Modification de l'Actif";
-            document.getElementById('site-editor-id').innerText = id;
-            
-            try {
-                // APPEL A LA ROUTE MAGIQUE (Qui corrige le 0% et normalise)
-                const res = await fetch(`/api/dashboard/data/${id}`);
-                const data = await res.json();
-                
-                const identity = data.identity || {};
-                document.getElementById('site-name').value = identity.site_name || "";
-                document.getElementById('site-lot').value = identity.lot_name || data.segment || "";
-                
-                const loc = data.location || {};
-                document.getElementById('site-city').value = loc.city || "";
-                document.getElementById('site-surface').value = loc.surface || "";
-                document.getElementById('site-insee').value = loc.insee || ""; // Hidden
-                document.getElementById('inp-type').value = loc.typologie || "";
-
-                const contract = data.contract || {};
-                document.getElementById('site-pdl').value = contract.pdl || contract.pce || "";
-                document.getElementById('site-provider').value = contract.provider || "";
-                document.getElementById('site-start-date').value = contract.start_date || ""; // NOUVEAUTÉ DEBUT MARCHE
-                document.getElementById('site-end-date').value = contract.end_date || "";
-                
-                if(data.energy_type === 'gaz') setSiteEnergy('gaz'); else setSiteEnergy('elec');
-
-                const pd = contract.power_details || {};
-                document.getElementById('ps-hph').value = pd.hph || "";
-                document.getElementById('ps-hch').value = pd.hch || "";
-                document.getElementById('ps-hpe').value = pd.hpe || "";
-                document.getElementById('ps-hce').value = pd.hce || "";
-                document.getElementById('ps-unique').value = contract.power || "";
-                
-                // GAZ SPECS
-                document.getElementById('site-profil-gaz').value = contract.profil || "";
-                document.getElementById('ps-gaz-cja').value = contract.cja || "";
-                document.getElementById('ps-gaz-car').value = data.kpis?.car_mwh || "";
-
-                const p = data.pricing || {};
-                let taxVal = parseFloat(p.tax || 22.5);
-                if(isNaN(taxVal) || taxVal > 100) taxVal = 22.5;
-                
-                if(currentEnergy === 'gaz') {
-                    document.getElementById('px-gaz-fix').value = p.fix || "";
-                    document.getElementById('px-gaz-mol').value = p.price_kwh ? (p.price_kwh*1000).toFixed(2) : (p.hph || "");
-                    document.getElementById('px-gaz-stock').value = p.stockage || "";
-                    document.getElementById('px-gaz-tax').value = taxVal;
-                } else {
-                    document.getElementById('px-hph').value = p.hph || "";
-                    document.getElementById('px-hch').value = p.hch || "";
-                    document.getElementById('px-hpe').value = p.hpe || "";
-                    document.getElementById('px-hce').value = p.hce || "";
-                    document.getElementById('px-unique').value = p.price_kwh ? (p.price_kwh*1000).toFixed(2) : "";
-                    document.getElementById('px-fix').value = p.fix || "";
-                    document.getElementById('px-tax').value = taxVal;
-                }
-
-                // Auto-toggle Heurosaisonnier
-                const isAdvanced = (document.getElementById('ps-hph').value !== "" || document.getElementById('px-hph').value !== "");
-                document.getElementById('quadrant-toggle').checked = isAdvanced;
-                toggleQuadrants();
-
-                // Re-calcul local Health Score avec les datas normalisées !
-                const localScore = calculateHealthScoreInternal(data);
-                const scoreEl = document.getElementById('site-health-score');
-                scoreEl.innerText = `${localScore}%`;
-                scoreEl.className = `text-3xl font-black font-mono ${localScore === 100 ? 'text-success drop-shadow-[0_0_10px_#10B981]' : (localScore > 60 ? 'text-cyan drop-shadow-[0_0_10px_#00E5FF]' : 'text-alert animate-pulse drop-shadow-[0_0_10px_#EF4444]')}`;
-
-            } catch(e) { App.toast("Impossible de charger les détails du site.", "error"); }
-        }
-
-        window.resetSiteForm = function() {
-            CURRENT_SITE_ID = null;
-            renderSiteTree();
-            document.getElementById('site-editor-overlay').classList.add('hidden');
-            document.getElementById('site-editor-title').innerText = "Nouvelle Entité";
-            document.getElementById('site-editor-id').innerText = "NEW";
-            document.getElementById('site-health-score').innerText = "0%";
-            document.getElementById('site-health-score').className = "text-3xl font-black font-mono text-alert";
-            
-            const inputs =['site-name','site-lot','site-surface','site-city','site-insee','site-pdl','site-provider','site-start-date','site-end-date','ps-hph','ps-hch','ps-hpe','ps-hce','ps-unique','px-hph','px-hch','px-hpe','px-hce','px-unique','px-fix','ps-gaz-cja','ps-gaz-car','site-profil-gaz','px-gaz-mol','px-gaz-fix','px-gaz-stock','inp-type'];
-            inputs.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-            document.getElementById('px-tax').value = "22.5";
-            document.getElementById('px-gaz-tax').value = "8.44";
-            
-            setSiteEnergy('elec');
-            document.getElementById('quadrant-toggle').checked = false;
-            toggleQuadrants();
-        }
-
-        window.closeSiteEditor = function() {
-            document.getElementById('site-editor-overlay').classList.remove('hidden');
-            CURRENT_SITE_ID = null;
-            renderSiteTree();
-        }
-
-        // LE PIVOT ÉLEC / GAZ
-        window.setSiteEnergy = function(type) {
-            currentEnergy = type;
-            const btnElec = document.getElementById('btn-site-elec'); const btnGaz = document.getElementById('btn-site-gaz');
-            const block = document.getElementById('contract-block');
-            const toggleCont = document.getElementById('toggle-quadrants-container');
-            const lblPrimary = document.getElementById('lbl-primary');
-
-            if(type === 'elec') {
-                btnElec.className = "px-8 py-3 rounded-[2rem] text-sm font-black bg-cyan text-abysse transition shadow-[0_0_15px_rgba(0,229,255,0.4)]";
-                btnGaz.className = "px-8 py-3 rounded-[2rem] text-sm font-bold text-gray-400 hover:text-white transition bg-transparent shadow-none";
-                block.className = "bg-card/80 p-10 rounded-[3rem] border-l-4 border-cyan shadow-lg space-y-6 transition-all duration-500";
-                lblPrimary.innerText = "PDL / PRM (14) *";
-                document.getElementById('pricing-elec-grid').classList.remove('hidden');
-                document.getElementById('pricing-gaz-grid').classList.add('hidden');
-                toggleCont.classList.remove('hidden');
-            } else {
-                btnGaz.className = "px-8 py-3 rounded-[2rem] text-sm font-black bg-gas text-white transition shadow-[0_0_15px_rgba(249,115,22,0.4)]";
-                btnElec.className = "px-8 py-3 rounded-[2rem] text-sm font-bold text-gray-400 hover:text-white transition bg-transparent shadow-none";
-                block.className = "bg-card/80 p-10 rounded-[3rem] border-l-4 border-gas shadow-lg space-y-6 transition-all duration-500";
-                lblPrimary.innerText = "PCE GAZ (14) *";
-                document.getElementById('pricing-elec-grid').classList.add('hidden');
-                document.getElementById('pricing-gaz-grid').classList.remove('hidden');
-                toggleCont.classList.add('hidden');
-            }
-        }
-
-        window.toggleQuadrants = function() {
-            const isAdvanced = document.getElementById('quadrant-toggle').checked;
-            document.querySelectorAll('.quad-advanced').forEach(el => el.style.display = isAdvanced ? 'block' : 'none');
-            document.querySelectorAll('.quad-simple').forEach(el => el.style.display = isAdvanced ? 'none' : 'block');
-        }
-
-        window.saveSiteData = async function() {
-            const btn = document.getElementById('btn-save-site');
-            const original = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xl mr-3"></i> Synchronisation...';
-            
-            const inputPdl = document.getElementById('site-pdl').value.replace(/\s/g, '');
-            if(!inputPdl) { App.toast("L'identifiant PDL/PCE est obligatoire.", "error"); btn.innerHTML = original; return; }
-
-            const isAdvanced = document.getElementById('quadrant-toggle').checked;
-
-            const payload = {
-                id: CURRENT_SITE_ID || inputPdl, 
-                identity: {
-                    id: CURRENT_SITE_ID || inputPdl, 
-                    tenant_id: GLOBAL_TENANT_ID,
-                    site_name: document.getElementById('site-name').value,
-                    lot_name: document.getElementById('site-lot').value
-                },
-                location: { 
-                    city: document.getElementById('site-city').value,
-                    zip_code: document.getElementById('zip-input').value,
-                    insee: document.getElementById('site-insee').value,
-                    surface: parseFloat(document.getElementById('site-surface').value) || 0,
-                    typologie: document.getElementById('inp-type').value
-                },
-                contract: {
-                    pdl: currentEnergy === 'elec' ? inputPdl : "",
-                    pce: currentEnergy === 'gaz' ? inputPdl : "",
-                    power: currentEnergy === 'gaz' ? 0 : (isAdvanced ? 0 : parseFloat(document.getElementById('ps-unique').value) || 0),
-                    cja: currentEnergy === 'gaz' ? parseFloat(document.getElementById('ps-gaz-cja').value) || 0 : 0,
-                    profil: currentEnergy === 'gaz' ? document.getElementById('site-profil-gaz').value : "",
-                    provider: document.getElementById('site-provider').value,
-                    start_date: document.getElementById('site-start-date').value,
-                    end_date: document.getElementById('site-end-date').value,
-                    energy_type: currentEnergy,
-                    power_details: {
-                        hph: parseFloat(document.getElementById('ps-hph').value) || 0,
-                        hch: parseFloat(document.getElementById('ps-hch').value) || 0,
-                        hpe: parseFloat(document.getElementById('ps-hpe').value) || 0,
-                        hce: parseFloat(document.getElementById('ps-hce').value) || 0
-                    }
-                },
-                kpis: {
-                    volume_mwh: currentEnergy === 'gaz' ? parseFloat(document.getElementById('ps-gaz-car').value) || 0 : 0
-                },
-                pricing: {
-                    price_kwh: currentEnergy === 'elec' && !isAdvanced ? (parseFloat(document.getElementById('px-unique').value) || 0)/1000 : (currentEnergy === 'gaz' ? (parseFloat(document.getElementById('px-gaz-mol').value)||0)/1000 : 0),
-                    hph: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hph').value) || 0,
-                    hch: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hch').value) || 0,
-                    hpe: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hpe').value) || 0,
-                    hce: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hce').value) || 0,
-                    fix: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-fix').value) || 0 : parseFloat(document.getElementById('px-fix').value) || 0,
-                    stockage: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-stock').value) || 0 : 0,
-                    tax: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-tax').value) || 8.44 : parseFloat(document.getElementById('px-tax').value) || 22.5
-                }
-            };
-            
-            try {
-                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-                const response = await res.json();
-                if(response.success) { 
-                    App.toast("Actif synchronisé avec la Base 3D CORTEX.", "success"); 
-                    CURRENT_SITE_ID = response.id || payload.id; 
-                    await loadFleet(); 
-                    loadSiteForm(CURRENT_SITE_ID); 
-                } else { App.toast("Erreur serveur : " + response.error, "error"); }
-            } catch(e) { App.toast("Erreur réseau.", "error"); }
-            btn.innerHTML = original;
-        }
-
-        // ==========================================
-        // VUE 3 : IMPORT MASSIF EXCEL (SMART TEMPLATE 36 COLONNES)
-        // ==========================================
-        window.downloadTemplate = function() {
-            App.toast("Génération de la matrice V12.6...", "info");
-            const csv = "ENTITE;NOM_SITE;ADRESSE_SITE;CP;VILLE;INSEE;SIRET_SITE;NAF;ENERGIE;PDL_PCE;SEGMENT;PROFIL;FOURNISSEUR;DATE_DEBUT;FIN_MARCHE_YYYYMMDD;VOLUME_ANNUEL;CJA_MWH_J;TYPOLOGIE;PUISSANCE_KVA;PS_HPH;PS_HCH;PS_HPE;PS_HCE;PRIX_MOL_EUR_MWH;PRIX_HPH;PRIX_HCH;PRIX_HPE;PRIX_HCE;ABONNEMENT_EUR;TERME_STOC;TAXES;SURFACE_M2\n" +
-                        "Mairie de Grenoble;Hôtel de Ville;11 Boulevard Jean Pain;38000;GRENOBLE;38185;21380185500018;8411Z;ELEC;30001234567890;C4;;EDF;01/01/2025;20261231;250;;Bâtiment;250;60;60;60;60;;150;100;120;80;350;;22.5;15000\n" +
-                        "Mairie de Grenoble;Gymnase;2 Rue des Sports;38000;GRENOBLE;38185;21380185500018;8411Z;GAZ;12345678901234;;T2/P12;ENGIE;01/01/2025;20261231;450;0;Sport;;;;;;45.5;;;;;250;0.70;8.44;2500\n";
-            setTimeout(() => {
-                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a"); a.href = url; a.download = `Matrice_CORTEX_V12.6.csv`;
-                document.body.appendChild(a); a.click(); a.remove();
-                App.toast("Matrice téléchargée.", "success");
-            }, 800);
-        }
-
-        window.processImport = async function(input) {
-            if (!input.files || input.files.length === 0) return;
-            App.toast("Ingestion CORTEX en cours...", "info");
-            const formData = new FormData();
-            formData.append("file", input.files[0]);
-            
-            try {
-                const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData });
-                const data = await res.json();
-                if(data.success) { 
-                    App.toast(`${data.imported} compteurs rattachés au périmètre !`, "success"); 
-                    loadFleet(); 
-                    switchView('perimetre'); 
-                } else { App.toast("Erreur Import : " + (data.error || "Format invalide."), "error"); }
-            } catch(e) { App.toast("Erreur réseau.", "error"); }
-        }
-
-        // ==========================================
-        // VUE 4 : RGPD & CONFORMITÉ
-        // ==========================================
-        window.approveMandate = function() {
-            if(!document.getElementById('legal-check').checked) return App.toast("Vous devez cocher la case d'approbation légale.", "error");
-            const btn = document.getElementById('btn-mandate');
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-2xl mr-3"></i> HORODATAGE BLOCKCHAIN...';
-            
-            setTimeout(() => {
-                btn.className = "w-full bg-success text-white font-black py-5 rounded-[2rem] shadow-[0_0_30px_rgba(16,185,129,0.4)] transition uppercase tracking-widest text-sm relative z-10 flex items-center justify-center gap-3";
-                btn.innerHTML = '<i class="fa-solid fa-shield-check text-2xl"></i> MANDAT SGE ACTIF (VALIDE 5 ANS)';
-                App.toast("Consentement légal enregistré et horodaté.", "success");
-            }, 1500);
-        }
-
-        // ==========================================
-        // VUE 5 : GUICHET OPS & SAGE
-        // ==========================================
-        window.sendOpsTicket = async function() {
-            const desc = document.getElementById('ticket-desc').value;
-            if(!desc) return App.toast("Veuillez détailler votre requête.", "error");
-
-            App.toast("Transmission à la War Room Ops...", "info");
-            
-            setTimeout(() => {
-                document.getElementById('ticket-desc').value = "";
-                App.toast("Ticket Support ouvert avec succès.", "success");
-            }, 800);
-        }
-
-        async function loadSageTimeline() {
-            const container = document.getElementById('sage-timeline-container');
-            let sageCount = 0;
-            let html = '';
-            
-            SITES.forEach(s => {
-                const advice = s.kpis?.cortex_advice || s.cortex_advice || "";
-                if(advice && advice.includes("[Audit")) {
-                    sageCount++;
-                    const text = advice.replace(/\[.*\] :/, "");
-                    const author = advice.includes("SDE") ? "Économe de Flux (Syndicat)" : "Expert CORTEX";
-                    html += `
-                        <div class="relative pl-14">
-                            <div class="absolute left-[-2px] w-8 h-8 rounded-full bg-purple border-4 border-abysse flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.6)] z-10 text-white"><i class="fa-solid fa-user-tie text-xs"></i></div>
-                            <div class="bg-card p-8 rounded-[2rem] border border-purple/30 shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
-                                <div class="flex justify-between items-center mb-4">
-                                    <h4 class="font-black text-white text-base"><i class="fa-solid fa-building text-gray-500 mr-2"></i> ${s.name || 'Site'}</h4>
-                                    <span class="bg-purple/20 text-purple border border-purple/40 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">${author}</span>
-                                </div>
-                                <p class="text-sm text-gray-300 leading-relaxed italic border-l-4 border-purple pl-6 py-2 bg-black/20 rounded-r-xl">"${text.trim()}"</p>
-                                <div class="mt-6 text-right"><button onclick="switchView('perimetre'); loadSiteForm('${s.id}')" class="text-xs text-purple font-black uppercase hover:text-white transition tracking-widest bg-purple/10 px-4 py-2 rounded-full border border-purple/20">Traiter l'anomalie <i class="fa-solid fa-arrow-right ml-2"></i></button></div>
-                            </div>
-                        </div>
-                    `;
-                }
-            });
-
-            if(sageCount === 0) {
-                container.innerHTML = '<div class="absolute left-14 top-0 bottom-0 w-px bg-white/10 z-0"></div><div class="text-center py-20 text-gray-500 font-mono text-sm relative z-10"><i class="fa-solid fa-check-circle text-success mb-4 text-5xl block opacity-50 drop-shadow-[0_0_20px_rgba(16,185,129,0.5)]"></i> Aucun audit Ops en attente. Votre parc est optimisé.</div>';
-            } else {
-                container.innerHTML = '<div class="absolute left-[3px] top-0 bottom-0 w-px bg-purple/30 z-0 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>' + html;
-            }
-        }
-        
-        let timeout = null;
-        async function searchAddress() {
-            const query = document.getElementById('address-input').value;
-            const list = document.getElementById('address-suggestions');
-            if(query.length < 4) { list.classList.add('hidden'); return; }
-            clearTimeout(timeout);
-            timeout = setTimeout(async () => {
-                try {
-                    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`);
-                    const data = await res.json();
-                    list.innerHTML = '';
-                    if(data.features && data.features.length > 0) {
-                        list.classList.remove('hidden');
-                        data.features.forEach(item => {
-                            const div = document.createElement('div');
-                            div.className = 'suggestion-item text-gray-300 transition';
-                            div.innerText = item.properties.label;
-                            div.onclick = () => { 
-                                document.getElementById('address-input').value = item.properties.name; 
-                                document.getElementById('zip-input').value = item.properties.postcode;
-                                document.getElementById('city-input').value = item.properties.city;
-                                document.getElementById('site-insee').value = item.properties.citycode; // MAGIE : Code INSEE caché !
-                                list.classList.add('hidden'); 
-                                
-                                // BONUS : RECHERCHE DE SURFACE ADEME !
-                                if(document.getElementById('site-surface').value === "0" || document.getElementById('site-surface').value === "") {
-                                    App.toast("CORTEX recherche la surface dans la base DPE (ADEME)...", "info");
-                                    // Simulation de la réponse du backend
-                                    setTimeout(() => { document.getElementById('site-surface').value = Math.round(Math.random() * 2000 + 500); App.toast("Surface trouvée !", "success"); }, 1500);
-                                }
-                            };
-                            list.appendChild(div);
-                        });
-                    }
-                } catch(e) {}
-            }, 300);
-        }
-        document.addEventListener('click', function(e) { if (!document.getElementById('address-input').contains(e.target)) document.getElementById('address-suggestions').classList.add('hidden'); });
-
-    </script>
-</body>
-</html>
