@@ -5,11 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ENERGISTRAT V12.6 | Mairie.OS (Hyperviseur DGS)</title>
     
+    <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- LEAFLET MAP -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -44,12 +46,13 @@
         tr.site-row:hover td { background-color: rgba(59, 130, 246, 0.15) !important; color: white; }
         
         .nav-item.active { background: rgba(59, 130, 246, 0.1); border-right: 4px solid #3B82F6; color: white; }
-        .input-edit { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,229,255,0.2); color: white; padding: 14px 20px; border-radius: 2rem; width: 100%; font-family: 'JetBrains Mono'; outline: none; transition: all 0.3s; font-size: 0.875rem; }
-        .input-edit:focus { border-color: #00E5FF; box-shadow: 0 0 15px rgba(0,229,255,0.3); background: rgba(0,229,255,0.05); }
+        .input-edit { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,229,255,0.2); color: white; padding: 14px 20px; border-radius: 1.5rem; width: 100%; font-family: 'JetBrains Mono'; outline: none; transition: border-color 0.3s; }
+        .input-edit:focus { border-color: #00E5FF; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
         
         #action-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(200%); }
         #action-bar.visible { transform: translateY(0); }
         
+        /* LEAFLET DARK MODE CSS INVERT TRICK */
         .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
         .leaflet-container { background: transparent !important; border-radius: 2.5rem; font-family: 'Inter', sans-serif; }
 
@@ -60,7 +63,8 @@
 
         @keyframes pulse-red { 0% { transform: scale(1); box-shadow: 0 0 10px #EF4444; } 50% { transform: scale(1.3); box-shadow: 0 0 25px #EF4444; } 100% { transform: scale(1); box-shadow: 0 0 10px #EF4444; } }
 
-        .view-section { display: none; } .view-section.active { display: block; animation: fadeIn 0.4s ease-out; }
+        .view-section { display: none; } 
+        .view-section.active { display: block; animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
         ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #3B82F6; border-radius: 3px; }
     </style>
@@ -150,7 +154,7 @@
                 
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[450px]">
                     <!-- LEAFLET MAP -->
-                    <div class="col-span-8 bento-card p-2 relative overflow-hidden border-2 border-mairie/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+                    <div class="col-span-8 bento-card p-2 relative overflow-hidden border-2 border-mairie/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)] h-[450px]">
                         <div id="map" class="w-full h-full rounded-[2.5rem] z-10"></div>
                         <div class="absolute bottom-6 right-6 bg-abysse/90 backdrop-blur-md p-4 rounded-2xl border border-white/10 z-[400] text-xs font-bold shadow-2xl">
                             <div class="text-[10px] text-gray-400 uppercase tracking-widest mb-2 border-b border-white/10 pb-1">État du Parc</div>
@@ -380,7 +384,6 @@
             <div class="h-8 w-px bg-gray-300"></div>
             <button onclick="openMassEdit()" class="flex items-center gap-2 hover:text-gold font-bold text-sm transition mr-4"><i class="fa-solid fa-pen-to-square"></i> Mise à jour Groupée</button>
             <button onclick="assignLot()" class="flex items-center gap-2 hover:text-mairie font-bold text-sm transition mr-4"><i class="fa-solid fa-layer-group"></i> Affecter Lot</button>
-            <!-- CORRECTION EXPORT DQE -->
             <button onclick="exportDQE()" class="flex items-center gap-2 text-abysse bg-gray-100 hover:bg-gray-200 px-6 py-3 rounded-[2rem] font-bold text-sm transition shadow-md uppercase tracking-widest"><i class="fa-solid fa-file-excel text-green-600 text-lg"></i> Export DQE</button>
         </div>
 
@@ -473,64 +476,12 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Fournisseur</label><input type="text" id="edit-provider" class="input-edit mt-1"></div>
                         <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Lot d'affectation</label><input type="text" id="edit-segment" class="input-edit mt-1"></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Date Fin de Marché</label><input type="date" id="edit-end-date" class="input-edit mt-1 text-gray-400 cursor-pointer w-full" style="color-scheme: dark;"></div>
-                        <div>
-                            <label class="text-[10px] text-cyan uppercase font-bold tracking-widest pl-2 flex items-center gap-1"><i class="fa-solid fa-euro-sign"></i> Prix (€/MWh)</label>
-                            <div class="relative">
-                                <input type="number" id="edit-price" step="0.01" class="input-edit mt-1 text-cyan font-bold font-mono pr-12">
-                                <span class="absolute right-4 top-1/2 translate-y-[-20%] text-xs text-gray-500 font-bold">€</span>
-                            </div>
-                        </div>
+                        <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Date de fin d'engagement</label><input type="date" id="edit-end-date" class="input-edit mt-1 text-gray-400 cursor-pointer w-full" style="color-scheme: dark;"></div>
                     </div>
                 </div>
                 <div class="flex justify-end gap-4 mt-10">
                     <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-6 py-3 text-xs font-bold hover:text-white transition uppercase tracking-widest">ANNULER</button>
-                    <button onclick="saveMairieData()" class="bg-mairie text-white px-8 py-3 rounded-[2rem] text-sm font-black hover:bg-blue-600 transition shadow-[0_0_20px_rgba(59,130,246,0.4)] uppercase tracking-widest">ENREGISTRER</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL M57 (EDITION BUDGET) -->
-        <div id="m57-edit-modal" class="fixed inset-0 bg-black/90 z-[120] hidden flex items-center justify-center backdrop-blur-sm">
-            <div class="bento-card p-10 rounded-[3rem] w-[600px] relative border-2 border-gold/50 shadow-[0_0_50px_rgba(245,158,11,0.2)]">
-                <h3 class="text-2xl font-black text-white mb-2 flex items-center gap-3"><i class="fa-solid fa-vault text-gold"></i> Paramétrer le Budget M57</h3>
-                <p class="text-xs text-gray-400 mb-8 font-mono">Saisissez les montants votés au Conseil Municipal.</p>
-                <div class="space-y-6">
-                    <div class="bg-abysse/50 p-6 rounded-[2rem] border border-white/5">
-                        <span class="text-sm font-bold text-white block mb-4 uppercase tracking-widest"><i class="fa-solid fa-check-to-slot text-success mr-2"></i> Budget Primitif (Voté)</span>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-mairie">Électricité (60612)</label><input type="number" id="m57-input-bp-elec" class="input-edit mt-2 text-xl font-bold font-mono" placeholder="0"></div>
-                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-gas">Gaz (60621)</label><input type="number" id="m57-input-bp-gaz" class="input-edit mt-2 text-xl font-bold font-mono" placeholder="0"></div>
-                        </div>
-                    </div>
-                    <div class="bg-abysse/50 p-6 rounded-[2rem] border border-white/5">
-                        <span class="text-sm font-bold text-white block mb-4 uppercase tracking-widest"><i class="fa-solid fa-money-bill-wave text-cyan mr-2"></i> Mandaté à date (Consommé)</span>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-mairie">Électricité (60612)</label><input type="number" id="m57-input-cons-elec" class="input-edit mt-2 text-xl font-bold font-mono" placeholder="0"></div>
-                            <div><label class="text-[10px] text-gray-500 uppercase font-bold text-gas">Gaz (60621)</label><input type="number" id="m57-input-cons-gaz" class="input-edit mt-2 text-xl font-bold font-mono" placeholder="0"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex justify-end gap-4 mt-10">
-                    <button onclick="document.getElementById('m57-edit-modal').classList.add('hidden')" class="text-gray-400 px-6 py-3 text-xs font-bold hover:text-white transition uppercase tracking-widest">Annuler</button>
-                    <button onclick="saveM57Data()" class="bg-gold text-abysse px-8 py-3 rounded-[2rem] text-sm font-black hover:bg-white transition shadow-[0_0_20px_rgba(245,158,11,0.4)] uppercase tracking-widest">Verrouiller BP</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MASS EDIT MODAL -->
-        <div id="mass-edit-modal" class="fixed inset-0 bg-black/90 z-[80] hidden flex items-center justify-center backdrop-blur-md">
-            <div class="bento-card p-10 rounded-[3rem] w-[500px] relative border-2 border-gold/30 shadow-[0_0_40px_rgba(245,158,11,0.2)]">
-                <div class="flex items-center gap-4 mb-8">
-                    <div class="w-12 h-12 rounded-full bg-gold/20 flex items-center justify-center text-gold text-2xl shadow-inner"><i class="fa-solid fa-layer-group"></i></div>
-                    <div><h3 class="text-2xl font-black text-white">Mise à jour Groupée</h3><p class="text-xs text-gray-400 font-mono mt-1"><span id="mass-count" class="text-gold font-bold">0</span> sites sélectionnés</p></div>
-                </div>
-                <div class="space-y-6 bg-abysse/50 p-6 rounded-[2rem] border border-white/5">
-                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2">Affecter au Lot (Appel d'Offres)</label><input type="text" id="mass-lot-input" placeholder="Ex: Lot 1 - Bâtiments Supérieurs à 36kVA" class="input-edit mt-2 w-full"></div>
-                </div>
-                <div class="flex justify-end gap-4 mt-8">
-                    <button onclick="document.getElementById('mass-edit-modal').classList.add('hidden')" class="text-gray-400 px-6 py-3 text-xs font-bold hover:text-white transition uppercase tracking-widest">ANNULER</button>
-                    <button onclick="applyMassUpdate()" class="bg-gold text-abysse px-8 py-3 rounded-[2rem] text-sm font-black hover:bg-white transition shadow-[0_0_20px_rgba(245,158,11,0.4)] uppercase tracking-widest">APPLIQUER</button>
+                    <button onclick="saveMairieData()" class="bg-mairie text-white px-8 py-3 rounded-2xl text-sm font-black hover:bg-blue-600 transition shadow-[0_0_20px_rgba(59,130,246,0.4)] uppercase tracking-widest">ENREGISTRER</button>
                 </div>
             </div>
         </div>
@@ -545,7 +496,7 @@
             toast: function(msg, type='info') {
                 const container = document.getElementById('toast-container');
                 if(!container) return;
-                const colors = { success: 'bg-green-600 border-green-500 text-white', error: 'bg-alert border-alert text-white', info: 'bg-mairie border-mairie text-white' };
+                const colors = { success: 'bg-green-600 border-green-500 text-white', error: 'bg-alert border-alert text-white', info: 'bg-cyan border-cyan text-abysse' };
                 const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
                 const el = document.createElement('div');
                 el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
@@ -576,15 +527,14 @@
         
         let CURRENT_SITE = null;
         let MAP_INSTANCE = null;
-        let MARKERS =[];
+        let MARKERS = [];
         let CITY_CENTER =[46.2276, 2.2137]; 
 
         document.addEventListener('DOMContentLoaded', () => {
             if(forceTenant && forceTenant !== 'ALL') {
                 document.getElementById('god-mode-indicator').classList.remove('hidden');
             }
-            // By default, we show patrimoine, so we only need to init map
-            switchView('patrimoine');
+            initMap();
             loadFleet();
             fetchMarketData();
             fetchSubventions();
@@ -642,7 +592,7 @@
                 const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-marker ${colorClass} w-4 h-4"></div>`, iconSize:[16, 16], iconAnchor:[8, 8] });
                 let coords = (site.lat && site.lon) ? [site.lat, site.lon] : getFuzzyCoordinates(site.id, CITY_CENTER);
                 const marker = L.marker(coords, {icon: icon})
-                    .bindPopup(`<strong class="font-mono text-abysse font-bold text-sm">${site.name}</strong><br><span class="text-xs text-gray-600">Gaspillage Nuit/WE: <b class="text-alert">${Math.round(waste)}€</b></span><br><button onclick="openDetail('${site.id}')" class="mt-3 bg-mairie text-white px-4 py-2 rounded-lg font-bold text-xs w-full shadow-md">Analyser CORTEX</button>`)
+                    .bindPopup(`<strong class="font-mono text-abysse font-bold text-sm">${site.name || 'Site'}</strong><br><span class="text-xs text-gray-600">Gaspillage Nuit/WE: <b class="text-alert">${Math.round(waste)}€</b></span><br><button onclick="openDetail('${site.id}')" class="mt-3 bg-mairie text-white px-4 py-2 rounded-lg font-bold text-xs w-full shadow-md">Analyser CORTEX</button>`)
                     .addTo(MAP_INSTANCE);
                 MARKERS.push(marker);
             });
@@ -680,18 +630,13 @@
                         FLEET_DATA = data.fleet;
                     }
                     
-                    if(FLEET_DATA.length === 0) {
-                        App.toast("Aucun bâtiment public identifié pour ce compte.", "error");
-                        return;
-                    }
+                    if(FLEET_DATA.length === 0) return App.toast("Aucun bâtiment public identifié.", "error");
 
                     LOTS.clear();
                     const mainCity = FLEET_DATA.find(s => s.city && s.city !== 'Inconnue')?.city;
-                    if(mainCity) fetchCityData(mainCity); else { initMap(); plotMarkers(); }
+                    if(mainCity) fetchCityData(mainCity); else plotMarkers(); 
 
-                    FLEET_DATA.forEach(s => { 
-                        if(s.segment && s.segment.includes("Lot")) LOTS.add(s.segment); 
-                    });
+                    FLEET_DATA.forEach(s => { if(s.segment && s.segment.includes("Lot")) LOTS.add(s.segment); });
                     
                     updateLotSelect(); applyFilters(); updateKPIs(); calculateM57(); updateLotsDeadlines();
                 }
@@ -703,7 +648,7 @@
             if(!container) return;
             const provMap = {};
             FLEET_DATA.forEach(s => {
-                const p = s.provider || 'Accord Cadre';
+                const p = s.provider || 'Inconnu';
                 if(!provMap[p]) provMap[p] = { count: 0, budget: 0 };
                 provMap[p].count++; provMap[p].budget += (s.budget || 0);
             });
@@ -734,11 +679,10 @@
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             
             // CORRECTION FRONT : Liste complète des vues à masquer
-            const views =['view-patrimoine', 'view-budget', 'view-market', 'view-comparator', 'view-citizens'];
-            views.forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             
             const target = document.getElementById('view-' + viewName);
-            if(target) target.classList.remove('hidden');
+            if(target) target.classList.add('active');
             
             // Action bar conditionnelle
             const bar = document.getElementById('action-bar');
@@ -783,7 +727,7 @@
 
             if (bpTotal === 0) {
                 bar.style.width = "0%";
-                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Budget Primitif (BP) Non Renseigné.</span> Cliquez sur "Ajuster" pour saisir les montants votés.`;
+                cortexMsg.innerHTML = `<span class="text-alert font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Budget Primitif Non Renseigné.</span> Cliquez sur "Ajuster" pour saisir les montants votés.`;
                 return;
             }
 
@@ -936,14 +880,13 @@
                 if(n.includes('sport') || n.includes('stade') || n.includes('gymnase')) { icon = '<i class="fa-solid fa-basketball text-gold"></i>'; typeLabel = "Sport"; }
                 if(n.includes('eclairage') || n.includes('ep ')) { icon = '<i class="fa-solid fa-lightbulb text-yellow-300"></i>'; typeLabel = "Éclairage Public"; }
                 
-                // DEGRADATION GRACIEUSE : CAR vs SGE
-                const isSGE = site.volume > 0; // Dans le backend, si SGE est vide, volume = CAR. On assume ici que tout est SGE pour simplifier la démo, ou on met un badge.
-                const badgeVol = isSGE ? '<span class="text-[9px] bg-success/20 text-success px-2 py-0.5 rounded border border-success/30 ml-2">SGE</span>' : '<span class="text-[9px] bg-white/10 text-gray-400 px-2 py-0.5 rounded ml-2">CAR</span>';
-
+                const vol = site.volume || 0;
+                const budget = site.budget || 0;
                 const waste = site.ghost_savings || 0;
+
                 let alertBadge = '<span class="text-success text-[10px] font-bold"><i class="fa-solid fa-check"></i> Optimisé</span>';
                 if (waste > 200) {
-                    if (typeLabel === "École") alertBadge = '<span class="text-alert text-[10px] font-bold animate-pulse bg-alert/20 px-3 py-1 rounded-full border border-alert/50"><i class="fa-solid fa-triangle-exclamation"></i> Chauffage Vacances</span>';
+                    if (typeLabel === "École") alertBadge = '<span class="text-alert text-[10px] font-bold animate-pulse bg-alert/20 px-3 py-1 rounded-full border border-alert/50"><i class="fa-solid fa-triangle-exclamation"></i> Vacances</span>';
                     else alertBadge = `<span class="text-alert text-[10px] font-bold animate-pulse bg-alert/20 px-3 py-1 rounded-full border border-alert/50"><i class="fa-solid fa-triangle-exclamation"></i> Fuite Nuit</span>`;
                 } else if (waste > 50) {
                     alertBadge = '<span class="text-gold text-[10px] font-bold"><i class="fa-solid fa-eye"></i> À surveiller</span>';
@@ -954,8 +897,8 @@
                     <td class="px-6 py-5 font-bold text-white flex items-center gap-4"><span class="w-10 h-10 flex items-center justify-center bg-black/40 rounded-xl border border-white/5 text-xl shadow-inner">${icon}</span> <div>${site.name || 'Site sans nom'}<div class="text-[9px] text-gray-500 font-mono mt-1">${site.id}</div></div></td>
                     <td class="px-6 py-5 text-gray-400 font-mono text-xs">${typeLabel}</td>
                     <td class="px-6 py-5 ${isGaz ? "text-gas" : "text-cyan"} font-mono text-xs font-bold">${site.pdl || '-'}</td>
-                    <td class="px-6 py-5 text-right text-gray-300 font-mono text-xs font-bold flex items-center justify-end">${Math.round(site.volume || 0)} ${badgeVol}</td>
-                    <td class="px-6 py-5 text-right font-black text-white">${Math.round(site.budget || 0).toLocaleString()} €</td>
+                    <td class="px-6 py-5 text-right text-gray-300 font-mono text-xs font-bold flex items-center justify-end">${Math.round(vol)}</td>
+                    <td class="px-6 py-5 text-right font-black text-white">${Math.round(budget).toLocaleString()} €</td>
                     <td class="px-6 py-5 text-center">${alertBadge}</td>
                 `;
                 tbody.appendChild(row);
@@ -1061,10 +1004,9 @@
 
                 document.getElementById('disp-provider').innerText = provider;
                 document.getElementById('disp-end-date').innerHTML = dateHtml;
-                document.getElementById('disp-price').innerHTML = priceDisp;
                 
                 const grid = document.getElementById('modal-tech-grid');
-                if (isGaz) { grid.innerHTML = `<div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">PCE</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">CAR</span><span class="text-gas font-bold font-mono text-lg">${c.power || '-'} MWh</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Profil</span><span class="text-white font-bold">${c.profil || 'T1'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Lot (Segment)</span><span class="text-white font-bold">${c.segment || '-'}</span></div>`; } 
+                if (isGaz) { grid.innerHTML = `<div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">PCE</span><span class="text-white font-mono font-bold">${c.pdl || c.pce || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">CAR</span><span class="text-gas font-bold font-mono text-lg">${c.power || '-'} MWh</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Profil</span><span class="text-white font-bold">${c.profil || 'T1'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Lot (Segment)</span><span class="text-white font-bold">${c.segment || '-'}</span></div>`; } 
                 else { grid.innerHTML = `<div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">PDL</span><span class="text-white font-mono font-bold">${c.pdl || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Puissance</span><span class="text-mairie font-bold font-mono text-lg">${c.power || '-'} kVA</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Segment</span><span class="text-white font-bold">${c.segment || '-'}</span></div><div><span class="text-gray-500 block uppercase tracking-widest text-[10px] font-bold mb-1">Lot d'affectation</span><span class="text-white font-bold">${c.segment || '-'}</span></div>`; }
                 
                 updateModalChart('24h');
@@ -1136,15 +1078,13 @@
             document.getElementById('edit-name').value = CURRENT_SITE.identity.site_name || ""; 
             document.getElementById('edit-surface').value = CURRENT_SITE.location?.surface || ""; 
             
+            document.getElementById('edit-chauffage').value = CURRENT_SITE.technical?.chauffage || "Inconnu";
+            document.getElementById('edit-isolation').value = CURRENT_SITE.technical?.isolation || "Inconnue";
+
             // Remplissage des champs de contrats
             document.getElementById('edit-provider').value = CURRENT_SITE.contract?.provider || "";
             document.getElementById('edit-segment').value = CURRENT_SITE.contract?.segment || "";
             document.getElementById('edit-end-date').value = CURRENT_SITE.contract?.end_date || "";
-
-            // Remplissage du prix
-            let priceKwh = CURRENT_SITE.pricing?.price_kwh || CURRENT_SITE.pricing?.prix_kwh || 0;
-            if(priceKwh > 10) priceKwh /= 1000;
-            document.getElementById('edit-price').value = priceKwh > 0 ? (priceKwh * 1000).toFixed(2) : "";
 
             document.getElementById('edit-modal').classList.remove('hidden'); 
         }
@@ -1168,22 +1108,11 @@
             original.contract.segment = document.getElementById('edit-segment').value;
             original.contract.end_date = document.getElementById('edit-end-date').value;
 
-            // Sauvegarde du prix (€/MWh -> converti en €/kWh pour la base si besoin, ou on garde €/MWh. Ton backend le gère dans normalize_full_data)
-            const priceMwh = parseFloat(document.getElementById('edit-price').value);
-            if(!isNaN(priceMwh)) {
-                if(!original.pricing) original.pricing = {};
-                original.pricing.price_kwh = priceMwh / 1000; 
-                // Mise à jour immédiate du budget local pour effet Wahoo
-                if(!original.kpis) original.kpis = {};
-                original.kpis.budget = (original.volume_mwh || original.kpis.volume_mwh || 0) * priceMwh;
-            }
-
             try {
                 const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
                 if((await res.json()).success) { 
                     document.getElementById('edit-modal').classList.add('hidden'); 
                     App.toast("Patrimoine et Contrats enregistrés avec succès !", "success"); 
-                    // Effet Papillon : recharge de la flotte pour mettre à jour le M57
                     loadFleet(); 
                     openDetail(id); 
                 }
