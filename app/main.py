@@ -222,6 +222,7 @@ def fetch_surface_ademe(address: str, zip_code: str = "") -> float:
 # TRADUCTEUR UNIVERSEL (SMART MAPPER 3D - ELEC & GAZ)
 # ==============================================================================
 def normalize_full_data(data, tenant_id=None):
+    """Traducteur Omnidirectionnel V12.6 : Protège la 3D existante, intègre le plat."""
     if 'identity' not in data: data['identity'] = {}
     if 'location' not in data: data['location'] = {}
     if 'contract' not in data: data['contract'] = {}
@@ -230,52 +231,58 @@ def normalize_full_data(data, tenant_id=None):
     if 'kpis' not in data: data['kpis'] = {}
     if 'power_details' not in data['contract']: data['contract']['power_details'] = {}
     
-    if not data['identity'].get('id'):
-        data['identity']['id'] = str(data.get('COMPTEUR_PDL') or data.get('PDL') or data.get('pdl') or data.get('PCE') or data.get('pce') or data.get('id') or f"GEN_{uuid.uuid4().hex[:8]}")
-        data['id'] = data['identity']['id']
+    # 1. Identité Primaire (Check 3D d'abord, puis Plat)
+    existing_id = data.get('identity', {}).get('id') or data.get('COMPTEUR_PDL') or data.get('PDL') or data.get('pdl') or data.get('PCE') or data.get('pce') or data.get('id') or f"GEN_{uuid.uuid4().hex[:8]}"
+    data['identity']['id'] = str(existing_id)
+    data['id'] = data['identity']['id']
 
     if tenant_id: data['identity']['tenant_id'] = tenant_id
 
-    data['identity']['site_name'] = str(data.get('NOM_SITE') or data.get('site_name') or data.get('name') or "Site Sans Nom")
-    data['identity']['siret'] = str(data.get('SIRET_SITE') or data.get('siret') or data.get('siren') or "")
-    data['identity']['naf'] = str(data.get('NAF') or data.get('naf') or "DEFAULT")
-    data['identity']['lot_name'] = str(data.get('LOT_AFFECTATION') or data.get('lot_name') or "")
+    data['identity']['site_name'] = str(data.get('identity', {}).get('site_name') or data.get('NOM_SITE') or data.get('site_name') or data.get('name') or "Site Sans Nom")
+    data['identity']['siret'] = str(data.get('identity', {}).get('siret') or data.get('SIRET_SITE') or data.get('siret') or data.get('siren') or "")
+    data['identity']['naf'] = str(data.get('identity', {}).get('naf') or data.get('NAF') or data.get('naf') or "DEFAULT")
+    data['identity']['lot_name'] = str(data.get('identity', {}).get('lot_name') or data.get('LOT_AFFECTATION') or data.get('lot_name') or "")
     
-    data['location']['address'] = str(data.get('ADRESSE_SITE') or data.get('ADRESSE_SIT') or data.get('address') or "")
-    data['location']['zip_code'] = str(data.get('CP') or data.get('zip_code') or "")
-    data['location']['city'] = str(data.get('VILLE') or data.get('city') or "")
-    data['location']['insee'] = str(data.get('INSEE') or data.get('insee') or "")
-    data['location']['typologie'] = str(data.get('TYPOLOGIE') or data.get('typologie') or "")
+    # 2. Localisation
+    data['location']['address'] = str(data.get('location', {}).get('address') or data.get('ADRESSE_SITE') or data.get('ADRESSE_SIT') or data.get('address') or "")
+    data['location']['zip_code'] = str(data.get('location', {}).get('zip_code') or data.get('CP') or data.get('zip_code') or "")
+    data['location']['city'] = str(data.get('location', {}).get('city') or data.get('VILLE') or data.get('city') or "")
+    data['location']['insee'] = str(data.get('location', {}).get('insee') or data.get('INSEE') or data.get('insee') or "")
+    data['location']['typologie'] = str(data.get('location', {}).get('typologie') or data.get('TYPOLOGIE') or data.get('typologie') or "")
     
-    try: data['location']['surface'] = float(str(data.get('SURFACE_M2') or data.get('surface') or 0.0).replace(',', '.'))
+    try: data['location']['surface'] = float(str(data.get('location', {}).get('surface') or data.get('SURFACE_M2') or data.get('surface') or 0.0).replace(',', '.'))
     except: data['location']['surface'] = 0.0
 
-    data['energy_type'] = str(data.get('ENERGIE') or data.get('energy_type') or "elec").lower()
+    # 3. Contrat
+    data['energy_type'] = str(data.get('contract', {}).get('energy_type') or data.get('ENERGIE') or data.get('energy_type') or "elec").lower()
     data['contract']['energy_type'] = data['energy_type']
     
     if data['energy_type'] == 'gaz': data['contract']['pce'] = data['identity']['id']
     else: data['contract']['pdl'] = data['identity']['id']
 
-    data['contract']['provider'] = str(data.get('FOURNISSEUR') or data.get('FOURNISSEU') or data.get('provider') or "")
-    data['contract']['segment'] = str(data.get('SEGMENT') or data.get('segment') or "")
-    data['contract']['profil'] = str(data.get('PROFIL') or data.get('profil') or "")
-    data['contract']['fta'] = str(data.get('FTA') or data.get('fta') or "")
-    data['contract']['start_date'] = str(data.get('DATE_DEBUT') or data.get('start_date') or "")
-    data['contract']['end_date'] = str(data.get('FIN_MARCHE_YYYYMMDD') or data.get('DATE_FIN') or data.get('end_date') or "")
+    data['contract']['provider'] = str(data.get('contract', {}).get('provider') or data.get('FOURNISSEUR') or data.get('FOURNISSEU') or data.get('provider') or "")
+    data['contract']['segment'] = str(data.get('contract', {}).get('segment') or data.get('SEGMENT') or data.get('segment') or "")
+    data['contract']['profil'] = str(data.get('contract', {}).get('profil') or data.get('PROFIL') or data.get('profil') or "")
+    data['contract']['fta'] = str(data.get('contract', {}).get('fta') or data.get('FTA') or data.get('fta') or "")
+    data['contract']['start_date'] = str(data.get('contract', {}).get('start_date') or data.get('DATE_DEBUT') or data.get('start_date') or "")
+    data['contract']['end_date'] = str(data.get('contract', {}).get('end_date') or data.get('FIN_MARCHE_YYYYMMDD') or data.get('DATE_FIN') or data.get('end_date') or "")
     
-    try: data['contract']['power'] = float(str(data.get('PUISSANCE_KVA') or data.get('power') or 0).replace(',', '.'))
+    try: data['contract']['power'] = float(str(data.get('contract', {}).get('power') or data.get('PUISSANCE_KVA') or data.get('power') or 0).replace(',', '.'))
     except: data['contract']['power'] = 0.0
 
-    try: data['contract']['cja'] = float(str(data.get('CJA_MWH_J') or data.get('cja') or 0).replace(',', '.'))
+    try: data['contract']['cja'] = float(str(data.get('contract', {}).get('cja') or data.get('CJA_MWH_J') or data.get('cja') or 0).replace(',', '.'))
     except: data['contract']['cja'] = 0.0
-    
-    try: data['kpis']['car_mwh'] = float(str(data.get('CAR_MWH') or data.get('car') or 0).replace(',', '.'))
-    except: data['kpis']['car_mwh'] = 0.0
 
+    # 4. Puissances 4 Cadrans
     quad_p = {'hph':['PS_HPH', 'ps_hph'], 'hch':['PS_HCH', 'ps_hch'], 'hpe':['PS_HPE', 'ps_hpe'], 'hce':['PS_HCE', 'ps_hce']}
     for t, keys in quad_p.items():
+        existing_val = data.get('contract', {}).get('power_details', {}).get(t)
+        if existing_val is not None and str(existing_val).strip() != "":
+            data['contract']['power_details'][t] = float(existing_val)
+            data['contract'][f"ps_{t}"] = float(existing_val)
+            continue
         for k in keys:
-            if k in data and str(data[k]).strip() not in["", "None", "nan", "NaN"]:
+            if k in data and str(data[k]).strip() not in ["", "None", "nan", "NaN"]:
                 try: 
                     val = float(str(data[k]).replace(',', '.'))
                     data['contract']['power_details'][t] = val
@@ -283,8 +290,13 @@ def normalize_full_data(data, tenant_id=None):
                     break
                 except: pass
 
+    # 5. Pricing
     quad_prix = {'hph':['PRIX_HPH', 'price_hph', 'prix_hph'], 'hch':['PRIX_HCH', 'price_hch', 'prix_hch'], 'hpe':['PRIX_HPE', 'price_hpe', 'prix_hpe'], 'hce':['PRIX_HCE', 'price_hce', 'prix_hce']}
     for t, keys in quad_prix.items():
+        existing_val = data.get('pricing', {}).get(t)
+        if existing_val is not None and str(existing_val).strip() != "":
+            data['pricing'][t] = float(existing_val)
+            continue
         for k in keys:
             if k in data and str(data[k]).strip() not in ["", "None", "nan", "NaN"]:
                 try: 
@@ -294,29 +306,30 @@ def normalize_full_data(data, tenant_id=None):
                     break
                 except: pass
                 
-    if 'price_kwh' not in data['pricing']:
+    if 'price_kwh' not in data['pricing'] or data['pricing'].get('price_kwh') == 0:
         try: 
-            p_unique = float(str(data.get('PRIX_MOLECULE') or data.get('PRIX_MOLECU') or data.get('PRIX_MOL_EUR_MWH') or 0).replace(',', '.'))
+            p_unique = float(str(data.get('pricing', {}).get('price_kwh') or data.get('PRIX_MOLECULE') or data.get('PRIX_MOLECU') or data.get('PRIX_MOL_EUR_MWH') or 0).replace(',', '.'))
             if p_unique > 10: p_unique = p_unique / 1000.0
             data['pricing']['price_kwh'] = p_unique
         except: data['pricing']['price_kwh'] = 0.0
 
-    try: data['pricing']['fix'] = float(str(data.get('ABONNEMENT_EUR') or data.get('ABONNEMEN') or data.get('fix') or 0).replace(',', '.'))
+    try: data['pricing']['fix'] = float(str(data.get('pricing', {}).get('fix') or data.get('ABONNEMENT_EUR') or data.get('ABONNEMEN') or data.get('fix') or 0).replace(',', '.'))
     except: data['pricing']['fix'] = 0.0
     
-    try: data['pricing']['stockage'] = float(str(data.get('TERME_STOC') or data.get('stockage') or 0).replace(',', '.'))
+    try: data['pricing']['stockage'] = float(str(data.get('pricing', {}).get('stockage') or data.get('TERME_STOC') or data.get('stockage') or 0).replace(',', '.'))
     except: data['pricing']['stockage'] = 0.0
     
-    try: data['pricing']['tax'] = float(str(data.get('TAXES') or data.get('tax') or 22.5).replace(',', '.'))
+    try: data['pricing']['tax'] = float(str(data.get('pricing', {}).get('tax') or data.get('TAXES') or data.get('tax') or 22.5).replace(',', '.'))
     except: data['pricing']['tax'] = 22.5
 
+    # 6. Volumes & KPIs
     try: 
-        vol = float(str(data.get('VOLUME_ANNUEL') or data.get('volume_mwh') or data.get('CAR_MWH') or 0).replace(',', '.'))
+        vol = float(str(data.get('kpis', {}).get('volume_mwh') or data.get('VOLUME_ANNUEL') or data.get('volume_mwh') or data.get('CAR_MWH') or 0).replace(',', '.'))
         data['kpis']['volume_mwh'] = vol
         data['volume_mwh'] = vol 
     except: pass
 
-    try: data['kpis']['pmax_kw'] = float(str(data.get('PUISSANCE_POINTE_MAX') or data.get('pmax_kw') or 0).replace(',', '.'))
+    try: data['kpis']['pmax_kw'] = float(str(data.get('kpis', {}).get('pmax_kw') or data.get('PUISSANCE_POINTE_MAX') or data.get('pmax_kw') or 0).replace(',', '.'))
     except: pass
 
     return data
