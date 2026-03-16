@@ -933,24 +933,45 @@ async def get_fleet_data(response: Response, user = Depends(get_current_user)):
 @app.get("/api/dashboard/data/{client_id}")
 async def get_dashboard_data(client_id: str, response: Response, user = Depends(get_current_user)):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    if not user: 
+        return JSONResponse({"error": "Non autorisé"}, 401)
+    
     data = db.get_site(client_id)
-    if not data: return JSONResponse({"error": "Site introuvable"}, 404)
-    profile = db.get_user_profile(user.get("uid")); is_admin = user.get("role") == "ADMIN"
+    if not data: 
+        return JSONResponse({"error": "Site introuvable"}, 404)
+    
+    profile = db.get_user_profile(user.get("uid"))
+    is_admin = user.get("role") == "ADMIN"
+    
+    # GUÉRISON SILENCIEUSE : Traduction des données plates en 3D
     t_id = data.get("identity", {}).get("tenant_id") or data.get("tenant_id") or profile.get("tenant_id", "ORPHELIN")
     data = normalize_full_data(data, t_id)
-    if not is_admin and data["identity"]["tenant_id"] != profile.get("tenant_id", "ORPHELIN"): return JSONResponse({"error": "Accès refusé."}, 403)
+    
+    if not is_admin and data["identity"]["tenant_id"] != profile.get("tenant_id", "ORPHELIN"):
+        return JSONResponse({"error": "Accès refusé."}, 403)
+        
     financials = cortex.enrich_site_financials(data) if cortex else {'meta':{'is_gas':False}, 'kpis':{'unit_price_kwh':0, 'pmc_eur_mwh':0, 'ghost_savings':0}, 'volume_mwh':0, 'budget_annual':0, 'pricing_details':{}}
     mr = get_market_ref()
     ma = cortex.analyze_market_position(financials['kpis']['unit_price_kwh'], mr, is_gas=financials['meta']['is_gas']) if cortex else {"status": "ANALYSE"}
-    if 'ref_price' not in ma: ma = {"status": "ANALYSE", "ref_price": mr['gaz']['peg_n1'] if financials['meta']['is_gas'] else mr['elec']['cal_n1'], "details": {"market_label": "PEG N+1" if financials['meta']['is_gas'] else "CAL N+1"}}
-    contract = data.get('contract', {}); pricing = financials.get('pricing_details') or data.get('pricing', {})
+    if 'ref_price' not in ma: 
+        ma = {"status": "ANALYSE", "ref_price": mr['gaz']['peg_n1'] if financials['meta']['is_gas'] else mr['elec']['cal_n1'], "details": {"market_label": "PEG N+1" if financials['meta']['is_gas'] else "CAL N+1"}}
+
+    contract = data.get('contract', {})
+    pricing = financials.get('pricing_details') or data.get('pricing', {})
     display_segment = financials.get('display_overrides', {}).get('segment', contract.get('segment'))
+
     vol_display = float(financials.get('volume_mwh') or data.get('kpis', {}).get('volume_mwh', 0))
     p_data = data.get('pricing', {})
-    u_price = float(p_data.get('price_kwh') or p_data.get('hph') or 0.20); if u_price > 2.0: u_price = u_price / 1000.0
-    tax_val = float(p_data.get('tax') or 22.5); sub_val = float(p_data.get('fix') or 0)
+    
+    # L'erreur de syntaxe interdite par Python était ici ! Elle est corrigée et aérée.
+    u_price = float(p_data.get('price_kwh') or p_data.get('hph') or 0.20)
+    if u_price > 2.0: 
+        u_price = u_price / 1000.0
+        
+    tax_val = float(p_data.get('tax') or 22.5)
+    sub_val = float(p_data.get('fix') or 0)
     budget_display = sub_val + (vol_display * 1000 * u_price) + (vol_display * tax_val)
+
     pd_details = contract.get('power_details', {})
     if not contract.get('ps_hph'): contract['ps_hph'] = pd_details.get('hph') or "-"
     if not contract.get('ps_hch'): contract['ps_hch'] = pd_details.get('hch') or "-"
@@ -958,9 +979,25 @@ async def get_dashboard_data(client_id: str, response: Response, user = Depends(
     if not contract.get('ps_hce'): contract['ps_hce'] = pd_details.get('hce') or "-"
 
     return JSONResponse(json_compliant({
-        "energy_type": "gaz" if contract.get('energy_type') == 'gaz' else "elec", "identity": data.get('identity', {}), "location": data.get('location', {}), "technical": data.get('technical', {}), "financials": data.get('financials', {}),
-        "contract": { "pdl": contract.get('pdl'), "pce": contract.get('pce'), "provider": contract.get('provider', 'Inconnu'), "segment": display_segment or contract.get('segment', '-'), "start_date": contract.get('start_date'), "end_date": contract.get('end_date'), "power": contract.get('power'), "cja": contract.get('cja'), "p_max": contract.get('p_max'), "fta": contract.get('fta'), "profil": contract.get('profil'), "power_details": pd_details, "ps_hph": contract.get('ps_hph'), "ps_hch": contract.get('ps_hch'), "ps_hpe": contract.get('ps_hpe'), "ps_hce": contract.get('ps_hce') },
-        "pricing": pricing, "kpis": { "volume_mwh": vol_display, "budget": budget_display, "pmc": financials['kpis']['pmc_eur_mwh'], "ghost_savings": financials['kpis']['ghost_savings'], "talon_kw": data.get('kpis', {}).get('talon_kw', 0), "pmax_kw": data.get('kpis', {}).get('pmax_kw', 0), "cortex_advice": data.get('kpis', {}).get('cortex_advice', "Pas d'analyse.") },
+        "energy_type": "gaz" if contract.get('energy_type') == 'gaz' else "elec", 
+        "identity": data.get('identity', {}), 
+        "location": data.get('location', {}), 
+        "technical": data.get('technical', {}), 
+        "financials": data.get('financials', {}),
+        "contract": {
+            "pdl": contract.get('pdl'), "pce": contract.get('pce'), "provider": contract.get('provider', 'Inconnu'), 
+            "segment": display_segment or contract.get('segment', '-'), "start_date": contract.get('start_date'), 
+            "end_date": contract.get('end_date'), "power": contract.get('power'), "cja": contract.get('cja'),
+            "p_max": contract.get('p_max'), "fta": contract.get('fta'), "profil": contract.get('profil'), 
+            "power_details": pd_details, "ps_hph": contract.get('ps_hph'), "ps_hch": contract.get('ps_hch'), 
+            "ps_hpe": contract.get('ps_hpe'), "ps_hce": contract.get('ps_hce')
+        },
+        "pricing": pricing, 
+        "kpis": {
+            "volume_mwh": vol_display, "budget": budget_display, "pmc": financials['kpis']['pmc_eur_mwh'], 
+            "ghost_savings": financials['kpis']['ghost_savings'], "talon_kw": data.get('kpis', {}).get('talon_kw', 0), 
+            "pmax_kw": data.get('kpis', {}).get('pmax_kw', 0), "cortex_advice": data.get('kpis', {}).get('cortex_advice', "Pas d'analyse.")
+        },
         "market_analysis": ma, "electricity_price": financials['kpis']['unit_price_kwh']
     }))
 
