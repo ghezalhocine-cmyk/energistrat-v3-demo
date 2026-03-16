@@ -168,6 +168,9 @@
                     </h2>
                     <span id="fs-solvency" class="px-2 py-0.5 text-[10px] font-bold uppercase rounded border bg-gray-800 text-gray-300">Solvabilité</span>
                     <span id="fs-pipeline-badge" class="px-2 py-0.5 text-[10px] font-bold uppercase rounded border bg-cyan/10 text-cyan border-cyan/30 ml-2">Pipeline</span>
+                    
+                    <!-- NOUVEAU : BADGE DATA HEALTH SCORE -->
+                    <span id="fs-health-badge" class="px-2 py-0.5 text-[10px] font-bold uppercase rounded border bg-gray-800 text-gray-300 ml-2 transition-colors">DATA: --%</span>
                 </div>
             </div>
             <div class="flex items-center gap-4">
@@ -212,13 +215,21 @@
                     <div id="fs-contacts-list" class="space-y-3"></div>
                 </div>
 
-                <div class="bento-card p-5">
+                <div class="bento-card p-5 flex flex-col">
                     <div class="flex justify-between items-center border-b border-cyan/10 pb-2 mb-4">
-                        <h3 class="text-xs font-bold text-gray-400 font-mono uppercase flex items-center gap-2"><i class="ph ph-factory text-cyan"></i> Sites SGE (<span id="fs-sites-count">0</span>)</h3>
-                        <i class="ph ph-plus text-cyan cursor-pointer hover:text-white" onclick="openAddSiteModal()" title="Lier un compteur SGE"></i>
+                        <h3 class="text-xs font-bold text-gray-400 font-mono uppercase flex items-center gap-2"><i class="ph ph-factory text-cyan"></i> Base 3D (<span id="fs-sites-count">0</span>)</h3>
+                        <i class="ph ph-plus text-cyan cursor-pointer hover:text-white" onclick="openAddSiteModal()" title="Ajouter un compteur"></i>
                     </div>
+                    
                     <div id="fs-alerts-container" class="mb-3 hidden flex-col gap-2"></div>
-                    <div class="text-[10px] text-gray-500 font-mono italic text-center">Ajoutez un PDL/PCE pour activer la Télémétrie SGE.</div>
+                    
+                    <!-- NOUVEAU : MINI-SCANNER 3D (Détails des sites) -->
+                    <div id="fs-sites-list" class="space-y-2 mb-4 overflow-y-auto max-h-[300px] pr-1"></div>
+
+                    <!-- NOUVEAU : PONT VERS DATA UNITY (GOD MODE) -->
+                    <button onclick="openDataUnity()" class="w-full py-3 mt-auto bg-cyan/10 text-cyan border border-cyan/30 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-cyan hover:text-abysse transition flex items-center justify-center gap-2 shadow-sm">
+                        <i class="ph ph-sliders"></i> Paramétrage Avancé (Data Unity)
+                    </button>
                 </div>
             </div>
 
@@ -230,7 +241,7 @@
                         <button class="action-tab whitespace-nowrap" onclick="switchActionTab('email')" id="tab-email"><i class="ph ph-envelope-simple"></i> E-mail</button>
                         <button class="action-tab whitespace-nowrap" onclick="switchActionTab('call')" id="tab-call"><i class="ph ph-phone"></i> Appel</button>
                         <button class="action-tab whitespace-nowrap" onclick="switchActionTab('task')" id="tab-task"><i class="ph ph-calendar-check"></i> Tâche</button>
-                        <button class="action-tab whitespace-nowrap" onclick="switchActionTab('ticket')" id="tab-ticket"><i class="ph ph-paper-plane-tilt text-alert"></i> Demande Achat</button>
+                        <button class="action-tab whitespace-nowrap" onclick="switchActionTab('ticket')" id="tab-ticket"><i class="ph ph-paper-plane-tilt text-alert"></i> Demande Support / Achat</button>
                     </div>
                     <div class="p-4">
                         <div id="action-note">
@@ -251,21 +262,21 @@
                         </div>
                         <div id="action-task" class="hidden flex-col gap-2">
                             <div class="flex gap-2">
-                                <input type="date" id="task-date" class="bg-abysse border border-cyan/20 rounded p-2 text-sm text-white font-mono outline-none focus:border-cyan w-1/3">
+                                <input type="date" id="task-date" class="bg-abysse border border-cyan/20 rounded p-2 text-sm text-white font-mono outline-none focus:border-cyan w-1/3" style="color-scheme: dark;">
                                 <input type="text" id="task-text" class="w-2/3 bg-abysse border border-cyan/20 rounded p-2 text-sm text-white font-mono outline-none focus:border-cyan" placeholder="Description de la tâche...">
                             </div>
                             <div class="flex justify-end mt-1"><button onclick="saveActivity('TASK', 'task-text')" class="px-4 py-1.5 bg-cyan text-abysse font-bold text-xs rounded hover:bg-white transition flex items-center gap-1"><i class="ph ph-calendar-plus"></i> Ajouter</button></div>
                         </div>
                         <div id="action-ticket" class="hidden flex-col gap-2">
-                            <div class="bg-alert/10 border border-alert/20 rounded p-2 text-xs text-alert font-mono flex items-center gap-2 mb-1"><i class="ph ph-warning-circle"></i> Alerte le Trading Floor (Middle-Office) pour un pricing complexe.</div>
-                            <textarea id="ticket-text" class="w-full bg-abysse border border-alert/30 rounded p-3 text-sm text-white font-mono outline-none focus:border-alert" rows="2" placeholder="Ex: Besoin d'un prix Back-to-Back sur 15 GWh en Base..."></textarea>
-                            <div class="flex justify-end mt-1"><button onclick="saveActivity('TICKET_ACHAT', 'ticket-text')" class="px-4 py-1.5 bg-alert text-white font-bold text-xs rounded hover:bg-white hover:text-alert transition flex items-center gap-1"><i class="ph ph-paper-plane-tilt"></i> Envoyer au Desk</button></div>
+                            <div class="bg-alert/10 border border-alert/20 rounded p-2 text-xs text-alert font-mono flex items-center gap-2 mb-1"><i class="ph ph-warning-circle"></i> Ouvre un ticket dans la console des Opérationnels (War Room).</div>
+                            <textarea id="ticket-text" class="w-full bg-abysse border border-alert/30 rounded p-3 text-sm text-white font-mono outline-none focus:border-alert" rows="2" placeholder="Ex: Besoin d'un prix sur 15 GWh ou Problème de contrat..."></textarea>
+                            <div class="flex justify-end mt-1"><button onclick="saveActivity('TICKET_ACHAT', 'ticket-text')" class="px-4 py-1.5 bg-alert text-white font-bold text-xs rounded hover:bg-white hover:text-alert transition flex items-center gap-1"><i class="ph ph-paper-plane-tilt"></i> Envoyer aux Ops</button></div>
                         </div>
                     </div>
                 </div>
 
                 <div class="flex-grow overflow-y-auto bento-card p-6">
-                    <h3 class="text-xs font-bold text-gray-400 font-mono uppercase mb-4 border-b border-cyan/10 pb-2"><i class="ph ph-clock-counter-clockwise"></i> Historique du Deal</h3>
+                    <h3 class="text-xs font-bold text-gray-400 font-mono uppercase mb-4 border-b border-cyan/10 pb-2"><i class="ph ph-clock-counter-clockwise"></i> Historique des Interactions & Support</h3>
                     <div class="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-cyan/20 before:to-transparent" id="fs-activities-list">
                     </div>
                 </div>
@@ -276,9 +287,9 @@
                 
                 <div id="fs-tools-fourniture" class="hidden flex-col gap-4">
                     <div class="bento-card p-5 border-t-4 border-success/50">
-                        <h3 class="text-xs font-bold text-success font-mono uppercase mb-4 flex items-center gap-2 border-b border-success/20 pb-2"><i class="ph ph-lightning"></i> Fast-Track (Monosite C5/C4)</h3>
+                        <h3 class="text-xs font-bold text-success font-mono uppercase mb-4 flex items-center gap-2 border-b border-success/20 pb-2"><i class="ph ph-lightning"></i> Fast-Track CPQ</h3>
                         <div class="space-y-3">
-                            <input type="number" id="qq-volume" placeholder="Volume MWh" class="w-full bg-abysse border border-success/30 rounded p-2 text-white text-sm outline-none focus:border-success font-mono">
+                            <input type="number" id="qq-volume" placeholder="Volume MWh (Auto)" class="w-full bg-abysse border border-success/30 rounded p-2 text-white text-sm outline-none focus:border-success font-mono">
                             <select id="qq-segment" class="w-full bg-abysse border border-success/30 rounded p-2 text-white text-sm outline-none focus:border-success font-mono">
                                 <option value="C5">Élec C5 (<36kVA)</option>
                                 <option value="C4">Élec C4 (Jaune)</option>
@@ -295,7 +306,7 @@
                     <div class="bento-card p-6 bg-gradient-to-b from-panel to-abysse text-center border border-success/20">
                         <i class="ph ph-files text-3xl text-gray-400 mb-2"></i>
                         <p class="text-xs text-gray-400 font-mono mb-4">Besoin d'un DQE Multi-sites ou d'un Shadow Pricing complet ?</p>
-                        <a href="/sales_cpq" class="block w-full py-3 bg-abysse border border-success text-success font-bold rounded-lg hover:bg-success hover:text-abysse transition shadow-[0_0_15px_rgba(0,255,102,0.1)]">OUVRIR LE CPQ</a>
+                        <a href="/sales_cpq" class="block w-full py-3 bg-abysse border border-success text-success font-bold rounded-lg hover:bg-success hover:text-abysse transition shadow-[0_0_15px_rgba(0,255,102,0.1)]">OUVRIR LE CPQ EXPERT</a>
                     </div>
                 </div>
 
@@ -317,7 +328,7 @@
                     <h3 class="text-xs font-bold text-white font-mono uppercase mb-4 flex items-center gap-2 border-b border-cyan/10 pb-2"><i class="ph ph-folder text-cyan"></i> Documents (GED)</h3>
                     <label class="drop-zone block mb-4">
                         <i class="ph ph-cloud-arrow-up text-2xl text-cyan mb-2"></i>
-                        <p class="text-[10px] text-gray-400 font-mono">Glissez Factures ou Mandats</p>
+                        <p class="text-[10px] text-gray-400 font-mono">Glissez Factures ou Kbis</p>
                         <input type="file" class="hidden" onchange="uploadDocument(this)">
                     </label>
                     <div class="space-y-2" id="fs-documents-list"></div>
@@ -328,7 +339,7 @@
     </div>
 
     <!-- ============================================================================== -->
-    <!-- MODALS D'AJOUT (LEAD, CONTACT, SITE)                                           -->
+    <!-- MODALS D'AJOUT (LEAD, CONTACT, SITE) ENRICHIES V12.6                           -->
     <!-- ============================================================================== -->
     
     <div id="new-lead-modal" class="fixed inset-0 bg-abysse/90 backdrop-blur-md hidden items-center justify-center z-50 opacity-0 transition-opacity">
@@ -398,23 +409,59 @@
         </div>
     </div>
 
-    <!-- Modal Ajouter Site -->
+    <!-- Modal Ajouter Site ENRICHIE V12.6 -->
     <div id="add-site-modal" class="fixed inset-0 bg-abysse/90 backdrop-blur-md hidden items-center justify-center z-50 opacity-0 transition-opacity">
-        <div class="bento-card p-8 w-[400px]">
-            <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2"><i class="ph ph-factory text-cyan"></i> Nouveau Site SGE</h2>
-            <form id="site-form" onsubmit="addSite(event)" class="flex flex-col gap-3">
-                <input type="text" id="new-s-name" placeholder="Nom du Site (ex: Usine Nord)" required class="w-full bg-abysse border border-cyan/20 rounded p-2 text-sm text-white focus:border-cyan outline-none">
-                <input type="text" id="new-s-pdl" placeholder="PDL ou PCE (14 chiffres)" required pattern="[0-9]{14}" class="w-full bg-abysse border border-cyan/20 rounded p-2 text-sm text-white focus:border-cyan outline-none font-mono">
-                <select id="new-s-energy" class="w-full bg-abysse border border-cyan/20 rounded p-2 text-sm text-white focus:border-cyan outline-none">
-                    <option value="elec">Électricité</option><option value="gaz">Gaz Naturel</option>
-                </select>
-                <div class="flex gap-2">
-                    <input type="number" id="new-s-vol" placeholder="Vol Annuel (MWh)" class="w-1/2 bg-abysse border border-cyan/20 rounded p-2 text-sm text-white focus:border-cyan outline-none">
-                    <input type="number" id="new-s-kva" placeholder="Pmax (kVA)" class="w-1/2 bg-abysse border border-cyan/20 rounded p-2 text-sm text-white focus:border-cyan outline-none">
+        <div class="bento-card p-8 w-[500px]">
+            <h2 class="text-lg font-bold text-white mb-2 flex items-center gap-2"><i class="ph ph-factory text-cyan"></i> Nouveau Site (Base 3D)</h2>
+            <p class="text-[10px] text-gray-400 mb-6 font-mono">Ces données alimenteront les War Rooms opérationnelles de vos clients.</p>
+            
+            <form id="site-form" onsubmit="addSite(event)" class="flex flex-col gap-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2">
+                        <label class="text-[10px] text-gray-500 uppercase font-bold">Nom du Site / Usine</label>
+                        <input type="text" id="new-s-name" placeholder="Ex: Usine Nord" required class="w-full bg-abysse border border-cyan/20 rounded p-2 text-sm text-white focus:border-cyan outline-none mt-1">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="text-[10px] text-gray-500 uppercase font-bold">Identifiant Unique (PDL/PCE) *</label>
+                        <input type="text" id="new-s-pdl" placeholder="14 chiffres" required class="w-full bg-abysse border border-cyan/50 rounded p-2 text-sm text-cyan focus:border-cyan outline-none mt-1 font-mono">
+                    </div>
+                    
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase font-bold">Énergie</label>
+                        <select id="new-s-energy" class="w-full bg-abysse border border-cyan/20 rounded p-2 text-sm text-white focus:border-cyan outline-none mt-1">
+                            <option value="elec">Électricité</option><option value="gaz">Gaz Naturel</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase font-bold">Surface (m²) <span class="text-purple-400 text-[8px]">Loi ELAN</span></label>
+                        <input type="number" id="new-s-surface" placeholder="0" class="w-full bg-abysse border border-cyan/20 rounded p-2 text-sm text-white focus:border-cyan outline-none mt-1 font-mono">
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase font-bold">Volume Annuel (MWh)</label>
+                        <input type="number" id="new-s-vol" placeholder="0" class="w-full bg-abysse border border-cyan/20 rounded p-2 text-sm text-white focus:border-cyan outline-none mt-1 font-mono">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase font-bold">Pmax / CJA</label>
+                        <input type="number" id="new-s-kva" placeholder="0" class="w-full bg-abysse border border-cyan/20 rounded p-2 text-sm text-white focus:border-cyan outline-none mt-1 font-mono">
+                    </div>
+
+                    <div class="col-span-2 border-t border-white/10 pt-4 mt-2">
+                        <span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Informations Contractuelles</span>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase font-bold">Fournisseur Actuel</label>
+                        <input type="text" id="new-s-provider" placeholder="Ex: EDF..." class="w-full bg-abysse border border-cyan/20 rounded p-2 text-sm text-white focus:border-cyan outline-none mt-1">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-alert uppercase font-bold">Fin de marché</label>
+                        <input type="date" id="new-s-enddate" class="w-full bg-abysse border border-alert/30 rounded p-2 text-sm text-gray-300 focus:border-alert outline-none mt-1" style="color-scheme: dark;">
+                    </div>
                 </div>
+
                 <div class="flex justify-end gap-2 mt-4">
-                    <button type="button" onclick="closeModal('add-site-modal')" class="px-4 py-2 text-gray-400 text-sm font-bold">Annuler</button>
-                    <button type="submit" class="px-4 py-2 bg-cyan text-abysse text-sm font-bold rounded hover:bg-white">Créer Compteur</button>
+                    <button type="button" onclick="closeModal('add-site-modal')" class="px-4 py-2 text-gray-400 text-sm font-bold hover:text-white transition">Annuler</button>
+                    <button type="submit" id="btn-save-new-site" class="px-6 py-2 bg-cyan text-abysse text-sm font-bold rounded hover:bg-white transition shadow-lg flex items-center gap-2"><i class="ph ph-check-circle"></i> Créer Compteur</button>
                 </div>
             </form>
         </div>
@@ -539,7 +586,7 @@
         async function quickChangeStage(dealId, newStage) {
             if (dealsData[dealId] && dealsData[dealId].stage !== newStage) {
                 dealsData[dealId].stage = newStage;
-                const columns = { LEAD: [], AUDIT:[], PROPOSAL:[], NEGOTIATION: [], WON:[], LOST:[] };
+                const columns = { LEAD:[], AUDIT:[], PROPOSAL:[], NEGOTIATION: [], WON:[], LOST:[] };
                 Object.values(dealsData).forEach(d => { if (columns[d.stage]) columns[d.stage].push(d); });
                 renderKanban(columns); renderList();
                 try {
@@ -549,16 +596,13 @@
             }
         }
 
-        // --- 3. OVERLAY DEAL CRASH-PROOF ---
+        // --- 3. OVERLAY DEAL CRASH-PROOF & 3D SCANNER ---
         function openDeal(dealId) {
             currentDealId = dealId;
             const deal = dealsData[dealId];
             if (!deal) return;
 
-            // Protection absolue contre les valeurs nulles
             document.getElementById('fs-holding-name').innerText = deal.holding_name || deal.name || "Inconnu";
-            
-            // Le Bug était ici : deal.pipeline pouvait être absent sur de très vieux leads
             const pipelineName = deal.pipeline || currentPipeline;
             document.getElementById('fs-pipeline-badge').innerText = pipelineName.toUpperCase();
             
@@ -572,7 +616,6 @@
             document.getElementById('fs-siren').innerText = deal.company_id ? deal.company_id.replace("COMP_", "") : "---";
             document.getElementById('fs-naf').innerText = deal.naf || "---";
             
-            // Sécurité Website
             const wLink = document.getElementById('fs-website-link');
             const wSpan = document.getElementById('fs-website');
             if (deal.website && deal.website !== "") {
@@ -580,40 +623,17 @@
                 wLink.href = deal.website.startsWith('http') ? deal.website : `https://${deal.website}`;
                 wLink.style.pointerEvents = "auto";
             } else {
-                wSpan.innerText = "---";
-                wLink.removeAttribute('href');
-                wLink.style.pointerEvents = "none";
+                wSpan.innerText = "---"; wLink.removeAttribute('href'); wLink.style.pointerEvents = "none";
             }
 
             document.getElementById('fs-address').innerText = deal.city || "---";
-            document.getElementById('fs-sites-count').innerText = deal.sites_count || 0;
             document.getElementById('fs-stage-select').value = deal.stage || 'LEAD';
 
-            // Icebreaker NAF
             if(deal.intelligence && deal.intelligence.pain_points) {
                 document.getElementById('fs-icebreaker-box').classList.remove('hidden');
                 document.getElementById('fs-pain-point').innerText = deal.intelligence.pain_points || "N/A";
                 document.getElementById('fs-pitch').innerText = deal.intelligence.pitch || "N/A";
-            } else {
-                document.getElementById('fs-icebreaker-box').classList.add('hidden');
-            }
-
-            // Alertes SaaS
-            const alertsContainer = document.getElementById('fs-alerts-container');
-            if (deal.saas_alerts && deal.saas_alerts.length > 0) {
-                alertsContainer.classList.remove('hidden'); alertsContainer.classList.add('flex');
-                alertsContainer.innerHTML = deal.saas_alerts.map(a => `<div class="text-xs text-alert bg-alert/10 p-2 rounded border border-alert/20 flex items-center gap-1"><i class="ph ph-warning-circle"></i> ${a}</div>`).join('');
-            } else { alertsContainer.classList.add('hidden'); alertsContainer.classList.remove('flex'); }
-
-            // Bifurcation CPQ vs Catalogue
-            if (currentPipeline === 'fourniture' || pipelineName === 'fourniture') {
-                document.getElementById('fs-tools-fourniture').classList.remove('hidden'); document.getElementById('fs-tools-fourniture').classList.add('flex');
-                document.getElementById('fs-tools-standard').classList.add('hidden');
-                document.getElementById('qq-volume').value = deal.volume || 0;
-            } else {
-                document.getElementById('fs-tools-fourniture').classList.add('hidden'); document.getElementById('fs-tools-fourniture').classList.remove('flex');
-                document.getElementById('fs-tools-standard').classList.remove('hidden');
-            }
+            } else { document.getElementById('fs-icebreaker-box').classList.add('hidden'); }
 
             // Contacts
             const contactBox = document.getElementById('fs-contacts-list');
@@ -632,17 +652,108 @@
                             </div>
                         </div>`;
                 });
+            } else { contactBox.innerHTML = `<p class="text-xs text-gray-500 font-mono italic">Aucun contact lié.</p>`; }
+
+            // Bifurcation CPQ vs Catalogue
+            if (currentPipeline === 'fourniture' || pipelineName === 'fourniture') {
+                document.getElementById('fs-tools-fourniture').classList.remove('hidden'); document.getElementById('fs-tools-fourniture').classList.add('flex');
+                document.getElementById('fs-tools-standard').classList.add('hidden');
             } else {
-                contactBox.innerHTML = `<p class="text-xs text-gray-500 font-mono italic">Aucun contact lié.</p>`;
+                document.getElementById('fs-tools-fourniture').classList.add('hidden'); document.getElementById('fs-tools-fourniture').classList.remove('flex');
+                document.getElementById('fs-tools-standard').classList.remove('hidden');
             }
+
+            // NOUVEAU : CHARGEMENT DE LA BASE 3D DANS LE CRM
+            renderDealSites(deal.company_id);
 
             fetchActivities(dealId);
             switchActionTab('note');
             document.getElementById('deal-fullscreen').classList.add('open');
         }
 
+        async function renderDealSites(companyId) {
+            const container = document.getElementById('fs-sites-list');
+            container.innerHTML = '<i class="ph ph-spinner animate-spin text-cyan"></i> Chargement de la Base 3D...';
+            try {
+                // Fetch de la flotte complète (L'API gère le cache et la vitesse)
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                const dealSites = data.fleet.filter(s => s.tenant_id === companyId);
+
+                document.getElementById('fs-sites-count').innerText = dealSites.length;
+
+                if (dealSites.length === 0) {
+                    container.innerHTML = '<div class="text-[10px] text-gray-500 font-mono italic text-center py-4">Aucun site. Ajoutez-en un manuel ou ouvrez la Data Unity pour un import Excel massif.</div>';
+                    document.getElementById('fs-health-badge').innerText = "DATA: 0%";
+                    document.getElementById('fs-health-badge').className = "px-2 py-0.5 text-[10px] font-bold uppercase rounded border ml-2 bg-gray-800 text-gray-400 border-gray-600";
+                    return;
+                }
+
+                let totalVol = 0;
+                let healthSum = 0;
+
+                container.innerHTML = dealSites.map(s => {
+                    totalVol += (s.volume || 0);
+
+                    // Mini algorithme de Health Score
+                    let score = 0;
+                    if(s.pdl) score += 25;
+                    if(s.surface) score += 25;
+                    if(s.provider && s.provider !== 'Inconnu') score += 25;
+                    if(s.budget > 0 || s.volume > 0) score += 25;
+                    healthSum += Math.min(score, 100);
+
+                    const icon = s.energy === 'gaz' ? '<i class="ph ph-fire text-alert"></i>' : '<i class="ph ph-lightning text-cyan"></i>';
+                    const prov = s.provider && s.provider !== 'Inconnu' ? s.provider : '<span class="text-alert opacity-70">Fournisseur ?</span>';
+                    const surf = s.surface ? `${s.surface} m²` : '<span class="text-alert opacity-70">Surface ?</span>';
+                    
+                    // Alerte de renouvellement
+                    let dateHtml = '';
+                    if (s.end_date) {
+                        dateHtml = `<span class="text-gray-500 ml-2">| Fin: ${s.end_date}</span>`;
+                    }
+
+                    return `
+                    <div class="bg-abysse border border-cyan/10 p-3 rounded-lg hover:border-cyan/40 transition mb-2 shadow-inner">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="font-bold text-white text-xs flex items-center gap-2 truncate">${icon} ${s.name}</div>
+                            <div class="text-[9px] text-cyan font-mono flex-shrink-0">${s.pdl}</div>
+                        </div>
+                        <div class="flex justify-between items-end mt-2 text-[10px] text-gray-400">
+                            <div><span class="block">${prov} ${dateHtml}</span><span class="block mt-0.5">Surface: ${surf}</span></div>
+                            <div class="text-right"><span class="block font-bold text-white">${Math.round(s.volume)} MWh</span></div>
+                        </div>
+                    </div>
+                    `;
+                }).join('');
+
+                // Auto-CPQ Volume
+                if (document.getElementById('qq-volume')) document.getElementById('qq-volume').value = Math.round(totalVol);
+
+                // Global Health Badge
+                const avgHealth = Math.round(healthSum / dealSites.length);
+                const healthBadge = document.getElementById('fs-health-badge');
+                if(healthBadge) {
+                    healthBadge.innerText = `DATA: ${avgHealth}%`;
+                    healthBadge.className = `px-2 py-0.5 text-[10px] font-bold uppercase rounded border ml-2 ${avgHealth > 75 ? 'bg-success/10 text-success border-success/30' : (avgHealth > 40 ? 'bg-warning/10 text-warning border-warning/30' : 'bg-alert/10 text-alert border-alert/30')}`;
+                }
+
+            } catch (e) {
+                container.innerHTML = '<div class="text-[10px] text-alert font-mono">Erreur de chargement.</div>';
+            }
+        }
+
         function closeDeal() { document.getElementById('deal-fullscreen').classList.remove('open'); currentDealId = null; }
         function changeDealStage(newStage) { if(currentDealId) quickChangeStage(currentDealId, newStage); }
+
+        // LE PONT GOD MODE VERS DATA UNITY
+        window.openDataUnity = function() {
+            if(currentDealId && dealsData[currentDealId]) {
+                const compId = dealsData[currentDealId].company_id;
+                // Redirection vers les settings avec usurpation
+                window.location.href = `/settings?force_tenant=${compId}`;
+            }
+        }
 
         // --- 4. ACTIONS CENTRALES ---
         function switchActionTab(tab) {['note', 'email', 'call', 'task', 'ticket'].forEach(t => {
@@ -752,19 +863,44 @@
             } catch(err) { alert("Erreur d'ajout"); }
         }
 
+        // AJOUT DE SITE MODIFIÉ POUR LA BASE 3D V12.6
         async function addSite(e) {
             e.preventDefault();
             if(!currentDealId) return;
             const deal = dealsData[currentDealId];
+            
+            const btn = document.getElementById('btn-save-new-site');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin"></i>...'; btn.disabled = true;
+
+            const pdl = document.getElementById('new-s-pdl').value.replace(/\s/g, '');
+            const energy = document.getElementById('new-s-energy').value;
+
+            // Utilisation du Smart Mapper (route /api/settings/save_client) pour créer la coquille 3D complète
             const payload = {
-                site_name: document.getElementById('new-s-name').value, pdl_pce: document.getElementById('new-s-pdl').value,
-                energy_type: document.getElementById('new-s-energy').value, car_mwh: parseFloat(document.getElementById('new-s-vol').value||0),
-                power_kva: parseFloat(document.getElementById('new-s-kva').value||0), address: "", company_id: deal.company_id
+                id: pdl,
+                forced_tenant_id: deal.company_id, // Usurpation backend
+                identity: { id: pdl, tenant_id: deal.company_id, site_name: document.getElementById('new-s-name').value },
+                location: { surface: parseFloat(document.getElementById('new-s-surface').value) || 0 },
+                contract: {
+                    energy_type: energy,
+                    provider: document.getElementById('new-s-provider').value,
+                    end_date: document.getElementById('new-s-enddate').value,
+                    power: parseFloat(document.getElementById('new-s-kva').value) || 0
+                },
+                kpis: { volume_mwh: parseFloat(document.getElementById('new-s-vol').value) || 0 }
             };
+            if(energy === 'gaz') payload.contract.pce = pdl; else payload.contract.pdl = pdl;
+
             try {
-                await fetch(`/api/crm/company/${deal.company_id}/site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-                closeModal('add-site-modal'); fetchDeals(currentPipeline); setTimeout(()=>openDeal(currentDealId), 500);
-            } catch(err) { alert("Erreur d'ajout"); }
+                await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                closeModal('add-site-modal'); 
+                fetchDeals(currentPipeline); 
+                
+                // On recharge les mini-cartes du deal
+                renderDealSites(deal.company_id);
+            } catch(err) { alert("Erreur d'ajout réseau."); }
+            finally { btn.innerHTML = orig; btn.disabled = false; }
         }
 
         // --- 7. FAST-TRACK QUOTE (FOURNITURE) ---
