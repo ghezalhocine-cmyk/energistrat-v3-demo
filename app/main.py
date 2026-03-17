@@ -422,7 +422,7 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             naf = comp.get("naf", "DEFAULT")
             formatted_deals.append({
                 "id": deal.get("id"), "company_id": comp.get("id"), "holding_name": comp.get("holding_name") or comp.get("name", "Inconnu"),
-                "name": deal.get("name", "Inconnu"), "city": comp.get("city", ""), "solvency_score": comp.get("solvency_score", "INCONNU"), 
+                "name": deal.get("name", "Inconnu"), "city": comp.get("city", ""),"website": comp.get("website", ""), "solvency_score": comp.get("solvency_score", "INCONNU"), 
                 "solvency_msg": comp.get("solvency_msg", "Non vérifié"), "naf": naf, "volume": vol, "stage": deal.get("stage", "LEAD"), 
                 "all_contacts": deal_contacts, "sites_count": len(company_sites), "saas_alerts": saas_alerts, "intelligence": crm_engine.generate_icebreaker(naf, pipe_type), 
                 "commission_est": float(deal.get("commission_est") or crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)), "products": deal.get("products",[]), "documents": deal.get("documents",[])
@@ -434,7 +434,7 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             fake_contact = {"id": old.get("id"), "firstname": str(old.get("contact_firstname", "")).strip(), "lastname": str(old.get("contact_lastname", "")).strip(), "role": old.get("contact_role", "Contact"), "phone": old.get("contact_phone", ""), "email": old.get("contact_email", ""), "linkedin": old.get("linkedin", "")}
             formatted_deals.append({
                 "id": old.get("id"), "company_id": old.get("id"), "holding_name": old.get("company_name", "Ancien Client"),
-                "name": deal.get("name", "Ancien Deal"), "city": old.get("city", ""), "solvency_score": "INCONNU", "solvency_msg": "Legacy (Créé avant API)",
+                "name": deal.get("name", "Ancien Deal"), "city": old.get("city", ""), "website": old.get("website", ""), "solvency_score": "INCONNU", "solvency_msg": "Legacy (Créé avant API)",
                 "naf": naf, "volume": vol, "stage": old.get("stage", "LEAD"), "all_contacts":[fake_contact], "sites_count": 0, "saas_alerts":[],
                 "intelligence": crm_engine.generate_icebreaker(naf, pipe_type), "commission_est": float(deal.get("commission_est") or crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)), "products": deal.get("products",[]), "documents": deal.get("documents",[])
             })
