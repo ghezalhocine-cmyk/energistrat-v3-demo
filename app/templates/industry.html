@@ -808,85 +808,80 @@
         // ==========================================
         // 7. ÉDITION DES DONNÉES (4 CADRANS)
         // ==========================================
+    
         window.openEditModal = function() {
             if(!CURRENT_SITE) return App.toast("Aucune usine sélectionnée.", "error");
-            document.getElementById('edit-id').value = CURRENT_SITE.identity.id;
-            document.getElementById('edit-name').value = CURRENT_SITE.identity.site_name || "";
-            document.getElementById('edit-provider').value = CURRENT_SITE.contract?.provider || "";
-            document.getElementById('edit-surface').value = CURRENT_SITE.location?.surface || "";
-            document.getElementById('edit-address').value = CURRENT_SITE.location?.address || "";
-            document.getElementById('edit-zip').value = CURRENT_SITE.location?.zip_code || "";
-            document.getElementById('edit-end-date').value = CURRENT_SITE.contract?.end_date || "";
-            document.getElementById('edit-segment').value = CURRENT_SITE.contract?.segment || "";
             
-            document.getElementById('edit-ps-hph').value = CURRENT_SITE.contract?.ps_hph || "";
-            document.getElementById('edit-ps-hch').value = CURRENT_SITE.contract?.ps_hch || "";
-            document.getElementById('edit-ps-hpe').value = CURRENT_SITE.contract?.ps_hpe || "";
-            document.getElementById('edit-ps-hce').value = CURRENT_SITE.contract?.ps_hce || "";
+            // Bouclier "Null-Safe" : Empêche le JS de planter si un champ HTML est absent
+            const safeSetVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ""; };
 
+            safeSetVal('edit-id', CURRENT_SITE.identity?.id);
+            safeSetVal('edit-name', CURRENT_SITE.identity?.site_name);
+            safeSetVal('edit-provider', CURRENT_SITE.contract?.provider);
+            safeSetVal('edit-surface', CURRENT_SITE.location?.surface);
+            safeSetVal('edit-address', CURRENT_SITE.location?.address);
+            safeSetVal('edit-zip', CURRENT_SITE.location?.zip_code);
+            safeSetVal('edit-end-date', CURRENT_SITE.contract?.end_date);
+            safeSetVal('edit-segment', CURRENT_SITE.contract?.segment);
+
+            // Puissances Cadrans
+            safeSetVal('edit-ps-hph', CURRENT_SITE.contract?.ps_hph);
+            safeSetVal('edit-ps-hch', CURRENT_SITE.contract?.ps_hch);
+            safeSetVal('edit-ps-hpe', CURRENT_SITE.contract?.ps_hpe);
+            safeSetVal('edit-ps-hce', CURRENT_SITE.contract?.ps_hce);
+
+            // Prix Cadrans
             const p = CURRENT_SITE.pricing || {};
-            document.getElementById('edit-px-hph').value = p.hph ? (p.hph > 10 ? p.hph : p.hph * 1000).toFixed(2) : "";
-            document.getElementById('edit-px-hch').value = p.hch ? (p.hch > 10 ? p.hch : p.hch * 1000).toFixed(2) : "";
-            document.getElementById('edit-px-hpe').value = p.hpe ? (p.hpe > 10 ? p.hpe : p.hpe * 1000).toFixed(2) : "";
-            document.getElementById('edit-px-hce').value = p.hce ? (p.hce > 10 ? p.hce : p.hce * 1000).toFixed(2) : "";
+            safeSetVal('edit-px-hph', p.hph ? (p.hph > 10 ? p.hph : p.hph * 1000).toFixed(2) : "");
+            safeSetVal('edit-px-hch', p.hch ? (p.hch > 10 ? p.hch : p.hch * 1000).toFixed(2) : "");
+            safeSetVal('edit-px-hpe', p.hpe ? (p.hpe > 10 ? p.hpe : p.hpe * 1000).toFixed(2) : "");
+            safeSetVal('edit-px-hce', p.hce ? (p.hce > 10 ? p.hce : p.hce * 1000).toFixed(2) : "");
 
-            let pKwh = CURRENT_SITE.pricing?.price_kwh || 0; if(pKwh > 10) pKwh /= 1000;
-            document.getElementById('edit-price').value = pKwh > 0 ? (pKwh * 1000).toFixed(2) : "";
+            // Fallback Lissé
+            let pKwh = p.price_kwh || 0; if(pKwh > 10) pKwh /= 1000;
+            safeSetVal('edit-price', pKwh > 0 ? (pKwh * 1000).toFixed(2) : "");
             
             document.getElementById('edit-modal').classList.remove('hidden');
         }
 
-        window.fetchSurfaceFromAdeme = async function() {
-            const addr = document.getElementById('edit-address').value;
-            const zip = document.getElementById('edit-zip').value;
-            if(!addr) return App.toast("L'adresse n'est pas renseignée.", "warning");
-            
-            App.toast("CORTEX interroge l'ADEME...", "info");
-            try {
-                const query = encodeURIComponent(`${addr} ${zip}`.trim());
-                const res = await fetch(`https://data.ademe.fr/data-fair/api/v1/datasets/dpe-v2-tertiaire-2/lines?q=${query}&size=1&select=surface_utile`);
-                const data = await res.json();
-                if(data && data.results && data.results.length > 0) {
-                    document.getElementById('edit-surface').value = data.results[0].surface_utile;
-                    App.toast(`Surface importée : ${data.results[0].surface_utile} m²`, "success");
-                } else { App.toast("Aucun DPE trouvé pour cette adresse.", "warning"); }
-            } catch(e) { App.toast("Erreur API ADEME.", "error"); }
-        }
-
         window.saveSiteChanges = async function() {
             const original = CURRENT_SITE || { identity: {}, contract: { power_details: {} }, location: {}, pricing: {} }; 
-            original.identity.site_name = document.getElementById('edit-name').value;
+            
+            // Extracteur "Null-Safe"
+            const safeGetVal = (id) => { const el = document.getElementById(id); return el ? el.value : null; };
+
+            original.identity.site_name = safeGetVal('edit-name') || original.identity.site_name;
             
             if(!original.contract) original.contract = { power_details: {} };
-            original.contract.provider = document.getElementById('edit-provider').value;
-            original.contract.end_date = document.getElementById('edit-end-date').value;
-            original.contract.segment = document.getElementById('edit-segment').value;
+            const prov = safeGetVal('edit-provider'); if(prov !== null) original.contract.provider = prov;
+            const endD = safeGetVal('edit-end-date'); if(endD !== null) original.contract.end_date = endD;
+            const seg = safeGetVal('edit-segment'); if(seg !== null) original.contract.segment = seg;
             
-            const newSurface = parseFloat(document.getElementById('edit-surface').value);
+            const newSurface = parseFloat(safeGetVal('edit-surface'));
             if(!original.location) original.location = {};
-            original.location.surface = isNaN(newSurface) ? 0 : newSurface;
+            if(!isNaN(newSurface)) original.location.surface = newSurface;
 
             if(!original.contract.power_details) original.contract.power_details = {};
-            original.contract.ps_hph = parseFloat(document.getElementById('edit-ps-hph').value) || null;
-            original.contract.ps_hch = parseFloat(document.getElementById('edit-ps-hch').value) || null;
-            original.contract.ps_hpe = parseFloat(document.getElementById('edit-ps-hpe').value) || null;
-            original.contract.ps_hce = parseFloat(document.getElementById('edit-ps-hce').value) || null;
+            original.contract.ps_hph = parseFloat(safeGetVal('edit-ps-hph')) || null;
+            original.contract.ps_hch = parseFloat(safeGetVal('edit-ps-hch')) || null;
+            original.contract.ps_hpe = parseFloat(safeGetVal('edit-ps-hpe')) || null;
+            original.contract.ps_hce = parseFloat(safeGetVal('edit-ps-hce')) || null;
 
             if(!original.pricing) original.pricing = {};
-            const pxHph = parseFloat(document.getElementById('edit-px-hph').value); if(!isNaN(pxHph)) original.pricing.hph = pxHph / 1000;
-            const pxHch = parseFloat(document.getElementById('edit-px-hch').value); if(!isNaN(pxHch)) original.pricing.hch = pxHch / 1000;
-            const pxHpe = parseFloat(document.getElementById('edit-px-hpe').value); if(!isNaN(pxHpe)) original.pricing.hpe = pxHpe / 1000;
-            const pxHce = parseFloat(document.getElementById('edit-px-hce').value); if(!isNaN(pxHce)) original.pricing.hce = pxHce / 1000;
+            const pxHph = parseFloat(safeGetVal('edit-px-hph')); if(!isNaN(pxHph)) original.pricing.hph = pxHph / 1000;
+            const pxHch = parseFloat(safeGetVal('edit-px-hch')); if(!isNaN(pxHch)) original.pricing.hch = pxHch / 1000;
+            const pxHpe = parseFloat(safeGetVal('edit-px-hpe')); if(!isNaN(pxHpe)) original.pricing.hpe = pxHpe / 1000;
+            const pxHce = parseFloat(safeGetVal('edit-px-hce')); if(!isNaN(pxHce)) original.pricing.hce = pxHce / 1000;
 
-            const pMwh = parseFloat(document.getElementById('edit-price').value);
-            if(!isNaN(pMwh)) { original.pricing.price_kwh = pMwh / 1000; }
+            const pMwh = parseFloat(safeGetVal('edit-price'));
+            if(!isNaN(pMwh)) original.pricing.price_kwh = pMwh / 1000;
 
             try {
                 const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
                 if((await res.json()).success) { 
                     document.getElementById('edit-modal').classList.add('hidden'); 
                     App.toast("Data Unity mise à jour !", "success"); 
-                    // Recharge la vue
+                    // Recharge la vue usine pour appliquer les calculs (EBITDA, Carbone)
                     window.loadSite(original.identity.id);
                 } else { App.toast("Erreur de sauvegarde", "error"); }
             } catch(e) { App.toast("Erreur réseau", "error"); }
