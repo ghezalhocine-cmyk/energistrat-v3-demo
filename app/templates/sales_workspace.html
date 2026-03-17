@@ -5,9 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SALES.CRM | Workspace 3D Ultime</title>
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- LEAFLET MAPS FOR WAR ROOM -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <script>
         tailwind.config = {
             theme: {
@@ -20,7 +25,7 @@
     </script>
     <style>
         body { background-color: #001529; color: #ffffff; overflow: hidden; font-family: 'Inter', sans-serif; }
-        .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 255, 0.1); border-radius: 2rem; transition: all 0.3s ease; }
+        .bento-card { background-color: rgba(0, 29, 61, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 255, 0.1); border-radius: 1.5rem; transition: all 0.3s ease; }
         .bento-card:hover { border-color: rgba(0, 229, 255, 0.4); box-shadow: 0 10px 30px -10px rgba(0, 229, 255, 0.2); }
         
         .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #9CA3AF; font-size: 13px; font-weight: 600; border-radius: 1.5rem; transition: all 0.2s; cursor: pointer; text-decoration: none; }
@@ -29,10 +34,11 @@
 
         .kanban-col { min-width: 340px; max-width: 340px; height: calc(100vh - 140px); display: flex; flex-direction: column; }
         .kanban-cards { flex-grow: 1; overflow-y: auto; padding-right: 8px; display: flex; flex-direction: column; gap: 16px; }
-        .deal-card { background: rgba(0, 21, 41, 0.9); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: 1.5rem; padding: 1.25rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .deal-card:hover { border-color: #00E5FF; transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,229,255,0.15); }
+        .deal-card { background: rgba(0, 21, 41, 0.95); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: 1.5rem; padding: 1.25rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .deal-card:hover { border-color: #00E5FF; transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,229,255,0.2); }
 
-        .inline-edit-input { background: rgba(0,0,0,0.4); border: 1px solid #00E5FF; color: white; border-radius: 0.5rem; padding: 4px 8px; outline: none; width: 100%; font-family: 'JetBrains Mono'; font-size: 0.875rem; }
+        .inline-edit-input { background: rgba(0,0,0,0.5); border: 1px solid #00E5FF; color: white; border-radius: 0.5rem; padding: 4px 8px; outline: none; width: 100%; font-family: 'JetBrains Mono'; font-size: 0.875rem; transition: all 0.2s; }
+        .inline-edit-input:focus { box-shadow: 0 0 10px rgba(0,229,255,0.4); }
         .editable-group:hover .edit-icon { opacity: 1; }
         .edit-icon { opacity: 0; transition: opacity 0.2s; cursor: pointer; color: #00E5FF; margin-left: 8px; }
 
@@ -46,16 +52,21 @@
         .drop-zone { border: 2px dashed rgba(0, 229, 255, 0.3); border-radius: 1.5rem; padding: 2rem; text-align: center; transition: all 0.3s ease; cursor: pointer; background: rgba(0,0,0,0.2); }
         .drop-zone:hover { background: rgba(0, 229, 255, 0.05); border-color: #00E5FF; }
 
+        .input-form { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,229,255,0.2); color: white; padding: 12px; border-radius: 1rem; width: 100%; outline: none; transition: border-color 0.3s; font-family: 'Inter', sans-serif; }
+        .input-form:focus { border-color: #00E5FF; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+
+        /* LEAFLET DARK MODE CSS INVERT TRICK */
+        .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        .leaflet-container { background: transparent !important; border-radius: 2rem; font-family: 'Inter', sans-serif; }
+        .map-marker { border-radius: 50%; border: 3px solid white; box-shadow: 0 0 15px rgba(0,0,0,0.8); }
+
         ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.3); border-radius: 3px; }
-        
-        .input-form { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,229,255,0.2); color: white; padding: 12px; border-radius: 1rem; width: 100%; outline: none; transition: border-color 0.3s; }
-        .input-form:focus { border-color: #00E5FF; }
     </style>
 </head>
-<body class="flex h-screen font-sans antialiased">
+<body class="flex h-screen font-sans antialiased bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
 
-    <!-- SIDEBAR -->
-    <aside class="w-64 bg-abysse border-r border-cyan/10 flex flex-col z-40 flex-none shadow-2xl">
+    <!-- SIDEBAR GAUCHE -->
+    <aside class="w-64 bg-abysse border-r border-cyan/10 flex flex-col z-40 flex-none overflow-y-auto shadow-2xl">
         <div class="h-24 flex items-center gap-3 px-6 border-b border-cyan/10 bg-card/50">
             <div class="w-10 h-10 bg-gradient-to-br from-cyan to-blue-800 rounded-xl flex items-center justify-center text-abysse font-black text-xl shadow-[0_0_15px_rgba(0,229,255,0.4)]">
                 <i class="ph ph-headset"></i>
@@ -70,8 +81,9 @@
             <div>
                 <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 px-6">Opérationnel</p>
                 <div class="space-y-1 px-2">
-                    <a href="/sales_workspace" class="sidebar-item active"><i class="ph ph-kanban text-xl"></i> Deal Desk (3D)</a>
-                    <a href="#" class="sidebar-item"><i class="ph ph-map-trifold text-xl"></i> War Room (Map)</a>
+                    <button onclick="closeWarRoomMap()" class="sidebar-item active w-full text-left"><i class="ph ph-kanban text-xl"></i> Deal Desk (3D)</button>
+                    <!-- LE FIX WAR ROOM MAP -->
+                    <button onclick="openWarRoomMap()" class="sidebar-item w-full text-left"><i class="ph ph-map-trifold text-xl text-gold"></i> War Room (Carte)</button>
                 </div>
             </div>
             <div>
@@ -92,9 +104,9 @@
     </aside>
 
     <!-- MAIN WORKSPACE -->
-    <main class="flex-grow flex flex-col h-screen relative bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+    <main class="flex-grow flex flex-col h-screen relative">
         
-        <header class="h-24 px-10 flex items-center justify-between bg-abysse/80 backdrop-blur-md border-b border-cyan/10 flex-none shadow-lg">
+        <header class="h-24 px-10 flex items-center justify-between bg-abysse/90 backdrop-blur-md border-b border-cyan/10 flex-none shadow-lg">
             <div class="flex bg-black/40 p-1 rounded-2xl border border-white/5">
                 <button onclick="switchPipeline('saas')" id="tab-saas" class="pipe-tab px-8 py-3 text-sm font-black rounded-xl bg-cyan text-abysse transition-all shadow-[0_0_15px_rgba(0,229,255,0.4)] uppercase tracking-widest">SaaS B2B</button>
                 <button onclick="switchPipeline('courtage')" id="tab-courtage" class="pipe-tab px-8 py-3 text-sm font-bold text-gray-400 hover:text-white rounded-xl transition-all uppercase tracking-widest">Courtage</button>
@@ -102,15 +114,20 @@
                 <button onclick="switchPipeline('fourniture')" id="tab-fourniture" class="pipe-tab px-8 py-3 text-sm font-bold text-gray-400 hover:text-success transition-all flex items-center gap-2 uppercase tracking-widest"><i class="ph ph-lightning text-lg"></i> Fourniture</button>
             </div>
 
-            <div class="flex items-center gap-8">
-                <div class="flex items-center bg-black/40 border border-white/10 rounded-xl p-1">
-                    <button onclick="switchView('kanban')" id="view-kanban" class="px-4 py-2 text-xs font-bold rounded-lg bg-cyan/20 text-cyan uppercase tracking-widest"><i class="ph ph-kanban"></i> Kanban</button>
-                    <button onclick="switchView('list')" id="view-list" class="px-4 py-2 text-xs font-bold rounded-lg text-gray-400 hover:text-white uppercase tracking-widest"><i class="ph ph-list-bullets"></i> Liste</button>
+            <div class="flex items-center gap-6">
+                <!-- LE FIX BOUTON ADMIN (Maintenant toujours visible) -->
+                <button onclick="openAdminCatalogue()" class="px-5 py-3 bg-abysse border border-cyan/30 text-cyan text-xs font-bold rounded-2xl hover:bg-cyan hover:text-abysse transition-colors flex items-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.2)] uppercase tracking-widest" title="Gérer le catalogue de prix">
+                    <i class="ph ph-gear text-lg"></i> Catalogue
+                </button>
+
+                <div class="flex items-center bg-black/40 border border-white/10 rounded-2xl p-1">
+                    <button onclick="switchView('kanban')" id="view-kanban" class="px-4 py-2 text-xs font-bold rounded-xl bg-cyan/20 text-cyan uppercase tracking-widest"><i class="ph ph-kanban"></i> Kanban</button>
+                    <button onclick="switchView('list')" id="view-list" class="px-4 py-2 text-xs font-bold rounded-xl text-gray-400 hover:text-white uppercase tracking-widest"><i class="ph ph-list-bullets"></i> Liste</button>
                 </div>
                 
-                <div class="text-right border-l border-cyan/20 pl-8">
+                <div class="text-right border-l border-cyan/20 pl-6">
                     <p class="text-[10px] text-cyan font-mono uppercase tracking-widest mb-1"><i class="ph ph-lock-key"></i> Pipeline Global</p>
-                    <h2 class="text-3xl font-black text-white font-mono drop-shadow-md" id="pipe-total-value">0 €</h2>
+                    <h2 class="text-2xl font-black text-white font-mono drop-shadow-md" id="pipe-total-value">0 €</h2>
                 </div>
                 <button onclick="openNewLeadModal()" class="px-8 py-4 bg-cyan text-abysse text-sm font-black rounded-[2rem] hover:bg-white transition-colors flex items-center gap-3 shadow-[0_0_20px_rgba(0,229,255,0.4)] uppercase tracking-widest">
                     <i class="ph ph-plus-circle text-xl"></i> CRÉER PROSPECT
@@ -119,29 +136,43 @@
         </header>
 
         <div class="flex-grow overflow-hidden relative p-8">
+            <!-- VUE KANBAN -->
             <div id="kanban-container" class="flex gap-8 h-full min-w-max overflow-x-auto pb-4 transition-opacity duration-300"></div>
 
+            <!-- VUE LISTE -->
             <div id="list-container" class="hidden flex-col h-full bento-card overflow-hidden transition-opacity duration-300">
                 <div class="p-6 border-b border-cyan/10 flex gap-4 items-center bg-card/50">
                     <div class="relative flex-grow">
                         <i class="ph ph-magnifying-glass absolute left-4 top-3.5 text-cyan text-lg"></i>
-                        <input type="text" id="search-list" onkeyup="filterList()" class="w-full bg-abysse border border-cyan/20 rounded-[2rem] py-3 pl-12 pr-4 text-white text-sm focus:border-cyan outline-none font-mono shadow-inner" placeholder="Rechercher Raison Sociale, SIREN, PDL...">
+                        <input type="text" id="search-list" onkeyup="filterList()" class="w-full bg-abysse border border-cyan/20 rounded-[2rem] py-3 pl-12 pr-4 text-white text-sm focus:border-cyan outline-none font-mono shadow-inner" placeholder="Rechercher Raison Sociale, SIREN...">
                     </div>
                 </div>
                 <div class="flex-grow overflow-auto bg-abysse/30">
                     <table class="w-full text-left text-sm whitespace-nowrap">
                         <thead class="bg-abysse sticky top-0 z-10 text-[10px] font-bold text-gray-500 border-b border-white/10 uppercase tracking-widest shadow-md">
                             <tr>
-                                <th class="px-6 py-4">Raison Sociale / Holding</th>
-                                <th class="px-6 py-4">Solvabilité Légale</th>
-                                <th class="px-6 py-4">Pipeline & Étape</th>
-                                <th class="px-6 py-4">Parc SGE (Base 3D)</th>
-                                <th class="px-6 py-4 text-right">Valeur Estimée</th>
+                                <th class="px-6 py-5">Raison Sociale / Holding</th>
+                                <th class="px-6 py-5">Solvabilité Légale</th>
+                                <th class="px-6 py-5">Pipeline & Étape</th>
+                                <th class="px-6 py-5">Parc SGE (Base 3D)</th>
+                                <th class="px-6 py-5 text-right">Valeur Estimée</th>
                             </tr>
                         </thead>
                         <tbody id="list-tbody" class="divide-y divide-white/5"></tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- VUE WAR ROOM MAP (NOUVEAU) -->
+            <div id="map-container" class="hidden absolute inset-8 bento-card p-2 border-2 border-gold/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-30 flex-col">
+                <div class="absolute top-6 left-6 bg-abysse/90 backdrop-blur-md p-4 rounded-2xl border border-white/10 z-[1000] text-xs font-bold text-white shadow-2xl">
+                    <div class="mb-2 text-gray-400 uppercase tracking-widest border-b border-white/10 pb-1">Statut des Deals</div>
+                    <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-cyan shadow-[0_0_8px_#00E5FF]"></span> Lead / Audit</div>
+                    <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-warning shadow-[0_0_8px_#FFB800]"></span> Négociation</div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-success shadow-[0_0_8px_#00FF66]"></span> Gagné (SASP)</div>
+                </div>
+                <button onclick="closeWarRoomMap()" class="absolute top-6 right-6 bg-abysse/90 hover:bg-alert text-white w-10 h-10 rounded-full border border-white/10 z-[1000] flex items-center justify-center transition"><i class="ph ph-x text-xl"></i></button>
+                <div id="war-room-map" class="w-full h-full rounded-[2rem]"></div>
             </div>
         </div>
     </main>
@@ -153,7 +184,7 @@
         
         <header class="h-24 px-10 flex items-center justify-between border-b border-cyan/20 bg-card/80 backdrop-blur-lg flex-none shadow-lg">
             <div class="flex items-center gap-6">
-                <button onclick="closeDeal()" class="w-12 h-12 rounded-full bg-abysse border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:border-white transition-colors text-xl shadow-inner"><i class="ph ph-arrow-left"></i></button>
+                <button onclick="closeDeal()" class="w-12 h-12 rounded-full bg-abysse border border-white/10 flex items-center justify-center text-gray-400 hover:text-cyan hover:border-cyan transition-colors text-xl shadow-inner"><i class="ph ph-arrow-left"></i></button>
                 <div class="flex flex-col justify-center">
                     <h2 class="text-3xl font-black text-white editable-group group flex items-center gap-3 italic tracking-tight">
                         <span id="fs-holding-name">Holding Name</span>
@@ -161,8 +192,8 @@
                     </h2>
                     <div class="flex items-center gap-3 mt-2">
                         <span id="fs-solvency" class="px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-gray-800 text-gray-300">Solvabilité</span>
-                        <span id="fs-pipeline-badge" class="px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-cyan/10 text-cyan border-cyan/30">Pipeline</span>
-                        <span id="fs-health-badge" class="px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-gray-800 text-gray-300 transition-colors shadow-sm">DATA: --%</span>
+                        <span id="fs-pipeline-badge" class="px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-cyan/10 text-cyan border-cyan/30 ml-2">Pipeline</span>
+                        <span id="fs-health-badge" class="px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-gray-800 text-gray-300 transition-colors shadow-sm ml-2">DATA: --%</span>
                     </div>
                 </div>
             </div>
@@ -184,7 +215,7 @@
             <!-- COLONNE 1 : DATA 3D (Identité & Sites) -->
             <div class="lg:col-span-3 flex flex-col gap-6 overflow-y-auto pr-2">
                 <div class="bento-card p-6 shadow-lg">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-white/10 pb-3"><i class="ph ph-buildings text-cyan text-lg"></i> Identité & Siège</h3>
+                    <h3 class="text-xs font-bold text-gray-400 font-mono uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-white/10 pb-3"><i class="ph ph-buildings text-cyan text-lg"></i> Identité & Siège</h3>
                     <div class="space-y-4 text-sm">
                         <div class="flex justify-between items-center"><span class="text-gray-500 font-bold text-[10px] uppercase tracking-widest">SIREN</span><span class="font-mono text-white font-bold" id="fs-siren">---</span></div>
                         <div class="flex justify-between items-center editable-group group"><span class="text-gray-500 font-bold text-[10px] uppercase tracking-widest">NAF</span><div class="flex items-center"><span class="font-mono text-cyan bg-cyan/10 px-3 py-1 rounded-md border border-cyan/20 font-bold" id="fs-naf">---</span><i class="ph ph-pencil-simple edit-icon" onclick="startInlineEdit('fs-naf', 'company', 'naf')"></i></div></div>
@@ -195,8 +226,8 @@
 
                 <div class="bento-card p-6 shadow-lg">
                     <div class="flex justify-between items-center border-b border-white/10 pb-3 mb-4">
-                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2"><i class="ph ph-users text-cyan text-lg"></i> Contacts</h3>
-                        <button onclick="openAddContactModal()" class="w-6 h-6 rounded bg-cyan/20 text-cyan flex items-center justify-center hover:bg-cyan hover:text-abysse transition"><i class="ph ph-plus font-bold"></i></button>
+                        <h3 class="text-xs font-bold text-gray-400 font-mono uppercase tracking-widest flex items-center gap-2"><i class="ph ph-users text-cyan text-lg"></i> Contacts</h3>
+                        <button onclick="openAddContactModal()" class="w-8 h-8 rounded-lg bg-cyan/20 text-cyan flex items-center justify-center hover:bg-cyan hover:text-abysse transition"><i class="ph ph-plus font-bold"></i></button>
                     </div>
                     <div id="fs-contacts-list" class="space-y-3"></div>
                 </div>
@@ -204,15 +235,14 @@
                 <div class="bento-card p-6 flex flex-col flex-1 shadow-lg border-t-4 border-cyan">
                     <div class="flex justify-between items-center border-b border-white/10 pb-3 mb-4">
                         <h3 class="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2"><i class="ph ph-factory text-cyan text-lg"></i> Base 3D (<span id="fs-sites-count">0</span>)</h3>
-                        <button onclick="openAddSiteModal()" class="w-6 h-6 rounded bg-cyan text-abysse flex items-center justify-center hover:bg-white transition shadow-md"><i class="ph ph-plus font-black"></i></button>
+                        <button onclick="openAddSiteModal()" class="w-8 h-8 rounded-lg bg-cyan text-abysse flex items-center justify-center hover:bg-white transition shadow-md"><i class="ph ph-plus font-black"></i></button>
                     </div>
                     
                     <div id="fs-alerts-container" class="mb-4 hidden flex-col gap-2"></div>
-                    
                     <div id="fs-sites-list" class="space-y-3 mb-6 overflow-y-auto flex-1 pr-2"></div>
 
                     <button onclick="openDataUnity()" class="w-full py-4 mt-auto bg-abysse border border-cyan/50 rounded-[2rem] text-[10px] font-bold uppercase tracking-widest text-cyan hover:bg-cyan hover:text-abysse transition flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.2)]">
-                        <i class="ph ph-sliders text-lg"></i> Paramétrage Avancé (Settings)
+                        <i class="ph ph-sliders text-lg"></i> Paramétrage Expert (Settings)
                     </button>
                 </div>
             </div>
@@ -268,64 +298,72 @@
             <!-- COLONNE 3 : OUTILS DE CLOSING (CPQ EXPERT & GED) -->
             <div class="lg:col-span-4 flex flex-col gap-6 overflow-y-auto pl-2">
                 
+                <!-- LE NOUVEAU CPQ PREDICTIF (ZÉRO MOCK) -->
                 <div id="fs-tools-fourniture" class="hidden flex-col gap-6">
                     <div class="bento-card p-8 border-t-4 border-success shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden bg-gradient-to-br from-card to-success/10">
                         <i class="ph ph-calculator absolute -right-6 -bottom-6 text-[120px] text-success opacity-5"></i>
-                        <h3 class="text-sm font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-success/30 pb-3 relative z-10"><i class="ph ph-lightning text-success text-xl"></i> Deal Desk (Pricer IA)</h3>
+                        <h3 class="text-sm font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-success/30 pb-3 relative z-10"><i class="ph ph-lightning text-success text-xl"></i> Deal Desk (Pricer 3D)</h3>
                         
-                        <div class="space-y-4 relative z-10">
+                        <div class="space-y-5 relative z-10">
                             <div>
-                                <label class="text-[9px] text-gray-400 uppercase font-bold tracking-widest mb-1 block">Site / Compteur à chiffrer</label>
+                                <label class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 block">Compteur SGE ciblé</label>
                                 <select id="cpq-site-select" class="input-form text-xs font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2300FF66%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_15px_center] bg-[length:10px_auto] cursor-pointer">
-                                    <option value="">Sélectionnez un site rattaché...</option>
+                                    <option value="">Sélectionnez un site...</option>
                                 </select>
                             </div>
                             
                             <div class="grid grid-cols-2 gap-4">
-                                <div><label class="text-[9px] text-gray-400 uppercase font-bold tracking-widest mb-1 block text-success">Début Fourniture</label><input type="date" id="cpq-start" class="input-form text-xs" style="color-scheme: dark;"></div>
-                                <div><label class="text-[9px] text-gray-400 uppercase font-bold tracking-widest mb-1 block text-alert">Fin Contrat</label><input type="date" id="cpq-end" class="input-edit text-xs border-alert/30" style="color-scheme: dark;"></div>
+                                <div><label class="text-[10px] text-success uppercase font-bold tracking-widest mb-1 block">Début Fourniture</label><input type="date" id="cpq-start" class="input-form text-xs" style="color-scheme: dark;"></div>
+                                <div><label class="text-[10px] text-alert uppercase font-bold tracking-widest mb-1 block">Fin Contrat</label><input type="date" id="cpq-end" class="input-form text-xs border-alert/30 focus:border-alert" style="color-scheme: dark;"></div>
+                            </div>
+
+                            <div class="flex items-center gap-3 bg-abysse/50 p-4 rounded-xl border border-white/5 cursor-pointer hover:border-success/30 transition shadow-inner">
+                                <input type="checkbox" id="cpq-use-forecast" class="w-5 h-5 accent-success cursor-pointer" checked>
+                                <div>
+                                    <label for="cpq-use-forecast" class="text-[10px] text-gray-300 font-bold uppercase tracking-widest cursor-pointer block">Ajuster volume (IA Forecast)</label>
+                                    <span class="text-[9px] text-gray-500 font-mono">Calcule le prix sur la trajectoire de sobriété.</span>
+                                </div>
                             </div>
                             
-                            <button onclick="runExpertCPQ()" id="btn-cpq" class="w-full py-4 mt-2 bg-success text-abysse font-black text-xs rounded-[2rem] hover:bg-white transition flex justify-center gap-2 items-center shadow-[0_0_20px_rgba(0,255,102,0.4)] uppercase tracking-widest"><i class="ph ph-magic-wand text-lg"></i> Calculer le Cost Stack</button>
+                            <button onclick="runExpertCPQ()" id="btn-cpq" class="w-full py-4 mt-2 bg-success text-abysse font-black text-xs rounded-[2rem] hover:bg-white transition flex justify-center gap-2 items-center shadow-[0_0_20px_rgba(0,255,102,0.4)] uppercase tracking-widest"><i class="ph ph-magic-wand text-lg"></i> Générer le Cost Stack</button>
                         </div>
                         
-                        <!-- RÉSULTAT COST STACK (NO MOCK) -->
-                        <div id="cpq-result" class="hidden mt-6 pt-5 border-t border-success/30 relative z-10">
-                            <div class="flex justify-between items-center mb-4">
+                        <!-- RÉSULTAT COST STACK -->
+                        <div id="cpq-result" class="hidden mt-8 pt-6 border-t border-success/30 relative z-10">
+                            <div class="flex justify-between items-center mb-5">
                                 <span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Durée d'engagement</span>
                                 <span class="text-xs font-bold text-white bg-black/50 px-3 py-1 rounded-md border border-white/10" id="cpq-duration">-- mois</span>
                             </div>
-                            <div class="space-y-2 mb-6">
+                            <div class="space-y-3 mb-8">
                                 <div class="flex justify-between text-xs font-mono"><span class="text-gray-400">Sourcing Molécule (Spot/Cal)</span><span class="text-white font-bold" id="cpq-mol">-- €</span></div>
-                                <div class="flex justify-between text-xs font-mono"><span class="text-gray-400">Certificats CEE</span><span class="text-white font-bold" id="cpq-cee">-- €</span></div>
+                                <div class="flex justify-between text-xs font-mono"><span class="text-gray-400">Certificats CEE (Obligation)</span><span class="text-white font-bold" id="cpq-cee">-- €</span></div>
                                 <div class="flex justify-between text-xs font-mono"><span class="text-gray-400">Acheminement (Estim. TURPE)</span><span class="text-white font-bold" id="cpq-turpe">-- €</span></div>
-                                <div class="flex justify-between text-xs font-mono pt-2 border-t border-white/10"><span class="text-success font-bold uppercase">Marge Brute Estimée</span><span class="text-success font-black text-sm" id="cpq-marge">-- €</span></div>
+                                <div class="flex justify-between text-xs font-mono pt-3 border-t border-white/10"><span class="text-success font-bold uppercase tracking-widest">Marge Brute / Courtage</span><span class="text-success font-black text-sm drop-shadow-md" id="cpq-marge">-- €</span></div>
                             </div>
-                            <div class="text-center bg-abysse/80 p-4 rounded-xl border border-success/50 shadow-inner">
+                            <div class="text-center bg-abysse/80 p-6 rounded-2xl border border-success/50 shadow-[0_0_15px_rgba(0,255,102,0.1)]">
                                 <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Prix de Vente Conseillé</div>
-                                <h4 class="text-4xl font-black text-success font-mono drop-shadow-md" id="cpq-price">--</h4>
-                                <div class="text-[10px] text-success mt-1">€ / MWh (HT)</div>
+                                <h4 class="text-5xl font-black text-success font-mono drop-shadow-lg" id="cpq-price">--</h4>
+                                <div class="text-[10px] text-success mt-2 font-bold uppercase tracking-widest">€ / MWh (HT)</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div id="fs-tools-standard" class="hidden flex-col gap-6">
-                    <div class="bento-card p-6 shadow-lg border-t-4 border-cyan">
-                        <div class="flex justify-between items-center border-b border-cyan/20 pb-3 mb-5">
-                            <h3 class="text-xs font-bold text-white font-mono uppercase tracking-widest flex items-center gap-2"><i class="ph ph-shopping-cart text-cyan text-lg"></i> Lignes de Devis</h3>
-                            <button onclick="openAdminCatalogue()" class="text-gray-500 hover:text-cyan transition" title="Gérer le Catalogue (Admin)"><i class="ph ph-gear text-lg"></i></button>
+                    <div class="bento-card p-8 shadow-lg border-t-4 border-cyan">
+                        <div class="flex justify-between items-center border-b border-cyan/20 pb-4 mb-6">
+                            <h3 class="text-xs font-bold text-white font-mono uppercase tracking-widest flex items-center gap-2"><i class="ph ph-shopping-cart text-cyan text-xl"></i> Lignes de Devis</h3>
                         </div>
                         <div class="space-y-4">
                             <select id="catalog-select" class="input-form text-xs font-mono appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2300E5FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_15px_center] bg-[length:10px_auto] cursor-pointer">
                                 <option value="">Chargement du catalogue...</option>
                             </select>
-                            <div class="flex gap-2">
-                                <input type="number" id="catalog-qty" value="1" min="1" class="input-form w-1/3 text-center text-xs font-bold" placeholder="Qté">
-                                <button onclick="addProductToDeal()" class="w-2/3 py-2 bg-abysse border border-cyan text-cyan font-bold text-xs rounded-xl hover:bg-cyan hover:text-abysse transition uppercase tracking-widest shadow-md">Ajouter</button>
+                            <div class="flex gap-3">
+                                <input type="number" id="catalog-qty" value="1" min="1" class="input-form w-1/3 text-center text-sm font-bold" placeholder="Qté">
+                                <button onclick="addProductToDeal()" class="w-2/3 py-3 bg-abysse border border-cyan text-cyan font-black text-xs rounded-xl hover:bg-cyan hover:text-abysse transition uppercase tracking-widest shadow-md">Ajouter</button>
                             </div>
                         </div>
-                        <div id="fs-products-list" class="mt-4 space-y-2 border-t border-white/10 pt-4 max-h-[150px] overflow-y-auto"></div>
+                        <div id="fs-products-list" class="mt-6 space-y-2 border-t border-white/10 pt-4 max-h-[200px] overflow-y-auto pr-1"></div>
                     </div>
                 </div>
 
@@ -344,7 +382,7 @@
     </div>
 
     <!-- ============================================================================== -->
-    <!-- MODALS D'AJOUT (LEAD, CONTACT, SITE) ENRICHIES V12.6                           -->
+    <!-- MODALS D'AJOUT (LEAD, CONTACT, SITE, ADMIN)                                    -->
     <!-- ============================================================================== -->
     
     <div id="new-lead-modal" class="fixed inset-0 bg-abysse/90 backdrop-blur-md hidden items-center justify-center z-50 opacity-0 transition-opacity">
@@ -418,7 +456,7 @@
     <div id="add-site-modal" class="fixed inset-0 bg-abysse/90 backdrop-blur-md hidden items-center justify-center z-[100] opacity-0 transition-opacity">
         <div class="bento-card p-10 w-[600px] border-2 border-cyan/30 shadow-[0_0_50px_rgba(0,229,255,0.2)]">
             <h2 class="text-2xl font-black text-white mb-2 flex items-center gap-3"><i class="ph ph-factory text-cyan"></i> Nouveau Compteur (Base 3D)</h2>
-            <p class="text-xs text-gray-400 mb-8 font-mono">Enregistrement direct dans l'Hyperviseur Opérationnel du client.</p>
+            <p class="text-xs text-gray-400 mb-8 font-mono">Ces données alimenteront les War Rooms opérationnelles de vos clients.</p>
             
             <form id="site-form" onsubmit="addSite(event)" class="flex flex-col gap-5">
                 <div class="grid grid-cols-2 gap-5">
@@ -451,22 +489,22 @@
                         <input type="number" id="new-s-kva" placeholder="0" class="input-form font-mono text-gray-400">
                     </div>
 
-                    <div class="col-span-2 border-t border-white/10 pt-6 mt-2">
+                    <div class="col-span-2 border-t border-white/10 pt-4 mt-2">
                         <span class="text-xs text-gold uppercase font-bold tracking-widest block mb-4"><i class="ph ph-file-text mr-2"></i> Informations Contractuelles</span>
                     </div>
                     <div>
                         <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block">Fournisseur Actuel</label>
-                        <input type="text" id="new-s-provider" placeholder="Ex: EDF, Engie..." class="input-form">
+                        <input type="text" id="new-s-provider" placeholder="Ex: EDF, Total..." class="input-form">
                     </div>
                     <div>
-                        <label class="text-[10px] text-alert uppercase font-bold tracking-widest pl-2 mb-1 block">Fin d'engagement</label>
+                        <label class="text-[10px] text-alert uppercase font-bold tracking-widest pl-2 mb-1 block">Fin de marché</label>
                         <input type="date" id="new-s-enddate" class="input-form text-gray-300 border-alert/30 focus:border-alert" style="color-scheme: dark;">
                     </div>
                 </div>
 
-                <div class="flex justify-end gap-4 mt-6 border-t border-white/10 pt-6">
+                <div class="flex justify-end gap-3 mt-6 border-t border-white/10 pt-6">
                     <button type="button" onclick="closeModal('add-site-modal')" class="px-6 py-3 text-gray-400 text-xs font-bold uppercase tracking-widest hover:text-white transition">Annuler</button>
-                    <button type="submit" id="btn-save-new-site" class="px-8 py-3 bg-cyan text-abysse text-sm font-black rounded-2xl hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.4)] flex items-center gap-2 uppercase tracking-widest"><i class="ph ph-cloud-arrow-up text-lg"></i> Connecter à la base</button>
+                    <button type="submit" id="btn-save-new-site" class="px-8 py-3 bg-cyan text-abysse text-sm font-black rounded-2xl hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.4)] flex items-center gap-2 uppercase tracking-widest"><i class="ph ph-cloud-arrow-up text-lg"></i> Injecter Data 3D</button>
                 </div>
             </form>
         </div>
@@ -505,12 +543,15 @@
     <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
+    <!-- ============================================================================== -->
+    <!-- LOGIQUE JAVASCRIPT (CORTEX CRASH-PROOF)                                        -->
+    <!-- ============================================================================== -->
     <script>
         const App = {
             toast: function(msg, type='info') {
                 const container = document.getElementById('toast-container');
                 if(!container) return;
-                const colors = { success: 'bg-green-600 border-green-500 text-white', error: 'bg-alert border-red-500 text-white', info: 'bg-cyan border-cyan text-abysse' };
+                const colors = { success: 'bg-green-600 border-green-500 text-white', error: 'bg-alert border-alert text-white', info: 'bg-cyan border-cyan text-abysse' };
                 const icon = type === 'success' ? 'ph-check-circle' : (type === 'error' ? 'ph-warning' : 'ph-info');
                 const el = document.createElement('div');
                 el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
@@ -527,13 +568,14 @@
         let currentDealId = null;
         let GLOBAL_CATALOGUE =[];
         let MARKET_DATA = null;
+        let mapInstance = null;
+        let mapMarkers =[];
 
         const STAGES = {'LEAD': 'Nouveau Lead', 'AUDIT': 'Audit / Pricing', 'PROPOSAL': 'Devis Envoyé', 'NEGOTIATION': 'Négociation', 'WON': 'Gagné (SASP)', 'LOST': 'Perdu'};
 
         document.addEventListener('DOMContentLoaded', () => { 
             switchPipeline('saas'); 
             loadAdminCatalogue();
-            // Fetch marché de gros (Zéro Mock) pour le CPQ Expert
             fetch('/api/tools/sniper/market').then(r=>r.json()).then(d => { if(d.success) MARKET_DATA = d.current_prices; }).catch(()=>{});
         });
 
@@ -569,13 +611,14 @@
                 const data = await res.json();
                 if (data.success) {
                     dealsData = {}; let totalValue = 0;
-                    const columns = { LEAD:[], AUDIT: [], PROPOSAL:[], NEGOTIATION: [], WON: [], LOST:[] };
+                    const columns = { LEAD:[], AUDIT: [], PROPOSAL:[], NEGOTIATION: [], WON:[], LOST:[] };
                     data.pipeline.forEach(deal => {
                         dealsData[deal.id] = deal;
                         if (columns[deal.stage]) { columns[deal.stage].push(deal); if (deal.stage !== 'LOST') totalValue += parseFloat(deal.commission_est || 0); }
                     });
                     document.getElementById('pipe-total-value').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalValue)) + ' €';
                     renderKanban(columns); renderList();
+                    if(document.getElementById('map-container').classList.contains('flex')) { plotWarRoomMap(); }
                 }
             } catch (err) {}
         }
@@ -588,7 +631,7 @@
                 let colorClass = stageKey === 'WON' ? 'text-success border-success/30' : (stageKey === 'LOST' ? 'text-alert border-alert/30' : 'text-cyan border-cyan/30');
                 
                 let cardsHtml = deals.map(d => {
-                    let bColor = d.solvency_score === 'VERT' ? 'bg-success shadow-[0_0_8px_#00FF66]' : (d.solvency_score === 'ORANGE' ? 'bg-warning shadow-[0_0_8px_#FFB800]' : (d.solvency_score === 'ROUGE' ? 'bg-alert animate-pulse shadow-[0_0_10px_#FF0055]' : 'bg-gray-500'));
+                    let bColor = d.solvency_score === 'VERT' ? 'bg-success shadow-[0_0_5px_#00FF66]' : (d.solvency_score === 'ORANGE' ? 'bg-warning shadow-[0_0_8px_#FFB800]' : (d.solvency_score === 'ROUGE' ? 'bg-alert animate-pulse shadow-[0_0_10px_#FF0055]' : 'bg-gray-500'));
                     let alertHtml = d.saas_alerts?.length > 0 ? `<div class="mt-4 text-[9px] text-alert bg-alert/10 px-2 py-1.5 rounded-lg border border-alert/20 flex items-center gap-2 font-bold uppercase tracking-widest"><i class="ph ph-warning-circle text-lg"></i> Alerte Base 3D</div>` : '';
                     return `
                         <div class="deal-card group" draggable="true" ondragstart="dragStart(event, '${d.id}')" onclick="openDeal('${d.id}')">
@@ -616,7 +659,7 @@
             const tbody = document.getElementById('list-tbody');
             tbody.innerHTML = '';
             Object.values(dealsData).forEach(d => {
-                let bColor = d.solvency_score === 'VERT' ? 'bg-success shadow-[0_0_5px_#00FF66]' : (d.solvency_score === 'ORANGE' ? 'bg-warning shadow-[0_0_5px_#FFB800]' : (d.solvency_score === 'ROUGE' ? 'bg-alert animate-pulse' : 'bg-gray-500'));
+                let bColor = d.solvency_score === 'VERT' ? 'bg-success shadow-[0_0_5px_#00FF66]' : (d.solvency_score === 'ORANGE' ? 'bg-warning shadow-[0_0_5px_#FFB800]' : (d.solvency_score === 'ROUGE' ? 'bg-alert' : 'bg-gray-500'));
                 let alertIcon = d.saas_alerts?.length > 0 ? `<i class="ph ph-warning text-alert text-xl ml-2 drop-shadow-md" title="Alerte SaaS"></i>` : '';
                 tbody.insertAdjacentHTML('beforeend', `
                     <tr class="grid-row border-b border-white/5 transition-colors" onclick="openDeal('${d.id}')">
@@ -633,6 +676,64 @@
             const query = document.getElementById('search-list').value.toLowerCase();
             const rows = document.getElementById('list-tbody').getElementsByTagName('tr');
             for (let row of rows) row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+        }
+
+        // --- WAR ROOM MAP (NOUVEAU) ---
+        function openWarRoomMap() {
+            document.getElementById('kanban-container').classList.add('hidden');
+            document.getElementById('list-container').classList.add('hidden');
+            const mapCont = document.getElementById('map-container');
+            mapCont.classList.remove('hidden'); mapCont.classList.add('flex');
+            
+            if(!mapInstance) {
+                mapInstance = L.map('war-room-map', {zoomControl: false}).setView([46.6, 1.8], 5);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '' }).addTo(mapInstance);
+                L.control.zoom({ position: 'topright' }).addTo(mapInstance);
+            }
+            setTimeout(() => mapInstance.invalidateSize(), 300);
+            plotWarRoomMap();
+        }
+
+        function closeWarRoomMap() {
+            document.getElementById('map-container').classList.add('hidden');
+            document.getElementById('map-container').classList.remove('flex');
+            switchView('kanban'); // Retour par défaut
+        }
+
+        function getFuzzyCoordinates(baseStr, center) {
+            let hash = 0; for (let i = 0; i < baseStr.length; i++) hash = baseStr.charCodeAt(i) + ((hash << 5) - hash);
+            const pseudoRandom1 = (Math.abs(hash) % 100) / 10000; const pseudoRandom2 = (Math.abs(hash >> 2) % 100) / 10000;
+            return[center[0] + (pseudoRandom1 - 0.005), center[1] + (pseudoRandom2 - 0.005)];
+        }
+
+        async function plotWarRoomMap() {
+            if(!mapInstance) return;
+            mapMarkers.forEach(m => mapInstance.removeLayer(m)); mapMarkers = [];
+            
+            for(const id in dealsData) {
+                const d = dealsData[id];
+                if(d.sites_count === 0) continue;
+                
+                let colorClass = 'marker-green'; let hex = '#00FF66';
+                if (d.stage === 'LEAD' || d.stage === 'AUDIT') { colorClass = 'marker-blue'; hex = '#00E5FF'; }
+                else if (d.stage === 'NEGOTIATION' || d.stage === 'PROPOSAL') { colorClass = 'marker-orange'; hex = '#FFB800'; }
+
+                const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-marker ${colorClass} w-4 h-4" style="background-color:${hex}; box-shadow:0 0 10px ${hex}"></div>`, iconSize:[16, 16], iconAnchor:[8, 8] });
+                
+                let coords = getFuzzyCoordinates(d.id,[46.6, 1.8]);
+                if(d.city) {
+                    try {
+                        const res = await fetch(`https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(d.city)}&fields=centre&limit=1`);
+                        const geo = await res.json();
+                        if(geo && geo.length > 0 && geo[0].centre) coords = [geo[0].centre.coordinates[1], geo[0].centre.coordinates[0]];
+                    } catch(e) {}
+                }
+                
+                const marker = L.marker(coords, {icon: icon})
+                    .bindPopup(`<div class="text-center p-2"><b class="text-white font-bold text-sm block mb-1">${d.name}</b><span style="color:${hex};" class="font-black text-sm font-mono">${Math.round(d.commission_est)} €</span><br><button onclick="openDeal('${d.id}')" class="mt-2 bg-abysse border border-white/20 text-white px-4 py-2 rounded-lg font-bold text-xs w-full hover:bg-white hover:text-black transition">Ouvrir</button></div>`)
+                    .addTo(mapInstance);
+                mapMarkers.push(marker);
+            }
         }
 
         // --- 2. DRAG & DROP ---
@@ -653,99 +754,107 @@
             }
         }
 
-        // --- 3. OVERLAY DEAL (3D SCANNER & PONT GOD MODE) ---
+        // --- 3. OVERLAY DEAL (3D SCANNER & PONT GOD MODE) BLINDÉ ---
         function openDeal(dealId) {
-            currentDealId = dealId;
-            const deal = dealsData[dealId];
-            if (!deal) return;
+            try {
+                currentDealId = dealId;
+                const deal = dealsData[dealId];
+                if (!deal) return;
 
-            document.getElementById('fs-holding-name').innerText = deal.holding_name || deal.name || "Inconnu";
-            const pipelineName = deal.pipeline || currentPipeline;
-            document.getElementById('fs-pipeline-badge').innerText = pipelineName.toUpperCase();
-            
-            const badge = document.getElementById('fs-solvency');
-            if (deal.solvency_score === 'VERT') badge.className = "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-success/20 text-success border-success/50 shadow-[0_0_10px_rgba(0,255,102,0.2)]";
-            else if (deal.solvency_score === 'ORANGE') badge.className = "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-warning/20 text-warning border-warning/50";
-            else if (deal.solvency_score === 'ROUGE') badge.className = "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-alert/20 text-alert border-alert/50 animate-pulse";
-            else badge.className = "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-gray-800 text-gray-400 border-gray-600";
-            badge.innerText = deal.solvency_msg || "Non vérifié";
+                document.getElementById('fs-holding-name').innerText = deal.holding_name || deal.name || "Inconnu";
+                const pipelineName = deal.pipeline || currentPipeline;
+                document.getElementById('fs-pipeline-badge').innerText = pipelineName.toUpperCase();
+                
+                const badge = document.getElementById('fs-solvency');
+                if (deal.solvency_score === 'VERT') badge.className = "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-success/20 text-success border-success/50 shadow-[0_0_10px_rgba(0,255,102,0.2)]";
+                else if (deal.solvency_score === 'ORANGE') badge.className = "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-warning/20 text-warning border-warning/50";
+                else if (deal.solvency_score === 'ROUGE') badge.className = "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-alert/20 text-alert border-alert/50 animate-pulse";
+                else badge.className = "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border bg-gray-800 text-gray-400 border-gray-600";
+                badge.innerText = deal.solvency_msg || "Non vérifié";
 
-            document.getElementById('fs-siren').innerText = deal.company_id ? deal.company_id.replace("COMP_", "") : "---";
-            document.getElementById('fs-naf').innerText = deal.naf || "---";
-            
-            const wLink = document.getElementById('fs-website-link');
-            const wSpan = document.getElementById('fs-website');
-            if (deal.website && deal.website !== "") {
-                wSpan.innerText = deal.website;
-                wLink.href = deal.website.startsWith('http') ? deal.website : `https://${deal.website}`;
-                wLink.style.pointerEvents = "auto";
-            } else {
-                wSpan.innerText = "---"; wLink.removeAttribute('href'); wLink.style.pointerEvents = "none";
+                document.getElementById('fs-siren').innerText = deal.company_id ? deal.company_id.replace("COMP_", "") : "---";
+                document.getElementById('fs-naf').innerText = deal.naf || "---";
+                
+                const wLink = document.getElementById('fs-website-link');
+                const wSpan = document.getElementById('fs-website');
+                if (deal.website && deal.website !== "") {
+                    wSpan.innerText = deal.website;
+                    wLink.href = deal.website.startsWith('http') ? deal.website : `https://${deal.website}`;
+                    wLink.style.pointerEvents = "auto";
+                } else {
+                    wSpan.innerText = "---"; wLink.removeAttribute('href'); wLink.style.pointerEvents = "none";
+                }
+
+                document.getElementById('fs-address').innerText = deal.city || "---";
+                document.getElementById('fs-stage-select').value = deal.stage || 'LEAD';
+
+                if(deal.intelligence && deal.intelligence.pain_points) {
+                    document.getElementById('fs-icebreaker-box').classList.remove('hidden');
+                    document.getElementById('fs-pain-point').innerText = deal.intelligence.pain_points || "N/A";
+                    document.getElementById('fs-pitch').innerText = deal.intelligence.pitch || "N/A";
+                } else { document.getElementById('fs-icebreaker-box').classList.add('hidden'); }
+
+                // Contacts
+                const contactBox = document.getElementById('fs-contacts-list');
+                contactBox.innerHTML = '';
+                if (deal.all_contacts && deal.all_contacts.length > 0) {
+                    deal.all_contacts.forEach(c => {
+                        contactBox.innerHTML += `
+                            <div class="flex items-center justify-between p-4 bg-abysse/50 border border-white/5 rounded-2xl shadow-inner">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-full bg-cyan/20 text-cyan flex items-center justify-center font-black text-sm border border-cyan/30 shadow-[0_0_10px_rgba(0,229,255,0.2)]">${(c.firstname||'?').charAt(0)}${(c.lastname||'?').charAt(0)}</div>
+                                    <div><p class="text-base font-bold text-white leading-tight">${c.firstname||''} ${c.lastname||''}</p><p class="text-[10px] text-gray-500 font-mono mt-1 uppercase tracking-widest">${c.role || 'Contact'}</p></div>
+                                </div>
+                                <div class="text-right text-xs font-mono space-y-1">
+                                    <p class="text-gray-400 hover:text-cyan cursor-pointer transition"><i class="ph ph-envelope-simple mr-1"></i> ${c.email || '---'}</p>
+                                    <p class="text-gray-500 hover:text-cyan cursor-pointer transition"><i class="ph ph-phone mr-1"></i> ${c.phone || '---'}</p>
+                                </div>
+                            </div>`;
+                    });
+                } else { contactBox.innerHTML = `<p class="text-xs text-gray-500 font-mono italic text-center py-4 bg-black/30 rounded-xl">Aucun contact lié.</p>`; }
+
+                // Bifurcation CPQ vs Catalogue
+                if (currentPipeline === 'fourniture' || pipelineName === 'fourniture') {
+                    document.getElementById('fs-tools-fourniture').classList.remove('hidden'); document.getElementById('fs-tools-fourniture').classList.add('flex');
+                    document.getElementById('fs-tools-standard').classList.add('hidden');
+                } else {
+                    document.getElementById('fs-tools-fourniture').classList.add('hidden'); document.getElementById('fs-tools-fourniture').classList.remove('flex');
+                    document.getElementById('fs-tools-standard').classList.remove('hidden');
+                    refreshDealProducts(); 
+                }
+
+                // CHARGEMENT DE LA BASE 3D DANS LE CRM
+                renderDealSites(deal.company_id);
+
+                fetchActivities(dealId);
+                switchActionTab('note');
+                document.getElementById('deal-fullscreen').classList.add('open');
+            } catch(e) {
+                console.error(e);
+                App.toast("Erreur critique d'ouverture", "error");
             }
-
-            document.getElementById('fs-address').innerText = deal.city || "---";
-            document.getElementById('fs-stage-select').value = deal.stage || 'LEAD';
-
-            if(deal.intelligence && deal.intelligence.pain_points) {
-                document.getElementById('fs-icebreaker-box').classList.remove('hidden');
-                document.getElementById('fs-pain-point').innerText = deal.intelligence.pain_points || "N/A";
-                document.getElementById('fs-pitch').innerText = deal.intelligence.pitch || "N/A";
-            } else { document.getElementById('fs-icebreaker-box').classList.add('hidden'); }
-
-            // Contacts
-            const contactBox = document.getElementById('fs-contacts-list');
-            contactBox.innerHTML = '';
-            if (deal.all_contacts && deal.all_contacts.length > 0) {
-                deal.all_contacts.forEach(c => {
-                    contactBox.innerHTML += `
-                        <div class="flex items-center justify-between p-4 bg-abysse/50 border border-white/5 rounded-2xl shadow-inner">
-                            <div class="flex items-center gap-4">
-                                <div class="w-10 h-10 rounded-full bg-cyan/20 text-cyan flex items-center justify-center font-black text-sm border border-cyan/30 shadow-[0_0_10px_rgba(0,229,255,0.2)]">${(c.firstname||'?').charAt(0)}${(c.lastname||'?').charAt(0)}</div>
-                                <div><p class="text-base font-bold text-white leading-tight">${c.firstname||''} ${c.lastname||''}</p><p class="text-[10px] text-gray-500 font-mono mt-1 uppercase tracking-widest">${c.role || 'Contact'}</p></div>
-                            </div>
-                            <div class="text-right text-xs font-mono space-y-1">
-                                <p class="text-gray-400 hover:text-cyan cursor-pointer transition"><i class="ph ph-envelope-simple mr-1"></i> ${c.email || '---'}</p>
-                                <p class="text-gray-500 hover:text-cyan cursor-pointer transition"><i class="ph ph-phone mr-1"></i> ${c.phone || '---'}</p>
-                            </div>
-                        </div>`;
-                });
-            } else { contactBox.innerHTML = `<p class="text-xs text-gray-500 font-mono italic text-center py-4 bg-black/30 rounded-xl">Aucun contact lié.</p>`; }
-
-            // Bifurcation CPQ vs Catalogue
-            if (currentPipeline === 'fourniture' || pipelineName === 'fourniture') {
-                document.getElementById('fs-tools-fourniture').classList.remove('hidden'); document.getElementById('fs-tools-fourniture').classList.add('flex');
-                document.getElementById('fs-tools-standard').classList.add('hidden');
-            } else {
-                document.getElementById('fs-tools-fourniture').classList.add('hidden'); document.getElementById('fs-tools-fourniture').classList.remove('flex');
-                document.getElementById('fs-tools-standard').classList.remove('hidden');
-                refreshDealProducts(); // Affiche les lignes de devis
-            }
-
-            // CHARGEMENT DE LA BASE 3D DANS LE CRM
-            renderDealSites(deal.company_id);
-
-            fetchActivities(dealId);
-            switchActionTab('note');
-            document.getElementById('deal-fullscreen').classList.add('open');
         }
 
-        // LE MINI-SCANNER 3D DU CRM
         async function renderDealSites(companyId) {
             const container = document.getElementById('fs-sites-list');
+            if(!companyId) {
+                container.innerHTML = '<div class="text-[10px] text-gray-400 font-mono text-center py-8 bg-black/40 rounded-2xl border border-white/5 border-dashed">Company ID manquant.</div>';
+                return;
+            }
+
             container.innerHTML = '<div class="text-center py-6"><i class="ph ph-spinner animate-spin text-cyan text-3xl mb-2 block"></i><span class="text-xs font-mono text-gray-500">Scan de la Base 3D...</span></div>';
             try {
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
-                // On récupère tous les sites du Tenant
                 const dealSites = data.fleet.filter(s => s.tenant_id === companyId);
 
                 document.getElementById('fs-sites-count').innerText = dealSites.length;
 
                 if (dealSites.length === 0) {
-                    container.innerHTML = '<div class="text-[10px] text-gray-400 font-mono text-center py-8 bg-black/40 rounded-2xl border border-white/5 border-dashed">Aucun site détecté. Cliquez sur le "+" ou ouvrez la Data Unity pour un import Excel massif.</div>';
+                    container.innerHTML = '<div class="text-[10px] text-gray-400 font-mono text-center py-8 bg-black/40 rounded-2xl border border-white/5 border-dashed">Aucun site. Ajoutez-en un manuel ou ouvrez la Data Unity pour un import Excel massif.</div>';
                     document.getElementById('fs-health-badge').innerText = "DATA: 0%";
                     document.getElementById('fs-health-badge').className = "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border ml-2 bg-gray-800 text-gray-500 border-gray-600";
-                    populateCpqSites([]); // Vide le CPQ
+                    populateCpqSites([]); 
                     return;
                 }
 
@@ -765,9 +874,8 @@
 
                     const icon = s.energy === 'gaz' ? '<i class="ph ph-fire text-alert"></i>' : '<i class="ph ph-lightning text-cyan"></i>';
                     const prov = s.provider && s.provider !== 'Inconnu' ? s.provider : '<span class="text-alert opacity-70">FNR ?</span>';
-                    const surf = s.surface ? `${s.surface} m²` : '<span class="text-alert opacity-70">Surf ?</span>';
+                    const surf = s.surface ? `${s.surface} m²` : '<span class="text-alert opacity-70">Surface ?</span>';
                     
-                    // Alerte de renouvellement
                     let dateHtml = '<span class="text-gray-600">Fin ?</span>';
                     if (s.end_date) {
                         const d = new Date(s.end_date);
@@ -793,7 +901,6 @@
                     `;
                 }).join('');
 
-                // Auto-CPQ Volume & Dropdown
                 populateCpqSites(dealSites);
 
                 // Global Health Badge
@@ -805,14 +912,13 @@
                 }
 
             } catch (e) {
-                container.innerHTML = '<div class="text-[10px] text-alert font-mono py-4 text-center">Erreur API Base 3D.</div>';
+                container.innerHTML = '<div class="text-[10px] text-alert font-mono">Erreur de chargement.</div>';
             }
         }
 
         function closeDeal() { document.getElementById('deal-fullscreen').classList.remove('open'); currentDealId = null; }
         function changeDealStage(newStage) { if(currentDealId) quickChangeStage(currentDealId, newStage); }
 
-        // LE PONT GOD MODE VERS DATA UNITY
         window.openDataUnity = function() {
             if(currentDealId && dealsData[currentDealId]) {
                 const compId = dealsData[currentDealId].company_id;
@@ -903,7 +1009,7 @@
             }
         }
 
-        // --- 6. MODALS AJOUTS (CONTACT / SITE 3D) ---
+        // --- 6. MODALS AJOUTS ---
         function openModal(id) {
             const m = document.getElementById(id); m.classList.remove('hidden'); m.classList.add('flex');
             setTimeout(() => { m.classList.remove('opacity-0'); m.querySelector('.bento-card').classList.remove('scale-95'); }, 10);
@@ -931,7 +1037,6 @@
             } catch(err) { App.toast("Erreur", "error"); }
         }
 
-        // AJOUT DE SITE MODIFIÉ POUR LA BASE 3D V12.6
         async function addSite(e) {
             e.preventDefault();
             if(!currentDealId) return;
@@ -939,15 +1044,14 @@
             
             const btn = document.getElementById('btn-save-new-site');
             const orig = btn.innerHTML;
-            btn.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i>...'; btn.disabled = true;
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin"></i>...'; btn.disabled = true;
 
             const pdl = document.getElementById('new-s-pdl').value.replace(/\s/g, '');
             const energy = document.getElementById('new-s-energy').value;
 
-            // Utilisation du Smart Mapper (route /api/settings/save_client) pour créer la coquille 3D complète
             const payload = {
                 id: pdl,
-                forced_tenant_id: deal.company_id, // Usurpation backend
+                forced_tenant_id: deal.company_id, 
                 identity: { id: pdl, tenant_id: deal.company_id, site_name: document.getElementById('new-s-name').value },
                 location: { surface: parseFloat(document.getElementById('new-s-surface').value) || 0 },
                 contract: {
@@ -964,13 +1068,13 @@
                 await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
                 closeModal('add-site-modal'); 
                 fetchDeals(currentPipeline); 
-                renderDealSites(deal.company_id); // Recharge les mini-cartes du deal
+                renderDealSites(deal.company_id); 
                 App.toast("Compteur injecté dans la Base 3D.", "success");
             } catch(err) { App.toast("Erreur réseau.", "error"); }
             finally { btn.innerHTML = orig; btn.disabled = false; }
         }
 
-        // --- 7. LE PRICER EXPERT (MINI CPQ NO MOCK) ---
+        // --- 7. LE PRICER EXPERT 3D (CPQ + FORECAST IA) ---
         let currentDealSites =[];
 
         function populateCpqSites(sites) {
@@ -984,7 +1088,6 @@
                 opt.innerText = `${s.energy==='gaz'?'🔥':'⚡'} ${s.name} (${Math.round(s.volume)} MWh)`;
                 select.appendChild(opt);
             });
-            // Reset result
             document.getElementById('cpq-result').classList.add('hidden');
         }
 
@@ -992,6 +1095,7 @@
             const siteId = document.getElementById('cpq-site-select').value;
             const startDateStr = document.getElementById('cpq-start').value;
             const endDateStr = document.getElementById('cpq-end').value;
+            const useForecast = document.getElementById('cpq-use-forecast').checked;
 
             if(!siteId || !startDateStr || !endDateStr) return App.toast("Sélectionnez un site et les dates d'engagement.", "error");
 
@@ -999,7 +1103,6 @@
             const end = new Date(endDateStr);
             if(end <= start) return App.toast("La date de fin doit être postérieure.", "error");
 
-            // Calcul de la durée en mois
             const durationMonths = Math.round((end - start) / (1000 * 60 * 60 * 24 * 30));
             if (durationMonths <= 0) return App.toast("Durée trop courte.", "error");
 
@@ -1012,31 +1115,42 @@
             btn.disabled = true;
 
             try {
-                // 1. Fetch Market API (Zero Mock)
+                let volumeAnnuelMoyen = site.volume;
+                const years = durationMonths / 12;
+
+                // INTEGARTION DU MOTEUR FORECAST (SOBRIÉTÉ)
+                if (useForecast) {
+                    try {
+                        const resF = await fetch(`/api/forecast/simulate/${siteId}`);
+                        const dataF = await resF.json();
+                        if (dataF && dataF.dataset_sobriety) {
+                            let sum = 0;
+                            let count = Math.min(years, 5); 
+                            if(count < 1) count = 1;
+                            for(let i=0; i<Math.ceil(count); i++) sum += dataF.dataset_sobriety[i];
+                            volumeAnnuelMoyen = sum / Math.ceil(count);
+                            App.toast(`Volume ajusté par l'IA : ${Math.round(volumeAnnuelMoyen)} MWh/an`, "success");
+                        }
+                    } catch(e) { console.warn("Erreur Forecast", e); }
+                }
+
                 const resMkt = await fetch('/api/tools/sniper/market');
                 const mktData = await resMkt.json();
                 
-                let basePrice = 85.0; // Fallback
+                let basePrice = 85.0; 
                 if(mktData.success && mktData.current_prices) {
                     basePrice = site.energy === 'gaz' ? mktData.current_prices.gaz : mktData.current_prices.elec;
                 }
 
-                // 2. Simulation Mathématique du Cost Stack
-                const volAnnuel = site.volume;
-                const years = durationMonths / 12;
-                
-                // Calculs (Hypothèses métier réalistes)
-                const totalSourcing = volAnnuel * years * basePrice;
-                const costCEE = site.energy === 'gaz' ? 0 : (volAnnuel * years * 4.5); // CEE ~4.5€/MWh en Elec
-                const costTurpe = site.energy === 'gaz' ? (volAnnuel * years * 8.0) : (volAnnuel * years * 14.5); // Acheminement estimé moyen
-                
-                // Marge (Courtage ou Fourniture) -> On fixe à 2.5€/MWh pour la démo
-                const margin = volAnnuel * years * 2.5;
+                // Cost Stack Mathématique
+                const totalSourcing = volumeAnnuelMoyen * years * basePrice;
+                const costCEE = site.energy === 'gaz' ? 0 : (volumeAnnuelMoyen * years * 4.5); 
+                const costTurpe = site.energy === 'gaz' ? (volumeAnnuelMoyen * years * 8.0) : (volumeAnnuelMoyen * years * 14.5); 
+                const margin = volumeAnnuelMoyen * years * 2.5;
 
                 const totalPriceEuro = totalSourcing + costCEE + costTurpe + margin;
-                const finalPriceMwh = totalPriceEuro / (volAnnuel * years);
+                const finalPriceMwh = totalPriceEuro / (volumeAnnuelMoyen * years);
 
-                // 3. Affichage
                 document.getElementById('cpq-duration').innerText = `${durationMonths} mois`;
                 document.getElementById('cpq-mol').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalSourcing)) + " €";
                 document.getElementById('cpq-cee').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(costCEE)) + " €";
@@ -1044,9 +1158,9 @@
                 document.getElementById('cpq-marge').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(margin)) + " €";
                 
                 document.getElementById('cpq-price').innerText = finalPriceMwh.toFixed(2);
-
                 document.getElementById('cpq-result').classList.remove('hidden');
-                App.toast("Cotation générée avec succès.", "success");
+                
+                if(!useForecast) App.toast("Cotation volume plat générée.", "success");
 
             } catch (e) {
                 App.toast("Erreur du Pricer.", "error");
@@ -1069,7 +1183,6 @@
                 const data = await res.json();
                 if(data.success && data.products) {
                     GLOBAL_CATALOGUE = data.products;
-                    // Maj Liste Admin
                     const list = document.getElementById('admin-products-list');
                     if(list) {
                         list.innerHTML = GLOBAL_CATALOGUE.map(p => `
@@ -1082,7 +1195,6 @@
                         `).join('');
                     }
 
-                    // Maj Dropdown Commercial
                     const select = document.getElementById('catalog-select');
                     if(select) {
                         select.innerHTML = '<option value="">-- Piocher dans le catalogue --</option>';
@@ -1127,7 +1239,6 @@
             const deal = dealsData[currentDealId];
             if(!deal) return;
 
-            // On fusionne les produits existants avec le nouveau
             const existingItems = deal.products ? deal.products.map(p => ({product_id: p.product_id || p.id, quantity: p.quantity})) :[];
             existingItems.push({product_id: prodId, quantity: qty});
 
@@ -1135,8 +1246,8 @@
                 const res = await fetch(`/api/crm/deal/${currentDealId}/products`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({items: existingItems}) });
                 if((await res.json()).success) {
                     App.toast("Devis mis à jour.", "success");
-                    fetchDeals(currentPipeline); // Refresh data
-                    setTimeout(() => refreshDealProducts(), 500); // UI Refresh
+                    fetchDeals(currentPipeline); 
+                    setTimeout(() => refreshDealProducts(), 500); 
                 }
             } catch(e) { App.toast("Erreur réseau.", "error"); }
         }
@@ -1176,7 +1287,6 @@
                 if(data.success) {
                     App.toast("Document sauvegardé.", "success");
                     fetchDeals(currentPipeline);
-                    // Mock refresh local
                     const list = document.getElementById('fs-documents-list');
                     list.innerHTML += `<div class="flex items-center gap-3 bg-abysse/50 p-3 rounded-xl border border-white/5"><i class="ph ph-file-pdf text-xl text-alert"></i><div class="truncate flex-1"><div class="font-bold text-white text-xs truncate">${data.document.name}</div><div class="text-[9px] text-gray-500 font-mono">${data.document.size}</div></div><i class="ph ph-download-simple text-gray-400 hover:text-white cursor-pointer transition"></i></div>`;
                 }
