@@ -1042,8 +1042,8 @@ async def api_finance_upload(file: UploadFile = File(...), site_id: str = Form(.
         return JSONResponse(json_compliant(finance.audit_invoice(parsed, site_data)))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
 
-VALID_VIEWS =["settings", "settings_pme", "settings_light", "settings_partner", "settings_ops", "ops_nexus", "ops_ingest", "ops_aggregator", "ops_market", "pme", "industry", "retail", "mairie", "sde", "oph", "syndic", "sante", "supplier", "citoyen", "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance", "dashboard_finance", "sales_workspace", "sales_playbook", "sales_outreach", "sales_academy", "sales_cpq"]
-PUBLIC_PAGES =["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html", "vision"]
+VALID_VIEWS =["settings", "settings_pme", "settings_light", "settings_partner", "settings_ops", "ops_nexus", "ops_ingest", "ops_aggregator", "ops_market", "pme", "industry", "retail", "mairie", "sde", "oph", "syndic", "sante", "supplier", "citoyen", "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance", "dashboard_finance", "sales_workspace", "sales_playbook", "sales_outreach", "sales_academy", "sales_cpq", "vision"]
+PUBLIC_PAGES =["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html"]
 
 @app.get("/{page_name}")
 async def serve_dynamic(request: Request, page_name: str, user = Depends(get_current_user)):
