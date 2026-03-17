@@ -805,8 +805,8 @@
             safeSetText('ged-csrd', `${intensity.toFixed(2)} <span class="text-xs text-gray-500">kgCO2e/Unité</span>`);
         }
 
-        // ==========================================
-        // 7. ÉDITION DES DONNÉES (4 CADRANS)
+     // ==========================================
+        // 7. ÉDITION DES DONNÉES (ZÉRO CRASH)
         // ==========================================
     
         window.openEditModal = function() {
@@ -838,10 +838,30 @@
             safeSetVal('edit-px-hce', p.hce ? (p.hce > 10 ? p.hce : p.hce * 1000).toFixed(2) : "");
 
             // Fallback Lissé
-            let pKwh = p.price_kwh || 0; if(pKwh > 10) pKwh /= 1000;
+            let pKwh = CURRENT_SITE.pricing?.price_kwh || 0; if(pKwh > 10) pKwh /= 1000;
             safeSetVal('edit-price', pKwh > 0 ? (pKwh * 1000).toFixed(2) : "");
             
             document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        window.fetchSurfaceFromAdeme = async function() {
+            // Null-safe get
+            const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : null; };
+            const addr = getVal('edit-address');
+            const zip = getVal('edit-zip');
+            if(!addr) return App.toast("L'adresse n'est pas renseignée.", "warning");
+            
+            App.toast("CORTEX interroge l'ADEME...", "info");
+            try {
+                const query = encodeURIComponent(`${addr} ${zip}`.trim());
+                const res = await fetch(`https://data.ademe.fr/data-fair/api/v1/datasets/dpe-v2-tertiaire-2/lines?q=${query}&size=1&select=surface_utile`);
+                const data = await res.json();
+                if(data && data.results && data.results.length > 0) {
+                    const surfEl = document.getElementById('edit-surface');
+                    if(surfEl) surfEl.value = data.results[0].surface_utile;
+                    App.toast(`Surface importée : ${data.results[0].surface_utile} m²`, "success");
+                } else { App.toast("Aucun DPE trouvé pour cette adresse.", "warning"); }
+            } catch(e) { App.toast("Erreur API ADEME.", "error"); }
         }
 
         window.saveSiteChanges = async function() {
@@ -850,7 +870,8 @@
             // Extracteur "Null-Safe"
             const safeGetVal = (id) => { const el = document.getElementById(id); return el ? el.value : null; };
 
-            original.identity.site_name = safeGetVal('edit-name') || original.identity.site_name;
+            const newName = safeGetVal('edit-name');
+            if(newName) original.identity.site_name = newName;
             
             if(!original.contract) original.contract = { power_details: {} };
             const prov = safeGetVal('edit-provider'); if(prov !== null) original.contract.provider = prov;
