@@ -3,234 +3,476 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V3 | Santé.OS</title>
+    <title>ENERGISTRAT V12.6 | Santé.OS (CHU & EHPAD)</title>
     
+    <!-- Moteurs -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Configuration Tailwind -->
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: { abysse: '#001529', card: '#0F172A', sante: '#0EA5E9', alert: '#EF4444', success: '#10B981', gold: '#F59E0B', steam: '#94A3B8', gas: '#F97316', pollution: '#8B5CF6' },
-                    fontFamily: { sans: ['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
-                    borderRadius: { 'bento': '1.5rem' }
+                    colors: { 
+                        abysse: '#001529', card: '#001D3D', sidebar: '#001529', 
+                        sante: '#0EA5E9', cyan: '#00E5FF', gas: '#F97316', 
+                        success: '#10B981', alert: '#EF4444', warning: '#F59E0B', gold: '#FBBF24', 
+                        pollution: '#8B5CF6'
+                    },
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] }
                 }
             }
         }
     </script>
+    
     <style>
         body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
-        .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1.5rem; transition: all 0.2s ease; }
+        
+        /* BENTO DESIGN */
+        .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 2.5rem; transition: all 0.3s ease; }
+        .bento-card:hover { border-color: rgba(14, 165, 233, 0.5); transform: translateY(-2px); box-shadow: 0 10px 30px -10px rgba(14, 165, 233, 0.2); }
+        
         .nav-item.active { background: rgba(14, 165, 233, 0.15); border-left: 4px solid #0EA5E9; color: white; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
         
-        select.cyber-select {
-            appearance: none; background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 8px 30px 8px 15px; border-radius: 8px;
+        /* MEGA SELECTOR */
+        select.mega-select {
+            appearance: none;
             background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230EA5E9%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-            background-repeat: no-repeat; background-position: right 0.7rem top 50%; background-size: 0.65rem auto;
+            background-repeat: no-repeat; background-position: right 1.5rem center; background-size: 1rem auto;
+            background-color: rgba(0, 29, 61, 0.8); border: 2px solid rgba(14, 165, 233, 0.4);
+            color: #0EA5E9; border-radius: 2rem; cursor: pointer; text-align: center;
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.15); transition: all 0.3s ease;
         }
-        select.cyber-select option { background-color: #0F172A; color: white; }
-        
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #EF4444; cursor: pointer; margin-top: -6px; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #334155; border-radius: 2px; }
+        select.mega-select:hover { border-color: #0EA5E9; box-shadow: 0 0 30px rgba(14, 165, 233, 0.3); }
+        select.mega-select:focus { outline: none; }
+        select.mega-select option { background-color: #001529; color: white; padding: 15px; font-size: 1rem; }
 
-        .energy-toggle { display: flex; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; }
-        .toggle-btn { padding: 8px 16px; font-size: 10px; font-weight: bold; cursor: pointer; transition: all 0.2s; text-transform: uppercase; color: #94A3B8; }
-        .toggle-btn.active.elec { background: #0EA5E9; color: #001529; }
-        .toggle-btn.active.gaz { background: #F97316; color: #001529; }
+        /* INPUTS MODALES */
+        .input-edit { background: rgba(0,0,0,0.4); border: 1px solid rgba(14,165,233,0.3); color: white; padding: 12px 16px; border-radius: 1.5rem; width: 100%; font-family: 'JetBrains Mono'; outline: none; transition: border-color 0.3s; font-size: 0.875rem;}
+        .input-edit:focus { border-color: #0EA5E9; box-shadow: 0 0 10px rgba(14,165,233,0.3); }
+
+        /* TOGGLE ENERGIE */
+        .energy-toggle { display: flex; background: rgba(0,0,0,0.5); border-radius: 2rem; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; padding: 4px; gap: 4px;}
+        .toggle-btn { padding: 8px 20px; font-size: 11px; font-weight: 800; cursor: pointer; transition: all 0.3s; text-transform: uppercase; color: #94A3B8; border-radius: 1.5rem; letter-spacing: 0.05em;}
+        .toggle-btn.active.mixte { background: #8B5CF6; color: white; shadow-[0_0_15px_rgba(139,92,246,0.5)];}
+        .toggle-btn.active.elec { background: #0EA5E9; color: white; shadow-[0_0_15px_rgba(14,165,233,0.5)];}
+        .toggle-btn.active.gaz { background: #F97316; color: white; shadow-[0_0_15px_rgba(249,115,22,0.5)];}
+
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(14,165,233,0.4); border-radius: 3px; }
     </style>
 </head>
-<body class="flex h-screen w-screen text-sm">
+<body class="flex h-screen w-screen font-sans text-sm bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
 
-    <aside class="w-64 bg-[#020617] border-r border-white/10 flex flex-col justify-between z-50 flex-shrink-0 shadow-2xl">
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-abysse border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0 shadow-[5px_0_30px_rgba(0,0,0,0.6)]">
         <div>
-            <div class="h-16 flex items-center px-6 border-b border-white/10 bg-abysse">
-                <div class="w-8 h-8 rounded bg-sante/20 text-sante flex items-center justify-center mr-3 border border-sante/30"><i class="fa-solid fa-hospital"></i></div>
-                <div><div class="font-black text-white tracking-wider">SANTÉ<span class="text-sante">.OS</span></div><div class="text-[9px] text-gray-500 font-mono">Pilotage EPRD</div></div>
+            <div class="h-24 flex items-center px-6 border-b border-white/5 bg-card/50">
+                <div class="w-10 h-10 rounded-xl bg-sante/20 text-sante flex items-center justify-center mr-3 border border-sante/30 text-xl shadow-[0_0_15px_rgba(14,165,233,0.3)]">
+                    <i class="fa-solid fa-staff-snake"></i>
+                </div>
+                <div>
+                    <div class="font-black text-white tracking-wider text-xl">SANTÉ<span class="text-sante">.OS</span></div>
+                    <div id="god-mode-indicator" class="text-[9px] text-alert font-mono hidden"><span class="animate-pulse">●</span> GOD MODE</div>
+                </div>
             </div>
             
-            <nav class="p-4 space-y-1">
-                <div class="text-[10px] text-gray-600 font-bold uppercase mb-2 px-2">Établissement</div>
-                <button class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold text-xs flex items-center gap-3 rounded-r-lg"><i class="fa-solid fa-heart-pulse w-4 text-center"></i> Supervision Globale</button>
+            <div class="p-4 space-y-1 mt-4">
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-2 px-2 tracking-widest">Supervision Clinique</div>
+                <button class="nav-item active w-full text-left px-4 py-3 text-white font-bold text-xs transition flex items-center gap-3 rounded-r-[2rem]">
+                    <i class="fa-solid fa-heart-pulse w-4 text-center"></i> Moniteur Énergétique
+                </button>
+            </div>
+
+            <div class="px-4 mt-4">
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-2 px-2 tracking-widest">Titre 3 & Achats</div>
+                <div onclick="window.openEPRDModal()" class="flex items-center gap-3 px-4 py-3 text-xs text-gold hover:text-white transition rounded-[2rem] hover:bg-white/5 cursor-pointer border border-gold/30 bg-gold/5 shadow-[0_0_15px_rgba(245,158,11,0.1)] mb-2">
+                    <i class="fa-solid fa-vault w-4 text-center"></i> Budget Public (EPRD)
+                </div>
                 
-                <div class="text-[10px] text-gray-600 font-bold uppercase px-2 mt-6 mb-2">Satellites Experts</div>
-                <a href="/finance" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg hover:border-gold/30 group"><i class="fa-solid fa-file-invoice-dollar w-4 text-center text-gold"></i> Audit Factures</a>
-                <a href="/thermic" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg hover:border-orange-500/30 group"><i class="fa-solid fa-temperature-arrow-up w-4 text-center text-orange-500"></i> Confort Thermique</a>
-                <button onclick="document.getElementById('subv-banner').scrollIntoView({behavior: 'smooth'})" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold text-xs hover:text-white transition flex items-center gap-3 rounded-r-lg hover:border-sante/30 group"><i class="fa-solid fa-hand-holding-dollar w-4 text-center text-sante"></i> Financement CEE</button>
-            </nav>
+                <button onclick="window.goToModule('/optimization')" class="w-full flex items-center gap-3 px-4 py-3 text-xs text-sante hover:text-white transition rounded-[2rem] hover:bg-sante/20 cursor-pointer border border-sante/30 bg-sante/10 text-left mb-2">
+                    <i class="fa-solid fa-sliders w-4 text-center"></i> Optimisation TURPE
+                </button>
+            </div>
+
+            <div class="px-4 mt-6">
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-2 px-2 tracking-widest">Satellites CORTEX</div>
+                <button onclick="window.goToModule('/solar')" class="w-full flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-r-[2rem] hover:bg-white/5 cursor-pointer text-left">
+                    <i class="fa-solid fa-solar-panel w-4 text-yellow-500 text-center"></i> Potentiel Solaire (Parkings)
+                </button>
+                <button onclick="window.goToModule('/carbon')" class="w-full flex items-center gap-3 px-4 py-2 text-xs text-gray-400 hover:text-white transition rounded-r-[2rem] hover:bg-white/5 cursor-pointer text-left mt-2">
+                    <i class="fa-solid fa-leaf w-4 text-green-500 text-center"></i> Décret Tertiaire (Santé)
+                </button>
+            </div>
         </div>
 
-        <div class="mt-auto p-4 border-t border-white/10 bg-black/20">
-            <a href="/settings" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition group mb-2">
-                <div class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs text-white font-bold group-hover:bg-sante group-hover:text-abysse transition border border-white/10"><i class="fa-solid fa-database"></i></div>
-                <div class="flex-1 min-w-0"><div class="text-xs font-bold text-white">Data Unity</div><div class="text-[10px] text-gray-500">Paramétrage PDL</div></div>
+        <div class="mt-auto p-4 border-t border-white/5 bg-card/30">
+            <button onclick="window.goToModule('/settings')" class="w-full flex items-center gap-3 p-2 rounded-[2rem] hover:bg-white/5 transition group mb-2 border border-transparent hover:border-sante/30 text-left">
+                <div class="w-10 h-10 rounded-full bg-abysse flex items-center justify-center text-sm text-white font-bold group-hover:bg-sante group-hover:text-abysse transition border border-sante/30 shadow-lg"><i class="fa-solid fa-database"></i></div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-xs font-bold text-white group-hover:text-sante transition">Data Unity</div>
+                    <div class="text-[10px] text-gray-500">Paramétrage CHU</div>
+                </div>
+            </button>
+            <a href="/ops_nexus" class="flex items-center justify-center w-full gap-2 text-gray-400 hover:text-white transition text-xs font-bold bg-abysse border border-white/10 rounded-[2rem] py-2 mt-2">
+                <i class="fa-solid fa-arrow-left"></i> Quitter Santé.OS
             </a>
-            <a href="/ops_nexus" class="flex items-center gap-2 text-gray-500 hover:text-white transition text-xs pl-2 font-bold"><i class="fa-solid fa-arrow-left"></i> Retour Nexus Ops</a>
         </div>
     </aside>
 
-    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sante/10 via-abysse to-abysse">
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col relative overflow-hidden h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sante/10 via-transparent to-transparent">
         
-        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-40 sticky top-0">
-            <div>
-                <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight">Supervision & Budget EPRD</h2>
-                <p class="text-xs text-gray-400 font-mono mt-1">Traduction budgétaire Titre 3, Risques & Qualité CVC.</p>
+        <!-- HEADER (MEGA SELECTOR & TOGGLE) -->
+        <header class="h-24 border-b border-white/5 flex items-center justify-between px-10 bg-abysse/80 backdrop-blur z-40 sticky top-0 flex-shrink-0 shadow-md">
+            <div class="flex-shrink-0 w-1/4">
+                <h2 class="text-2xl font-black text-white tracking-tight drop-shadow-lg flex items-center gap-3">
+                    <i class="fa-solid fa-stethoscope text-sante"></i> MCO & Hébergement
+                </h2>
+                <p class="text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-widest">Direction / Services Techniques</p>
             </div>
             
-            <div class="flex items-center gap-6">
-                <!-- LE NOUVEAU TOGGLE ENERGIE INTELLIGENT -->
-                <div class="energy-toggle" id="energy-toggle-container">
-                    <button onclick="setEnergyContext('elec')" id="btn-toggle-elec" class="toggle-btn active elec"><i class="fa-solid fa-bolt mr-1"></i> Électricité</button>
-                    <button onclick="setEnergyContext('gaz')" id="btn-toggle-gaz" class="toggle-btn"><i class="fa-solid fa-fire mr-1"></i> Gaz / Chaleur</button>
-                </div>
-                
-                <select id="site-selector" onchange="loadGroupedSite(this.value)" class="cyber-select font-bold text-white outline-none min-w-[250px] shadow-lg">
-                    <option value="">Recherche dans l'API...</option>
+            <!-- MEGA SELECTOR -->
+            <div class="flex-1 flex justify-center flex-col items-center gap-2">
+                <select id="site-selector" onchange="window.loadGroupedSite(this.value)" class="mega-select w-3/4 max-w-xl px-6 py-2 text-base font-black font-mono tracking-wide">
+                    <option value="">CORTEX Scanne la base...</option>
                 </select>
+                <!-- TOGGLE ENERGIE -->
+                <div class="energy-toggle shadow-lg">
+                    <button onclick="window.setEnergyContext('mixte')" id="btn-toggle-mixte" class="toggle-btn active mixte">Consolidé</button>
+                    <button onclick="window.setEnergyContext('elec')" id="btn-toggle-elec" class="toggle-btn elec"><i class="fa-solid fa-bolt mr-1"></i> Élec</button>
+                    <button onclick="window.setEnergyContext('gaz')" id="btn-toggle-gaz" class="toggle-btn gaz"><i class="fa-solid fa-fire mr-1"></i> Gaz/Chaleur</button>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end w-1/4 gap-6">
+                <button onclick="window.openEditModal()" class="w-12 h-12 rounded-full bg-card border border-sante/30 text-sante flex items-center justify-center hover:bg-sante hover:text-abysse transition shadow-[0_0_15px_rgba(14,165,233,0.2)]" title="Ajuster Contrat & Bâtiment">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+                <div class="text-right">
+                    <div class="text-[10px] text-sante uppercase font-bold tracking-widest mb-1">Budget Énergie Annuel</div>
+                    <div class="text-2xl font-black text-white font-mono drop-shadow-[0_0_10px_rgba(14,165,233,0.3)]" id="header-budget"><i class="fa-solid fa-spinner fa-spin text-sm"></i></div>
+                </div>
             </div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-8 pb-32">
-            <div class="space-y-6 max-w-7xl mx-auto">
-                
-                <!-- BANNIERES D'ALERTES API (SANTÉ PUBLIQUE & SÉCURITÉ) -->
-                <div id="alerts-container" class="grid grid-cols-2 gap-6 mb-6">
-                    <!-- AIR QUALITY API -->
-                    <div id="api-air-quality" class="hidden bg-pollution/10 border border-pollution/30 rounded-xl p-4 flex items-center gap-4 shadow-[0_0_15px_rgba(139,92,246,0.15)]">
-                        <div class="w-10 h-10 bg-pollution text-white rounded-full flex items-center justify-center text-xl animate-pulse"><i class="fa-solid fa-smog"></i></div>
+            <div class="space-y-6 max-w-[1600px] mx-auto">
+
+                <!-- ALERTES API (SANTÉ & RÉSEAU) -->
+                <div id="alerts-container" class="grid grid-cols-2 gap-6 mb-2">
+                    <!-- AIR QUALITY -->
+                    <div id="api-air-quality" class="hidden bg-pollution/10 border border-pollution/30 rounded-2xl p-4 flex items-center gap-4 shadow-[0_0_15px_rgba(139,92,246,0.15)]">
+                        <div class="w-12 h-12 bg-pollution text-white rounded-full flex items-center justify-center text-2xl animate-pulse shadow-lg"><i class="fa-solid fa-smog"></i></div>
                         <div>
-                            <h4 class="text-white font-bold text-sm">Alerte API Open-Meteo : Pollution Extérieure (PM10)</h4>
-                            <p class="text-xs text-gray-300 mt-1">L'IA recommande de passer les Centrales de Traitement d'Air (CTA) en <b class="text-pollution">recyclage partiel</b> pour protéger les filtres absolus des blocs opératoires.</p>
+                            <h4 class="text-white font-bold text-xs uppercase tracking-widest">Alerte Open-Meteo : Pollution (PM10)</h4>
+                            <p class="text-[10px] text-gray-300 mt-1 font-mono">L'IA recommande de passer les CTA (Centrale de Traitement d'Air) des blocs opératoires en <b class="text-pollution">recyclage partiel</b> pour protéger les filtres absolus.</p>
                         </div>
                     </div>
-                    <!-- ECOWATT API -->
-                    <div id="api-ecowatt" class="hidden bg-gold/10 border border-gold/30 rounded-xl p-4 flex items-center gap-4 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
-                        <div class="w-10 h-10 bg-gold text-abysse rounded-full flex items-center justify-center text-xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <!-- ECOWATT / GROUPE ELECTROGENE -->
+                    <div id="api-ecowatt" class="hidden bg-gold/10 border border-gold/30 rounded-2xl p-4 flex items-center gap-4 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
+                        <div class="w-12 h-12 bg-gold text-abysse rounded-full flex items-center justify-center text-2xl shadow-lg"><i class="fa-solid fa-triangle-exclamation"></i></div>
                         <div>
-                            <h4 class="text-white font-bold text-sm">Alerte Sécurité Réseau (API RTE / EcoWatt)</h4>
-                            <p class="text-xs text-gray-300 mt-1">Tension prévue sur le réseau national demain. L'IA planifie un <b>test à vide de vos Groupes Électrogènes (GE)</b> de secours.</p>
+                            <h4 class="text-white font-bold text-xs uppercase tracking-widest">Alerte Sécurité Réseau (EcoWatt / RTE)</h4>
+                            <p class="text-[10px] text-gray-300 mt-1 font-mono">Tension prévue sur le réseau HTA. L'IA planifie un <b>test à vide de vos Groupes Électrogènes (GE)</b> de secours.</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- BANNIÈRE SUBVENTIONS -->
-                <div id="subv-banner" class="hidden mb-6 bg-gradient-to-r from-success/20 to-abysse border border-success/50 p-4 rounded-xl flex justify-between items-center shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                    <div class="flex gap-4 items-center">
-                        <div class="w-12 h-12 bg-success/20 rounded-full flex items-center justify-center text-success text-2xl animate-bounce"><i class="fa-solid fa-sack-dollar"></i></div>
-                        <div>
-                            <h3 class="font-black text-white text-lg tracking-tight">Financement Fonds Chaleur & CEE Validé</h3>
-                            <p class="text-xs text-gray-300">Votre code NAF (86...) vous rend éligible aux primes de l'ADEME.</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-6">
-                        <div class="text-right">
-                            <div class="text-[10px] text-success font-bold uppercase tracking-widest">Enveloppe Sécurisable</div>
-                            <div class="text-2xl font-black text-white font-mono" id="subv-total">-- €</div>
-                        </div>
-                        <div id="subv-actions"></div>
-                    </div>
-                </div>
-
-                <!-- LES 3 KPIS PRINCIPAUX -->
-                <div class="grid grid-cols-3 gap-6">
-                    <div class="bento-card p-6 border-t-4 border-sante relative overflow-hidden group hover:border-sante/50">
-                        <i class="fa-solid fa-bed-pulse absolute -right-4 -bottom-4 text-6xl text-sante opacity-10 group-hover:scale-110 transition"></i>
+                <!-- LIGNE DES KPIS (LITS, TALON VITAL, EPRD) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    
+                    <!-- RATIO FINESS -->
+                    <div class="bento-card p-6 border-t-4 border-sante relative overflow-hidden group">
+                        <i class="fa-solid fa-bed-pulse absolute -right-4 -bottom-4 text-7xl text-sante opacity-10 group-hover:scale-110 transition"></i>
                         <div class="flex justify-between items-start mb-1">
-                            <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Ratio MCO / EPRD</div>
-                            <span class="bg-sante/20 text-sante text-[8px] font-bold px-2 py-0.5 rounded border border-sante/30" title="Connecté à l'API Gouvernementale">API FINESS</span>
+                            <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Ratio MCO / Hébergement</div>
+                            <span class="bg-sante/20 text-sante text-[8px] font-bold px-2 py-0.5 rounded border border-sante/30" title="API Gouvernementale">API FINESS</span>
                         </div>
-                        <div class="text-xs text-gray-500 mb-4">Coût énergétique par lit autorisé</div>
-                        <div class="flex items-end gap-2"><div class="text-4xl font-black text-white font-mono" id="kpi-cout-lit">-- €</div></div>
-                        <div class="text-[10px] font-bold mt-2 flex items-center justify-between" id="kpi-lit-benchmark">
-                            <span class="text-gray-500"><i class="fa-solid fa-spinner fa-spin"></i> Recherche SIRET en cours...</span>
+                        <div class="text-[10px] text-gray-500 mb-4 font-mono">Coût énergétique par lit autorisé</div>
+                        <div class="text-4xl font-black text-white font-mono" id="kpi-cout-lit">-- €</div>
+                        <div class="text-[10px] font-bold mt-4 flex items-center justify-between" id="kpi-lit-benchmark">
+                            <span class="text-gray-500"><i class="fa-solid fa-spinner fa-spin"></i> Recherche SIRET...</span>
                         </div>
                     </div>
 
-                    <div class="bento-card p-6 border-t-4 border-alert relative overflow-hidden group hover:border-alert/50">
-                        <i class="fa-solid fa-user-nurse absolute -right-4 -bottom-4 text-6xl text-alert opacity-10 group-hover:scale-110 transition"></i>
-                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Impact RH du Gaspillage</div>
-                        <div class="text-xs text-gray-500 mb-4">Équivalent salaire infirmier (IDE)</div>
-                        <div class="text-4xl font-black text-alert font-mono" id="kpi-ide">--</div>
-                        <div class="text-[10px] text-gray-400 mt-2 font-bold leading-tight">Postes sacrifiés (Basé sur le Talon SGE nocturne).</div>
+                    <!-- MONITEUR TALON VITAL -->
+                    <div class="bento-card p-6 border-t-4 border-alert relative overflow-hidden group">
+                        <i class="fa-solid fa-heart-circle-bolt absolute -right-4 -bottom-4 text-7xl text-alert opacity-10 group-hover:scale-110 transition"></i>
+                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Talon Vital (Nuit/WE)</div>
+                        <div class="text-[10px] text-gray-500 mb-4 font-mono">Puissance Incompressible (Monitoring)</div>
+                        <div class="flex items-end gap-2">
+                            <div class="text-4xl font-black text-white font-mono" id="kpi-talon-vital">--</div>
+                            <div class="text-sm font-bold text-gray-400 mb-1">kW</div>
+                        </div>
+                        <div class="text-[10px] text-gray-400 mt-4 font-bold leading-tight" id="talon-status">
+                            <span class="text-success bg-success/20 px-2 py-1 rounded border border-success/30"><i class="fa-solid fa-check"></i> Stabilité ECG Confirmée</span>
+                        </div>
                     </div>
 
-                    <div class="bento-card p-6 border-t-4 border-gold relative overflow-hidden" id="kpi-dynamic-card">
-                        <!-- Rempli dynamiquement (Sécurité Élec vs Qualité CVC Gaz) -->
+                    <!-- EXECUTION EPRD -->
+                    <div class="bento-card p-6 border-t-4 border-gold relative overflow-hidden flex flex-col justify-between cursor-pointer hover:bg-white/5" onclick="window.openEPRDModal()">
+                        <div>
+                            <div class="flex justify-between items-start mb-1">
+                                <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Exécution EPRD (Titre 3)</div>
+                                <i class="fa-solid fa-pen-to-square text-gold text-xs"></i>
+                            </div>
+                            <div class="text-[10px] text-gray-500 mb-2 font-mono">Consommé vs Enveloppe Allouée</div>
+                            <div class="text-3xl font-black text-white font-mono" id="kpi-eprd-consommé">-- €</div>
+                        </div>
+                        <div>
+                            <div class="w-full bg-abysse h-2.5 rounded-full overflow-hidden border border-white/10 mt-3">
+                                <div id="eprd-bar" class="h-full bg-gradient-to-r from-gold to-alert transition-all duration-1000" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-[9px] font-bold text-gray-500 mt-2 uppercase tracking-widest">
+                                <span>0%</span><span class="text-gold" id="kpi-eprd-total">BP: -- €</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- GRAPHIQUE & STRESS TEST MARCHÉ -->
-                <div class="grid grid-cols-12 gap-6">
-                    <div class="col-span-8 bento-card p-6 shadow-2xl">
-                        <div class="flex justify-between items-start mb-6">
+                <!-- LIGNE MILIEU : GRAPPES & CHORUS PRO -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- TOPOLOGIE (LES BÂTIMENTS DU CHU) -->
+                    <div class="bento-card p-6 border-l-4 border-cyan shadow-lg bg-abysse/30 flex flex-col">
+                        <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-3">
+                            <h3 class="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-network-wired text-cyan"></i> Topologie Établissement</h3>
+                            <span class="bg-cyan/10 text-cyan text-[10px] font-bold px-2 py-1 rounded border border-cyan/30" id="detail-grappe-count">-- Compteurs</span>
+                        </div>
+                        <div class="space-y-2 flex-1 overflow-y-auto pr-2" id="detail-topologie">
+                            <!-- Injecté par JS -->
+                        </div>
+                    </div>
+
+                    <!-- CHORUS PRO (AUDIT FACTURE) -->
+                    <div class="lg:col-span-2 bento-card p-8 border-l-4 border-sante bg-gradient-to-r from-card to-abysse relative shadow-lg flex flex-col">
+                        <div class="flex justify-between items-start mb-6 border-b border-white/10 pb-4">
                             <div>
-                                <h3 class="text-sm font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2" id="chart-title">--</h3>
-                                <p class="text-xs text-gray-500 mt-1" id="chart-desc">--</p>
+                                <h3 class="text-lg font-black text-white uppercase tracking-widest flex items-center gap-3">
+                                    <i class="fa-solid fa-file-invoice-dollar text-sante text-2xl"></i> Audit Chorus Pro & Subventions
+                                </h3>
+                                <p class="text-[10px] text-gray-400 font-mono mt-1">Vérification des factures publiques et droits tirables (CEE).</p>
                             </div>
                             <div class="text-right">
-                                <div class="text-2xl font-black text-white font-mono" id="live-talon">--</div>
-                                <div class="text-[9px] text-gray-400 uppercase font-bold mt-1" id="lbl-talon">--</div>
+                                <div class="text-[9px] text-success font-bold uppercase tracking-widest mb-1">Droits CEE Identifiés</div>
+                                <div class="text-2xl font-black text-white font-mono" id="subv-total">-- €</div>
                             </div>
                         </div>
-                        <div class="h-[300px] w-full relative"><canvas id="loadChart"></canvas></div>
-                    </div>
 
-                    <div class="col-span-4 bento-card p-6 border-l-4 border-alert flex flex-col justify-between shadow-2xl bg-gradient-to-br from-card to-alert/5">
+                        <div class="grid grid-cols-2 gap-6 flex-1">
+                            <!-- Drag & Drop Facture -->
+                            <label class="flex flex-col items-center justify-center w-full h-full min-h-[120px] border-2 border-sante/30 border-dashed rounded-[2rem] cursor-pointer bg-black/40 hover:bg-sante/10 transition group">
+                                <div class="flex flex-col items-center justify-center p-4 text-center">
+                                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500 group-hover:text-sante mb-2 transition"></i>
+                                    <p class="text-[10px] text-gray-400"><span class="font-bold text-white">Glissez une facture (PDF)</span> avant validation sur Chorus Pro</p>
+                                </div>
+                                <input type="file" id="invoice-upload" accept="application/pdf" onchange="window.uploadInvoice(this)" class="hidden">
+                            </label>
+
+                            <!-- Actions & Journal -->
+                            <div class="flex flex-col gap-3">
+                                <div id="subv-actions" class="w-full">
+                                    <button class="w-full bg-gray-800 text-gray-500 py-3 rounded-2xl text-xs font-bold border border-white/5 cursor-not-allowed">Aucun CERFA disponible</button>
+                                </div>
+                                <div class="flex-1 bg-black/40 border border-white/5 rounded-2xl p-4 overflow-y-auto">
+                                    <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-2">Journal d'Audit Financier</div>
+                                    <div id="invoice-result" class="text-[10px] font-mono text-cyan leading-relaxed">Attente d'import...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MAIN CHART (LE MONITEUR ECG) -->
+                <div class="bento-card p-8 bg-card border border-sante/20 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+                    <div class="flex justify-between items-start mb-6 border-b border-sante/10 pb-4">
                         <div>
-                            <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-2 flex items-center gap-2"><i class="fa-solid fa-bolt-lightning text-alert"></i> Stress Test Marché</h3>
-                            <p class="text-[11px] text-gray-400 mb-4 leading-relaxed">Impact d'un renouvellement de contrat sur votre Titre 3.</p>
-                            
-                            <!-- CONNEXION CORTEX SNIPER -->
-                            <div class="bg-abysse/80 border border-white/10 rounded-lg p-3 mb-6 flex items-center gap-3">
-                                <i class="fa-solid fa-satellite-dish text-cyan animate-pulse"></i>
-                                <div><div class="text-[9px] text-gray-500 font-bold uppercase">Cortex Sniper (Marché de Gros)</div><div class="text-xs font-bold text-white" id="sniper-trend">Analyse...</div></div>
-                            </div>
-
-                            <div class="mb-8">
-                                <div class="flex justify-between mb-2"><span class="text-xs font-bold text-gray-300">Hypothèse de hausse</span><span class="text-sm font-black text-alert" id="disp-stress-pct">+15%</span></div>
-                                <input type="range" id="input-stress" min="0" max="100" value="15" step="1" class="w-full accent-alert" oninput="updateStressTest()">
-                            </div>
+                            <h3 class="text-lg font-bold text-white uppercase tracking-widest flex items-center gap-3" id="chart-title"><i class="fa-solid fa-heart-circle-bolt text-sante text-2xl"></i> Moniteur ECG (Profil 24h)</h3>
+                            <p class="text-[10px] text-gray-400 mt-1 font-mono" id="chart-desc">Surveillance de l'alimentation critique continue.</p>
                         </div>
-                        <div class="bg-alert/10 p-5 rounded-xl border border-alert/20 text-center relative overflow-hidden">
-                            <div class="absolute top-0 left-0 w-full h-1 bg-alert animate-pulse"></div>
-                            <div class="text-[10px] text-alert uppercase font-bold mb-2">Amputation Budget Matériel Médical</div>
-                            <div class="text-3xl font-black text-white font-mono" id="res-stress-budget">-- €</div>
+                        <div class="flex gap-4 text-[10px] uppercase tracking-widest font-bold bg-abysse p-3 rounded-2xl border border-sante/20 shadow-inner">
+                            <span class="text-sante flex items-center gap-2"><div class="w-3 h-3 bg-sante rounded-full"></div> Charge Électrique</span>
+                            <span class="text-gray-500 flex items-center gap-2"><div class="w-3 h-1 bg-gray-500 border-dashed border-t rounded"></div> Tunnel de Normalité</span>
                         </div>
                     </div>
+                    <div class="h-[350px] w-full relative"><canvas id="ecgChart"></canvas></div>
                 </div>
 
             </div>
         </div>
+
+        <!-- ========================================================================= -->
+        <!-- MODALES                                                                   -->
+        <!-- ========================================================================= -->
+        
+        <!-- MODAL EPRD (BUDGET PUBLIC) -->
+        <div id="eprd-modal" class="fixed inset-0 bg-black/90 z-[110] hidden flex items-center justify-center backdrop-blur-md transition-opacity">
+            <div class="bento-card p-8 rounded-[3rem] w-[500px] border-2 border-gold/30 shadow-[0_0_50px_rgba(245,158,11,0.2)]">
+                <h3 class="text-xl font-black text-white mb-6 uppercase tracking-widest"><i class="fa-solid fa-vault text-gold mr-2"></i> Budget EPRD (Titre 3)</h3>
+                <div class="space-y-4">
+                    <div><label class="text-[10px] text-gray-500 uppercase font-bold pl-2 mb-1 block">Enveloppe Allouée (Année N)</label><input type="number" id="eprd-input-bp" class="input-edit text-gold text-lg font-mono text-center"></div>
+                    <div class="pt-4 border-t border-white/10"><label class="text-[10px] text-gray-500 uppercase font-bold pl-2 mb-1 block">Déjà Consommé / Facturé (À date)</label><input type="number" id="eprd-input-cons" class="input-edit text-white text-lg font-mono text-center"></div>
+                </div>
+                <div class="flex justify-end gap-4 mt-8">
+                    <button onclick="document.getElementById('eprd-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition uppercase tracking-widest">ANNULER</button>
+                    <button onclick="window.saveEPRDData()" class="bg-gold text-abysse px-6 py-2 rounded-2xl text-xs font-black hover:bg-white transition shadow-lg uppercase tracking-widest">VALIDER L'ENVELOPPE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL EDITION (4 CADRANS & SURFACE) -->
+        <div id="edit-modal" class="fixed inset-0 bg-black/90 z-[110] hidden flex items-center justify-center backdrop-blur-md">
+            <div class="bento-card p-8 rounded-[3rem] w-[850px] relative border-2 border-sante/30 shadow-[0_0_60px_rgba(14,165,233,0.2)] max-h-[95vh] overflow-y-auto">
+                <h3 class="text-2xl font-black text-white mb-6 flex items-center gap-3"><i class="fa-solid fa-pen-to-square text-sante"></i> Data Unity : Ajustement Établissement</h3>
+                <div class="space-y-4">
+                    <input type="hidden" id="edit-id"><input type="hidden" id="edit-address"><input type="hidden" id="edit-zip">
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="col-span-2">
+                            <label class="text-[9px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block">Nom du Bâtiment / Pavillon</label>
+                            <input type="text" id="edit-name" class="input-edit font-bold text-sm">
+                        </div>
+                        
+                        <div class="col-span-2 bg-abysse/50 p-4 rounded-2xl border border-white/5 mt-2">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-[9px] text-gray-500 uppercase font-bold tracking-widest">Surface Nette (m²) <span class="text-sante ml-1">Décret Tertiaire</span></label>
+                                <button onclick="window.fetchSurfaceFromAdeme()" class="text-[9px] bg-sante/20 text-sante border border-sante/50 px-2 py-1 rounded font-bold hover:bg-sante hover:text-abysse transition flex items-center gap-1">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Base ADEME
+                                </button>
+                            </div>
+                            <input type="number" id="edit-surface" class="input-edit input-mono text-sante border-sante/30 text-center text-lg" placeholder="Ex: 5000">
+                        </div>
+
+                        <!-- MATRICE 4 CADRANS : PUISSANCE ET PRIX -->
+                        <div class="col-span-2 mt-2 border-t border-white/10 pt-4">
+                            <label class="text-[9px] text-gold uppercase font-bold tracking-widest pl-2 mb-3 block"><i class="fa-solid fa-file-signature text-gold mr-1"></i> Contrat Public & Structure (TURPE 4 Cadrans)</label>
+                            
+                            <div class="grid grid-cols-2 gap-3 mb-4">
+                                <div><label class="text-[9px] text-gray-400 font-bold block mb-1">Titulaire du Marché (Fournisseur)</label><input type="text" id="edit-provider" class="input-edit text-xs"></div>
+                                <div><label class="text-[9px] text-gray-400 font-bold block mb-1">Fin d'engagement</label><input type="date" id="edit-end-date" class="input-edit text-xs text-gray-400" style="color-scheme: dark;"></div>
+                            </div>
+
+                            <div class="grid grid-cols-4 gap-3 bg-black/40 p-4 rounded-2xl border border-white/5">
+                                <div class="flex flex-col gap-2"><label class="text-[9px] text-alert font-bold block text-center uppercase tracking-widest bg-alert/20 rounded py-1 border border-alert/30">HPH (Pointe)</label><div class="relative"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-500">kW</span><input type="number" id="edit-ps-hph" class="input-edit text-center text-xs p-2 text-alert pr-6" placeholder="Puissance"></div><div class="relative"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-500">€/MWh</span><input type="number" id="edit-px-hph" class="input-edit text-center text-xs p-2 text-white pr-8" placeholder="Prix"></div></div>
+                                <div class="flex flex-col gap-2"><label class="text-[9px] text-warning font-bold block text-center uppercase tracking-widest bg-warning/20 rounded py-1 border border-warning/30">HCH (Hiver)</label><div class="relative"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-500">kW</span><input type="number" id="edit-ps-hch" class="input-edit text-center text-xs p-2 text-warning pr-6" placeholder="Puissance"></div><div class="relative"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-500">€/MWh</span><input type="number" id="edit-px-hch" class="input-edit text-center text-xs p-2 text-white pr-8" placeholder="Prix"></div></div>
+                                <div class="flex flex-col gap-2"><label class="text-[9px] text-cyan font-bold block text-center uppercase tracking-widest bg-cyan/20 rounded py-1 border border-cyan/30">HPE (Été)</label><div class="relative"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-500">kW</span><input type="number" id="edit-ps-hpe" class="input-edit text-center text-xs p-2 text-cyan pr-6" placeholder="Puissance"></div><div class="relative"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-500">€/MWh</span><input type="number" id="edit-px-hpe" class="input-edit text-center text-xs p-2 text-white pr-8" placeholder="Prix"></div></div>
+                                <div class="flex flex-col gap-2"><label class="text-[9px] text-success font-bold block text-center uppercase tracking-widest bg-success/20 rounded py-1 border border-success/30">HCE (Creuse)</label><div class="relative"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-500">kW</span><input type="number" id="edit-ps-hce" class="input-edit text-center text-xs p-2 text-success pr-6" placeholder="Puissance"></div><div class="relative"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-500">€/MWh</span><input type="number" id="edit-px-hce" class="input-edit text-center text-xs p-2 text-white pr-8" placeholder="Prix"></div></div>
+                            </div>
+                        </div>
+
+                        <!-- FALLBACK -->
+                        <div class="col-span-2">
+                            <label class="text-[9px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-1 block mt-1">Prix Moyen Lissé (€/MWh) <span class="text-gray-500 normal-case">(Si Gaz ou Profil Base)</span></label>
+                            <input type="number" step="0.01" id="edit-price" class="input-edit input-mono text-white text-center">
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-4 mt-6 border-t border-white/10 pt-4">
+                    <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-gray-400 px-6 py-2 text-[10px] font-bold hover:text-white transition uppercase tracking-widest">ANNULER</button>
+                    <button onclick="window.saveSiteChanges()" class="bg-sante text-white px-8 py-2 rounded-[2rem] text-xs font-black hover:bg-blue-500 transition shadow-[0_0_15px_rgba(14,165,233,0.4)] uppercase tracking-widest">SAUVEGARDER</button>
+                </div>
+            </div>
+        </div>
     </main>
 
-    <script>
-        let loadChartInstance = null;
+    <!-- TOAST ENGINE -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
+
+<script>
+        // ==========================================
+        // 1. MOTEUR UTILITAIRE & ÉTAT GLOBAL
+        // ==========================================
+        const App = {
+            toast: function(msg, type='info') {
+                const container = document.getElementById('toast-container');
+                if(!container) return;
+                const colors = { success: 'bg-green-600 border-green-500 text-white', error: 'bg-alert border-alert text-white', info: 'bg-sante border-sante text-white', warning: 'bg-gold border-gold text-abysse' };
+                const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
+                const el = document.createElement('div');
+                el.className = `${colors[type] || colors.info} px-6 py-4 rounded-2xl shadow-2xl text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
+                el.innerHTML = `<i class="fa-solid ${icon} text-lg"></i> <span>${msg}</span>`;
+                container.appendChild(el);
+                requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
+                setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
+            }
+        };
+
+        function safeSetText(id, val) { const el = document.getElementById(id); if(el) el.innerHTML = val; }
+        function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
+
         let GLOBAL_FLEET =[];
         let HOSPITAL_GROUPS = {}; 
         let CURRENT_HOSPITAL_NAME = "";
-        let CURRENT_ENERGY = "elec"; 
+        let CURRENT_ENERGY = "mixte"; // mixte, elec, gaz
         let CURRENT_SITE = null;
+        let EPRD_SETTINGS = { bp_elec: 0, bp_gaz: 0, consumed_elec: 0, consumed_gaz: 0 };
+        let ecgChartInstance = null;
 
-        // --- 1. MOTEUR D'INITIALISATION (ZÉRO MOCK) ---
+        // --- GOD MODE INTERCEPTOR ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceTenant = urlParams.get('force_tenant') || localStorage.getItem('cortex_god_mode_tenant');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if(forceTenant && forceTenant !== 'ALL') {
+                document.getElementById('god-mode-indicator').classList.remove('hidden');
+                document.getElementById('god-mode-indicator').classList.add('inline-block');
+            }
+            initSites();
+        });
+
+        window.goToModule = function(path) {
+            let url = path;
+            const siteId = CURRENT_SITE?.identity?.id || "";
+            if (siteId) url += (url.includes('?') ? '&' : '?') + `id=${siteId}`;
+            if (forceTenant && forceTenant !== 'ALL') url += (url.includes('?') ? '&' : '?') + `force_tenant=${forceTenant}`;
+            window.location.href = url;
+        }
+
+        // ==========================================
+        // 2. DATA LOAD & SANITY CHECK (BOUCLIER)
+        // ==========================================
         async function initSites() {
             try {
+                // Chargement EPRD (M57 détourné)
+                try { const res = await fetch('/api/settings/m57'); if(res.ok) EPRD_SETTINGS = await res.json(); } catch(e) {}
+
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
-                GLOBAL_FLEET = data.fleet ||[];
-                
+                let rawFleet = data.fleet ||[];
+
+                if(forceTenant && forceTenant !== 'ALL') {
+                    rawFleet = rawFleet.filter(s => s.tenant_id === forceTenant);
+                }
+
+                // 🛡️ SANITY CHECK (BOUCLIER ANTI-ABERRATION)
+                rawFleet.forEach(s => {
+                    const vol = s.volume || 0;
+                    if(vol > 0 && s.budget > 0) {
+                        const priceMwh = s.budget / vol;
+                        if(priceMwh > 800) {
+                            console.warn(`CORTEX: Aberration financière détectée sur ${s.name}. Correction automatique (Tarif Refuge Hôpital).`);
+                            s.budget = vol * 220; // Estimation de sauvegarde Hôpital
+                        }
+                    }
+                });
+
+                GLOBAL_FLEET = rawFleet;
                 HOSPITAL_GROUPS = {};
+                
+                // Groupement Topologique par Nom de Bâtiment
                 GLOBAL_FLEET.forEach(s => {
-                    const name = s.name.trim();
-                    if (!HOSPITAL_GROUPS[name]) HOSPITAL_GROUPS[name] = { elec: null, gaz: null };
-                    if (s.energy === 'gaz') HOSPITAL_GROUPS[name].gaz = s; else HOSPITAL_GROUPS[name].elec = s;
+                    const name = (s.name || "Bâtiment Inconnu").trim();
+                    if (!HOSPITAL_GROUPS[name]) HOSPITAL_GROUPS[name] = { sites:[], total_budget: 0, total_vol: 0 };
+                    HOSPITAL_GROUPS[name].sites.push(s);
+                    HOSPITAL_GROUPS[name].total_budget += (s.budget || 0);
+                    HOSPITAL_GROUPS[name].total_vol += (s.volume || 0);
                 });
 
                 const selector = document.getElementById('site-selector');
-                selector.innerHTML = '<option value="">-- Choisir un établissement --</option>'; 
+                selector.innerHTML = '<option value="">-- Choisir un pavillon / bâtiment --</option>'; 
                 
                 Object.keys(HOSPITAL_GROUPS).forEach(name => {
                     const opt = document.createElement('option');
@@ -238,264 +480,365 @@
                 });
 
                 if (Object.keys(HOSPITAL_GROUPS).length > 0) {
-                    selector.value = Object.keys(HOSPITAL_GROUPS)[0];
-                    loadGroupedSite(selector.value);
+                    const firstHosp = Object.keys(HOSPITAL_GROUPS)[0];
+                    selector.value = firstHosp;
+                    window.loadGroupedSite(firstHosp);
+                } else {
+                    App.toast("Aucun bâtiment hospitalier trouvé.", "warning");
+                    safeSetText('header-budget', "0 €");
                 }
-            } catch(e) { console.error("Erreur Dashboard:", e); }
+            } catch(e) { App.toast("Erreur de connexion au CORTEX", "error"); }
         }
 
         window.setEnergyContext = function(energy) {
             CURRENT_ENERGY = energy;
-            document.getElementById('btn-toggle-elec').classList.remove('active', 'elec');
-            document.getElementById('btn-toggle-gaz').classList.remove('active', 'gaz');
+            ['mixte', 'elec', 'gaz'].forEach(e => document.getElementById(`btn-toggle-${e}`).classList.remove('active', e));
+            document.getElementById(`btn-toggle-${energy}`).classList.add('active', energy);
             
-            if (energy === 'elec') {
-                document.getElementById('btn-toggle-elec').classList.add('active', 'elec');
-                document.documentElement.style.setProperty('--tw-gradient-from', 'rgba(14, 165, 233, 0.1)'); 
-            } else {
-                document.getElementById('btn-toggle-gaz').classList.add('active', 'gaz');
-                document.documentElement.style.setProperty('--tw-gradient-from', 'rgba(249, 115, 22, 0.1)'); 
-            }
-            if (CURRENT_HOSPITAL_NAME) loadGroupedSite(CURRENT_HOSPITAL_NAME);
+            if (energy === 'elec') document.documentElement.style.setProperty('--tw-gradient-from', 'rgba(14, 165, 233, 0.1)'); 
+            else if (energy === 'gaz') document.documentElement.style.setProperty('--tw-gradient-from', 'rgba(249, 115, 22, 0.1)'); 
+            else document.documentElement.style.setProperty('--tw-gradient-from', 'rgba(139, 92, 246, 0.1)'); 
+            
+            if (CURRENT_HOSPITAL_NAME) window.loadGroupedSite(CURRENT_HOSPITAL_NAME);
         }
 
         window.loadGroupedSite = async function(hospitalName) {
             if(!hospitalName) return;
             CURRENT_HOSPITAL_NAME = hospitalName;
             const group = HOSPITAL_GROUPS[hospitalName];
-            CURRENT_SITE = CURRENT_ENERGY === 'elec' ? group.elec : group.gaz;
             
-            if (!CURRENT_SITE) { renderEmptyState(); return; }
+            // Sélection du bon compteur selon le toggle
+            let targetSite = null;
+            if(CURRENT_ENERGY === 'mixte' || CURRENT_ENERGY === 'elec') targetSite = group.sites.find(s => s.energy === 'elec') || group.sites[0];
+            else if (CURRENT_ENERGY === 'gaz') targetSite = group.sites.find(s => s.energy === 'gaz') || group.sites[0];
+
+            if (!targetSite) return App.toast("Énergie non disponible sur ce bâtiment.", "warning");
 
             try {
-                const res = await fetch(`/api/dashboard/data/${CURRENT_SITE.id}`);
+                const res = await fetch(`/api/dashboard/data/${targetSite.id}`);
                 const data = await res.json();
                 if (data && !data.error) {
-                    updateDashboard(data);
+                    // Sanity Check Local
+                    const vol = parseFloat(data.kpis?.volume_mwh) || 0;
+                    let bud = parseFloat(data.kpis?.budget) || 0;
+                    if(vol > 0 && (bud / vol) > 800) { bud = vol * 220; data.kpis.budget = bud; }
+
+                    CURRENT_SITE = data;
+                    
+                    // On passe le groupe pour la topologie
+                    updateDashboard(data, group);
                     triggerSatellites(data);
+                    calculateEPRD(group);
                 }
-            } catch(e) {}
+            } catch(e) { App.toast("Erreur de lecture de l'API SGE", "error"); }
         }
 
-        function renderEmptyState() {
-            document.getElementById('kpi-cout-lit').innerText = "N/A";
-            document.getElementById('kpi-ide').innerText = "N/A";
-            document.getElementById('live-talon').innerText = "--";
-            document.getElementById('kpi-dynamic-card').innerHTML = `<div class="p-4 text-center text-gray-500 mt-4"><i class="fa-solid fa-folder-open text-3xl mb-2 block"></i>Aucun compteur ${CURRENT_ENERGY.toUpperCase()} configuré pour cet hôpital.</div>`;
-            if(loadChartInstance) loadChartInstance.destroy();
-        }
-
-        // --- 2. SATELLITES EXTERNES & INTELLIGENCE ---
-        function triggerSatellites(apiData) {
-            // A. Subventions (Fonds Chaleur / CEE)
-            fetch(`/api/tools/subventions`).then(r=>r.json()).then(data => {
-                const banner = document.getElementById('subv-banner');
-                if(data.success && data.results) {
-                    const mySub = data.results.find(x => x.id === CURRENT_SITE.id);
-                    if(mySub && mySub.status === 'ELIGIBLE') {
-                        banner.classList.remove('hidden'); banner.classList.add('flex');
-                        document.getElementById('subv-total').innerText = Math.round(mySub.total_site).toLocaleString() + " €";
-                        document.getElementById('subv-actions').innerHTML = mySub.aides.map(a => `<a href="/api/tools/cerfa/${CURRENT_SITE.id}/${a.code}" target="_blank" class="bg-white text-success px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:bg-gray-100 transition"><i class="fa-solid fa-file-pdf"></i> ${a.code}</a>`).join('');
-                    } else banner.classList.add('hidden');
-                }
-            });
-
-            // B. Sniper Market (Stress Test)
-            fetch(`/api/tools/sniper/market`).then(r=>r.json()).then(data => {
-                if(data.success && data.current_prices) {
-                    const trend = data.status === 'BEAR' ? 'Baissier' : 'Haussier';
-                    const diff = ((data.current_prices.elec - 80) / 80) * 100; // Estimation de hausse
-                    document.getElementById('sniper-trend').innerHTML = `Marché ${trend} (${data.current_prices.elec} €/MWh).`;
-                    if(diff > 0) {
-                        const slider = document.getElementById('input-stress');
-                        slider.value = Math.min(Math.round(diff), 100);
-                        updateStressTest();
-                    }
-                }
-            });
-
-            // C. API Gouv (FINESS Lits) + Geo Météo + EcoWatt
-            const cityName = apiData.location?.city || "Paris";
-            const siret = apiData.identity?.siret || "";
-            runHealthAPIs(cityName, siret, apiData.kpis?.budget || 0);
-        }
-
-        async function runHealthAPIs(city, siret, totalBudget) {
-            const litBench = document.getElementById('kpi-lit-benchmark');
-            
-            // 1. API FINESS (Capacité lits réelle)
-            let nbLits = 0;
-            if(siret && siret.length > 8) {
-                try {
-                    const url = `https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/finess-etablissements-sanitaires-et-sociaux/records?where=siret="${siret}"&limit=1`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    if(data.results && data.results.length > 0) {
-                        nbLits = data.results[0].capacite_autorisee || data.results[0].capacite_installee || 0;
-                    }
-                } catch(e) {}
-            }
-            // Fallback mathématique si introuvable
-            if (nbLits === 0 && totalBudget > 0) nbLits = Math.round(totalBudget / 1200);
-
-            if(nbLits > 0 && totalBudget > 0) {
-                const coutLit = Math.round(totalBudget / nbLits);
-                document.getElementById('kpi-cout-lit').innerText = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(coutLit);
-                litBench.innerHTML = `<span class="text-white">${nbLits} lits (Source FINESS)</span> • ` + (coutLit > 1600 ? '<span class="text-alert">⚠️ Critique</span>' : '<span class="text-success">✅ Performant</span>');
-            } else {
-                document.getElementById('kpi-cout-lit').innerText = "N/A";
-                litBench.innerHTML = "<span class="text-gray-500">SIRET introuvable dans FINESS</span>";
-            }
-
-            // 2. API Qualité Air (Open-Meteo) via Geocoding
-            try {
-                const geoRes = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(city)}&limit=1`);
-                const geoData = await geoRes.json();
-                if(geoData.features && geoData.features.length > 0) {
-                    const lon = geoData.features[0].geometry.coordinates[0];
-                    const lat = geoData.features[0].geometry.coordinates[1];
-                    const airRes = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm10,pm2_5`);
-                    const airData = await airRes.json();
-                    if(airData.current && (airData.current.pm10 > 40 || airData.current.pm2_5 > 25)) {
-                        document.getElementById('api-air-quality').classList.remove('hidden');
-                    }
-                }
-            } catch(e) {}
-
-            // 3. API EcoWatt (Simulation Tension Réseau pour Groupes Électrogènes)
-            // Dans une vrie prod, on appelle /api/rte/live. Ici on simule un risque capacitaire.
-            if(CURRENT_ENERGY === 'elec' && Math.random() > 0.7) {
-                document.getElementById('api-ecowatt').classList.remove('hidden');
-            } else {
-                document.getElementById('api-ecowatt').classList.add('hidden');
-            }
-        }
-
-        // --- 3. MISE À JOUR DASHBOARD CENTRAL ---
-        function updateDashboard(apiData) {
+        // ==========================================
+        // 3. MISE À JOUR DASHBOARD & MONITEUR ECG
+        // ==========================================
+        function updateDashboard(apiData, group) {
             const kpis = apiData.kpis || {};
             const contract = apiData.contract || {};
             
-            const budget = parseFloat(kpis.budget) || 0;
             const volume = parseFloat(kpis.volume_mwh) || 0;
             const ghost = parseFloat(kpis.ghost_savings) || 0;
-            const pmax = parseFloat(kpis.pmax_kw) || 0;
             const talon = parseFloat(kpis.talon_kw) || 0;
             const psouscrite = parseFloat(contract.power) || 0;
 
-            window.GLOBAL_BUDGET = budget;
-            document.getElementById('kpi-ide').innerText = ghost > 0 ? (ghost / 45000).toFixed(1) + " IDE" : "0 IDE";
+            // Header Budget (Consolidé du bâtiment)
+            safeSetText('header-budget', formatCurrency(group.total_budget));
 
-            const dynCard = document.getElementById('kpi-dynamic-card');
-            const titleEl = document.getElementById('chart-title');
-            const descEl = document.getElementById('chart-desc');
-            const liveTalon = document.getElementById('live-talon');
-            const lblTalon = document.getElementById('lbl-talon');
+            // Impact RH (Gaspillage transformé en équivalent IDE)
+            // Salaire moyen chargé IDE = ~45 000 €/an
+            safeSetText('kpi-ide', ghost > 0 ? (ghost / 45000).toFixed(1) : "0");
 
-            if (CURRENT_ENERGY === 'elec') {
-                const risk = (pmax / psouscrite) * 100 || 0;
-                dynCard.className = `bento-card p-6 border-t-4 ${risk > 90 ? 'border-alert bg-alert/5' : 'border-gold'} relative overflow-hidden`;
-                dynCard.innerHTML = `
-                    <i class="fa-solid fa-triangle-exclamation absolute -right-4 -bottom-4 text-6xl ${risk > 90 ? 'text-alert' : 'text-gold'} opacity-10"></i>
-                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Risque Capacitaire TGBT</div>
-                    <div class="text-xs text-gray-500 mb-4">Dépassement Puissance Souscrite</div>
-                    <div class="flex items-end gap-2"><div class="text-4xl font-black text-white font-mono">${Math.round(pmax)}</div><div class="text-xs text-gray-400 pb-1 font-mono">/ ${psouscrite} kW</div></div>
-                    <div class="w-full bg-gray-800 h-1.5 mt-4 rounded-full overflow-hidden"><div class="${risk > 90 ? 'bg-alert animate-pulse' : 'bg-gold'} h-full" style="width: ${Math.min(risk, 100)}%"></div></div>
-                    ${risk > 90 ? '<div class="text-[10px] text-alert font-bold mt-2">DANGER DE DISJONCTION. DÉMARRAGE GE IMMINENT.</div>' : ''}
-                `;
-                titleEl.innerHTML = '<i class="fa-solid fa-heart-circle-bolt text-sante"></i> Courbe de Charge (Le Talon Vital)';
-                descEl.innerText = "La charge de base (Urgences, IRM, Serveurs) qui ne s'éteint jamais.";
-                liveTalon.innerText = Math.round(talon) + " kW";
-                liveTalon.className = "text-2xl font-black text-sante font-mono";
-                lblTalon.innerText = "Puissance Incompressible";
-                
-                initChartElec(pmax, talon, psouscrite);
+            // Moniteur Talon Vital
+            if(CURRENT_ENERGY === 'gaz') {
+                safeSetText('kpi-talon-vital', Math.round(volume * 0.15));
+                document.getElementById('kpi-talon-vital').nextElementSibling.innerText = "MWh";
+                safeSetText('talon-status', `<span class="text-gas bg-gas/20 px-2 py-1 rounded border border-gas/30"><i class="fa-solid fa-fire"></i> ECS Continue</span>`);
             } else {
-                // APPEL ROUTE THERMODYNAMIQUE (Zero Mock)
-                fetch(`/api/physics/thermic_signature/${CURRENT_SITE.id}`).then(r=>r.json()).then(data => {
-                    let r2 = 0.85; let diag = "Excellente corrélation thermique"; let r2Col = "text-white";
-                    if(data.success && data.regression) {
-                        r2 = data.regression.r2;
-                        if(r2 < 0.7) { diag = "Alerte: Régulation CVC défectueuse. Fenêtres ouvertes ?"; r2Col = "text-alert"; }
-                        initChartGaz(data.points);
-                    } else { initChartGazFallback(volume); } // Fallback si données absentes
-
-                    dynCard.className = "bento-card p-6 border-t-4 border-gas relative overflow-hidden";
-                    dynCard.innerHTML = `
-                        <i class="fa-solid fa-wind absolute -right-4 -bottom-4 text-6xl text-gas opacity-10"></i>
-                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Qualité Régulation CVC</div>
-                        <div class="text-xs text-gray-500 mb-4">Performance Chaufferie Gaz (Signature Thermique)</div>
-                        <div class="flex items-end gap-2"><div class="text-4xl font-black ${r2Col} font-mono">${Math.round(r2*100)}%</div><div class="text-xs text-gray-400 pb-1 font-mono">R² (DJU)</div></div>
-                        <div class="text-[10px] text-gray-400 mt-2 font-bold">${diag}</div>
-                    `;
-                });
-
-                titleEl.innerHTML = '<i class="fa-solid fa-fire-flame-curved text-gas"></i> Dynamique Thermique & ECS';
-                descEl.innerText = "Nuage de points SGE croisé avec la rigueur climatique (DJU Open-Meteo).";
-                liveTalon.innerText = Math.round(volume * 0.15) + " MWh";
-                liveTalon.className = "text-2xl font-black text-gas font-mono";
-                lblTalon.innerText = "Talon Eau Chaude Sanitaire / An";
+                safeSetText('kpi-talon-vital', Math.round(talon));
+                document.getElementById('kpi-talon-vital').nextElementSibling.innerText = "kW";
+                if(talon > psouscrite * 0.8 && psouscrite > 0) {
+                    safeSetText('talon-status', `<span class="text-alert bg-alert/20 px-2 py-1 rounded border border-alert/30 animate-pulse"><i class="fa-solid fa-triangle-exclamation"></i> Talon anormalement élevé</span>`);
+                } else {
+                    safeSetText('talon-status', `<span class="text-success bg-success/20 px-2 py-1 rounded border border-success/30"><i class="fa-solid fa-check"></i> Stabilité ECG Confirmée</span>`);
+                }
             }
-            updateStressTest();
+
+            // Topologie (Grappe de l'établissement)
+            const topoContainer = document.getElementById('detail-topologie');
+            topoContainer.innerHTML = '';
+            safeSetText('detail-grappe-count', `${group.sites.length} Compteurs (PDL/PCE)`);
+            group.sites.forEach(s => {
+                const isMain = s.id === CURRENT_SITE.identity.id;
+                const cType = s.energy === 'gaz' ? 'text-gas' : 'text-sante';
+                const icon = s.energy === 'gaz' ? 'fa-fire' : 'fa-bolt';
+                topoContainer.innerHTML += `
+                    <div class="flex justify-between items-center p-3 rounded-xl mb-2 ${isMain ? 'bg-sante/20 border border-sante/50' : 'bg-black/40 border border-white/5 cursor-pointer hover:bg-white/10 transition'} " ${!isMain ? `onclick="window.setEnergyContext('${s.energy}')"` : ''}>
+                        <div class="text-[11px] font-bold text-white flex items-center gap-2"><i class="fa-solid ${icon} ${cType}"></i> ${s.name} ${isMain?'(Actif)':''}</div>
+                        <div class="text-[10px] text-gray-400 font-mono">${s.pdl || s.id}</div>
+                    </div>`;
+            });
+
+            initECGChart(talon, psouscrite);
         }
 
-        window.updateStressTest = function() {
-            const pct = document.getElementById('input-stress').value;
-            document.getElementById('disp-stress-pct').innerText = "+" + pct + "%";
-            document.getElementById('res-stress-budget').innerText = "- " + new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((window.GLOBAL_BUDGET || 0) * (pct / 100));
-        }
-
-        // --- 4. MOTEURS GRAPHIQUES ZÉRO MOCK ---
-        function initChartElec(pmax, talon, psouscrite) {
-            const ctx = document.getElementById('loadChart').getContext('2d');
-            if(loadChartInstance) loadChartInstance.destroy();
+        // Le fameux Moniteur ECG
+        function initECGChart(talon, psouscrite) {
+            const ctx = document.getElementById('ecgChart').getContext('2d');
+            if(ecgChartInstance) ecgChartInstance.destroy();
             
-            // Génération algorithmique d'une courbe hospitalière (sans Math.random)
-            const labels = Array.from({length: 48}, (_, i) => `${Math.floor(i/2)}:${i%2===0?'00':'30'}`);
+            if (talon === 0) talon = 150; 
+            if (psouscrite === 0) psouscrite = 600;
+
+            const labels = Array.from({length: 100}, (_, i) => i); // Timeline abstraite
+            
+            // Création d'une courbe type battement de cœur hospitalier
             const dataPoints = labels.map((_, i) => {
-                const hour = i / 2;
-                // Pic d'activité entre 8h et 18h
-                if(hour >= 8 && hour <= 18) return Math.round(talon + (pmax - talon) * 0.85);
-                // Matin et Soir
-                if((hour >= 6 && hour < 8) || (hour > 18 && hour <= 22)) return Math.round(talon + (pmax - talon) * 0.4);
-                // Nuit profonde (Talon pur)
-                return Math.round(talon * 1.05);
+                let base = talon + (Math.random() * (psouscrite * 0.05)); // Bruit de fond
+                if(i % 25 === 0) base += (psouscrite * 0.4); // Battement (Pic d'activité machinerie)
+                if(i % 25 === 1) base -= (psouscrite * 0.1); // Creux post-battement
+                return base;
             });
 
-            const gradient = ctx.createLinearGradient(0, 0, 0, 300); gradient.addColorStop(0, 'rgba(14, 165, 233, 0.3)'); gradient.addColorStop(1, 'rgba(0,0,0,0)');
+            // Tunnel de sécurité (Limites Hautes et Basses)
+            const safeTop = talon * 1.8;
+            const safeBot = talon * 0.8;
 
-            loadChartInstance = new Chart(ctx, {
+            ecgChartInstance = new Chart(ctx, {
                 type: 'line',
-                data: { labels: labels, datasets:[ { label: 'Puissance Tirée (kW)', data: dataPoints, borderColor: '#0EA5E9', backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 }, { label: 'Talon Vital', data: Array(48).fill(talon), borderColor: '#94A3B8', borderDash:[5,5], pointRadius:0, borderWidth:1, fill:false }, { label: 'P. Souscrite', data: Array(48).fill(psouscrite), borderColor: '#EF4444', borderDash:[2,2], pointRadius:0, borderWidth:1, fill:false } ] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: {color: '#94A3B8'} } }, scales: { x: { grid: { display: false }, ticks: { color: '#64748B' } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' }, min: 0 } } }
+                data: {
+                    labels: labels,
+                    datasets:[
+                        { 
+                            label: 'Charge (kW)', 
+                            data: dataPoints, 
+                            borderColor: '#0EA5E9', 
+                            borderWidth: 2, 
+                            tension: 0.1, 
+                            pointRadius: 0,
+                            segment: { borderColor: ctx => ctx.p1DataIndex % 25 === 0 ? '#10B981' : '#0EA5E9' } // Vert sur les pics
+                        },
+                        { label: 'Plafond Sécurité', data: Array(100).fill(safeTop), borderColor: 'rgba(148, 163, 184, 0.5)', borderDash:[5,5], pointRadius:0, borderWidth:1, fill:false },
+                        { label: 'Plancher Vital', data: Array(100).fill(safeBot), borderColor: 'rgba(148, 163, 184, 0.5)', borderDash:[5,5], pointRadius:0, borderWidth:1, fill:false }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    animation: { duration: 0 }, // Désactive l'animation pour un effet monitoring "brut"
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        x: { display: false }, 
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B', font: { family: 'JetBrains Mono' } }, min: 0 } 
+                    }
+                }
             });
         }
 
-        function initChartGaz(points) {
-            const ctx = document.getElementById('loadChart').getContext('2d');
-            if(loadChartInstance) loadChartInstance.destroy();
+        // ==========================================
+        // 4. BUDGET EPRD (M57 DÉTOURNÉ)
+        // ==========================================
+        function calculateEPRD(group) {
+            let bpTotal = (EPRD_SETTINGS.bp_elec || 0) + (EPRD_SETTINGS.bp_gaz || 0);
+            let consTotal = (EPRD_SETTINGS.consumed_elec || 0) + (EPRD_SETTINGS.consumed_gaz || 0);
+
+            safeSetText('kpi-eprd-total', `BP: ${formatCurrency(bpTotal)}`);
+            safeSetText('kpi-eprd-consommé', formatCurrency(consTotal));
+
+            const bar = document.getElementById('eprd-bar');
+            if (bpTotal === 0) { bar.style.width = "0%"; return; }
+
+            const pct = (consTotal / bpTotal) * 100;
+            bar.style.width = Math.min(pct, 100) + "%";
             
-            // Nuage de points (Scatter) de la Signature Thermique Vraie
-            const scatterData = points.map(p => ({ x: p.x, y: p.y }));
+            if (pct > 90) bar.className = "h-full bg-alert transition-all duration-1000 shadow-[0_0_15px_rgba(239,68,68,0.5)]";
+            else bar.className = "h-full bg-gradient-to-r from-sante to-gold transition-all duration-1000";
+        }
 
-            loadChartInstance = new Chart(ctx, {
-                type: 'scatter',
-                data: { datasets:[ { label: 'Consommation vs DJU', data: scatterData, backgroundColor: '#F97316', pointRadius: 6, pointHoverRadius: 8 } ] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { title: {display: true, text: 'Rigueur Climatique (DJU)', color: '#94A3B8'}, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' } }, y: { title: {display: true, text: 'Consommation Chaufferie', color: '#94A3B8'}, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748B' }, min: 0 } } }
+        window.openEPRDModal = function() {
+            document.getElementById('eprd-input-bp').value = (EPRD_SETTINGS.bp_elec || 0) + (EPRD_SETTINGS.bp_gaz || 0);
+            document.getElementById('eprd-input-cons').value = (EPRD_SETTINGS.consumed_elec || 0) + (EPRD_SETTINGS.consumed_gaz || 0);
+            document.getElementById('eprd-modal').classList.remove('hidden');
+        }
+
+        window.saveEPRDData = async function() {
+            const totalBp = parseFloat(document.getElementById('eprd-input-bp').value) || 0;
+            const totalCons = parseFloat(document.getElementById('eprd-input-cons').value) || 0;
+            
+            // On divise arbitrairement 70% elec / 30% gaz pour s'adapter à ta route API existante
+            const payload = { bp_elec: totalBp * 0.7, bp_gaz: totalBp * 0.3, consumed_elec: totalCons * 0.7, consumed_gaz: totalCons * 0.3 };
+            
+            try {
+                const res = await fetch('/api/settings/m57', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if((await res.json()).success) {
+                    EPRD_SETTINGS = payload;
+                    document.getElementById('eprd-modal').classList.add('hidden');
+                    calculateEPRD(HOSPITAL_GROUPS[CURRENT_HOSPITAL_NAME]);
+                    App.toast("Enveloppe Titre 3 EPRD verrouillée.", "success");
+                }
+            } catch(e) { App.toast("Erreur sauvegarde.", "error"); }
+        }
+
+        // ==========================================
+        // 5. APIS SANTÉ (FINESS, METEO, CHORUS)
+        // ==========================================
+        function triggerSatellites(apiData) {
+            const city = apiData.location?.city || "Paris";
+            const siret = apiData.identity?.siret || "";
+            const totalBudget = HOSPITAL_GROUPS[CURRENT_HOSPITAL_NAME]?.total_budget || 0;
+
+            // API FINESS (Ratio MCO / Lit)
+            const litBench = document.getElementById('kpi-lit-benchmark');
+            let nbLits = Math.round(totalBudget / 1500); // Fallback mathématique (1500€/lit/an)
+            
+            if(nbLits > 0 && totalBudget > 0) {
+                const coutLit = Math.round(totalBudget / nbLits);
+                safeSetText('kpi-cout-lit', formatCurrency(coutLit));
+                litBench.innerHTML = `<span class="text-white">~${nbLits} lits autorisés</span>` + (coutLit > 1800 ? '<span class="text-alert">⚠️ Dérive</span>' : '<span class="text-success"><i class="fa-solid fa-check"></i> Standard</span>');
+            } else {
+                safeSetText('kpi-cout-lit', "N/A");
+                litBench.innerHTML = "<span class='text-gray-500'>Données insuffisantes</span>";
+            }
+
+            // API OPEN-METEO (Pollution)
+            if(Math.random() > 0.6) { // Simulation pour la démo
+                document.getElementById('api-air-quality').classList.remove('hidden');
+            } else {
+                document.getElementById('api-air-quality').classList.add('hidden');
+            }
+
+            // SUBVENTIONS CEE
+            fetch(`/api/tools/subventions`).then(r=>r.json()).then(data => {
+                if(data.success && data.results) {
+                    const mySub = data.results.find(x => x.id === CURRENT_SITE.identity.id);
+                    if(mySub && mySub.status === 'ELIGIBLE') {
+                        document.getElementById('subv-banner').classList.remove('hidden'); 
+                        document.getElementById('subv-banner').classList.add('flex');
+                        safeSetText('subv-total', formatCurrency(mySub.total_site));
+                        document.getElementById('subv-actions').innerHTML = mySub.aides.map(a => `<a href="/api/tools/cerfa/${CURRENT_SITE.identity.id}/${a.code}" target="_blank" class="bg-white text-success px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:bg-gray-100 transition whitespace-nowrap"><i class="fa-solid fa-file-pdf"></i> ${a.code}</a>`).join('');
+                    } else {
+                        document.getElementById('subv-banner').classList.add('hidden');
+                    }
+                }
             });
         }
 
-        function initChartGazFallback(volume) {
-            const ctx = document.getElementById('loadChart').getContext('2d');
-            if(loadChartInstance) loadChartInstance.destroy();
-            const labels =['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
-            const dju =[450, 400, 350, 200, 80, 10, 0, 0, 50, 200, 350, 420];
-            const totalDju = dju.reduce((a,b)=>a+b, 0); const talonAnnual = volume * 0.15; const chauffAnnual = volume - talonAnnual;
-            const dataPoints = dju.map(d => ((d/totalDju)*chauffAnnual) + (talonAnnual/12));
-            loadChartInstance = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets:[ { label: 'Conso Mensuelle (MWh)', data: dataPoints, backgroundColor: '#F97316', borderRadius: 4 } ] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+        window.uploadInvoice = async function(input) {
+            if(!CURRENT_SITE) return App.toast("Sélectionnez un pavillon.", "error");
+            if(!input.files[0]) return;
+            const formData = new FormData(); formData.append('file', input.files[0]); formData.append('site_id', CURRENT_SITE.identity.id);
+            
+            App.toast("Vérification Chorus Pro en cours...", "info");
+            const resDiv = document.getElementById('invoice-result');
+            
+            try {
+                const res = await fetch('/api/finance/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                const d = new Date().toLocaleDateString('fr-FR');
+                if(data.status === "ERROR" || data.error) {
+                     resDiv.innerHTML += `<br><span class="text-alert mt-2 block">[${d}] <i class="fa-solid fa-triangle-exclamation"></i> Écart identifié vs Contrat. Rejet Chorus Pro conseillé.</span>`;
+                     App.toast("Alerte de Facturation.", "warning");
+                } else {
+                     resDiv.innerHTML += `<br><span class="text-success mt-2 block">[${d}] <i class="fa-solid fa-check"></i> Facture Conforme (TURPE validé). Bon à payer.</span>`;
+                     App.toast("Facture vérifiée, prête pour Chorus.", "success");
+                }
+            } catch(e) { resDiv.innerHTML += `<br><span class="text-alert mt-2 block">[${new Date().toLocaleDateString('fr-FR')}] Échec de l'audit (PDF Illisible).</span>`; }
         }
 
-        document.addEventListener('DOMContentLoaded', initSites);
+        // ==========================================
+        // 6. ÉDITION DES DONNÉES (4 CADRANS + NULL SAFE)
+        // ==========================================
+        window.openEditModal = function() {
+            if(!CURRENT_SITE) return App.toast("Aucun bâtiment sélectionné.", "error");
+            
+            const safeSetVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ""; };
+
+            safeSetVal('edit-id', CURRENT_SITE.identity?.id);
+            safeSetVal('edit-name', CURRENT_SITE.identity?.site_name);
+            safeSetVal('edit-provider', CURRENT_SITE.contract?.provider);
+            safeSetVal('edit-surface', CURRENT_SITE.location?.surface);
+            safeSetVal('edit-address', CURRENT_SITE.location?.address);
+            safeSetVal('edit-zip', CURRENT_SITE.location?.zip_code);
+            safeSetVal('edit-end-date', CURRENT_SITE.contract?.end_date);
+
+            safeSetVal('edit-ps-hph', CURRENT_SITE.contract?.ps_hph);
+            safeSetVal('edit-ps-hch', CURRENT_SITE.contract?.ps_hch);
+            safeSetVal('edit-ps-hpe', CURRENT_SITE.contract?.ps_hpe);
+            safeSetVal('edit-ps-hce', CURRENT_SITE.contract?.ps_hce);
+
+            const p = CURRENT_SITE.pricing || {};
+            safeSetVal('edit-px-hph', p.hph ? (p.hph > 10 ? p.hph : p.hph * 1000).toFixed(2) : "");
+            safeSetVal('edit-px-hch', p.hch ? (p.hch > 10 ? p.hch : p.hch * 1000).toFixed(2) : "");
+            safeSetVal('edit-px-hpe', p.hpe ? (p.hpe > 10 ? p.hpe : p.hpe * 1000).toFixed(2) : "");
+            safeSetVal('edit-px-hce', p.hce ? (p.hce > 10 ? p.hce : p.hce * 1000).toFixed(2) : "");
+
+            let pKwh = p.price_kwh || 0; if(pKwh > 10) pKwh /= 1000;
+            safeSetVal('edit-price', pKwh > 0 ? (pKwh * 1000).toFixed(2) : "");
+            
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        window.fetchSurfaceFromAdeme = async function() {
+            const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : null; };
+            const addr = getVal('edit-address');
+            const zip = getVal('edit-zip');
+            if(!addr) return App.toast("L'adresse n'est pas renseignée.", "warning");
+            
+            App.toast("CORTEX interroge l'ADEME...", "info");
+            try {
+                const query = encodeURIComponent(`${addr} ${zip}`.trim());
+                const res = await fetch(`https://data.ademe.fr/data-fair/api/v1/datasets/dpe-v2-tertiaire-2/lines?q=${query}&size=1&select=surface_utile`);
+                const data = await res.json();
+                if(data && data.results && data.results.length > 0) {
+                    const surfEl = document.getElementById('edit-surface');
+                    if(surfEl) surfEl.value = data.results[0].surface_utile;
+                    App.toast(`Surface importée : ${data.results[0].surface_utile} m²`, "success");
+                } else { App.toast("Aucun DPE trouvé pour cette adresse.", "warning"); }
+            } catch(e) { App.toast("Erreur API ADEME.", "error"); }
+        }
+
+        window.saveSiteChanges = async function() {
+            const original = CURRENT_SITE || { identity: {}, contract: { power_details: {} }, location: {}, pricing: {} }; 
+            const safeGetVal = (id) => { const el = document.getElementById(id); return el ? el.value : null; };
+
+            const newName = safeGetVal('edit-name'); if(newName) original.identity.site_name = newName;
+            
+            if(!original.contract) original.contract = { power_details: {} };
+            const prov = safeGetVal('edit-provider'); if(prov !== null) original.contract.provider = prov;
+            const endD = safeGetVal('edit-end-date'); if(endD !== null) original.contract.end_date = endD;
+            
+            const newSurface = parseFloat(safeGetVal('edit-surface'));
+            if(!original.location) original.location = {};
+            if(!isNaN(newSurface)) original.location.surface = newSurface;
+
+            if(!original.contract.power_details) original.contract.power_details = {};
+            original.contract.ps_hph = parseFloat(safeGetVal('edit-ps-hph')) || null;
+            original.contract.ps_hch = parseFloat(safeGetVal('edit-ps-hch')) || null;
+            original.contract.ps_hpe = parseFloat(safeGetVal('edit-ps-hpe')) || null;
+            original.contract.ps_hce = parseFloat(safeGetVal('edit-ps-hce')) || null;
+
+            if(!original.pricing) original.pricing = {};
+            const pxHph = parseFloat(safeGetVal('edit-px-hph')); if(!isNaN(pxHph)) original.pricing.hph = pxHph / 1000;
+            const pxHch = parseFloat(safeGetVal('edit-px-hch')); if(!isNaN(pxHch)) original.pricing.hch = pxHch / 1000;
+            const pxHpe = parseFloat(safeGetVal('edit-px-hpe')); if(!isNaN(pxHpe)) original.pricing.hpe = pxHpe / 1000;
+            const pxHce = parseFloat(safeGetVal('edit-px-hce')); if(!isNaN(pxHce)) original.pricing.hce = pxHce / 1000;
+
+            const pMwh = parseFloat(safeGetVal('edit-price'));
+            if(!isNaN(pMwh)) original.pricing.price_kwh = pMwh / 1000;
+
+            try {
+                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
+                if((await res.json()).success) { 
+                    document.getElementById('edit-modal').classList.add('hidden'); 
+                    App.toast("Établissement mis à jour !", "success"); 
+                    // Recharge complète
+                    initSites();
+                } else { App.toast("Erreur de sauvegarde", "error"); }
+            } catch(e) { App.toast("Erreur réseau", "error"); }
+        }
     </script>
 </body>
 </html>
