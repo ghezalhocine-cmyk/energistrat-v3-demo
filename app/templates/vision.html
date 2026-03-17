@@ -140,14 +140,24 @@
                     <div class="flex items-center gap-6">
                         <h3 class="text-xl font-black text-white uppercase tracking-widest flex items-center gap-3"><i class="fa-solid fa-layer-group text-hologram"></i> Hologramme Y/Y Actif</h3>
                         
-                        <!-- SÉLECTEURS D'ANNÉES -->
+                        <!-- SÉLECTEURS D'ANNÉES DÉBRIDÉS -->
                         <div class="flex items-center gap-2 bg-black/40 p-1.5 rounded-2xl border border-white/10 shadow-inner">
                             <select id="year-a" class="bg-transparent text-gray-400 font-bold font-mono outline-none cursor-pointer pl-3 pr-2 text-sm" onchange="window.updateHoloChart()">
-                                <option value="2025">2025 (Réf)</option><option value="2024">2024 (Réf)</option><option value="2023">2023 (Réf)</option>
+                                <option value="2023">2023 (Passé)</option>
+                                <option value="2024" selected>2024 (Réf N-2)</option>
+                                <option value="2025">2025 (Réf N-1)</option>
+                                <option value="2026">2026 (Actuel)</option>
+                                <option value="2027">2027 (Proj)</option>
+                                <option value="2028">2028 (Proj)</option>
                             </select>
                             <span class="text-gray-600 font-black">VS</span>
                             <select id="year-b" class="bg-transparent text-cyan font-bold font-mono outline-none cursor-pointer pl-2 pr-3 text-sm" onchange="window.updateHoloChart()">
-                                <option value="2026">2026 (Actuel)</option><option value="2027">2027 (Proj)</option><option value="2028">2028 (Proj)</option>
+                                <option value="2023">2023 (Passé)</option>
+                                <option value="2024">2024 (Réf N-2)</option>
+                                <option value="2025">2025 (Réf N-1)</option>
+                                <option value="2026" selected>2026 (Actuel)</option>
+                                <option value="2027">2027 (Proj)</option>
+                                <option value="2028">2028 (Proj)</option>
                             </select>
                         </div>
                     </div>
@@ -172,8 +182,8 @@
                 
                 <!-- LÉGENDE -->
                 <div class="mt-4 flex justify-center gap-8 text-[10px] font-bold uppercase tracking-widest text-gray-500 bg-abysse/50 py-3 rounded-2xl border border-white/5 shadow-inner">
-                    <span class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-gray-600"></div> Année de Référence (A)</span>
-                    <span class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-cyan shadow-[0_0_10px_#00E5FF]"></div> Année Comparée (B)</span>
+                    <span class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-gray-600"></div> Année (A)</span>
+                    <span class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-cyan shadow-[0_0_10px_#00E5FF]"></div> Année (B)</span>
                     <span class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-success/30 border border-success"></div> Zone de Gain (Sobriété)</span>
                     <span class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-alert/30 border border-alert"></div> Zone de Dérive (Surcoût)</span>
                 </div>
@@ -220,10 +230,7 @@
     <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
-<!-- ============================================== -->
-<!-- LE JAVASCRIPT SERA INJECTÉ DANS LA PARTIE 2    -->
-<!-- ============================================== -->
-<script>
+    <script>
         // ==========================================
         // 1. MOTEUR UTILITAIRE & ÉTAT GLOBAL
         // ==========================================
@@ -324,35 +331,34 @@
                         const totalY = dataThermic.points.reduce((acc, p) => acc + p.y, 0);
                         if(totalY > 0) DJU_WEIGHTS = dataThermic.points.map(p => (p.y / totalY) * 100);
                     } else {
-                        // Fallback mathématique (Le 15% Talon de notre IA)
+                        // Fallback mathématique
                         const isGaz = CURRENT_SITE.energy_type === 'gaz';
                         const talonRatio = isGaz ? 0.15 : 0.30;
                         const chauffRatio = 1 - talonRatio;
-                        const djuProfil =[0.15, 0.13, 0.12, 0.08, 0.04, 0, 0, 0, 0.02, 0.08, 0.13, 0.15]; // Profil standard France
+                        const djuProfil =[0.15, 0.13, 0.12, 0.08, 0.04, 0, 0, 0, 0.02, 0.08, 0.13, 0.15];
                         DJU_WEIGHTS = djuProfil.map(p => ((p * chauffRatio) + (talonRatio/12)) * 100);
                     }
                 } catch(e) {}
 
                 // 3. Calcul du Gain Global Sécurisé
                 const vol = CURRENT_SITE.kpis?.volume_mwh || 0;
-                let price = 150; // Prix refuge
+                let price = 150; 
                 if (CURRENT_SITE.pricing?.price_kwh) price = CURRENT_SITE.pricing.price_kwh * 1000;
-                else if (CURRENT_SITE.pricing?.hph) price = (CURRENT_SITE.pricing.hph * 1000 + CURRENT_SITE.pricing.hce * 1000) / 2; // Moyenne grossière si 4 cadrans
+                else if (CURRENT_SITE.pricing?.hph) price = (CURRENT_SITE.pricing.hph * 1000 + CURRENT_SITE.pricing.hce * 1000) / 2;
                 
-                // On estime un gain conservateur (ex: 20% sur 3 ans)
                 const gainCumule = vol * 0.20 * price * 3; 
                 safeSetText('header-gains', "+" + formatCurrency(gainCumule));
 
                 // 4. Lancement des moteurs visuels
                 window.updateHoloChart();
                 updatePolarChart();
-                renderAutoChronology(); // Génère les événements déduits !
+                renderAutoChronology();
 
             } catch(e) { App.toast("Erreur de récupération du site", "error"); }
         }
 
         // ==========================================
-        // 3. HOLOGRAMME Y/Y & TOGGLE €/kWh (L'EFFET CISEAUX)
+        // 3. HOLOGRAMME Y/Y & TOGGLE €/kWh
         // ==========================================
         window.setChartMode = function(mode) {
             CHART_MODE = mode;
@@ -376,7 +382,7 @@
             
             // 1. LE COEFFICIENT VOLUMIQUE (Sobriété ou Dérive)
             let volCoef = 1.0; 
-            if(year == 2023) volCoef = 1.15; // Passé énergivore
+            if(year == 2023) volCoef = 1.15; 
             if(year == 2024) volCoef = 1.08;
             if(year == 2025) volCoef = 1.00; // Actuel
             if(year == 2026) volCoef = 0.90; // Sobriété N+1
@@ -386,15 +392,16 @@
             const targetVol = baseVol * volCoef;
             
             // 2. LE MULTIPLICATEUR FINANCIER (L'Effet Ciseaux sur les prix de marché)
-            let pricePerMwh = 150; // Base 2025
+            let pricePerMwh = 150; // Base par defaut
             if(CURRENT_SITE.pricing?.price_kwh) pricePerMwh = CURRENT_SITE.pricing.price_kwh * 1000;
             
             let priceCoef = 1.0;
-            if(year == 2023) priceCoef = isGaz ? 2.5 : 1.8; // Crise Ukrainienne (Prix délirants)
+            if(year == 2023) priceCoef = isGaz ? 2.5 : 1.8; // Crise Ukrainienne
             if(year == 2024) priceCoef = 1.3;
             if(year == 2025) priceCoef = 1.0; // Contrat actuel
-            if(year == 2026) priceCoef = 0.9; // Baisse estimée du SPOT
+            if(year == 2026) priceCoef = 0.9; 
             if(year == 2027) priceCoef = 0.85;
+            if(year == 2028) priceCoef = 0.85;
 
             const targetPrice = pricePerMwh * priceCoef;
             
@@ -416,7 +423,7 @@
             // Calcul du Delta Financier ou Volumique (Année A - Année B)
             const sumA = dataA.reduce((a,b) => a+b, 0);
             const sumB = dataB.reduce((a,b) => a+b, 0);
-            const delta = sumA - sumB; // Si > 0, c'est une économie de B par rapport à A
+            const delta = sumA - sumB; 
             
             const overlay = document.getElementById('delta-overlay');
             const labelEl = document.getElementById('delta-label');
@@ -432,8 +439,7 @@
                 valEl.innerText = "+" + valFormatted;
                 valEl.className = "text-2xl font-black text-success font-mono";
             } else {
-                // SURCOUT / DÉRIVE (B est plus grand que A)
-                // L'Effet Ciseaux en action !
+                // SURCOUT / DÉRIVE (B est plus grand que A) - L'Effet Ciseaux !
                 labelEl.innerText = `DÉRIVE Y/Y (${yearA} vs ${yearB}) :`;
                 valEl.innerText = "-" + valFormatted;
                 valEl.className = "text-2xl font-black text-alert font-mono animate-pulse";
@@ -469,7 +475,7 @@
                             pointBorderWidth: 2,
                             pointRadius: 4,
                             pointHoverRadius: 6,
-                            fill: '-1', // La magie Chart.js : Remplit l'espace entre la courbe B et la courbe A !
+                            fill: '-1', // Remplit l'espace entre la courbe B et la courbe A
                             tension: 0.4
                         }
                     ]
@@ -496,10 +502,9 @@
             const ctx = document.getElementById('polarChart').getContext('2d');
             if(polarChartInstance) polarChartInstance.destroy();
 
-            // Coloration intelligente : Rouge/Orange pour l'hiver (Chauffage), Cyan pour l'été (Froid/Base)
             const colors = DJU_WEIGHTS.map((w, i) => {
-                if (i <= 2 || i >= 9) return 'rgba(239, 68, 68, 0.7)'; // Jan-Mar & Oct-Dec (Hiver)
-                if (i >= 5 && i <= 7) return 'rgba(0, 229, 255, 0.7)'; // Juin-Aout (Été)
+                if (i <= 2 || i >= 9) return 'rgba(239, 68, 68, 0.7)'; // Hiver
+                if (i >= 5 && i <= 7) return 'rgba(0, 229, 255, 0.7)'; // Été
                 return 'rgba(139, 92, 246, 0.5)'; // Mi-saison
             });
 
@@ -516,7 +521,6 @@
                 }
             });
 
-            // Recommandation textuelle basée sur la variation
             const winterSum = DJU_WEIGHTS[0]+DJU_WEIGHTS[1]+DJU_WEIGHTS[11];
             const summerSum = DJU_WEIGHTS[5]+DJU_WEIGHTS[6]+DJU_WEIGHTS[7];
             const ratio = winterSum / (summerSum || 1);
@@ -524,87 +528,75 @@
             const msgEl = document.getElementById('polar-advice');
             if(ratio > 2.5) msgEl.innerHTML = "<span class='text-alert font-bold'><i class='fa-solid fa-triangle-exclamation'></i> Bâtiment Thermo-Sensible.</span> Forte asymétrie hivernale. L'isolation de la toiture est prioritaire.";
             else if(ratio < 0.8) msgEl.innerHTML = "<span class='text-cyan font-bold'><i class='fa-solid fa-fan'></i> Pic Estival Détecté.</span> La climatisation (CVC) domine la signature énergétique du site.";
-            else msgEl.innerHTML = "<span class='text-success font-bold'><i class='fa-solid fa-check'></i> Profil Constant (Ruban).</span> Le process industriel ou les serveurs lissent l'impact climatique (Talon majeur).";
+            else msgEl.innerHTML = "<span class='text-success font-bold'><i class='fa-solid fa-check'></i> Profil Constant (Ruban).</span> Le process industriel ou les serveurs lissent l'impact climatique.";
         }
 
         // ==========================================
-        // 5. DATA ROOM (AUTO-CHRONOLOGIE CORTEX)
+        // 5. DATA ROOM (AUTO-CHRONOLOGIE CORTEX FIXÉE)
         // ==========================================
         function renderAutoChronology() {
             const container = document.getElementById('events-container');
             container.innerHTML = '';
-
             const events =[];
             
-            // DÉDUCTION 1 : Le Contrat
-            if(CURRENT_SITE.contract) {
-                const prov = CURRENT_SITE.contract.provider || "Fournisseur Historique";
-                const start = CURRENT_SITE.contract.start_date;
-                const end = CURRENT_SITE.contract.end_date;
-                
-                if(start) {
-                    events.push({
-                        date: new Date(start), type: 'contract', icon: 'fa-file-signature', color: 'text-gold', bg: 'bg-gold/20',
-                        title: `Début d'exécution du marché (${prov})`, desc: `Fixation des prix et conditions TURPE.`
-                    });
-                } else {
-                    events.push({
-                        date: new Date(new Date().getFullYear(), 0, 1), type: 'contract', icon: 'fa-file-signature', color: 'text-gold', bg: 'bg-gold/20',
-                        title: `Marché ${prov} (En cours)`, desc: `Le contrat cadre est actif sur cet exercice.`
-                    });
+            try {
+                // DÉDUCTION 1 : Le Contrat
+                if(CURRENT_SITE && CURRENT_SITE.contract) {
+                    const prov = CURRENT_SITE.contract.provider || "Fournisseur Historique";
+                    const start = CURRENT_SITE.contract.start_date;
+                    const end = CURRENT_SITE.contract.end_date;
+                    
+                    if(start) {
+                        events.push({ date: new Date(start), type: 'contract', icon: 'fa-file-signature', color: 'text-gold', bg: 'bg-gold/20', title: `Début d'exécution du marché (${prov})`, desc: `Fixation des prix et conditions TURPE.` });
+                    } else {
+                        events.push({ date: new Date(new Date().getFullYear(), 0, 1), type: 'contract', icon: 'fa-file-signature', color: 'text-gold', bg: 'bg-gold/20', title: `Marché ${prov} (En cours)`, desc: `Le contrat cadre est actif sur cet exercice.` });
+                    }
+                    
+                    if(end) {
+                        events.push({ date: new Date(end), type: 'alert', icon: 'fa-triangle-exclamation', color: 'text-alert', bg: 'bg-alert/20', title: `Échéance Contractuelle : Risque Spot`, desc: `Renouvellement AAPC / Courtage prioritaire.` });
+                    }
                 }
-                
-                if(end) {
-                    events.push({
-                        date: new Date(end), type: 'alert', icon: 'fa-triangle-exclamation', color: 'text-alert', bg: 'bg-alert/20',
-                        title: `Échéance Contractuelle : Risque d'exposition Spot`, desc: `Renouvellement AAPC / Courtage prioritaire avant cette date.`
-                    });
+
+                // DÉDUCTION 2 : Le Gaspillage Nocturne
+                const ghost = parseFloat(CURRENT_SITE?.kpis?.ghost_savings) || 0;
+                if(ghost > 200) {
+                    events.push({ date: new Date(new Date().getFullYear() - 1, 10, 1), type: 'gtb', icon: 'fa-ghost', color: 'text-warning', bg: 'bg-warning/20', title: `Alerte CORTEX : Dérive Nocturne Détectée`, desc: `Le site présente une hémorragie financière estimée à ${formatCurrency(ghost)}/an.` });
+                    events.push({ date: new Date(new Date().getFullYear(), 2, 1), type: 'hvac', icon: 'fa-brain', color: 'text-success', bg: 'bg-success/20', title: `Recommandation : Pose de GTB Programmée`, desc: `L'investissement sera amorti par le gain sur le talon.` });
                 }
-            }
 
-            // DÉDUCTION 2 : Le Gaspillage Nocturne (L'hémorragie)
-            const ghost = parseFloat(CURRENT_SITE.kpis?.ghost_savings) || 0;
-            if(ghost > 200) {
-                events.push({
-                    date: new Date(new Date().getFullYear() - 1, 10, 1), type: 'gtb', icon: 'fa-ghost', color: 'text-warning', bg: 'bg-warning/20',
-                    title: `Alerte CORTEX : Dérive Nocturne Détectée`, desc: `Le site présente une hémorragie financière estimée à ${formatCurrency(ghost)}/an.`
+                // DÉDUCTION 3 : Décret Tertiaire & Sobriété
+                events.push({ date: new Date(2030, 0, 1), type: 'law', icon: 'fa-scale-balanced', color: 'text-hologram', bg: 'bg-hologram/20', title: `Jalon Légal : Décret Tertiaire (-40%)`, desc: `Obligation réglementaire de réduction de la consommation finale.` });
+
+                // Tri chronologique Sécurisé (Même si une date est invalide)
+                events.sort((a,b) => {
+                    const timeA = a.date instanceof Date && !isNaN(a.date) ? a.date.getTime() : 0;
+                    const timeB = b.date instanceof Date && !isNaN(b.date) ? b.date.getTime() : 0;
+                    return timeB - timeA;
                 });
-                events.push({
-                    date: new Date(new Date().getFullYear() + 1, 2, 1), type: 'hvac', icon: 'fa-brain', color: 'text-success', bg: 'bg-success/20',
-                    title: `Recommandation : Pose de GTB Programmée`, desc: `L'investissement sera amorti par le gain sur le talon de nuit.`
+
+                if(events.length === 0) {
+                    container.innerHTML = '<div class="text-center text-gray-500 font-mono text-xs mt-10">L\'IA n\'a pas pu déduire de jalons.</div>';
+                    return;
+                }
+
+                events.forEach(ev => {
+                    const dateStr = (ev.date instanceof Date && !isNaN(ev.date)) ? ev.date.toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'}) : "Date Inconnue";
+                    container.innerHTML += `
+                        <div class="relative pl-8 pb-6 group">
+                            <div class="absolute left-[-21px] top-1 w-8 h-8 rounded-full ${ev.bg} border border-${ev.color.split('-')[1]}/50 flex items-center justify-center ${ev.color} shadow-[0_0_15px_currentColor] group-hover:scale-110 transition z-10">
+                                <i class="fa-solid ${ev.icon} text-xs"></i>
+                            </div>
+                            <div class="bg-black/30 p-4 rounded-2xl border border-white/5 group-hover:border-white/20 transition cursor-default">
+                                <div class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1 font-mono">${dateStr}</div>
+                                <div class="text-sm font-bold text-white leading-snug">${ev.title}</div>
+                                <div class="mt-2 text-[10px] text-gray-500 font-mono">${ev.desc}</div>
+                            </div>
+                        </div>
+                    `;
                 });
+            } catch(e) {
+                container.innerHTML = '<div class="text-center text-alert font-mono text-xs mt-10">Erreur lors de la génération IA.</div>';
             }
-
-            // DÉDUCTION 3 : Décret Tertiaire & Sobriété
-            events.push({
-                date: new Date(2030, 0, 1), type: 'law', icon: 'fa-scale-balanced', color: 'text-hologram', bg: 'bg-hologram/20',
-                title: `Jalon Légal : Décret Tertiaire (-40%)`, desc: `Obligation réglementaire de réduction de la consommation finale.`
-            });
-
-            // Tri chronologique
-            events.sort((a,b) => b.date - a.date);
-
-            if(events.length === 0) {
-                container.innerHTML = '<div class="text-center text-gray-500 font-mono text-xs mt-10">L\'IA n\'a pas pu déduire de jalons.</div>';
-                return;
-            }
-
-            events.forEach(ev => {
-                const dateStr = ev.date.toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'});
-                
-                container.innerHTML += `
-                    <div class="relative pl-8 pb-6 group">
-                        <div class="absolute left-[-21px] top-1 w-8 h-8 rounded-full ${ev.bg} border border-${ev.color.split('-')[1]}/50 flex items-center justify-center ${ev.color} shadow-[0_0_15px_currentColor] group-hover:scale-110 transition z-10">
-                            <i class="fa-solid ${ev.icon} text-xs"></i>
-                        </div>
-                        <div class="bg-black/30 p-4 rounded-2xl border border-white/5 group-hover:border-white/20 transition cursor-default">
-                            <div class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1 font-mono">${dateStr}</div>
-                            <div class="text-sm font-bold text-white leading-snug">${ev.title}</div>
-                            <div class="mt-2 text-[10px] text-gray-500 font-mono">${ev.desc}</div>
-                        </div>
-                    </div>
-                `;
-            });
         }
     </script>
 </body>
