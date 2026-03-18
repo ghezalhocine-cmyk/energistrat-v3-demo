@@ -331,11 +331,11 @@
                         const totalY = dataThermic.points.reduce((acc, p) => acc + p.y, 0);
                         if(totalY > 0) DJU_WEIGHTS = dataThermic.points.map(p => (p.y / totalY) * 100);
                     } else {
-                        // Fallback mathématique
+                        // Fallback mathématique (Le 15% Talon de notre IA)
                         const isGaz = CURRENT_SITE.energy_type === 'gaz';
                         const talonRatio = isGaz ? 0.15 : 0.30;
                         const chauffRatio = 1 - talonRatio;
-                        const djuProfil =[0.15, 0.13, 0.12, 0.08, 0.04, 0, 0, 0, 0.02, 0.08, 0.13, 0.15];
+                        const djuProfil =[0.15, 0.13, 0.12, 0.08, 0.04, 0, 0, 0, 0.02, 0.08, 0.13, 0.15]; 
                         DJU_WEIGHTS = djuProfil.map(p => ((p * chauffRatio) + (talonRatio/12)) * 100);
                     }
                 } catch(e) {}
@@ -349,10 +349,10 @@
                 const gainCumule = vol * 0.20 * price * 3; 
                 safeSetText('header-gains', "+" + formatCurrency(gainCumule));
 
-                // 4. Lancement des moteurs visuels
-                window.updateHoloChart();
-                updatePolarChart();
-                renderAutoChronology();
+                // 4. Lancement des moteurs visuels isolés (Anti-Crash)
+                try { window.updateHoloChart(); } catch(err) { console.error("Erreur HoloChart", err); }
+                try { window.updatePolarChart(); } catch(err) { console.error("Erreur PolarChart", err); }
+                try { window.renderAutoChronology(); } catch(err) { console.error("Erreur Chrono", err); }
 
             } catch(e) { App.toast("Erreur de récupération du site", "error"); }
         }
@@ -375,37 +375,33 @@
             window.updateHoloChart();
         }
 
-        // Le Cœur de l'IA : Reconstruction Mensuelle & Historique Financier
         function getSimulatedMonthlyData(year) {
             const baseVol = CURRENT_SITE.kpis?.volume_mwh || 100;
             const isGaz = CURRENT_SITE.energy_type === 'gaz';
             
-            // 1. LE COEFFICIENT VOLUMIQUE (Sobriété ou Dérive)
             let volCoef = 1.0; 
             if(year == 2023) volCoef = 1.15; 
             if(year == 2024) volCoef = 1.08;
-            if(year == 2025) volCoef = 1.00; // Actuel
-            if(year == 2026) volCoef = 0.90; // Sobriété N+1
-            if(year == 2027) volCoef = 0.82; // Décret Tertiaire N+2
+            if(year == 2025) volCoef = 1.00; 
+            if(year == 2026) volCoef = 0.90; 
+            if(year == 2027) volCoef = 0.82; 
             if(year == 2028) volCoef = 0.75;
             
             const targetVol = baseVol * volCoef;
             
-            // 2. LE MULTIPLICATEUR FINANCIER (L'Effet Ciseaux sur les prix de marché)
-            let pricePerMwh = 150; // Base par defaut
+            let pricePerMwh = 150; 
             if(CURRENT_SITE.pricing?.price_kwh) pricePerMwh = CURRENT_SITE.pricing.price_kwh * 1000;
             
             let priceCoef = 1.0;
-            if(year == 2023) priceCoef = isGaz ? 2.5 : 1.8; // Crise Ukrainienne
+            if(year == 2023) priceCoef = isGaz ? 2.5 : 1.8; 
             if(year == 2024) priceCoef = 1.3;
-            if(year == 2025) priceCoef = 1.0; // Contrat actuel
+            if(year == 2025) priceCoef = 1.0; 
             if(year == 2026) priceCoef = 0.9; 
             if(year == 2027) priceCoef = 0.85;
             if(year == 2028) priceCoef = 0.85;
 
             const targetPrice = pricePerMwh * priceCoef;
             
-            // 3. LA DISTRIBUTION SAISONNIÈRE (Les 12 mois)
             return DJU_WEIGHTS.map(weight => {
                 const monthVol = targetVol * (weight / 100);
                 return CHART_MODE === 'euro' ? (monthVol * targetPrice) : monthVol;
@@ -420,7 +416,6 @@
             const dataA = getSimulatedMonthlyData(yearA);
             const dataB = getSimulatedMonthlyData(yearB);
 
-            // Calcul du Delta Financier ou Volumique (Année A - Année B)
             const sumA = dataA.reduce((a,b) => a+b, 0);
             const sumB = dataB.reduce((a,b) => a+b, 0);
             const delta = sumA - sumB; 
@@ -428,24 +423,22 @@
             const overlay = document.getElementById('delta-overlay');
             const labelEl = document.getElementById('delta-label');
             const valEl = document.getElementById('delta-value');
-            overlay.classList.remove('hidden');
+            if(overlay) overlay.classList.remove('hidden');
             
             const unit = CHART_MODE === 'euro' ? '€' : 'MWh';
             const valFormatted = CHART_MODE === 'euro' ? formatCurrency(Math.abs(delta)) : Math.round(Math.abs(delta)) + " " + unit;
             
             if(delta >= 0) {
-                // ECONOMIE (B est plus petit que A)
-                labelEl.innerText = `ÉCONOMIES Y/Y (${yearA} vs ${yearB}) :`;
-                valEl.innerText = "+" + valFormatted;
-                valEl.className = "text-2xl font-black text-success font-mono";
+                if(labelEl) labelEl.innerText = `ÉCONOMIES Y/Y (${yearA} vs ${yearB}) :`;
+                if(valEl) { valEl.innerText = "+" + valFormatted; valEl.className = "text-2xl font-black text-success font-mono"; }
             } else {
-                // SURCOUT / DÉRIVE (B est plus grand que A) - L'Effet Ciseaux !
-                labelEl.innerText = `DÉRIVE Y/Y (${yearA} vs ${yearB}) :`;
-                valEl.innerText = "-" + valFormatted;
-                valEl.className = "text-2xl font-black text-alert font-mono animate-pulse";
+                if(labelEl) labelEl.innerText = `DÉRIVE Y/Y (${yearA} vs ${yearB}) :`;
+                if(valEl) { valEl.innerText = "-" + valFormatted; valEl.className = "text-2xl font-black text-alert font-mono animate-pulse"; }
             }
 
-            const ctx = document.getElementById('holoChart').getContext('2d');
+            const canvas = document.getElementById('holoChart');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
             if(holoChartInstance) holoChartInstance.destroy();
 
             const labels =["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"];
@@ -456,40 +449,17 @@
                     labels: labels,
                     datasets:[
                         {
-                            label: `Réf ${yearA}`,
-                            data: dataA,
-                            borderColor: '#64748B',
-                            borderWidth: 3,
-                            borderDash: [5, 5],
-                            pointRadius: 0,
-                            tension: 0.4
+                            label: `Réf ${yearA}`, data: dataA, borderColor: '#64748B', borderWidth: 3, borderDash: [5, 5], pointRadius: 0, tension: 0.4
                         },
                         {
-                            label: `Comparé ${yearB}`,
-                            data: dataB,
-                            borderColor: '#00E5FF',
-                            backgroundColor: 'rgba(0, 229, 255, 0.1)',
-                            borderWidth: 4,
-                            pointBackgroundColor: '#8B5CF6',
-                            pointBorderColor: '#fff',
-                            pointBorderWidth: 2,
-                            pointRadius: 4,
-                            pointHoverRadius: 6,
-                            fill: '-1', // Remplit l'espace entre la courbe B et la courbe A
-                            tension: 0.4
+                            label: `Comparé ${yearB}`, data: dataB, borderColor: '#00E5FF', backgroundColor: 'rgba(0, 229, 255, 0.1)', borderWidth: 4, pointBackgroundColor: '#8B5CF6', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6, fill: '-1', tension: 0.4
                         }
                     ]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { display: false }, 
-                        tooltip: { mode: 'index', intersect: false, titleFont: {family: 'JetBrains Mono'}, bodyFont: {family: 'JetBrains Mono'}, callbacks: { label: (c) => ` ${c.dataset.label} : ${CHART_MODE==='euro'?formatCurrency(c.raw):Math.round(c.raw)+' MWh'}` } } 
-                    },
-                    scales: {
-                        x: { grid: { display: false, drawBorder: false }, ticks: { color: '#94A3B8', font: {family: 'JetBrains Mono'} } },
-                        y: { grid: { color: 'rgba(139, 92, 246, 0.1)', drawBorder: false }, ticks: { color: '#94A3B8', font: {family: 'JetBrains Mono'} }, beginAtZero: true }
-                    },
+                    plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, titleFont: {family: 'JetBrains Mono'}, bodyFont: {family: 'JetBrains Mono'}, callbacks: { label: (c) => ` ${c.dataset.label} : ${CHART_MODE==='euro'?formatCurrency(c.raw):Math.round(c.raw)+' MWh'}` } } },
+                    scales: { x: { grid: { display: false, drawBorder: false }, ticks: { color: '#94A3B8', font: {family: 'JetBrains Mono'} } }, y: { grid: { color: 'rgba(139, 92, 246, 0.1)', drawBorder: false }, ticks: { color: '#94A3B8', font: {family: 'JetBrains Mono'} }, beginAtZero: true } },
                     interaction: { mode: 'nearest', axis: 'x', intersect: false }
                 }
             });
@@ -498,14 +468,16 @@
         // ==========================================
         // 4. AUTOPSIE SAISONNIÈRE (RADAR POLAR)
         // ==========================================
-        function updatePolarChart() {
-            const ctx = document.getElementById('polarChart').getContext('2d');
+        window.updatePolarChart = function() {
+            const canvas = document.getElementById('polarChart');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
             if(polarChartInstance) polarChartInstance.destroy();
 
             const colors = DJU_WEIGHTS.map((w, i) => {
-                if (i <= 2 || i >= 9) return 'rgba(239, 68, 68, 0.7)'; // Hiver
-                if (i >= 5 && i <= 7) return 'rgba(0, 229, 255, 0.7)'; // Été
-                return 'rgba(139, 92, 246, 0.5)'; // Mi-saison
+                if (i <= 2 || i >= 9) return 'rgba(239, 68, 68, 0.7)'; 
+                if (i >= 5 && i <= 7) return 'rgba(0, 229, 255, 0.7)'; 
+                return 'rgba(139, 92, 246, 0.5)'; 
             });
 
             polarChartInstance = new Chart(ctx, {
@@ -526,16 +498,19 @@
             const ratio = winterSum / (summerSum || 1);
             
             const msgEl = document.getElementById('polar-advice');
+            if(!msgEl) return;
+
             if(ratio > 2.5) msgEl.innerHTML = "<span class='text-alert font-bold'><i class='fa-solid fa-triangle-exclamation'></i> Bâtiment Thermo-Sensible.</span> Forte asymétrie hivernale. L'isolation de la toiture est prioritaire.";
             else if(ratio < 0.8) msgEl.innerHTML = "<span class='text-cyan font-bold'><i class='fa-solid fa-fan'></i> Pic Estival Détecté.</span> La climatisation (CVC) domine la signature énergétique du site.";
             else msgEl.innerHTML = "<span class='text-success font-bold'><i class='fa-solid fa-check'></i> Profil Constant (Ruban).</span> Le process industriel ou les serveurs lissent l'impact climatique.";
         }
 
         // ==========================================
-        // 5. DATA ROOM (AUTO-CHRONOLOGIE CORTEX FIXÉE)
+        // 5. DATA ROOM (AUTO-CHRONOLOGIE CORTEX)
         // ==========================================
-        function renderAutoChronology() {
+        window.renderAutoChronology = function() {
             const container = document.getElementById('events-container');
+            if(!container) return;
             container.innerHTML = '';
             const events =[];
             
@@ -547,13 +522,15 @@
                     const end = CURRENT_SITE.contract.end_date;
                     
                     if(start) {
-                        events.push({ date: new Date(start), type: 'contract', icon: 'fa-file-signature', color: 'text-gold', bg: 'bg-gold/20', title: `Début d'exécution du marché (${prov})`, desc: `Fixation des prix et conditions TURPE.` });
+                        const sDate = new Date(start);
+                        if(!isNaN(sDate)) events.push({ date: sDate, type: 'contract', icon: 'fa-file-signature', color: 'text-gold', bg: 'bg-gold/20', title: `Début d'exécution du marché (${prov})`, desc: `Fixation des prix et conditions TURPE.` });
                     } else {
                         events.push({ date: new Date(new Date().getFullYear(), 0, 1), type: 'contract', icon: 'fa-file-signature', color: 'text-gold', bg: 'bg-gold/20', title: `Marché ${prov} (En cours)`, desc: `Le contrat cadre est actif sur cet exercice.` });
                     }
                     
                     if(end) {
-                        events.push({ date: new Date(end), type: 'alert', icon: 'fa-triangle-exclamation', color: 'text-alert', bg: 'bg-alert/20', title: `Échéance Contractuelle : Risque Spot`, desc: `Renouvellement AAPC / Courtage prioritaire.` });
+                        const eDate = new Date(end);
+                        if(!isNaN(eDate)) events.push({ date: eDate, type: 'alert', icon: 'fa-triangle-exclamation', color: 'text-alert', bg: 'bg-alert/20', title: `Échéance Contractuelle : Risque Spot`, desc: `Renouvellement AAPC / Courtage prioritaire.` });
                     }
                 }
 
@@ -567,7 +544,7 @@
                 // DÉDUCTION 3 : Décret Tertiaire & Sobriété
                 events.push({ date: new Date(2030, 0, 1), type: 'law', icon: 'fa-scale-balanced', color: 'text-hologram', bg: 'bg-hologram/20', title: `Jalon Légal : Décret Tertiaire (-40%)`, desc: `Obligation réglementaire de réduction de la consommation finale.` });
 
-                // Tri chronologique Sécurisé (Même si une date est invalide)
+                // Tri chronologique Sécurisé
                 events.sort((a,b) => {
                     const timeA = a.date instanceof Date && !isNaN(a.date) ? a.date.getTime() : 0;
                     const timeB = b.date instanceof Date && !isNaN(b.date) ? b.date.getTime() : 0;
@@ -597,7 +574,7 @@
             } catch(e) {
                 container.innerHTML = '<div class="text-center text-alert font-mono text-xs mt-10">Erreur lors de la génération IA.</div>';
             }
-        }
+            }
     </script>
 </body>
 </html>
