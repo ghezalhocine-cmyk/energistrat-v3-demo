@@ -20,21 +20,17 @@
                         alert: '#EF4444', gold: '#F59E0B', lom: '#3B82F6', 
                         gas: '#F97316', citizen: '#D946EF'
                     }, 
-                    fontFamily: { sans:['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } 
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] } 
                 } 
             } 
         }
     </script>
     <style>
         body { background-color: #001529; color: #e2e8f0; overflow: hidden; font-family: 'Inter', sans-serif; }
-        
         .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 2rem; transition: all 0.3s ease; }
         .bento-card:hover { border-color: rgba(99, 102, 241, 0.4); transform: translateY(-2px); box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.2); }
-        
         .nav-item.active { background: rgba(99, 102, 241, 0.15); border-right: 4px solid #6366F1; color: white; }
-        
-        .view-section { display: none !important; } 
-        .view-section.active { display: block !important; animation: fadeIn 0.4s ease-out; }
+        .view-section { display: none !important; } .view-section.active { display: block !important; animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
         
         /* MEGA SELECTOR */
@@ -51,6 +47,8 @@
 
         .input-edit { background: rgba(0,0,0,0.4); border: 1px solid rgba(99, 102, 241, 0.3); color: white; padding: 12px 16px; border-radius: 1.5rem; width: 100%; font-family: 'JetBrains Mono'; outline: none; transition: border-color 0.3s; font-size: 0.875rem;}
         .input-edit:focus { border-color: #6366F1; box-shadow: 0 0 10px rgba(99, 102, 241, 0.3); }
+
+        .timeline-syndic::before { content: ''; position: absolute; left: 47px; top: 0; bottom: 0; width: 2px; background: rgba(0, 229, 255, 0.2); }
 
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.5); border-radius: 3px; }
     </style>
@@ -106,7 +104,7 @@
 
     <main class="flex-1 flex flex-col relative bg-transparent overflow-hidden">
         
-        <!-- HEADER (MEGA SELECTOR & METRICS) -->
+        <!-- HEADER -->
         <header class="h-24 border-b border-white/5 flex items-center justify-between px-10 bg-abysse/90 backdrop-blur z-20 flex-shrink-0 shadow-md">
             <div class="flex-shrink-0 w-1/4">
                 <h2 id="page-title" class="text-2xl font-black text-white italic tracking-tight drop-shadow-lg">Le Pacificateur d'AG</h2>
@@ -137,8 +135,7 @@
             <!-- ========================================== -->
             <div id="view-dashboard" class="view-section active max-w-[1600px] w-full mx-auto space-y-6">
                 
-                <!-- BANIÈRE CONTEXTUELLE (ELEC VS GAZ) -->
-                <div id="context-banner" class="bg-gradient-to-r from-card to-abysse border border-white/10 rounded-2xl p-4 flex items-center gap-4 shadow-lg">
+                <div id="context-banner" class="bg-gradient-to-r from-card to-abysse border border-white/10 rounded-2xl p-4 flex items-center gap-4 shadow-lg hidden">
                     <div id="context-icon" class="w-12 h-12 rounded-full flex items-center justify-center text-2xl text-white shadow-inner"></div>
                     <div>
                         <h3 class="text-white font-black uppercase tracking-widest text-sm" id="context-title">Analyse en cours...</h3>
@@ -147,8 +144,6 @@
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    
-                    <!-- CALCULATEUR DE TANTIÈMES (QUOTE-PART) -->
                     <div class="col-span-4 bento-card p-8 border-t-4 border-syndic flex flex-col shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
                         <h3 class="text-sm font-black text-white uppercase tracking-widest mb-6 flex items-center gap-3"><i class="fa-solid fa-calculator text-syndic text-xl"></i> Calculateur Quote-Part</h3>
                         <p class="text-xs text-gray-400 mb-8 leading-relaxed">Saisissez la surface de l'appartement du copropriétaire pour isoler sa part exacte sur la facture globale.</p>
@@ -156,7 +151,7 @@
                         <div class="flex items-center gap-4 mb-8 bg-black/40 p-4 rounded-2xl border border-white/5">
                             <input type="number" id="apt-surface" value="65" class="bg-abysse border border-syndic/30 rounded-xl p-3 text-white font-mono w-24 text-center text-xl focus:border-syndic outline-none transition shadow-inner" oninput="window.updateTantieme()">
                             <div>
-                                <span class="text-sm font-bold text-white block">m² (Surface du lot privé)</span>
+                                <span class="text-sm font-bold text-white block">m² (Surface lot privé)</span>
                                 <span class="text-[9px] text-gray-500 font-mono uppercase">Sur une surface totale de <span id="global-surface" class="text-syndic font-bold">-- m²</span></span>
                             </div>
                         </div>
@@ -168,20 +163,17 @@
                         </div>
                     </div>
 
-                    <!-- LE BOUCLIER TRVE -->
                     <div class="col-span-8 bento-card p-10 border-t-4 border-success shadow-2xl relative overflow-hidden flex flex-col justify-center">
                         <i class="fa-solid fa-shield-halved absolute -right-10 -bottom-10 text-9xl text-success opacity-5"></i>
                         <h3 class="text-sm font-black text-white uppercase tracking-widest mb-2 flex items-center gap-3 relative z-10"><i class="fa-solid fa-shield-check text-success text-xl"></i> Performance d'Achat vs État (TRVE)</h3>
-                        <p class="text-xs text-gray-400 mb-10 leading-relaxed font-mono relative z-10">Prouvez à l'Assemblée Générale que le contrat négocié par le Syndic protège la copropriété des hausses tarifaires gouvernementales.</p>
+                        <p class="text-xs text-gray-400 mb-10 leading-relaxed font-mono relative z-10">Prouvez à l'Assemblée Générale que le contrat négocié par le Syndic protège la copropriété des hausses tarifaires.</p>
                         
                         <div class="flex items-center justify-between gap-8 relative z-10">
                             <div class="flex-1 bg-black/40 p-6 rounded-3xl border border-white/5 text-center">
                                 <div class="text-[10px] text-gray-500 font-bold uppercase mb-2 flex items-center justify-center gap-2">Coût au Tarif Réglementé <span class="bg-gray-800 text-white px-2 py-0.5 rounded text-[8px]" id="badge-trve-price">-- €/MWh</span></div>
                                 <div class="text-4xl font-mono font-bold text-gray-400" id="trve-cost">-- €</div>
                             </div>
-                            
                             <div class="text-4xl text-gray-600"><i class="fa-solid fa-arrow-right"></i></div>
-                            
                             <div class="flex-1 bg-syndic/10 p-6 rounded-3xl border border-syndic/30 text-center shadow-inner">
                                 <div class="text-[10px] text-syndic font-bold uppercase mb-2">Budget Réel Négocié</div>
                                 <div class="text-4xl font-mono font-black text-white" id="real-cost">-- €</div>
@@ -196,21 +188,19 @@
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- DÉTECTEUR D'ANOMALIE (COMMUNS/NUIT) -->
                     <div class="bento-card p-8 border-t-4 border-cyan flex flex-col justify-center text-center shadow-lg bg-abysse/50">
                         <div class="w-16 h-16 rounded-full bg-cyan/20 text-cyan flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-lightbulb"></i></div>
                         <h3 class="text-sm font-black text-white uppercase tracking-widest mb-2" id="ghost-title">Anomalie des Communs</h3>
-                        <p class="text-[10px] text-gray-400 font-mono mb-4">Coût estimé des fuites (VMC, éclairage parking) en période nocturne.</p>
+                        <p class="text-[10px] text-gray-400 font-mono mb-4">Coût estimé des fuites (VMC, éclairage) en période nocturne.</p>
                         <div class="text-4xl font-black text-cyan font-mono drop-shadow-[0_0_15px_rgba(0,229,255,0.4)] mb-2" id="kpi-ghost">-- €</div>
                         <div class="text-[9px] text-cyan font-bold uppercase bg-cyan/10 px-4 py-2 rounded-xl border border-cyan/20 mx-auto inline-block">Charge récupérable sans gros travaux</div>
                     </div>
 
-                    <!-- LE DIAGNOSTIC THERMIQUE (CONDITIONNEL GAZ) -->
                     <div class="bento-card p-8 border-t-4 border-gas flex flex-col justify-center text-center shadow-lg bg-abysse/50" id="thermic-card">
                         <div class="w-16 h-16 rounded-full bg-gas/20 text-gas flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-temperature-arrow-down"></i></div>
                         <h3 class="text-sm font-black text-white uppercase tracking-widest mb-2">Audit Chauffage Collectif (DPE)</h3>
                         <p class="text-[10px] text-gray-400 font-mono mb-4">Corrélation de la consommation avec la rigueur climatique (DJU).</p>
-                        <div class="text-4xl font-black text-white font-mono drop-shadow-md mb-2" id="modal-dju"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+                        <div class="text-4xl font-black text-white font-mono drop-shadow-md mb-2" id="modal-dju"><i class="fa-solid fa-spinner fa-spin text-2xl text-gas"></i></div>
                         <div class="text-[9px] text-gray-400 font-bold uppercase bg-black/40 px-4 py-2 rounded-xl border border-white/10 mx-auto inline-block" id="modal-dju-msg">Analyse IA...</div>
                     </div>
                 </div>
@@ -219,14 +209,9 @@
             <!-- ========================================== -->
             <!-- VUE 2 : CONSOLE B2B2C (VOTES & LOI LOM)    -->
             <!-- ========================================== -->
-            <div id="view-b2b2c" class="view-section max-w-[1600px] w-full mx-auto">
-                <div class="text-center mb-10">
-                    <h2 class="text-4xl font-black text-white italic tracking-tight">CONSOLE <span class="text-citizen">RÉSIDENTS (B2B2C)</span></h2>
-                    <p class="text-sm text-gray-500 mt-2 font-mono">Pilotez les interactions avec les copropriétaires via l'application Citoyen.</p>
-                </div>
-
-                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                    <!-- LE VOTE DU CONSEIL SYNDICAL (QUORUM) -->
+            <div id="view-b2b2c" class="view-section max-w-[1600px] w-full mx-auto space-y-8">
+                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
+                    <!-- LE VOTE DU CONSEIL SYNDICAL -->
                     <div class="bento-card p-10 border-t-4 border-syndic shadow-lg">
                         <h3 class="text-sm font-black text-white mb-6 flex items-center justify-between uppercase tracking-widest">
                             <span><i class="fa-solid fa-check-to-slot text-syndic mr-2 text-xl"></i> Taux d'Approbation e-Vote</span>
@@ -247,15 +232,13 @@
                         </div>
                     </div>
 
-                    <!-- LE BOUCLIER LOI LOM (MOBILITÉ IRVE) -->
+                    <!-- LE BOUCLIER LOI LOM -->
                     <div class="bento-card p-10 border-t-4 border-lom bg-gradient-to-br from-card to-lom/10 relative overflow-hidden shadow-lg flex flex-col justify-between">
                         <div class="absolute right-0 bottom-0 opacity-10 text-9xl text-lom transform translate-x-4 translate-y-4"><i class="fa-solid fa-car-side"></i></div>
-                        
                         <div>
                             <h3 class="text-sm font-black text-white mb-2 relative z-10 uppercase tracking-widest"><i class="fa-solid fa-charging-station text-lom mr-2 text-xl"></i> Bouclier Légal (Loi LOM)</h3>
                             <p class="text-xs text-gray-400 mb-8 leading-relaxed font-mono relative z-10">Alternative au "Droit à la prise" : Le syndicat subventionne la recharge publique des véhicules électriques.</p>
                         </div>
-
                         <div class="flex justify-between items-center mb-8 relative z-10 bg-abysse/50 p-6 rounded-3xl border border-white/5">
                             <div>
                                 <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Décharges Signées (App)</div>
@@ -283,40 +266,30 @@
                     <button onclick="window.genererBilanAG()" class="relative z-10 bg-cyan text-abysse font-black px-10 py-5 rounded-[2rem] shadow-[0_0_30px_rgba(0,229,255,0.4)] hover:bg-white transition inline-flex items-center gap-3 text-sm uppercase tracking-widest">
                         <i class="fa-solid fa-print text-lg"></i> Imprimer le Dossier Officiel
                     </button>
-                    <p class="text-[10px] text-gray-500 mt-6 relative z-10 font-bold uppercase tracking-widest"><i class="fa-solid fa-shield-check text-success mr-1"></i> Tiers de Confiance : Algorithme certifié ENERGISTRAT.</p>
                 </div>
             </div>
 
             <!-- VUE 3 : HISTORIQUE CONTRATS (MACHINE À REMONTER LE TEMPS) -->
-            <div id="view-contrats" class="view-section max-w-[1400px] mx-auto">
-                <div class="text-center mb-8">
-                    <h2 class="text-4xl font-black text-white italic tracking-tight">TRAÇABILITÉ <span class="text-cyan">CONTRACTUELLE</span></h2>
-                    <p class="text-sm text-gray-400 mt-2 font-mono">Historique des marchés et régularisation des charges à N-2.</p>
-                </div>
-                <div class="bento-card p-0 overflow-hidden flex flex-col h-[600px] border-t-4 border-cyan shadow-2xl">
+            <div id="view-contrats" class="view-section max-w-[1400px] mx-auto space-y-6">
+                <div class="bento-card p-0 overflow-hidden flex flex-col h-[650px] border-t-4 border-cyan shadow-2xl">
                     <div class="p-8 border-b border-white/5 bg-card/50 flex justify-between items-center flex-shrink-0">
-                        <div>
-                            <h3 class="text-sm font-black text-white flex items-center gap-3 uppercase tracking-widest"><i class="fa-solid fa-clock-rotate-left text-cyan text-xl"></i> Historique (Journal des Événements)</h3>
-                        </div>
+                        <h3 class="text-sm font-black text-white flex items-center gap-3 uppercase tracking-widest"><i class="fa-solid fa-clock-rotate-left text-cyan text-xl"></i> Historique des Contrats</h3>
                         <button onclick="window.openEditModal()" class="bg-cyan/20 text-cyan border border-cyan/50 hover:bg-cyan hover:text-abysse px-6 py-3 rounded-2xl text-xs font-bold transition shadow-lg flex items-center gap-2 uppercase tracking-widest">
                             <i class="fa-solid fa-plus"></i> Ajouter un ancien contrat
                         </button>
                     </div>
                     <div class="flex-1 overflow-y-auto p-8 relative" id="contract-history-list">
-                        <!-- Ligne chronologique CSS dans la balise style ajoutée localement -->
-                        <style> .timeline-syndic::before { content: ''; position: absolute; left: 47px; top: 0; bottom: 0; width: 2px; background: rgba(0, 229, 255, 0.2); } </style>
                         <div class="timeline-syndic absolute inset-0 pointer-events-none"></div>
                         <div id="events-container" class="space-y-6 relative z-10">
-                            <!-- Injecté par JS (Basé sur technical.journal ou données en base) -->
-                            <div class="text-center text-gray-500 font-mono text-xs mt-10"><i class="fa-solid fa-spinner fa-spin text-cyan mr-2"></i> Extraction des archives...</div>
+                            <!-- Injecté par JS -->
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- VUE 4 : CHASSEUR CEE & DPE -->
-            <div id="view-cee" class="view-section max-w-[1400px] mx-auto">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div id="view-cee" class="view-section max-w-[1400px] mx-auto space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                     <div class="bento-card p-8 border-t-4 border-gold shadow-[0_20px_50px_rgba(245,158,11,0.2)] flex flex-col justify-center text-center bg-gradient-to-b from-card to-gold/5">
                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2"><i class="fa-solid fa-sack-dollar text-gold mr-1"></i> Aides & Subventions Détectées</span>
                         <div class="text-5xl font-black text-white font-mono drop-shadow-md" id="cee-total">-- €</div>
@@ -324,13 +297,11 @@
                     </div>
                     <div class="col-span-2 bento-card p-10 bg-abysse/80 border border-white/10 flex flex-col justify-center">
                         <h3 class="text-xl font-black text-white mb-3 uppercase tracking-widest"><i class="fa-solid fa-wand-magic-sparkles text-gold mr-3"></i> Intelligence Artificielle CORTEX</h3>
-                        <p class="text-sm text-gray-400 leading-relaxed font-mono">
-                            L'algorithme croise la surface de la copropriété, la zone climatique (DJU) et le vecteur énergétique pour identifier les opérations de rénovation finançables (Ex: BAT-EN-101) et préparer le Plan Pluriannuel de Travaux (PPT).
-                        </p>
+                        <p class="text-sm text-gray-400 leading-relaxed font-mono">L'algorithme croise la surface de la copropriété, la zone climatique (DJU) et le vecteur énergétique pour identifier les opérations de rénovation finançables (Ex: BAT-EN-101) et préparer le Plan Pluriannuel de Travaux (PPT).</p>
                     </div>
                 </div>
 
-                <div class="bento-card p-0 overflow-hidden flex flex-col h-[500px] shadow-2xl border border-white/10">
+                <div class="bento-card p-0 overflow-hidden flex flex-col h-[400px] shadow-2xl border border-white/10">
                     <div class="p-6 border-b border-white/5 bg-card/50">
                         <h3 class="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest"><i class="fa-solid fa-list-check text-gray-400"></i> Dossiers Éligibles (Parc)</h3>
                     </div>
@@ -351,8 +322,7 @@
             </div>
 
             <!-- VUE 5 : AUDIT FACTURES (OCR) -->
-            <div id="view-finance" class="view-section max-w-[1400px] mx-auto space-y-6">
-                <!-- MODULE D'UPLOAD FACTURE (FINANCIAL TWIN) -->
+            <div id="view-factures" class="view-section max-w-[1400px] mx-auto space-y-6">
                 <div class="bento-card p-10 border-dashed border-2 border-alert/40 bg-alert/5 text-center transition group hover:border-alert hover:bg-alert/10 shadow-[0_0_30px_rgba(239,68,68,0.15)]">
                     <label class="cursor-pointer block w-full">
                         <i class="fa-solid fa-cloud-arrow-up text-6xl text-gray-500 group-hover:text-alert mb-6 transition"></i>
@@ -368,7 +338,7 @@
         </div>
     </main>
 
-    <!-- MODAL EDITION / MACHINE A REMONTER LE TEMPS -->
+    <!-- MODAL EDITION (CONTRAT & TANTIÈMES) -->
     <div id="edit-modal" class="fixed inset-0 bg-black/90 z-[110] hidden flex items-center justify-center p-4 backdrop-blur-md transition-opacity">
         <div class="bento-card w-[800px] p-10 relative border-2 border-syndic/40 shadow-[0_0_60px_rgba(99,102,241,0.2)] max-h-[95vh] overflow-y-auto">
             <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-abysse border border-white/10 text-gray-400 hover:text-white hover:border-white transition flex items-center justify-center text-xl"><i class="fa-solid fa-xmark"></i></button>
@@ -403,7 +373,6 @@
                         </div>
                     </div>
 
-                    <!-- PRIX (Matrice Simplifiée) -->
                     <div class="col-span-2 border-t border-white/10 pt-4">
                         <label class="text-[10px] text-gold uppercase font-bold tracking-widest pl-2 mb-3 block"><i class="fa-solid fa-file-invoice-dollar text-gold mr-1"></i> Tarification Négociée</label>
                         <div class="grid grid-cols-2 gap-6 bg-black/40 p-4 rounded-2xl border border-white/5">
@@ -429,10 +398,10 @@
         </div>
     </div>
 
-    <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
-// ==========================================
+<script>
+        // ==========================================
         // 1. MOTEUR UTILITAIRE & ÉTAT GLOBAL
         // ==========================================
         const App = {
@@ -465,7 +434,10 @@
         const forceTenant = urlParams.get('force_tenant') || localStorage.getItem('cortex_god_mode_tenant');
 
         document.addEventListener('DOMContentLoaded', () => {
-            if(forceTenant && forceTenant !== 'ALL') document.getElementById('god-mode-indicator').classList.remove('hidden');
+            if(forceTenant && forceTenant !== 'ALL') {
+                const gm = document.getElementById('god-mode-indicator');
+                if(gm) gm.classList.remove('hidden');
+            }
             window.switchView('dashboard');
             initSyndic();
         });
@@ -491,7 +463,6 @@
             safeSetText('page-title', titles[viewId] || 'SYNDIC.OS');
             safeSetText('page-desc', descs[viewId] || '');
 
-            // Focus sur l'input du Tantième si on est sur le Dashboard
             if(viewId === 'dashboard') {
                 const input = document.getElementById('apt-surface');
                 if(input) setTimeout(() => input.focus(), 200);
@@ -511,12 +482,11 @@
                     FLEET_DATA = (forceTenant && forceTenant !== 'ALL') ? data.fleet.filter(s => s.tenant_id === forceTenant) : data.fleet;
                     GREEN_LEAGUE = data.green_league ||[];
 
-                    // Remplissage du Mega Selector
                     const selector = document.getElementById('site-selector');
-                    selector.innerHTML = '<option value="ALL">🏢 Vision Globale (Tout le Parc)</option>';
+                    selector.innerHTML = '<option value="ALL">🏢 Vision Globale (Tout le Cabinet)</option>';
                     
-                    // Groupement par Immeuble (Nom)
-                    const groupedNames =[...new Set(FLEET_DATA.map(s => s.name))];
+                    // Groupement des compteurs par Immeuble
+                    const groupedNames = [...new Set(FLEET_DATA.map(s => s.name))];
                     groupedNames.forEach(name => {
                         const opt = document.createElement('option');
                         opt.value = name; opt.innerText = `Copropriété : ${name}`;
@@ -536,7 +506,6 @@
                     MARKET_DATA.elec = data.current_prices.elec || 85.0;
                     MARKET_DATA.trve = data.current_prices.trve || 230.0;
                     safeSetText('badge-trve-price', `${MARKET_DATA.trve} €/MWh`);
-                    safeSetText('market-status-badge', `Marché Spot: ${MARKET_DATA.elec} €/MWh`);
                 }
             } catch(e) {}
         }
@@ -561,7 +530,8 @@
                 safeSetText('header-address', "Synthèse consolidée du cabinet de Syndic");
                 window.CURRENT_ID = null;
                 window.CURRENT_NAME = null;
-                document.getElementById('context-banner').classList.add('hidden');
+                const banner = document.getElementById('context-banner');
+                if(banner) banner.classList.add('hidden');
             } else {
                 window.CURRENT_NAME = val;
                 dataToAnalyze = FLEET_DATA.filter(s => s.name === val);
@@ -577,33 +547,28 @@
                 const descEl = document.getElementById('context-desc');
                 const thermicCard = document.getElementById('thermic-card');
                 
-                banner.classList.remove('hidden');
+                if(banner) banner.classList.remove('hidden');
                 
-                // Détection Réseau de Chaleur ou Gaz
+                // Détection de réseau de chaleur ou gaz (Dalkia, Engie, Idex, Coriance)
                 const hasHeat = dataToAnalyze.some(s => s.energy === 'gaz' || (s.provider && s.provider.toLowerCase().match(/dalkia|engie|idex|coriance/)));
                 
                 if (hasHeat) {
-                    banner.className = "bg-gradient-to-r from-card to-abysse border border-white/10 rounded-2xl p-4 flex items-center gap-4 shadow-[0_0_20px_rgba(249,115,22,0.15)] mb-6";
-                    iconEl.className = "w-12 h-12 rounded-full flex items-center justify-center text-2xl text-gas shadow-inner bg-gas/10 border border-gas/30";
-                    iconEl.innerHTML = '<i class="fa-solid fa-fire"></i>';
-                    titleEl.innerText = "CHAUFFAGE COLLECTIF";
-                    titleEl.className = "text-white font-black uppercase tracking-widest text-sm";
-                    descEl.innerText = "L'IA analyse la signature thermique (DPE) pour la rénovation.";
-                    thermicCard.style.display = "flex"; 
+                    if(banner) banner.className = "bg-gradient-to-r from-card to-abysse border border-white/10 rounded-2xl p-4 flex items-center gap-4 shadow-[0_0_20px_rgba(249,115,22,0.15)] mb-6";
+                    if(iconEl) { iconEl.className = "w-12 h-12 rounded-full flex items-center justify-center text-2xl text-gas shadow-inner bg-gas/10 border border-gas/30"; iconEl.innerHTML = '<i class="fa-solid fa-fire"></i>'; }
+                    if(titleEl) { titleEl.innerText = "CHAUFFAGE COLLECTIF"; titleEl.className = "text-white font-black uppercase tracking-widest text-sm"; }
+                    if(descEl) descEl.innerText = "L'IA analyse la signature thermique (DPE) pour les Appels de Fonds.";
+                    if(thermicCard) thermicCard.style.display = "flex"; 
                 } else {
-                    banner.className = "bg-gradient-to-r from-card to-abysse border border-white/10 rounded-2xl p-4 flex items-center gap-4 shadow-[0_0_20px_rgba(0,229,255,0.15)] mb-6";
-                    iconEl.className = "w-12 h-12 rounded-full flex items-center justify-center text-2xl text-cyan shadow-inner bg-cyan/10 border border-cyan/30";
-                    iconEl.innerHTML = '<i class="fa-solid fa-lightbulb"></i>';
-                    titleEl.innerText = "PARTIES COMMUNES (Électricité)";
-                    titleEl.className = "text-white font-black uppercase tracking-widest text-sm";
-                    descEl.innerText = "Ascenseurs, VMC, Parkings. Le DPE n'est pas applicable sur ce compteur.";
-                    thermicCard.style.display = "none"; 
+                    if(banner) banner.className = "bg-gradient-to-r from-card to-abysse border border-white/10 rounded-2xl p-4 flex items-center gap-4 shadow-[0_0_20px_rgba(0,229,255,0.15)] mb-6";
+                    if(iconEl) { iconEl.className = "w-12 h-12 rounded-full flex items-center justify-center text-2xl text-cyan shadow-inner bg-cyan/10 border border-cyan/30"; iconEl.innerHTML = '<i class="fa-solid fa-lightbulb"></i>'; }
+                    if(titleEl) { titleEl.innerText = "PARTIES COMMUNES (Électricité)"; titleEl.className = "text-white font-black uppercase tracking-widest text-sm"; }
+                    if(descEl) descEl.innerText = "Ascenseurs, VMC, Parkings. Le DPE n'est pas applicable sur ce compteur.";
+                    if(thermicCard) thermicCard.style.display = "none"; 
                 }
 
                 if(hasHeat && leadSite) fetchThermicSignature(leadSite.id);
             }
 
-            // Injections de données dans les modules
             runFinancials(dataToAnalyze);
             runCeeHunter(dataToAnalyze);
             runContractHistory(dataToAnalyze);
@@ -613,9 +578,6 @@
 
         function runFinancials(data) {
             let totalVol = 0; let totalBudget = 0; let totalGhost = 0; let totalSurface = 0;
-            const auditList = document.getElementById('audit-list'); 
-            if(auditList) auditList.innerHTML = '';
-
             const processedSurfaces = new Set();
 
             data.sort((a,b) => b.budget - a.budget).forEach(s => {
@@ -627,28 +589,17 @@
                     totalSurface += s.surface;
                     processedSurfaces.add(s.name);
                 }
-
-                if(auditList) {
-                    const pmp_kwh = vol > 0 ? budg / (vol * 1000) : 0;
-                    let auditStatus = `<span class="text-success font-bold"><i class="fa-solid fa-check mr-1"></i> Conforme SGE</span>`;
-                    let pmpColor = "text-white";
-
-                    if (vol > 0 && budg === 0) { auditStatus = `<span class="bg-gold/20 text-gold px-2 py-1 rounded font-bold border border-gold/50">Facture Manquante</span>`; pmpColor = "text-gray-500"; } 
-                    else if (pmp_kwh > 0.28) { auditStatus = `<span class="bg-alert/20 text-alert px-2 py-1 rounded font-bold border border-alert/50 animate-pulse">Prix Aberrant</span>`; pmpColor = "text-alert font-bold"; }
-
-                    auditList.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white"><i class="fa-solid ${s.energy==='gaz'?'fa-fire text-alert':'fa-bolt text-cyan'} mr-2"></i>${s.pdl || s.id}<div class="text-[9px] text-gray-500 font-normal">${s.name}</div></td><td class="px-6 py-4 text-right font-mono">${Math.round(vol)} MWh</td><td class="px-6 py-4 text-right font-mono">${Math.round(budg).toLocaleString()} €</td><td class="px-6 py-4 text-right font-mono ${pmpColor}">${pmp_kwh > 0 ? pmp_kwh.toFixed(3) + ' €' : '-'}</td><td class="px-6 py-4">${auditStatus}</td></tr>`;
-                }
             });
 
             safeSetText('kpi-total-vol', Math.round(totalVol).toLocaleString() + " MWh");
             safeSetText('kpi-total-budget', formatCurrency(totalBudget));
             
-            // Le Gaspillage devient "Anomalie des Communs"
+            // Anomalie des communs (Ghost savings)
             safeSetText('kpi-ghost', formatCurrency(totalGhost));
             const ghostTitle = document.getElementById('ghost-title');
-            if(ghostTitle) ghostTitle.innerText = (totalGhost > totalBudget * 0.2 && totalBudget > 0) ? "Alerte Surconsommation Nuit" : "Anomalie des Communs";
+            if(ghostTitle) ghostTitle.innerText = (totalGhost > totalBudget * 0.2 && totalBudget > 0) ? "Alerte Surconsommation" : "Anomalie des Communs";
             
-            // TRVE (Bouclier Tarifaire)
+            // TRVE (Bouclier Tarifaire pour l'AG)
             const trvePriceKwh = MARKET_DATA.trve / 1000;
             const budgetTrve = totalVol * trvePriceKwh * 1000;
             const savings = budgetTrve - totalBudget;
@@ -662,9 +613,9 @@
                 trveSavingsEl.className = savings>0 ? "text-6xl font-mono font-black text-success drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "text-6xl font-mono font-black text-alert drop-shadow-[0_0_15px_rgba(239,68,68,0.3)]";
             }
 
-            // Calculateur Tantièmes
+            // Tantièmes
             window.CURRENT_BUDGET = totalBudget;
-            window.CURRENT_SURFACE = totalSurface > 0 ? totalSurface : (IS_GLOBAL ? 50000 : 1500);
+            window.CURRENT_SURFACE = totalSurface > 0 ? totalSurface : (IS_GLOBAL ? 50000 : 1500); 
             safeSetText('global-surface', `${Math.round(window.CURRENT_SURFACE).toLocaleString()} m²`);
             
             runChartP1(totalBudget);
@@ -672,7 +623,7 @@
         }
 
         // ==========================================
-        // 4. CALCULATEUR TANTIÈMES (QUOTE-PART)
+        // 4. CALCULATEUR TANTIÈMES
         // ==========================================
         window.updateTantieme = function() { 
             const aptEl = document.getElementById('apt-surface');
@@ -692,7 +643,7 @@
         }
 
         // ==========================================
-        // 5. CEE HUNTER & DIAGNOSTIC
+        // 5. CEE HUNTER & DIAGNOSTIC DPE
         // ==========================================
         function runCeeHunter(data) {
             let totalCee = 0;
@@ -727,112 +678,97 @@
                     r2El.innerText = r2.toFixed(2) + " R²";
                     if(r2 > 0.8) { 
                         r2El.className = "text-4xl font-black text-alert font-mono drop-shadow-md mb-2 animate-pulse"; 
-                        msgEl.innerHTML = "<span class='text-alert'><i class='fa-solid fa-triangle-exclamation mr-1'></i> Passoire Thermique (Bâtiment F/G)</span>"; 
+                        msgEl.innerHTML = "<span class='text-alert'><i class='fa-solid fa-triangle-exclamation mr-1'></i> Passoire Thermique (Cat. F/G)</span>"; 
                     } else { 
                         r2El.className = "text-4xl font-black text-success font-mono drop-shadow-md mb-2"; 
-                        msgEl.innerHTML = "<span class='text-success'><i class='fa-solid fa-check mr-1'></i> Décorrélation Thermique (Isolation OK)</span>"; 
+                        msgEl.innerHTML = "<span class='text-success'><i class='fa-solid fa-check mr-1'></i> Bonne Isolation (Cat. C/D)</span>"; 
                     }
                 } else throw new Error();
-            } catch(e) { r2El.innerText = "N/A"; msgEl.innerText = "Historique Linky insuffisant pour l'IA."; r2El.className = "text-4xl font-black text-gray-600 font-mono drop-shadow-md mb-2"; }
+            } catch(e) { r2El.innerText = "N/A"; msgEl.innerText = "Historique insuffisant pour l'IA."; r2El.className = "text-4xl font-black text-gray-600 font-mono drop-shadow-md mb-2"; }
         }
 
         // ==========================================
-        // 6. HISTORIQUE CONTRATS (MACHINE À REMONTER LE TEMPS)
+        // 6. HISTORIQUE CONTRATS (LA MACHINE A REMONTER LE TEMPS)
         // ==========================================
         function runContractHistory(data) {
             const container = document.getElementById('events-container');
-            const list = document.getElementById('contract-list');
-            if(container) container.innerHTML = '';
-            if(list) list.innerHTML = '';
-
+            if(!container) return;
+            container.innerHTML = '';
             let events =[];
-            const today = new Date();
-            const warningLimit = new Date(); warningLimit.setMonth(today.getMonth() + 6); 
 
             data.forEach(s => {
-                if(s.budget === 0) return; 
-
-                // Table Radar
-                if(list) {
-                    const endDateStr = s.contract?.end_date || "2025-12-31"; 
-                    const endDate = new Date(endDateStr);
-                    const isAlert = endDate <= warningLimit;
-                    const formattedDate = !isNaN(endDate) ? endDate.toLocaleDateString('fr-FR') : "N/A";
-
-                    list.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5"><td class="px-6 py-4 font-bold text-white">${s.name}<br><span class="text-[9px] text-gray-500 font-mono">${s.pdl || s.id}</span></td><td class="px-6 py-4 text-gray-300">${s.provider || 'Inconnu'}</td><td class="px-6 py-4 font-mono ${isAlert ? 'text-alert font-bold' : 'text-gray-400'}">${formattedDate}</td><td class="px-6 py-4">${isAlert ? '<span class="bg-alert/20 text-alert px-2 py-1 rounded text-[10px] font-bold border border-alert/50 animate-pulse">Renouvellement Urgent</span>' : '<span class="bg-success/10 text-success px-2 py-1 rounded text-[10px] border border-success/30">Sécurisé</span>'}</td><td class="px-6 py-4 text-center"><button class="bg-white/10 hover:bg-cyan hover:text-abysse text-white px-3 py-1 rounded text-xs border border-white/10 transition font-bold uppercase tracking-widest text-[9px]">Générer DQE</button></td></tr>`;
-                }
-
-                // Journal Base 3D
+                // Si des événements ont été créés manuellement par le syndic
                 if(s.technical && s.technical.journal) {
                     events = events.concat(s.technical.journal);
                 }
                 
+                // Déduction du contrat actuel
                 if(s.contract) {
                     const start = s.contract.start_date;
                     const end = s.contract.end_date;
-                    const prov = s.contract.provider || "Fournisseur Historique";
+                    const prov = s.contract.provider || "Fournisseur Non Défini";
                     const price = s.pricing?.price_kwh ? (s.pricing.price_kwh * 1000).toFixed(2) + " €/MWh" : "Prix Inconnu";
                     
-                    if(start) events.push({ date: new Date(start), type: 'contract', title: `Nouveau marché négocié (${prov})`, desc: `Tarif sécurisé à ${price}. Fin d'engagement prévue le ${end || '?'}.` });
+                    if(start) events.push({ date: new Date(start), type: 'contract', title: `Nouveau marché d'énergie négocié (${prov})`, desc: `Tarif sécurisé à ${price} pour la copropriété ${s.name}.` });
                     if(end) {
                         const eDate = new Date(end);
-                        if(eDate < new Date() && !isNaN(eDate)) events.push({ date: eDate, type: 'alert', title: `Contrat Échu (${prov})`, desc: `La copropriété est exposée aux tarifs de renouvellement tacite.` });
+                        if(eDate < new Date()) events.push({ date: eDate, type: 'alert', title: `Contrat Échu (${prov})`, desc: `La copropriété est exposée aux tarifs de renouvellement tacite.` });
                     }
                 }
             });
 
-            if(container) {
-                events.sort((a,b) => {
-                    const timeA = a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime();
-                    const timeB = b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime();
-                    return timeB - timeA;
-                });
+            events.sort((a,b) => {
+                const timeA = a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime();
+                const timeB = b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime();
+                return timeB - timeA;
+            });
 
-                if(events.length === 0) {
-                    container.innerHTML = '<div class="text-center text-gray-500 font-mono text-xs mt-10">L\'IA n\'a détecté aucun historique de contrat.</div>';
-                    return;
-                }
-
-                events.forEach(ev => {
-                    const isAlert = ev.type === 'alert';
-                    const color = isAlert ? 'text-alert' : 'text-cyan';
-                    const bg = isAlert ? 'bg-alert/20' : 'bg-cyan/20';
-                    const icon = isAlert ? 'fa-triangle-exclamation' : 'fa-file-signature';
-                    const d = ev.date instanceof Date ? ev.date : new Date(ev.date);
-                    const dateStr = !isNaN(d) ? d.toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'}) : "Date Inconnue";
-
-                    container.innerHTML += `
-                        <div class="relative pl-12 pb-6 group">
-                            <div class="absolute left-[-16px] top-1 w-8 h-8 rounded-full ${bg} border border-${color.split('-')[1]}/50 flex items-center justify-center ${color} shadow-[0_0_15px_currentColor] z-10">
-                                <i class="fa-solid ${icon} text-xs"></i>
-                            </div>
-                            <div class="bg-black/30 p-6 rounded-2xl border border-white/5 hover:border-white/20 transition cursor-default">
-                                <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2 font-mono">${dateStr}</div>
-                                <div class="text-base font-bold text-white leading-snug mb-1">${ev.title}</div>
-                                <div class="text-xs text-gray-500 font-mono">${ev.desc}</div>
-                            </div>
-                        </div>
-                    `;
-                });
+            if(events.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 font-mono text-xs mt-10">L\'IA n\'a détecté aucun historique.</div>';
+                return;
             }
+
+            events.forEach(ev => {
+                const isAlert = ev.type === 'alert';
+                const color = isAlert ? 'text-alert' : 'text-cyan';
+                const bg = isAlert ? 'bg-alert/20' : 'bg-cyan/20';
+                const icon = isAlert ? 'fa-triangle-exclamation' : 'fa-file-signature';
+                const d = ev.date instanceof Date ? ev.date : new Date(ev.date);
+                const dateStr = !isNaN(d) ? d.toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'}) : "Date Inconnue";
+
+                container.innerHTML += `
+                    <div class="relative pl-12 pb-6 group">
+                        <div class="absolute left-[-16px] top-1 w-8 h-8 rounded-full ${bg} border border-${color.split('-')[1]}/50 flex items-center justify-center ${color} shadow-[0_0_15px_currentColor] z-10">
+                            <i class="fa-solid ${icon} text-xs"></i>
+                        </div>
+                        <div class="bg-black/30 p-6 rounded-2xl border border-white/5 hover:border-white/20 transition cursor-default">
+                            <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2 font-mono">${dateStr}</div>
+                            <div class="text-base font-bold text-white leading-snug mb-1">${ev.title}</div>
+                            <div class="text-xs text-gray-500 font-mono">${ev.desc}</div>
+                        </div>
+                    </div>
+                `;
+            });
         }
 
         // ==========================================
         // 7. CONSOLE B2B2C (VOTES & LOM)
         // ==========================================
         function runB2B2CConsole(data) {
-            const totalFoyers = IS_GLOBAL ? (FLEET_DATA.length * 15) : (data.length * 15);
-            const votesTotal = Math.floor(totalFoyers * 0.65); 
-            const votesPour = Math.floor(votesTotal * 0.88); 
+            // Approx: 1 bâtiment = ~25 logements pour une copropriété moyenne
+            const totalFoyers = IS_GLOBAL ? (FLEET_DATA.length * 25) : (data.length * 25);
+            const votesTotal = Math.floor(totalFoyers * 0.55); // 55% de participation app citoyen
+            const votesPour = Math.floor(votesTotal * 0.88); // 88% d'approbation
 
             safeSetText('vote-participation', `${votesTotal} / ${totalFoyers}`);
             safeSetText('vote-percent', `${Math.round((votesPour/votesTotal)*100)}%`);
             const vBar = document.getElementById('vote-bar');
             if(vBar) vBar.style.width = `${Math.round((votesPour/votesTotal)*100)}%`;
 
-            const lomSigned = Math.floor(totalFoyers * 0.15); 
+            // Loi LOM (Droit à la prise)
+            const lomSigned = Math.floor(totalFoyers * 0.12); // 12% de VE dans la copro
             safeSetText('lom-signed', lomSigned);
-            safeSetText('lom-budget', formatCurrency(Math.round(lomSigned * 120))); 
+            safeSetText('lom-budget', formatCurrency(Math.round(lomSigned * 120))); // 120€ d'abonnement Pass Mobilité par an
         }
 
         function runGamification() {
@@ -847,14 +783,14 @@
             rankingData.sort((a,b) => b.score - a.score).slice(0, 10).forEach((c, idx) => {
                 const medal = idx === 0 ? "🥇" : (idx === 1 ? "🥈" : (idx === 2 ? "🥉" : `<span class="text-gray-600 font-bold">${idx+1}</span>`));
                 list.innerHTML += `
-                    <div class="border rounded-xl p-4 flex justify-between items-center bg-white/5 border-white/5 hover:border-gaming/50 transition">
+                    <div class="border rounded-2xl p-4 flex justify-between items-center bg-white/5 border-white/5 hover:border-gaming/50 transition">
                         <div class="flex items-center gap-4">
                             <div class="w-8 text-center text-2xl drop-shadow-md">${medal}</div>
                             <div><div class="text-sm font-bold text-white">${c.name || 'Copropriété'}</div><div class="text-[10px] text-gray-500 mt-1 font-mono"><i class="fa-solid fa-location-dot mr-1"></i>${c.city || 'Ville'}</div></div>
                         </div>
                         <div class="text-right">
                             <div class="font-mono font-black text-gaming text-2xl">${c.score}<span class="text-[10px] font-normal">/100</span></div>
-                            <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest mt-1">Score Bâtiment</div>
+                            <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest mt-1">Score Immeuble</div>
                         </div>
                     </div>`;
             });
@@ -866,7 +802,7 @@
             setTimeout(() => { 
                 btn.className = "bg-white text-gaming font-black px-6 py-3 rounded-xl shadow-lg uppercase tracking-widest text-xs flex justify-center items-center"; 
                 btn.innerHTML = `<i class="fa-solid fa-check mr-2"></i> Notifications transmises aux résidents`; 
-                App.toast("Défi hivernal lancé sur l'application Citoyen !", "success"); 
+                App.toast("Défi lancé sur l'application Citoyen !", "success"); 
             }, 1500); 
         }
 
@@ -874,7 +810,7 @@
         // 8. ÉDITION DES CONTRATS & PDF AG
         // ==========================================
         window.openEditModal = function() {
-            if(IS_GLOBAL || !window.CURRENT_ID) return App.toast("Sélectionnez UN immeuble précis (Pas de modification globale possible).", "error");
+            if(IS_GLOBAL || !window.CURRENT_ID) return App.toast("Sélectionnez UN immeuble dans le menu déroulant en haut.", "error");
             
             const siteToEdit = FLEET_DATA.find(s => s.id === window.CURRENT_ID);
             if(!siteToEdit) return;
@@ -924,7 +860,7 @@
             siteToUpdate.technical.journal.push({
                 date: startD || new Date().toISOString(),
                 type: 'contract',
-                title: `Contrat Négocié (${prov || 'Inconnu'}) archivé`,
+                title: `Marché Négocié (${prov || 'Inconnu'}) archivé par le Syndic`,
                 desc: `Tarif fixé à ${pMwh} €/MWh pour une puissance de ${ps} kVA.`
             });
 
@@ -933,8 +869,8 @@
                 if((await res.json()).success) { 
                     document.getElementById('edit-modal').classList.add('hidden'); 
                     App.toast("Contrat archivé. Historique mis à jour !", "success"); 
-                    // Recharge la vue
-                    window.loadSite(window.CURRENT_ID); 
+                    // Recharge 
+                    initSyndic(); 
                 } else { App.toast("Erreur de sauvegarde", "error"); }
             } catch(e) { App.toast("Erreur réseau", "error"); }
         }
@@ -944,7 +880,7 @@
                 App.toast("Génération du rapport PDF de l'Assemblée Générale...", "info");
                 setTimeout(() => { window.open(`/api/tools/bilan_ag/${window.CURRENT_ID}`, '_blank'); }, 800);
             } else { 
-                App.toast("Recherchez UNE copropriété précise dans la barre du haut pour générer son Bilan AG.", "error"); 
+                App.toast("Sélectionnez UNE copropriété dans le menu déroulant en haut pour générer son Bilan AG.", "error"); 
             } 
         }
 
