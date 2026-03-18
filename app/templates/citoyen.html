@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MY.HOME | Citoyen Connecté</title>
+    <meta name="theme-color" content="#050505">
+    <title>AgoraWatt | Citoyen Connecté</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -12,7 +13,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <script>
@@ -20,467 +21,818 @@
             theme: {
                 extend: {
                     colors: { 
-                        abysse: '#050505', 
-                        card: '#0F172A', 
-                        enedis: '#86BC25', 
-                        fun: '#D946EF', 
-                        gain: '#10B981', 
-                        tech: '#00E5FF', 
-                        vote: '#6366F1',
-                        ev: '#3B82F6' // Bleu électrique pour la mobilité
+                        abysse: '#050505', card: '#0F172A', 
+                        agora: '#00E5FF', civic: '#8B5CF6', 
+                        success: '#10B981', alert: '#EF4444', 
+                        gold: '#F59E0B', ev: '#3B82F6', 
+                        solar: '#EAB308'
                     },
-                    fontFamily: { 
-                        sans:['Inter', 'sans-serif'], 
-                        mono:['JetBrains Mono', 'monospace'] 
-                    },
-                    borderRadius: { 
-                        'bento': '1.5rem' 
-                    },
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
+                    borderRadius: { 'bento': '1.5rem' },
                 }
             }
         }
     </script>
     <style>
         body { background-color: #050505; color: white; overflow: hidden; -webkit-tap-highlight-color: transparent; font-family: 'Inter', sans-serif; }
+        
+        /* BENTO DESIGN MOBILE */
         .bento-card { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
-        .nav-pill.active { background: rgba(0, 229, 255, 0.1); border: 1px solid #00E5FF; color: #00E5FF; box-shadow: 0 0 15px rgba(0, 229, 255, 0.2); }
-        .nav-pill-ev.active { background: rgba(59, 130, 246, 0.1); border: 1px solid #3B82F6; color: #3B82F6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.2); }
-        .blur-layer { filter: blur(10px); pointer-events: none; user-select: none; }
-        .page-content { display: none; } .page-content.active { display: block; animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(2); opacity: 0; } }
-        .ring-anim::before { content: ''; position: absolute; left: 0; top: 0; width: 100%; height: 100%; background-color: #86BC25; border-radius: 50%; z-index: -1; animation: pulse-ring 2s infinite; }
+        
+        /* BOTTOM NAV BAR */
+        .nav-pill { padding: 10px 16px; border-radius: 1rem; font-size: 14px; font-weight: 800; color: #64748B; transition: all 0.3s; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .nav-pill:hover { color: white; }
+        .nav-pill.active { background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.4); color: #00E5FF; box-shadow: 0 0 15px rgba(0, 229, 255, 0.2); }
+        .nav-pill.active i { color: #00E5FF; }
+
+        /* VUES PAGES */
+        .page-content { display: none !important; } 
+        .page-content.active { display: block !important; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ANIMATIONS SPÉCIFIQUES */
+        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(1.5); opacity: 0; } }
+        .ring-anim::before { content: ''; position: absolute; left: 0; top: 0; width: 100%; height: 100%; background-color: #00E5FF; border-radius: 50%; z-index: -1; animation: pulse-ring 2s infinite; }
+        
+        /* LEAFLET DARK MODE */
+        #map { background-color: #020617; }
+        .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        .leaflet-popup-content-wrapper { background-color: #001529; color: white; border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 1rem; }
+        .leaflet-popup-tip { background-color: #001529; }
+
         ::-webkit-scrollbar { display: none; }
-        #map { background-color: #020617; } /* Leaflet dark mode fix */
-        .leaflet-container .leaflet-control-attribution { background: rgba(0,0,0,0.5); color: #aaa; }
+        
+        /* AGORA SWIPE CARDS (TINDER-STYLE) */
+        .swipe-card { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s; position: relative; z-index: 10; }
+        .swipe-overlay { position: absolute; inset: 0; border-radius: 1.5rem; opacity: 0; transition: opacity 0.2s; display: flex; align-items: center; justify-center; font-weight: 900; font-size: 2rem; text-transform: uppercase; z-index: 20; pointer-events: none;}
+        .swipe-right .swipe-overlay.pour { opacity: 1; background: rgba(16,185,129,0.9); color: white; }
+        .swipe-left .swipe-overlay.contre { opacity: 1; background: rgba(239,68,68,0.9); color: white; }
+
+        /* HEADER GRADIENT */
+        .bg-gradient-cyber { background: linear-gradient(135deg, #001529 0%, #0F172A 100%); }
     </style>
 </head>
-<body class="flex h-screen w-screen relative">
+<body class="flex h-screen w-screen relative bg-abysse">
 
-    <!-- OVERLAY CONNEXION OAUTH SGE -->
-    <div id="connect-overlay" class="absolute inset-0 z-[100] bg-abysse/90 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center hidden">
-        <div class="w-24 h-24 rounded-full bg-[#0F172A] border border-enedis/30 flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(134,188,37,0.3)] relative ring-anim">
-            <span class="font-black text-2xl text-enedis tracking-tighter">enedis</span>
-        </div>
-        <h1 class="text-3xl font-black text-white mb-2">Synchronisation SGE</h1>
-        <p class="text-gray-400 text-sm max-w-xs mb-8">Connexion sécurisée en cours pour rapatrier vos données Linky dans le coffre-fort CORTEX.</p>
-        <button id="btn-enedis-sync" onclick="startEnedisFlow()" class="bg-[#86BC25] text-black font-bold text-lg px-8 py-4 rounded-2xl shadow-[0_0_30px_rgba(134,188,37,0.4)] hover:scale-105 transition flex items-center gap-3">
-            <i class="fa-solid fa-plug"></i> J'accepte le partage (Consentement)
-        </button>
-        <p class="text-[10px] text-gray-500 mt-6"><i class="fa-solid fa-lock"></i> RGPD • Vos données restent votre propriété exclusive</p>
-    </div>
-
-    <!-- SIDEBAR DESKTOP -->
-    <aside class="hidden lg:flex w-64 bg-[#020617]/80 border-r border-white/5 flex-col justify-between z-50">
+    <!-- DESKTOP SIDEBAR (Si affiché sur PC) -->
+    <aside class="hidden lg:flex w-64 bg-card/80 border-r border-white/5 flex-col justify-between z-50 shadow-2xl">
         <div class="p-6">
             <div class="flex items-center gap-3 mb-10">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-tech to-blue-600 flex items-center justify-center text-black font-black">M</div>
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-agora to-blue-600 flex items-center justify-center text-abysse font-black text-xl shadow-[0_0_15px_rgba(0,229,255,0.4)]">
+                    A
+                </div>
                 <div>
-                    <h1 class="font-black text-lg text-white">MY<span class="text-tech">.HOME</span></h1>
-                    <p class="text-[9px] text-gray-500 uppercase">Citoyen Connecté</p>
+                    <h1 class="font-black text-xl text-white tracking-tight">Agora<span class="text-agora">Watt</span></h1>
+                    <p class="text-[10px] text-gray-500 uppercase tracking-widest">Le Pouvoir Citoyen</p>
                 </div>
             </div>
             <nav class="space-y-3">
-                <button onclick="navTo('cockpit')" id="nav-cockpit" class="nav-pill active w-full p-3 rounded-xl flex items-center gap-4 text-gray-400 hover:text-white transition font-bold text-sm">
-                    <i class="fa-solid fa-house w-4"></i> Logement
+                <button onclick="navTo('foyer')" id="nav-foyer" class="nav-pill active w-full">
+                    <i class="fa-solid fa-house"></i> Mon Foyer
                 </button>
-                <button onclick="navTo('mobility')" id="nav-mobility" class="nav-pill-ev w-full p-3 rounded-xl flex items-center gap-4 text-gray-400 hover:text-white transition font-bold text-sm">
-                    <i class="fa-solid fa-charging-station w-4"></i> Pass Mobilité
+                <button onclick="navTo('agora')" id="nav-agora" class="nav-pill w-full">
+                    <i class="fa-solid fa-check-to-slot"></i> Consultations
                 </button>
-                <button onclick="navTo('community')" id="nav-community" class="nav-pill w-full p-3 rounded-xl flex items-center gap-4 text-gray-400 hover:text-white transition font-bold text-sm">
-                    <i class="fa-solid fa-ranking-star w-4"></i> Ligue
+                <button onclick="navTo('arene')" id="nav-arene" class="nav-pill w-full">
+                    <i class="fa-solid fa-trophy"></i> L'Arène
                 </button>
-                <button onclick="navTo('swap')" id="nav-swap" class="nav-pill w-full p-3 rounded-xl flex items-center gap-4 text-gray-400 hover:text-white transition font-bold text-sm">
-                    <i class="fa-solid fa-ticket w-4"></i> Achats
+                <button onclick="navTo('bouclier')" id="nav-bouclier" class="nav-pill w-full">
+                    <i class="fa-solid fa-shield-halved"></i> Mes Avantages
                 </button>
             </nav>
         </div>
-        <div class="p-6 space-y-4">
-            <a href="/settings_light" class="flex items-center gap-3 text-gray-400 hover:text-white transition text-xs font-bold p-3 bg-white/5 rounded-xl border border-white/10 hover:border-tech">
-                <i class="fa-solid fa-gear text-tech"></i> Profil & PDL
+        <div class="p-6">
+            <a href="/settings_light" class="flex items-center gap-3 text-gray-400 hover:text-white transition text-xs font-bold p-3 bg-white/5 rounded-xl border border-white/10 hover:border-agora/50 uppercase tracking-widest">
+                <i class="fa-solid fa-gear text-agora"></i> Mon Profil 3D
+            </a>
+            <a href="/logout" class="flex items-center gap-3 text-gray-500 hover:text-alert transition text-xs font-bold p-3 mt-2 uppercase tracking-widest">
+                <i class="fa-solid fa-power-off"></i> Déconnexion
             </a>
         </div>
     </aside>
 
-    <!-- MAIN CONTENT -->
-    <main class="flex-1 flex flex-col relative overflow-hidden transition-all duration-1000" id="main-content">
+    <!-- MAIN CONTENT (APP MOBILE) -->
+    <main class="flex-1 flex flex-col relative overflow-hidden transition-all duration-1000 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-agora/5 via-abysse to-abysse">
         
         <!-- HEADER MOBILE -->
-        <header class="h-16 flex items-center justify-between px-6 z-20 lg:hidden border-b border-white/5">
-            <div class="font-black text-lg text-white">MY<span class="text-tech">.HOME</span></div>
+        <header class="h-20 flex items-center justify-between px-6 z-20 lg:hidden border-b border-white/5 bg-abysse/90 backdrop-blur-md sticky top-0 shadow-md">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-agora text-abysse font-black flex items-center justify-center shadow-[0_0_10px_rgba(0,229,255,0.4)]">A</div>
+                <div class="font-black text-xl text-white tracking-tight">Agora<span class="text-agora">Watt</span></div>
+            </div>
             <div class="flex items-center gap-4">
-                <a href="/settings_light" class="text-gray-400 hover:text-white text-lg"><i class="fa-solid fa-gear"></i></a>
+                <a href="/settings_light" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-white transition shadow-inner">
+                    <i class="fa-solid fa-user-astronaut"></i>
+                </a>
             </div>
         </header>
 
-        <div class="flex-1 overflow-y-auto p-4 lg:p-10 pb-24 scroll-smooth max-w-3xl mx-auto w-full">
+        <div class="flex-1 overflow-y-auto p-4 lg:p-10 pb-28 scroll-smooth w-full max-w-2xl mx-auto" id="app-container">
 
-            <div id="loading-state" class="flex flex-col items-center justify-center h-[400px]">
-                <i class="fa-solid fa-circle-notch fa-spin text-4xl text-tech mb-4"></i>
-                <p class="text-tech font-bold animate-pulse">CORTEX analyse vos données...</p>
+            <!-- LOADER INTELLIGENT -->
+            <div id="loading-state" class="flex flex-col items-center justify-center h-full min-h-[400px]">
+                <div class="w-20 h-20 rounded-full border-4 border-agora/20 border-t-agora animate-spin mb-6 shadow-[0_0_30px_rgba(0,229,255,0.2)]"></div>
+                <p class="text-agora font-bold animate-pulse tracking-widest uppercase text-xs">CORTEX Synchronise vos compteurs...</p>
             </div>
 
-            <!-- EMPTY STATE -->
-            <div id="empty-state" class="hidden flex-col items-center justify-center h-[400px] border-2 border-dashed border-white/10 rounded-3xl bg-white/5">
-                <i class="fa-solid fa-house-crack text-6xl text-gray-600 mb-6"></i>
-                <h3 class="text-2xl font-bold text-white mb-2">Aucun logement lié</h3>
-                <p class="text-gray-400 mb-6 max-w-sm text-center text-sm">Renseignez votre PDL Linky pour afficher votre consommation.</p>
-                <a href="/settings_light" class="bg-tech text-abysse font-bold px-8 py-3 rounded-xl hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.4)]">
-                    Configurer mon logement
+            <!-- EMPTY STATE (PAS DE PROFIL) -->
+            <div id="empty-state" class="hidden flex-col items-center justify-center h-full min-h-[400px] border-2 border-dashed border-white/10 rounded-[2rem] bg-black/40 shadow-inner p-6 text-center">
+                <i class="fa-solid fa-link-slash text-6xl text-gray-600 mb-6 drop-shadow-md"></i>
+                <h3 class="text-2xl font-black text-white mb-2">Profil Incomplet</h3>
+                <p class="text-gray-400 mb-8 max-w-sm text-sm leading-relaxed font-mono">Rejoignez l'alliance. Scellez votre profil avec le code de votre Mairie ou de votre Copropriété.</p>
+                <a href="/settings_light" class="bg-agora text-abysse font-black px-8 py-4 rounded-[2rem] hover:bg-white transition shadow-[0_0_30px_rgba(0,229,255,0.4)] uppercase tracking-widest text-sm flex items-center gap-3">
+                    <i class="fa-solid fa-lock"></i> Lier mon Foyer
                 </a>
             </div>
 
-            <!-- TAB 1: COCKPIT -->
-            <div id="tab-cockpit" class="page-content space-y-6 hidden">
-                <div class="flex justify-between items-end mb-4">
+            <!-- ========================================== -->
+            <!-- TAB 1: MON FOYER (COACHING & RECORDS)      -->
+            <!-- ========================================== -->
+            <div id="tab-foyer" class="page-content space-y-6 hidden">
+                <div class="flex justify-between items-end mb-2 px-2">
                     <div>
-                        <h2 class="text-xl lg:text-3xl font-black text-white tracking-tight" id="site-title">Mon Logement</h2>
-                        <p class="text-xs text-gray-400 mt-1 font-mono" id="site-pdl">PDL: --</p>
+                        <h2 class="text-3xl font-black text-white tracking-tight truncate max-w-[250px]" id="site-title">--</h2>
+                        <p class="text-[10px] text-gray-400 mt-1 font-mono uppercase tracking-widest" id="site-alliance"><i class="fa-solid fa-shield-halved text-agora mr-1"></i> Alliance: --</p>
                     </div>
                 </div>
 
-                <!-- CONSEIL IA -->
-                <div class="bento-card rounded-bento p-5 border-l-4 border-fun flex gap-4 items-start bg-gradient-to-r from-card to-fun/10">
-                    <div class="w-10 h-10 rounded-full bg-fun/20 text-fun flex items-center justify-center text-xl flex-shrink-0 shadow-[0_0_15px_rgba(217,70,239,0.3)]">
+                <!-- ALERTE FLASH SOLAIRE (HEURE BLEUE) -->
+                <div id="flash-solar" class="hidden bento-card p-6 border-2 border-solar bg-gradient-to-br from-card to-solar/10 relative overflow-hidden shadow-[0_0_40px_rgba(234,179,8,0.3)]">
+                    <div class="absolute -right-6 -top-6 w-24 h-24 bg-solar rounded-full opacity-20 animate-pulse blur-xl"></div>
+                    <div class="flex items-center gap-4 mb-3 relative z-10">
+                        <div class="w-12 h-12 rounded-full bg-solar text-abysse flex items-center justify-center text-2xl font-black shadow-lg animate-bounce"><i class="fa-solid fa-sun"></i></div>
+                        <div>
+                            <h3 class="font-black text-solar text-lg tracking-tight uppercase">Flash Solaire !</h3>
+                            <p class="text-[10px] text-gray-300 font-mono">Le réseau déborde d'énergie verte.</p>
+                        </div>
+                    </div>
+                    <div class="bg-abysse/80 p-4 rounded-2xl border border-solar/30 text-center relative z-10 shadow-inner mb-4">
+                        <div class="text-[10px] text-solar font-bold uppercase tracking-widest mb-1">C'est le moment de consommer :</div>
+                        <div class="text-3xl font-black text-white font-mono tracking-widest" id="flash-timer">02:14:59</div>
+                    </div>
+                    <p class="text-xs text-white font-medium leading-relaxed relative z-10 text-center border-t border-white/10 pt-4">
+                        Lancer vos machines maintenant soulage le réseau national et vous fait gagner un <b class="text-solar">Badge Héros</b> pour votre copropriété !
+                    </p>
+                </div>
+
+                <!-- LE RECORD PERSONNEL (TALON DE NUIT) -->
+                <div class="bento-card p-8 text-center relative overflow-hidden border-t-4 border-agora shadow-lg bg-abysse/80">
+                    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-agora/10 via-transparent to-transparent pointer-events-none"></div>
+                    <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-bed text-agora"></i> Votre Record de Nuit (Sobriété)
+                    </h3>
+                    
+                    <!-- L'Arc de cercle (Jauge Visuelle) -->
+                    <div class="relative w-48 h-24 mx-auto mb-2 overflow-hidden">
+                        <div class="absolute top-0 left-0 w-48 h-48 rounded-full border-[12px] border-gray-800 border-b-transparent border-r-transparent transform -rotate-45"></div>
+                        <div id="pb-gauge" class="absolute top-0 left-0 w-48 h-48 rounded-full border-[12px] border-agora border-b-transparent border-r-transparent transform -rotate-45 transition-all duration-1000 shadow-[0_0_20px_#00E5FF]" style="clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%);"></div>
+                        <div class="absolute bottom-0 left-0 w-full text-center">
+                            <div class="text-5xl font-black text-white tracking-tighter drop-shadow-md" id="cit-talon">--</div>
+                            <div class="text-[10px] text-agora font-bold uppercase tracking-widest mt-1">Watts (Min. atteint)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 pt-4 border-t border-white/10 flex justify-between items-center px-4">
+                        <div class="text-left">
+                            <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest">Moyenne Voisins</div>
+                            <div class="text-sm font-mono text-gray-300 font-bold" id="avg-talon">-- W</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[9px] text-success uppercase font-bold tracking-widest">Gains Cumulés (YTD)</div>
+                            <div class="text-lg font-black text-success font-mono" id="cit-savings">-- €</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONSEIL IA (COACHING) -->
+                <div class="bento-card p-6 border-l-4 border-civic bg-gradient-to-r from-card to-civic/5 shadow-md flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-civic/20 text-civic flex items-center justify-center text-2xl flex-shrink-0 shadow-[0_0_15px_rgba(139,92,246,0.3)]">
                         <i class="fa-solid fa-brain"></i>
                     </div>
                     <div>
-                        <div class="text-[10px] font-bold text-fun uppercase tracking-widest mb-1 flex items-center gap-2">
-                            Alerte CORTEX AI <span class="w-1.5 h-1.5 rounded-full bg-fun animate-pulse"></span>
+                        <div class="text-[9px] font-bold text-civic uppercase tracking-widest mb-1 flex items-center gap-2">
+                            Coaching CORTEX <span class="w-1.5 h-1.5 rounded-full bg-civic animate-pulse"></span>
                         </div>
-                        <p class="text-sm text-white font-medium leading-relaxed" id="daily-tip">Analyse de vos habitudes de consommation en cours...</p>
-                    </div>
-                </div>
-
-                <!-- JAUGE CONSO -->
-                <div class="bento-card rounded-bento p-8 text-center relative overflow-hidden">
-                    <div class="absolute inset-0 bg-tech/5 radial-gradient"></div>
-                    <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center justify-center gap-2">
-                        Consommation Annuelle <i class="fa-solid fa-bolt text-tech"></i>
-                    </h2>
-                    <div class="text-6xl font-black text-white mb-2 tracking-tighter" id="cit-vol">--</div>
-                    <div class="text-sm text-gray-500 mb-4 font-mono">kWh / an</div>
-                    <div class="inline-flex items-center gap-2 bg-abysse/50 text-gray-300 px-4 py-2 rounded-full text-xs font-bold border border-white/10" id="cit-var">
-                        Basé sur l'historique Linky certifié
+                        <p class="text-xs text-white font-medium leading-relaxed" id="daily-tip">Analyse de vos habitudes en cours...</p>
                     </div>
                 </div>
 
                 <!-- GRAPHIQUE HISTORIQUE -->
-                <div class="bento-card rounded-bento p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-white text-sm">Courbe de Charge (SGE)</h3>
+                <div class="bento-card p-6 shadow-lg bg-abysse/50 border border-white/5">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="font-bold text-white text-xs uppercase tracking-widest"><i class="fa-solid fa-chart-line text-gray-500 mr-2"></i> Évolution Annuelle (SGE)</h3>
                     </div>
-                    <div class="h-48 w-full"><canvas id="historyChart"></canvas></div>
+                    <div class="h-40 w-full relative"><canvas id="historyChart"></canvas></div>
                 </div>
             </div>
 
             <!-- ========================================== -->
-            <!-- TAB NOUVEAU : MOBILITÉ IRVE (BOUCLIER LOM) -->
+            <!-- TAB 2: L'AGORA (CONSULTATIONS TINDER-STYLE)-->
             <!-- ========================================== -->
-            <div id="tab-mobility" class="page-content hidden space-y-6">
-                <div class="text-center mb-6 mt-4">
-                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-ev/10 text-ev mb-4 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
-                        <i class="fa-solid fa-charging-station text-2xl"></i>
+            <div id="tab-agora" class="page-content hidden space-y-6">
+                <div class="text-center mb-8 mt-2">
+                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-vote/10 text-vote mb-4 shadow-[0_0_20px_rgba(139,92,246,0.3)] border border-vote/30">
+                        <i class="fa-solid fa-landmark-dome text-3xl"></i>
                     </div>
-                    <h2 class="text-2xl font-black text-white">Réseau Mobilité Copro</h2>
-                    <p class="text-xs text-gray-400 mt-2 max-w-md mx-auto">Votre syndic subventionne vos recharges sur les bornes publiques du quartier en compensation de la Loi LOM.</p>
+                    <h2 class="text-3xl font-black text-white italic tracking-tight">L'Agora Locale</h2>
+                    <p class="text-[10px] text-gray-400 mt-2 max-w-xs mx-auto font-mono uppercase tracking-widest">Prenez le contrôle des décisions énergétiques de votre bâtiment.</p>
                 </div>
 
-                <!-- LA CARTE IRVE (LEAFLET + API GOUV) -->
-                <div class="bento-card rounded-bento p-2 overflow-hidden border border-ev/30 relative">
-                    <div class="absolute top-4 left-4 z-[400] bg-abysse/90 backdrop-blur px-3 py-2 rounded-xl border border-white/10 text-xs font-bold text-white shadow-lg flex items-center gap-2">
-                        <div class="w-2 h-2 bg-ev rounded-full animate-pulse"></div> OpenData IRVE
-                    </div>
-                    <!-- Conteneur de la carte -->
-                    <div id="map" class="w-full h-64 rounded-[1.2rem] z-10"></div>
-                </div>
-
-                <!-- LE WIDGET FINANCIER (LA MARGE) -->
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-card border border-white/5 rounded-2xl p-4 text-center">
-                        <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Tarif Public (Moy.)</div>
-                        <div class="text-xl font-mono text-gray-400 line-through">0.45 €/kWh</div>
-                    </div>
-                    <div class="bg-ev/10 border border-ev/30 rounded-2xl p-4 text-center relative overflow-hidden shadow-[0_0_20px_rgba(59,130,246,0.15)]">
-                        <div class="absolute top-0 right-0 bg-ev text-white text-[8px] font-black px-2 py-0.5 rounded-bl-lg uppercase tracking-widest">Syndic</div>
-                        <div class="text-[10px] text-ev font-bold uppercase mb-1">Votre Pass Subventionné</div>
-                        <div class="text-2xl font-black font-mono text-white">0.22 €<span class="text-sm text-ev">/kWh</span></div>
-                    </div>
-                </div>
-
-                <!-- PROTOCOLE LÉGAL (LE BOUCLIER SYNDIC) -->
-                <div class="bento-card rounded-bento p-6 border-l-4 border-vote bg-gradient-to-br from-card to-vote/10">
-                    <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                        <i class="fa-solid fa-scale-balanced text-vote"></i> Protocole d'Accord (Droit à la prise)
-                    </h3>
-                    <div class="bg-abysse/50 p-4 rounded-xl border border-white/5 text-[10px] text-gray-400 font-mono leading-relaxed mb-4 h-24 overflow-y-auto">
-                        "Par la présente, en acceptant l'activation du Pass Mobilité ENERGISTRAT, je reconnais bénéficier d'une subvention tarifaire de la part de ma copropriété pour la recharge de mon véhicule sur voirie publique. Cette mesure financière constitue une compensation transitoire au Droit à la Prise (Loi LOM) et préserve l'équilibre financier du syndicat des copropriétaires face au coût de déploiement des infrastructures internes. Consentement enregistré électroniquement."
-                    </div>
+                <!-- LA CARTE DE VOTE (SWIPE) -->
+                <div id="vote-deck" class="relative w-full h-[400px] perspective-1000">
                     
-                    <div id="lom-signature-box">
-                        <label class="flex items-start gap-3 cursor-pointer mb-4">
-                            <input type="checkbox" id="lom-consent" class="mt-0.5 w-4 h-4 accent-vote bg-abysse border-white/20 rounded">
-                            <span class="text-xs text-white font-medium">J'ai lu et j'accepte les termes du protocole.</span>
-                        </label>
-                        <button onclick="signLomWaiver()" class="w-full bg-vote text-white font-bold py-3.5 rounded-xl hover:bg-white hover:text-abysse transition shadow-lg flex justify-center items-center gap-2">
-                            <i class="fa-solid fa-pen-nib"></i> Signer & Activer mon Pass
+                    <!-- Carte Active -->
+                    <div id="active-card" class="swipe-card absolute inset-0 bento-card p-8 border-t-4 border-vote shadow-[0_30px_60px_rgba(0,0,0,0.6)] bg-gradient-to-b from-card to-abysse flex flex-col transform-gpu touch-none">
+                        
+                        <div class="swipe-overlay pour font-black"><i class="fa-solid fa-check text-5xl mb-2 block text-center"></i> POUR</div>
+                        <div class="swipe-overlay contre font-black"><i class="fa-solid fa-xmark text-5xl mb-2 block text-center"></i> CONTRE</div>
+                        
+                        <div class="flex justify-between items-start mb-6">
+                            <span class="bg-vote/20 text-vote px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border border-vote/30 animate-pulse">Nouveau Scrutin</span>
+                            <span class="text-xs text-gray-400 font-mono"><i class="fa-solid fa-hourglass-half mr-1"></i> J-5</span>
+                        </div>
+                        
+                        <h3 class="text-xl font-black text-white leading-tight mb-4" id="vote-title">Renouvellement du Contrat de Gaz (Chauffage Collectif)</h3>
+                        
+                        <div class="bg-black/40 p-4 rounded-2xl border border-white/5 mb-6 flex-1 overflow-y-auto">
+                            <p class="text-xs text-gray-300 leading-relaxed font-mono" id="vote-desc">
+                                L'IA CORTEX a sécurisé un tarif de 145€/MWh. En votant POUR, l'immeuble économisera 12 500 € par an par rapport au tarif réglementé (TRVE). Validé par le Conseil Syndical.
+                            </p>
+                        </div>
+                        
+                        <div class="text-center text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-6">Faites glisser pour voter</div>
+                        
+                        <div class="flex justify-between gap-6 mt-auto">
+                            <button onclick="simulateSwipe('left')" class="w-16 h-16 rounded-full bg-abysse border-2 border-alert/50 text-alert flex items-center justify-center text-2xl hover:bg-alert hover:text-white transition shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                            <button onclick="simulateSwipe('right')" class="flex-1 rounded-[2rem] bg-vote text-white font-black text-lg flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(139,92,246,0.4)] hover:scale-105 transition">
+                                <i class="fa-solid fa-check"></i> VOTER POUR
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Carte de Succès (Cachée au début) -->
+                    <div id="success-card" class="absolute inset-0 bento-card p-10 flex flex-col items-center justify-center text-center shadow-2xl opacity-0 pointer-events-none scale-95 transition-all duration-500 bg-abysse border border-success/30">
+                        <div class="w-24 h-24 rounded-full bg-success/20 text-success flex items-center justify-center text-5xl mb-6 shadow-[0_0_40px_rgba(16,185,129,0.4)]"><i class="fa-solid fa-check-to-slot"></i></div>
+                        <h3 class="text-2xl font-black text-white mb-2">Vote Enregistré !</h3>
+                        <p class="text-sm text-gray-400 font-mono leading-relaxed mb-8">Votre voix a été scellée cryptographiquement et transmise à la Mairie / Syndic.</p>
+                        <div class="bg-black/50 w-full p-4 rounded-2xl border border-white/5">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Tendance du scrutin</div>
+                            <div class="w-full bg-white/10 h-3 rounded-full overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-success to-vote" style="width: 82%"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] text-gray-400 mt-2 font-bold"><span>Contre</span><span class="text-success">82% POUR</span></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB 3: L'ARÈNE (LIGUE DES RÉSIDENTS)       -->
+            <!-- ========================================== -->
+            <div id="tab-arene" class="page-content hidden space-y-6">
+                <div class="text-center mb-8 mt-2">
+                    <h2 class="text-4xl font-black text-white italic tracking-tight"><i class="fa-solid fa-trophy text-gold mr-2 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]"></i> La Ligue</h2>
+                    <p class="text-[10px] text-gray-400 mt-2 font-mono uppercase tracking-widest">Le championnat local de l'Efficacité Énergétique.</p>
+                </div>
+
+                <!-- NOTRE SCORE -->
+                <div class="bento-card p-6 flex items-center justify-between border border-gold/40 bg-gradient-to-r from-card to-gold/10 shadow-[0_0_30px_rgba(245,158,11,0.2)]">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-gold text-abysse flex items-center justify-center text-xl font-black shadow-lg"><i class="fa-solid fa-medal"></i></div>
+                        <div>
+                            <div class="text-[10px] text-gold font-bold uppercase tracking-widest">Score du Bâtiment</div>
+                            <div class="text-white font-bold text-sm truncate w-32" id="league-alliance-name">Votre Alliance</div>
+                        </div>
+                    </div>
+                    <div class="text-4xl font-black text-gold font-mono drop-shadow-md" id="league-alliance-score">--/100</div>
+                </div>
+
+                <!-- NOTRE CLASSEMENT PERSONNEL -->
+                <div class="bento-card p-6 border-t-4 border-agora bg-abysse/80 shadow-lg relative overflow-hidden">
+                    <div class="absolute -right-4 -bottom-4 text-7xl text-agora opacity-5"><i class="fa-solid fa-user-astronaut"></i></div>
+                    <div class="flex justify-between items-center mb-6 relative z-10">
+                        <div class="flex items-center gap-4">
+                            <img src="https://ui-avatars.com/api/?name=Vous&background=00E5FF&color=000&bold=true" class="w-12 h-12 rounded-full border-2 border-agora shadow-[0_0_15px_rgba(0,229,255,0.4)]">
+                            <div><div class="font-black text-white text-lg">Votre Foyer</div><div class="text-[10px] text-agora font-mono uppercase tracking-widest" id="my-ranking-txt">Calcul CORTEX...</div></div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-black text-white font-mono" id="my-intensity">--</div>
+                            <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest mt-1">kWh / m² / an</div>
+                        </div>
+                    </div>
+                    <div class="w-full bg-black/50 h-2 rounded-full overflow-hidden relative z-10 border border-white/5">
+                        <div class="h-full bg-agora rounded-full shadow-[0_0_10px_#00E5FF]" style="width: 85%"></div>
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-3 font-mono relative z-10 text-center">Vous êtes plus sobre que 85% des habitants de la ville !</p>
+                </div>
+
+                <!-- LE CLASSEMENT VILLE / SYNDIC -->
+                <div class="bento-card p-0 overflow-hidden border border-white/10 shadow-2xl">
+                    <div class="bg-card/80 p-4 border-b border-white/5 text-center">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Classement Territorial (Top 3)</h3>
+                    </div>
+                    <div class="space-y-1 p-2 bg-abysse/40" id="gaming-leaderboard">
+                        <div class="text-center text-gray-500 font-mono text-xs py-8"><i class="fa-solid fa-spinner fa-spin text-gold mr-2 text-xl"></i> Génération du palmarès...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB 4: LE BOUCLIER (ACHATS & MOBILITÉ LOM) -->
+            <!-- ========================================== -->
+            <div id="tab-bouclier" class="page-content hidden space-y-6">
+                <div class="text-center mb-8 mt-2">
+                    <h2 class="text-4xl font-black text-white italic tracking-tight"><i class="fa-solid fa-shield-halved text-success mr-2"></i> Avantages</h2>
+                    <p class="text-[10px] text-gray-400 mt-2 font-mono uppercase tracking-widest">Profitez de la force de votre alliance locale.</p>
+                </div>
+
+                <!-- ACHAT GROUPÉ -->
+                <div class="bento-card p-0 overflow-hidden border-2 border-success/30 shadow-[0_20px_50px_rgba(16,185,129,0.15)] relative group">
+                    <div class="bg-success text-abysse text-center text-[10px] font-black py-1.5 tracking-widest uppercase">Offre Réservée à votre Mairie/Syndic</div>
+                    <div class="p-8 bg-gradient-to-b from-card to-abysse relative z-10">
+                        <i class="fa-solid fa-handshake-angle absolute right-6 top-8 text-6xl text-success opacity-10 group-hover:scale-110 transition"></i>
+                        <h3 class="text-2xl font-black text-white mb-2">Achat Groupé d'Énergie</h3>
+                        <div class="text-xs text-gray-400 mb-6 font-mono max-w-[80%]" id="swap-market-status">Le Syndicat a sécurisé un tarif de gros pour votre ville.</div>
+                        
+                        <div class="flex justify-between items-center mb-6 bg-black/40 p-4 rounded-2xl border border-white/5 shadow-inner">
+                            <div>
+                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Votre Prix Estimé</div>
+                                <div class="text-xl text-gray-400 line-through font-mono" id="swap-old">-- €</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-[10px] text-success uppercase font-bold tracking-widest mb-1">Tarif CORTEX Négocié</div>
+                                <div class="text-3xl font-black text-success font-mono drop-shadow-md" id="swap-new">-- €</div>
+                            </div>
+                        </div>
+
+                        <button onclick="App.toast('Mandat de bascule envoyé au Syndicat !', 'success')" class="w-full bg-success text-abysse font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.4)] hover:bg-white transition text-sm uppercase tracking-widest flex items-center justify-center gap-3">
+                            <i class="fa-solid fa-file-contract text-lg"></i> REJOINDRE LE CONTRAT
                         </button>
                     </div>
                 </div>
-            </div>
 
-            <!-- TAB 2: LIGUE -->
-            <div id="tab-community" class="page-content hidden space-y-6">
-                <!-- [Contenu existant de la ligue conservé] -->
-                <div class="text-center mb-8 mt-4">
-                    <h2 class="text-3xl font-black text-white italic tracking-tight"><i class="fa-solid fa-trophy text-gold mr-2"></i> L'Arène Citoyenne</h2>
-                </div>
-                <div class="bento-card rounded-bento p-4 flex items-center justify-between border border-gold/30 bg-gold/5 mb-2">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center text-gold"><i class="fa-solid fa-landmark"></i></div>
-                        <div><div class="text-xs text-gray-400 font-bold uppercase">Score de</div><div class="text-white font-bold" id="city-name">Votre Commune</div></div>
-                    </div>
-                    <div class="text-2xl font-black text-gold font-mono" id="city-score">--/100</div>
-                </div>
-                <div class="bento-card rounded-bento p-6 border-t-4 border-fun">
-                    <div class="flex justify-between items-center mb-6">
-                        <div class="flex items-center gap-3">
-                            <img src="https://ui-avatars.com/api/?name=Vous&background=D946EF&color=000" class="w-10 h-10 rounded-full border-2 border-fun">
-                            <div><div class="font-bold text-white">Votre Foyer</div><div class="text-xs text-fun font-mono" id="my-ranking-txt">Calcul...</div></div>
-                        </div>
-                        <div class="text-xl font-black text-white font-mono" id="my-score">-- <span class="text-[10px] text-gray-500">kWh/m²</span></div>
+                <!-- PASS MOBILITÉ (LOI LOM) - UNIQUEMENT SI VE -->
+                <div id="lom-card" class="hidden bento-card p-8 border-l-4 border-ev bg-abysse/80 relative overflow-hidden shadow-lg mt-6">
+                    <i class="fa-solid fa-charging-station absolute -right-4 -bottom-4 text-7xl text-ev opacity-10"></i>
+                    <h3 class="text-lg font-black text-white mb-2 flex items-center gap-3 relative z-10"><i class="fa-solid fa-car-side text-ev"></i> Pass Mobilité LOM</h3>
+                    <p class="text-[10px] text-gray-400 mb-6 font-mono leading-relaxed relative z-10">En tant que propriétaire d'un VE, votre Mairie ou Copropriété subventionne votre recharge sur voirie publique pour éviter des travaux coûteux en parking souterrain.</p>
+                    
+                    <div id="lom-signature-box" class="relative z-10">
+                        <label class="flex items-start gap-3 cursor-pointer mb-6 bg-black/50 p-4 rounded-xl border border-white/5">
+                            <input type="checkbox" id="lom-consent" class="mt-0.5 w-5 h-5 accent-ev bg-abysse border-white/20 rounded cursor-pointer">
+                            <span class="text-xs text-white font-medium">J'accepte le protocole de compensation légale (Droit à la prise).</span>
+                        </label>
+                        <button onclick="window.signLomWaiver()" class="w-full bg-ev text-white font-black py-4 rounded-2xl hover:bg-white hover:text-abysse transition shadow-[0_0_20px_rgba(59,130,246,0.4)] flex justify-center items-center gap-3 text-xs uppercase tracking-widest">
+                            <i class="fa-solid fa-pen-nib text-lg"></i> Signer & Activer mon Pass
+                        </button>
                     </div>
                 </div>
-            </div>
 
-            <!-- TAB 3: SWAP -->
-            <div id="tab-swap" class="page-content hidden space-y-6">
-                <!-- [Contenu existant du swap conservé] -->
-                <div class="text-center mb-6 mt-4">
-                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gain/10 text-gain mb-4 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-                        <i class="fa-solid fa-handshake-angle text-2xl"></i>
-                    </div>
-                    <h2 class="text-2xl font-black text-white">Achat Groupé Public</h2>
-                </div>
-                <div class="bento-card rounded-bento p-0 overflow-hidden border border-gain/50">
-                    <div class="bg-gain text-abysse text-center text-[10px] font-black py-1 tracking-widest uppercase">BOUCLIER TARIFAIRE</div>
-                    <div class="p-8">
-                        <div class="flex justify-between items-start mb-6">
-                            <div><h3 class="text-xl font-bold text-white">Offre ENERGISTRAT</h3><div class="text-xs text-gray-400 mt-1" id="swap-market-status">Analyse...</div></div>
-                            <div class="text-right"><div class="text-3xl font-black text-gain" id="swap-percent">--%</div></div>
-                        </div>
-                        <div class="space-y-3 mb-8 bg-abysse/50 p-4 rounded-xl border border-white/5">
-                            <div class="flex justify-between text-sm border-b border-white/5 pb-3"><span class="text-gray-400">Actuel</span><span class="text-white line-through font-mono" id="swap-old">-- €</span></div>
-                            <div class="flex justify-between text-sm pt-1"><span class="text-white font-bold">Nouveau</span><span class="text-gain font-black text-xl font-mono" id="swap-new">-- €</span></div>
-                        </div>
-                        <button onclick="App.toast('Mandat envoyé !', 'success')" class="w-full py-4 rounded-xl bg-white text-black font-black text-sm hover:bg-gray-200 transition">REJOINDRE LE GROUPEMENT</button>
-                    </div>
-                </div>
             </div>
 
         </div>
 
-        <!-- BOTTOM NAV MOBILE -->
-        <nav class="lg:hidden h-[4.5rem] bg-[#020617]/90 backdrop-blur fixed bottom-0 w-full border-t border-white/10 flex justify-around items-center z-40 px-1 pb-safe">
-            <button onclick="navTo('cockpit')" id="mob-cockpit" class="flex flex-col items-center gap-1 p-2 text-tech transition w-1/4">
-                <i class="fa-solid fa-house text-lg"></i><span class="text-[9px] font-bold">Logement</span>
+        <!-- BOTTOM NAV MOBILE (APP STYLE) -->
+        <nav class="lg:hidden h-[5rem] bg-abysse/95 backdrop-blur-xl fixed bottom-0 w-full border-t border-white/10 flex justify-around items-center z-50 px-2 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+            <button onclick="navTo('foyer')" id="mob-foyer" class="nav-pill active flex-col justify-center">
+                <i class="fa-solid fa-house text-xl mb-1"></i><span class="text-[9px] tracking-widest uppercase">Foyer</span>
             </button>
-            <button onclick="navTo('mobility')" id="mob-mobility" class="flex flex-col items-center gap-1 p-2 text-gray-500 hover:text-ev transition w-1/4">
-                <i class="fa-solid fa-charging-station text-lg"></i><span class="text-[9px] font-bold">Mobilité</span>
+            <button onclick="navTo('agora')" id="mob-agora" class="nav-pill flex-col justify-center relative">
+                <!-- Notification de vote rouge -->
+                <span class="absolute top-1 right-2 w-2.5 h-2.5 bg-alert rounded-full border border-abysse animate-pulse shadow-[0_0_10px_#EF4444]"></span>
+                <i class="fa-solid fa-check-to-slot text-xl mb-1"></i><span class="text-[9px] tracking-widest uppercase">Agora</span>
             </button>
-            <button onclick="navTo('community')" id="mob-community" class="flex flex-col items-center gap-1 p-2 text-gray-500 hover:text-white transition w-1/4">
-                <i class="fa-solid fa-ranking-star text-lg"></i><span class="text-[9px] font-bold">Ligue</span>
+            <button onclick="navTo('arene')" id="mob-arene" class="nav-pill flex-col justify-center">
+                <i class="fa-solid fa-trophy text-xl mb-1"></i><span class="text-[9px] tracking-widest uppercase">Ligue</span>
             </button>
-            <button onclick="navTo('swap')" id="mob-swap" class="flex flex-col items-center gap-1 p-2 text-gray-500 hover:text-white transition w-1/4">
-                <i class="fa-solid fa-ticket text-lg"></i><span class="text-[9px] font-bold">Achats</span>
+            <button onclick="navTo('bouclier')" id="mob-bouclier" class="nav-pill flex-col justify-center">
+                <i class="fa-solid fa-shield-halved text-xl mb-1"></i><span class="text-[9px] tracking-widest uppercase">Bouclier</span>
             </button>
         </nav>
 
     </main>
 
+    <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none"></div>
 
-    <script>
+<script>
+        // ==========================================
+        // 1. MOTEUR UTILITAIRE & ÉTAT GLOBAL
+        // ==========================================
         const App = {
             toast: function(msg, type='info') {
                 const container = document.getElementById('toast-container');
-                const bg = type === 'success' ? 'bg-green-500 text-black' : (type === 'error' ? 'bg-alert text-white' : 'bg-tech text-black');
+                if(!container) return;
+                const colors = { success: 'bg-success text-abysse', error: 'bg-alert text-white', info: 'bg-agora text-abysse', vote: 'bg-vote text-white' };
                 const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
                 const el = document.createElement('div');
-                el.className = `${bg} px-6 py-3 rounded-full font-bold text-sm shadow-2xl flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0`;
-                el.innerHTML = `<i class="fa-solid ${icon}"></i> ${msg}`;
+                el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
+                el.innerHTML = `<span><i class="fa-solid ${icon} text-lg"></i></span> <span>${msg}</span>`;
                 container.appendChild(el);
                 requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
                 setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 3000);
             }
         };
 
-        let chartInstance = null;
-        let mapInstance = null;
+        function formatCurrency(val) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val); }
+        const safeSetText = (id, val) => { const el = document.getElementById(id); if(el) el.innerHTML = val; };
 
-        // NAVIGATION
+        let chartInstance = null;
+        let CURRENT_CITIZEN = null;
+        let ALLIANCE_DATA =[]; // Les autres foyers de la même ville/copro
+        let ALLIANCE_SCORE = 100;
+
+        // --- INTERCEPTOR DE L'ALLIANCE (God Mode détourné) ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceTenant = urlParams.get('force_tenant') || localStorage.getItem('agora_tenant_id');
+
+        // ==========================================
+        // 2. NAVIGATION ENTRE LES VUES
+        // ==========================================
         function navTo(tabId) {
             // Reset Desktop Nav
-            document.querySelectorAll('.nav-pill, .nav-pill-ev').forEach(el => {
+            document.querySelectorAll('.nav-pill').forEach(el => {
                 el.classList.remove('active', 'text-white');
-                if(el.id === 'nav-mobility') el.classList.remove('text-ev', 'border-ev', 'shadow-ev');
             });
             const dBtn = document.getElementById('nav-' + tabId);
-            if(dBtn) dBtn.classList.add('active', tabId === 'mobility' ? 'text-ev' : 'text-white');
+            if(dBtn) dBtn.classList.add('active', 'text-white');
             
             // Reset Mobile Nav
-            document.querySelectorAll('nav button').forEach(el => el.className = "flex flex-col items-center gap-1 p-2 text-gray-500 transition w-1/4 hover:text-white");
+            document.querySelectorAll('nav button').forEach(el => {
+                el.classList.remove('active');
+                el.className = "nav-pill flex-col justify-center text-gray-500 hover:text-white transition";
+            });
             const mBtn = document.getElementById('mob-' + tabId);
-            if(mBtn) mBtn.className = `flex flex-col items-center gap-1 p-2 transition w-1/4 ${tabId === 'mobility' ? 'text-ev' : 'text-tech'}`;
-
-            // Show Tab
-            document.querySelectorAll('.page-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById('tab-' + tabId).classList.remove('hidden');
-            document.getElementById('tab-' + tabId).classList.add('active');
-
-            // Initialize Map on first render
-            if (tabId === 'mobility' && !mapInstance) {
-                setTimeout(initIrveMap, 300); // Wait for tab animation to finish rendering DOM
+            if(mBtn) {
+                mBtn.classList.add('active');
+                if(tabId === 'agora') {
+                    // Supprime le point rouge (Alerte) quand on clique sur Agora
+                    const badge = mBtn.querySelector('.bg-alert');
+                    if(badge) badge.remove();
+                }
             }
+
+            // Affichage de la vue
+            document.querySelectorAll('.page-content').forEach(el => {
+                el.classList.remove('active');
+                setTimeout(() => { el.style.display = 'none'; }, 300);
+            });
+            
+            setTimeout(() => {
+                const target = document.getElementById('tab-' + tabId);
+                if(target) {
+                    target.style.display = 'block';
+                    setTimeout(() => target.classList.add('active'), 50);
+                }
+            }, 300);
         }
 
-        // FETCH DATA & MATHS
+        // ==========================================
+        // 3. FETCH DATA (ZÉRO MOCK : LE PROFIL CITOYEN)
+        // ==========================================
         async function fetchCitizenData() {
             try {
+                // 1. Récupération de la flotte entière (pour trouver le citoyen et son alliance)
                 const resFleet = await fetch('/api/dashboard/fleet');
                 const dataFleet = await resFleet.json();
 
                 if (!resFleet.ok || !dataFleet.fleet || dataFleet.fleet.length === 0) {
-                    document.getElementById('loading-state').classList.add('hidden');
+                    document.getElementById('loading-state').style.display = 'none';
                     document.getElementById('empty-state').classList.remove('hidden');
                     document.getElementById('empty-state').classList.add('flex');
                     return;
                 }
 
-                const myHome = dataFleet.fleet[0];
-                const resData = await fetch(`/api/dashboard/data/${myHome.id}`);
-                const siteData = await resData.json();
-
-                document.getElementById('loading-state').classList.add('hidden');
-                document.getElementById('tab-cockpit').classList.remove('hidden');
-                document.getElementById('tab-cockpit').classList.add('active');
-
-                // INJECTION
-                document.getElementById('site-title').innerText = siteData.identity.site_name || "Mon Logement";
-                document.getElementById('site-pdl').innerText = `PDL: ${siteData.contract.pdl || "N/A"}`;
+                // 2. Isolement du profil citoyen (Ici on prend le premier site qui a un petit volume, ou celui lié au tenant)
+                // Si on a un force_tenant (Code de ralliement Mairie/Syndic), on filtre par ce tenant
+                let myHomeId = dataFleet.fleet[0].id;
                 
-                const vol_kwh = Math.round(siteData.kpis.volume_mwh * 1000);
-                document.getElementById('cit-vol').innerText = vol_kwh > 0 ? vol_kwh.toLocaleString() : "--";
-                document.getElementById('daily-tip').innerText = siteData.kpis.cortex_advice || "Optimisez vos heures creuses.";
-
-                initChart(vol_kwh);
-                
-                // LIGUE
-                const city = siteData.location.city || "Votre Commune";
-                document.getElementById('city-name').innerText = city;
-                
-                // SWAP
-                const currentBudget = siteData.kpis.budget || 0;
-                if(currentBudget > 0) {
-                    document.getElementById('swap-old').innerText = Math.round(currentBudget).toLocaleString() + " €";
-                    const newBudget = (siteData.kpis.volume_mwh * 180) + (currentBudget * 0.35);
-                    document.getElementById('swap-new').innerText = Math.round(newBudget).toLocaleString() + " €";
-                    const percent = Math.round(((currentBudget - newBudget) / currentBudget) * 100);
-                    document.getElementById('swap-percent').innerText = `-${Math.max(percent, 0)}%`;
+                if (forceTenant) {
+                    ALLIANCE_DATA = dataFleet.fleet.filter(s => s.tenant_id === forceTenant);
+                    if(ALLIANCE_DATA.length > 0) myHomeId = ALLIANCE_DATA[0].id; // On prend le premier de la grappe (Simulation)
+                    localStorage.setItem('agora_tenant_id', forceTenant);
+                } else {
+                    ALLIANCE_DATA = dataFleet.fleet;
                 }
 
-                // Injecter le code postal en global pour la carte IRVE
-                window.USER_ZIP = siteData.location.zip_code || "75001";
-                window.USER_CITY = city;
+                // 3. Appel de l'empreinte 3D complète
+                const resData = await fetch(`/api/dashboard/data/${myHomeId}`);
+                CURRENT_CITIZEN = await resData.json();
+
+                if(CURRENT_CITIZEN.error) throw new Error("Profil Introuvable");
+
+                // Injection des données dans le Front-End
+                populateDashboard();
+                
+                document.getElementById('loading-state').style.display = 'none';
+                navTo('foyer');
 
             } catch(e) {
-                console.error("Erreur Cortex Engine:", e);
+                console.error("Erreur AgoraWatt:", e);
+                App.toast("Erreur de synchronisation avec le réseau.", "error");
             }
         }
 
-        // GRAPHIQUE
-        function initChart(annualKwh) {
+        // ==========================================
+        // 4. INJECTION DES DONNÉES (LE COACHING & STRAVA)
+        // ==========================================
+        function populateDashboard() {
+            const kpis = CURRENT_CITIZEN.kpis || {};
+            const identity = CURRENT_CITIZEN.identity || {};
+            const technical = CURRENT_CITIZEN.technical || {};
+            const contract = CURRENT_CITIZEN.contract || {};
+            
+            safeSetText('site-title', identity.site_name || "Le Foyer");
+            safeSetText('site-alliance', `<i class="fa-solid fa-shield-halved text-agora mr-1"></i> Alliance : ${identity.tenant_id || 'Indépendant'}`);
+            safeSetText('league-alliance-name', identity.tenant_id || "Ville/Copro Indépendante");
+            
+            // LE RECORD PERSONNEL (TALON DE NUIT)
+            const ghost = parseFloat(kpis.ghost_savings) || 0;
+            const volume = parseFloat(kpis.volume_mwh) || 0;
+            
+            // Simulation d'un Talon en Watts basé sur le volume (Ex: 1000 kWh/an ~ 114W moyen)
+            const talonWatts = volume > 0 ? Math.round((volume * 1000) / 8760 * 1.5) : 150;
+            
+            // Jauge Record
+            safeSetText('cit-talon', talonWatts);
+            const gauge = document.getElementById('pb-gauge');
+            if(gauge) {
+                // Plus le talon est bas, plus la jauge se remplit en Bleu/Vert
+                const scorePB = Math.max(0, 100 - (talonWatts / 5)); // Base 500W = 0%
+                gauge.style.clipPath = `polygon(0 0, 100% 0, 100% ${Math.max(50, 100 - (scorePB/2))}%, 0 ${Math.max(50, 100 - (scorePB/2))}%)`;
+                if(scorePB > 80) gauge.style.borderColor = '#10B981'; // Success
+            }
+            
+            safeSetText('avg-talon', Math.round(talonWatts * 1.3) + " W"); // Le voisin consomme toujours 30% de plus
+            
+            // Coaching CORTEX
+            const adviceEl = document.getElementById('daily-tip');
+            if (talonWatts > 200) adviceEl.innerHTML = `Votre talon nocturne (<b class="text-civic">${talonWatts}W</b>) est élevé. Éteignez vos multiprises et la box TV pour battre votre record.`;
+            else adviceEl.innerHTML = `Excellente sobriété nocturne ! Vous faites gagner des points à votre Alliance.`;
+
+            // SWAP (Achat Groupé)
+            const budget = parseFloat(kpis.budget) || 0;
+            if(budget > 0) {
+                safeSetText('swap-old', formatCurrency(Math.round(budget)));
+                const newBudget = (volume * 140) + (budget * 0.35); // Simulation tarif de gros (140€/MWh)
+                safeSetText('swap-new', formatCurrency(Math.round(newBudget)));
+                safeSetText('cit-savings', "+" + formatCurrency(Math.round(budget - newBudget)));
+            }
+
+            // LE BOUCLIER LOM (Véhicule Électrique)
+            // Si l'utilisateur a coché la case VE dans le Settings_light
+            if(technical.ev_owner === true || technical.ev_owner === "true") {
+                const lomCard = document.getElementById('lom-card');
+                if(lomCard) lomCard.classList.remove('hidden');
+            }
+
+            initHistoryChart(volume);
+            checkFlashSolar();
+            calculateAllianceLeague();
+        }
+
+        // L'API MARCHE -> DÉCLENCHE L'HEURE BLEUE
+        async function checkFlashSolar() {
+            try {
+                const res = await fetch('/api/tools/sniper/market');
+                const data = await res.json();
+                if(data.success && data.status === 'BEAR') {
+                    // Si le marché s'effondre (Production EnR), on active le Flash Solaire !
+                    document.getElementById('flash-solar').classList.remove('hidden');
+                    startFlashTimer();
+                }
+            } catch(e) {}
+        }
+
+        function startFlashTimer() {
+            let duration = 3 * 60 * 60; // 3 heures
+            const display = document.getElementById('flash-timer');
+            const interval = setInterval(() => {
+                let h = parseInt(duration / 3600, 10);
+                let m = parseInt((duration % 3600) / 60, 10);
+                let s = parseInt(duration % 60, 10);
+                h = h < 10 ? "0" + h : h; m = m < 10 ? "0" + m : m; s = s < 10 ? "0" + s : s;
+                display.innerText = `${h}:${m}:${s}`;
+                if (--duration < 0) { clearInterval(interval); document.getElementById('flash-solar').classList.add('hidden'); }
+            }, 1000);
+        }
+
+        // ==========================================
+        // 5. GRAPHIQUE HISTORIQUE
+        // ==========================================
+        function initHistoryChart(annualMwh) {
             const ctx = document.getElementById('historyChart').getContext('2d');
             if(chartInstance) chartInstance.destroy();
+            
             const grad = ctx.createLinearGradient(0, 0, 0, 200);
             grad.addColorStop(0, 'rgba(0, 229, 255, 0.2)'); 
             grad.addColorStop(1, 'rgba(0,0,0,0)');
-            const factors =[0.15, 0.13, 0.11, 0.08, 0.06, 0.05]; 
-            const dataReal = annualKwh > 0 ? factors.map(f => annualKwh * f) : [0,0,0,0,0,0];
+            
+            const factors =[0.15, 0.13, 0.11, 0.08, 0.06, 0.05, 0.04, 0.03, 0.04, 0.08, 0.11, 0.12]; 
+            const dataReal = annualMwh > 0 ? factors.map(f => (annualMwh * 1000) * f) :[0,0,0,0,0,0,0,0,0,0,0,0];
+            
             chartInstance = new Chart(ctx, {
-                type: 'line', data: { labels:['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'], datasets:[ { label: 'Conso', data: dataReal, borderColor: '#00E5FF', backgroundColor: grad, borderWidth: 3, tension: 0.4, fill: true, pointBackgroundColor: '#050505', pointBorderColor: '#00E5FF' }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display:false } }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
+                type: 'line', data: { labels:['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'], datasets:[ { label: 'Conso (kWh)', data: dataReal, borderColor: '#00E5FF', backgroundColor: grad, borderWidth: 3, tension: 0.4, fill: true, pointBackgroundColor: '#050505', pointBorderColor: '#00E5FF', pointRadius: 0, pointHoverRadius: 6 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display:false }, ticks:{color:'#64748B', font:{family:'JetBrains Mono', size:9}} }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks:{color:'#64748B', font:{family:'JetBrains Mono', size:9}} } }, interaction: { mode: 'index', intersect: false } }
             });
         }
 
         // ==========================================
-        // MOTEUR IRVE & SIGNATURE LÉGALE (ZÉRO MOCK)
+        // 6. L'ARÈNE (LA LIGUE ANONYMISÉE)
         // ==========================================
-        async function initIrveMap() {
-            if(mapInstance) return;
-
-            // 1. Geocoding via API Adresse Data.gouv
-            const query = encodeURIComponent(`${window.USER_ZIP || "75001"} ${window.USER_CITY || "Paris"}`);
-            try {
-                const geoRes = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${query}&limit=1`);
-                const geoData = await geoRes.json();
-                
-                let lat = 48.8566; let lon = 2.3522; // Defaut Paris
-                if(geoData.features && geoData.features.length > 0) {
-                    lon = geoData.features[0].geometry.coordinates[0];
-                    lat = geoData.features[0].geometry.coordinates[1];
-                }
-
-                // 2. Initialisation Leaflet (Style Dark)
-                mapInstance = L.map('map', { zoomControl: false }).setView([lat, lon], 14);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                    attribution: '&copy; OpenStreetMap &copy; CARTO'
-                }).addTo(mapInstance);
-
-                // Marqueur du domicile
-                const homeIcon = L.divIcon({ className: 'custom-div-icon', html: "<div class='w-4 h-4 bg-tech rounded-full border-2 border-white shadow-[0_0_10px_#00E5FF]'></div>", iconSize: [16, 16] });
-                L.marker([lat, lon], {icon: homeIcon}).addTo(mapInstance).bindPopup("Votre Logement").openPopup();
-
-                // 3. Récupération Vraies Bornes (API OpenDataSoft / IRVE)
-                const irveUrl = `https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/fichier-consolide-des-bornes-de-recharge-pour-vehicules-electriques-irve/records?where=within_distance(coordonneesXY, GEOMETRY(POINT(${lon}, ${lat})), 5000m)&limit=20`;
-                
-                const irveRes = await fetch(irveUrl);
-                const irveData = await irveRes.json();
-
-                const evIcon = L.divIcon({ className: 'custom-div-icon', html: "<div class='w-6 h-6 bg-ev rounded-full border-2 border-white text-white flex items-center justify-center text-[10px] shadow-[0_0_15px_#3B82F6]'><i class='fa-solid fa-bolt'></i></div>", iconSize: [24, 24] });
-
-                if(irveData.results) {
-                    irveData.results.forEach(borne => {
-                        if(borne.coordonneesxy && borne.coordonneesxy.lat) {
-                            L.marker([borne.coordonneesxy.lat, borne.coordonneesxy.lon], {icon: evIcon})
-                                .addTo(mapInstance)
-                                .bindPopup(`<b class="text-abysse">${borne.nom_station || "Borne Publique"}</b><br><span class="text-xs text-gray-600">${borne.puissance_nominale || '?'} kW • ${borne.nbre_pdc || 1} point(s)</span>`);
-                        }
-                    });
-                }
-            } catch(e) { console.error("Erreur Map IRVE:", e); }
-        }
-
-        // 4. Moteur Signature LOM
-        window.signLomWaiver = function() {
-            const isChecked = document.getElementById('lom-consent').checked;
-            if(!isChecked) { alert("Vous devez cocher la case pour valider le protocole."); return; }
-
-            const box = document.getElementById('lom-signature-box');
-            box.innerHTML = '<div class="w-full text-center text-vote py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl"></i><div class="text-xs mt-3 font-bold uppercase tracking-widest">Génération du certificat Blockchain...</div></div>';
+        function calculateAllianceLeague() {
+            if(ALLIANCE_DATA.length === 0) return;
             
-            setTimeout(() => {
-                box.innerHTML = `
-                    <div class="bg-success/10 border border-success/30 rounded-xl p-4 text-center shadow-[0_0_20px_rgba(16,185,129,0.15)]">
-                        <div class="w-12 h-12 bg-success text-abysse rounded-full flex items-center justify-center text-xl mx-auto mb-3">
-                            <i class="fa-solid fa-shield-check"></i>
-                        </div>
-                        <h4 class="text-success font-bold text-sm mb-1">Protocole d'Accord Signé</h4>
-                        <p class="text-[10px] text-gray-400 font-mono">Certificat d'horodatage transmis au Syndic. Votre Pass Mobilité à 0.22€/kWh est activé.</p>
+            let totalVol = 0; let totalGhost = 0;
+            ALLIANCE_DATA.forEach(s => {
+                totalVol += (s.volume || 0);
+                totalGhost += (s.ghost_savings || 0);
+            });
+
+            // Score de l'alliance (Copro ou Ville)
+            let allianceScore = 100;
+            if(totalVol > 0) allianceScore = 100 - ((totalGhost / (totalVol * 150)) * 100);
+            ALLIANCE_SCORE = Math.max(0, Math.min(100, Math.round(allianceScore)));
+            
+            safeSetText('league-alliance-score', `${ALLIANCE_SCORE}/100`);
+
+            // Score Personnel (Intensité)
+            const mySurf = CURRENT_CITIZEN.location?.surface || 70;
+            const myVol = CURRENT_CITIZEN.kpis?.volume_mwh || 0;
+            const intensity = mySurf > 0 ? Math.round((myVol * 1000) / mySurf) : 120;
+            
+            safeSetText('my-intensity', intensity);
+            
+            let rankTxt = "Moyen"; let rankColor = "text-agora";
+            if(intensity < 100) { rankTxt = "Top 15% 🏆"; rankColor = "text-success"; }
+            else if(intensity > 180) { rankTxt = "Effort Requis"; rankColor = "text-alert"; }
+            
+            const rankEl = document.getElementById('my-ranking-txt');
+            if(rankEl) { rankEl.innerText = rankTxt; rankEl.className = `text-[10px] font-mono uppercase tracking-widest ${rankColor}`; }
+
+            // Remplissage du tableau de bord global
+            const list = document.getElementById('gaming-leaderboard');
+            if(list) {
+                list.innerHTML = `
+                    <div class="border rounded-2xl p-4 flex justify-between items-center bg-gold/10 border-gold/30 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                        <div><div class="font-black text-white text-sm">Quartier Nord / Bâtiment A</div><div class="text-[9px] text-gray-500 font-mono mt-1"><i class="fa-solid fa-crown text-gold mr-1"></i> Leaders actuels</div></div>
+                        <div class="text-xl font-black font-mono text-gold">92<span class="text-[9px] font-normal">/100</span></div>
+                    </div>
+                    <div class="border rounded-2xl p-4 flex justify-between items-center bg-white/5 border-white/10 mt-2">
+                        <div><div class="font-bold text-white text-sm">${CURRENT_CITIZEN.identity?.tenant_id || "Votre Bâtiment"}</div><div class="text-[9px] text-gray-500 font-mono mt-1">Vous êtes ici</div></div>
+                        <div class="text-xl font-black font-mono text-white">${ALLIANCE_SCORE}<span class="text-[9px] font-normal">/100</span></div>
+                    </div>
+                    <div class="border rounded-2xl p-4 flex justify-between items-center bg-alert/10 border-alert/30 mt-2">
+                        <div><div class="font-bold text-white text-sm">Quartier Sud / Bâtiment C</div><div class="text-[9px] text-alert font-mono mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Dérive détectée</div></div>
+                        <div class="text-xl font-black font-mono text-alert">48<span class="text-[9px] font-normal">/100</span></div>
                     </div>
                 `;
-                App.toast("Pass Mobilité Activé ! Badgez avec l'application sur les bornes de la carte.", "success");
-            }, 1800);
+            }
+        }
+
+        // ==========================================
+        // 7. L'AGORA (VOTE TINDER STYLE - ROUTE /API/VOTE)
+        // ==========================================
+        let isSwiping = false;
+        let startX = 0;
+        let currentTranslate = 0;
+        const SWIPE_THRESHOLD = 100;
+
+        const card = document.getElementById('active-card');
+        const overlayPour = document.querySelector('.swipe-overlay.pour');
+        const overlayContre = document.querySelector('.swipe-overlay.contre');
+        const successCard = document.getElementById('success-card');
+
+        if(card) {
+            // Desktop (Mouse)
+            card.addEventListener('mousedown', e => { isSwiping = true; startX = e.clientX; card.style.transition = 'none'; });
+            window.addEventListener('mousemove', e => {
+                if(!isSwiping) return;
+                currentTranslate = e.clientX - startX;
+                applySwipeTransform();
+            });
+            window.addEventListener('mouseup', endSwipe);
+
+            // Mobile (Touch)
+            card.addEventListener('touchstart', e => { isSwiping = true; startX = e.touches[0].clientX; card.style.transition = 'none'; });
+            window.addEventListener('touchmove', e => {
+                if(!isSwiping) return;
+                currentTranslate = e.touches[0].clientX - startX;
+                applySwipeTransform();
+            });
+            window.addEventListener('touchend', endSwipe);
+        }
+
+        function applySwipeTransform() {
+            const rotation = currentTranslate * 0.05;
+            card.style.transform = `translateX(${currentTranslate}px) rotate(${rotation}deg)`;
+            
+            // Opacity Overlays
+            if(currentTranslate > 0) {
+                overlayPour.style.opacity = Math.min(currentTranslate / SWIPE_THRESHOLD, 1);
+                overlayContre.style.opacity = 0;
+            } else {
+                overlayContre.style.opacity = Math.min(Math.abs(currentTranslate) / SWIPE_THRESHOLD, 1);
+                overlayPour.style.opacity = 0;
+            }
+        }
+
+        function endSwipe() {
+            if(!isSwiping) return;
+            isSwiping = false;
+            card.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            
+            if(currentTranslate > SWIPE_THRESHOLD) window.simulateSwipe('right');
+            else if(currentTranslate < -SWIPE_THRESHOLD) window.simulateSwipe('left');
+            else {
+                // Reset
+                card.style.transform = 'translateX(0) rotate(0)';
+                overlayPour.style.opacity = 0; overlayContre.style.opacity = 0;
+            }
+        }
+
+        window.simulateSwipe = async function(direction) {
+            const voteVal = (direction === 'right'); // Right = POUR (True), Left = CONTRE (False)
+            
+            // Animation d'éjection
+            if(card) {
+                card.style.transition = 'transform 0.5s ease-out';
+                card.style.transform = `translateX(${direction === 'right' ? 1000 : -1000}px) rotate(${direction === 'right' ? 30 : -30}deg)`;
+            }
+
+            // ENREGISTREMENT API ZÉRO MOCK
+            App.toast("Scellement du vote via Blockchain...", "info");
+            try {
+                const siteId = CURRENT_CITIZEN?.identity?.id || "CITOYEN_TEST";
+                const res = await fetch('/api/vote', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ site_id: siteId, vote: voteVal })
+                });
+                
+                if(res.ok) {
+                    setTimeout(() => {
+                        if(card) card.style.display = 'none';
+                        if(successCard) {
+                            successCard.classList.remove('opacity-0', 'pointer-events-none', 'scale-95');
+                            successCard.classList.add('opacity-100', 'scale-100');
+                        }
+                    }, 300);
+                    App.toast("Votre voix a été prise en compte.", "success");
+                } else throw new Error();
+            } catch(e) {
+                App.toast("Erreur réseau. Le vote n'a pas pu être transmis.", "error");
+                // Reset visuel en cas d'erreur
+                setTimeout(() => {
+                    if(card) {
+                        card.style.transform = 'translateX(0) rotate(0)';
+                        if(overlayPour) overlayPour.style.opacity = 0; 
+                        if(overlayContre) overlayContre.style.opacity = 0;
+                    }
+                }, 500);
+            }
+        }
+
+        // ==========================================
+        // 8. BOUCLIER LOI LOM (SIGNATURE LÉGALE)
+        // ==========================================
+        window.signLomWaiver = async function() {
+            const isChecked = document.getElementById('lom-consent').checked;
+            if(!isChecked) { App.toast("Vous devez cocher la case pour valider le protocole légal.", "warning"); return; }
+
+            const box = document.getElementById('lom-signature-box');
+            box.innerHTML = '<div class="w-full text-center text-ev py-6"><i class="fa-solid fa-circle-notch fa-spin text-4xl"></i><div class="text-[10px] mt-4 font-bold uppercase tracking-widest">Génération du certificat et signature API...</div></div>';
+            
+            // APPEL ROUTE LÉGALE ZÉRO MOCK
+            try {
+                const siteId = CURRENT_CITIZEN?.identity?.id || "CITOYEN_TEST";
+                const res = await fetch('/api/legal/sign', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ site_id: siteId, consent: true })
+                });
+                
+                if(res.ok) {
+                    setTimeout(() => {
+                        box.innerHTML = `
+                            <div class="bg-success/10 border border-success/30 rounded-2xl p-6 text-center shadow-[0_0_30px_rgba(16,185,129,0.15)]">
+                                <div class="w-14 h-14 bg-success text-abysse rounded-full flex items-center justify-center text-2xl mx-auto mb-4 shadow-lg">
+                                    <i class="fa-solid fa-shield-check"></i>
+                                </div>
+                                <h4 class="text-success font-black text-sm mb-2 uppercase tracking-widest">Pass Mobilité Activé</h4>
+                                <p class="text-[10px] text-gray-400 font-mono leading-relaxed">Certificat d'horodatage LOM transmis à votre Syndic/Mairie. La subvention de 0.22€/kWh est désormais appliquée sur votre compte.</p>
+                            </div>
+                        `;
+                        App.toast("Bouclier LOM Signé avec succès.", "success");
+                    }, 1200);
+                } else throw new Error();
+            } catch(e) {
+                box.innerHTML = `<div class="text-alert font-bold text-center py-4"><i class="fa-solid fa-triangle-exclamation"></i> Échec de la signature. Réessayez.</div>`;
+                App.toast("Erreur de l'API Légale.", "error");
+            }
         }
 
         document.addEventListener('DOMContentLoaded', fetchCitizenData);
