@@ -503,7 +503,7 @@
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
 <script>
-        // ==========================================
+// ==========================================
         // 1. MOTEUR UTILITAIRE & ÉTAT GLOBAL
         // ==========================================
         const App = {
@@ -548,7 +548,10 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            if(forceTenant && forceTenant !== 'ALL') document.getElementById('god-mode-indicator').classList.remove('hidden');
+            if(forceTenant && forceTenant !== 'ALL') {
+                const gm = document.getElementById('god-mode-indicator');
+                if(gm) gm.classList.remove('hidden');
+            }
             initSDE();
         });
 
@@ -580,28 +583,35 @@
         }
 
         // ==========================================
-        // 2. INITIALISATION & DATA UNITY
+        // 2. INITIALISATION & DATA UNITY (CAISSONS ÉTANCHES)
         // ==========================================
         async function initSDE() {
             try {
-                // 1. M57 & Subventions en parallèle
-                Promise.all([
-                    fetch('/api/settings/m57').then(r=>r.ok?r.json():null),
-                    fetch('/api/tools/subventions').then(r=>r.json())
-                ]).then(([m57data, subvData]) => {
-                    if (m57data && (m57data.bp_elec || m57data.bp_gaz)) {
-                        M57_DB['PRINCIPAL'] = { bp: (m57data.bp_elec || 0) + (m57data.bp_gaz || 0), cons: (m57data.consumed_elec || 0) + (m57data.consumed_gaz || 0) };
-                        M57_DB['IRVE'] = { bp: m57data.bp_irve || 0, cons: m57data.consumed_irve || 0 };
-                        M57_DB['ENR'] = { bp: m57data.bp_enr || 0, cons: m57data.consumed_enr || 0 };
+                // 1. M57 & Subventions (Isolés pour ne pas bloquer si erreur)
+                try {
+                    const m57res = await fetch('/api/settings/m57');
+                    if (m57res.ok) {
+                        const m57data = await m57res.json();
+                        if (m57data && (m57data.bp_elec || m57data.bp_gaz)) {
+                            M57_DB['PRINCIPAL'] = { bp: (m57data.bp_elec || 0) + (m57data.bp_gaz || 0), cons: (m57data.consumed_elec || 0) + (m57data.consumed_gaz || 0) };
+                            M57_DB['IRVE'] = { bp: m57data.bp_irve || 0, cons: m57data.consumed_irve || 0 };
+                            M57_DB['ENR'] = { bp: m57data.bp_enr || 0, cons: m57data.consumed_enr || 0 };
+                        }
                     }
-                    if(subvData && subvData.success && subvData.results) {
+                } catch(e) { console.warn("M57 load failed"); }
+
+                try {
+                    const subvRes = await fetch('/api/tools/subventions');
+                    if (subvRes.ok) {
+                        const subvData = await subvRes.json();
                         TOTAL_SDE_CEE = subvData.total_enveloppe || 0;
                         safeSetText('kpi-total-cee', formatCurrency(TOTAL_SDE_CEE));
                     }
-                }).catch(e=>console.log(e));
+                } catch(e) { console.warn("Subventions load failed"); }
 
                 // 2. Chargement du Parc
                 const res = await fetch('/api/dashboard/fleet');
+                if(!res.ok) throw new Error("HTTP Error " + res.status);
                 const data = await res.json();
                 
                 if(data.fleet) {
@@ -609,20 +619,25 @@
 
                     if(FLEET_DATA.length === 0) {
                         App.toast("Aucun actif territorial trouvé.", "error");
-                        document.getElementById('map-loader').style.display = 'none';
+                        const loader = document.getElementById('map-loader');
+                        if(loader) loader.style.display = 'none';
                         return;
                     }
 
                     FILTER_META.segments =[...new Set(FLEET_DATA.map(s => s.segment).filter(Boolean))];
-                    populateFilters();
-
-                    processCityData();
-                    window.applyMapFilters(); // Initialise Map, Data Health et Liste via Filtre
-                    runSageEngine(); 
-                    runChorus(); 
-                    runDqeUI();
+                    
+                    // Exécution séquentielle protégée
+                    try { populateFilters(); } catch(e) { console.error("Filter init failed", e); }
+                    try { processCityData(); } catch(e) { console.error("City data failed", e); }
+                    try { window.applyMapFilters(); } catch(e) { console.error("Map filters failed", e); }
+                    try { runSageEngine(); } catch(e) { console.error("Sage failed", e); }
+                    try { runChorus(); } catch(e) { console.error("Chorus failed", e); }
+                    try { runDqeUI(); } catch(e) { console.error("DQE failed", e); }
                 }
-            } catch(e) { App.toast("Erreur de synchronisation Backend.", "error"); }
+            } catch(e) { 
+                App.toast("Erreur de synchronisation Backend.", "error"); 
+                console.error("Critical error in initSDE:", e);
+            }
         }
 
         function populateFilters() {
@@ -630,7 +645,8 @@
             if(!selLot) return;
             selLot.innerHTML = '<option value="all">Tous les Lots</option>';
             FILTER_META.segments.forEach(lot => {
-                if(lot.toLowerCase().includes('lot') || lot.toLowerCase().includes('c4') || lot.toLowerCase().includes('c5')) {
+                const strLot = String(lot).toLowerCase(); // Null-Safe
+                if(strLot.includes('lot') || strLot.includes('c4') || strLot.includes('c5')) {
                     const opt = document.createElement('option'); opt.value = lot; opt.innerText = lot; selLot.appendChild(opt);
                 }
             });
@@ -640,30 +656,34 @@
         // 3. MOTEUR CARTOGRAPHIQUE & OMNISEARCH
         // ==========================================
         window.applyMapFilters = function() {
-            const term = document.getElementById('omni-search').value.toLowerCase().trim();
-            const typeFilter = document.getElementById('filter-ep').value; // 'all' ou 'ep'
-            const lotFilter = document.getElementById('filter-lot').value;
+            const searchEl = document.getElementById('omni-search');
+            const epEl = document.getElementById('filter-ep');
+            const lotEl = document.getElementById('filter-lot');
 
-            // 1. Filtrer les compteurs individuels
+            const term = (searchEl ? searchEl.value : "").toLowerCase().trim();
+            const typeFilter = epEl ? epEl.value : "all";
+            const lotFilter = lotEl ? lotEl.value : "all";
+
+            // 1. Filtrer
             const filteredFleet = FLEET_DATA.filter(s => {
                 let isEP = false;
-                const n = (s.name || "").toLowerCase();
+                const n = String(s.name || "").toLowerCase();
                 if(n.includes('eclairage') || n.includes('ep ') || n.includes('candélabre')) isEP = true;
 
                 if (typeFilter === 'ep' && !isEP) return false;
-                if (lotFilter !== 'all' && (!s.segment || !s.segment.includes(lotFilter))) return false;
+                if (lotFilter !== 'all' && (!s.segment || !String(s.segment).includes(lotFilter))) return false;
                 
-                const safeId = s.id ? s.id.toLowerCase() : "";
-                return safeId.includes(term) || n.includes(term) || (s.city||"").toLowerCase().includes(term);
+                const safeId = String(s.id || "").toLowerCase();
+                return safeId.includes(term) || n.includes(term) || String(s.city||"").toLowerCase().includes(term);
             });
 
-            // 2. Mettre à jour Data Health Radar
+            // 2. Mettre à jour Data Health
             updateDataHealth(filteredFleet);
 
-            // 3. Agréger par Ville pour la Carte et la Liste
+            // 3. Agréger par Ville
             CITY_DATA = {}; TOTAL_SDE_VOL = 0; TOTAL_SDE_BUDGET = 0;
             filteredFleet.forEach(s => {
-                const city = (s.city && s.city !== "") ? s.city.toUpperCase() : "COMMUNE INCONNUE";
+                const city = (s.city && s.city !== "") ? String(s.city).toUpperCase() : "COMMUNE INCONNUE";
                 if(!CITY_DATA[city]) CITY_DATA[city] = { name: city, vol: 0, budget: 0, ghost: 0, count: 0, ids:[], provider: s.provider, tenant: s.tenant_id };
                 
                 CITY_DATA[city].vol += (s.volume || 0); 
@@ -676,7 +696,6 @@
                 TOTAL_SDE_BUDGET += (s.budget || 0);
             });
 
-            // Score de Sobriété
             for(let c in CITY_DATA) {
                 const data = CITY_DATA[c]; let score = 100;
                 if(data.budget > 0) score = 100 - ((data.ghost / data.budget) * 100);
@@ -692,13 +711,14 @@
         }
 
         function updateDataHealth(fleet) {
-            if(fleet.length === 0) return;
+            if(!fleet || fleet.length === 0) return;
             let missingSurface = 0;
             fleet.forEach(s => { if(!s.surface || s.surface === 0) missingSurface++; });
             
             const pct = Math.round(((fleet.length - missingSurface) / fleet.length) * 100);
             const msgEl = document.getElementById('health-msg');
             const pctEl = document.getElementById('health-pct');
+            if(!msgEl || !pctEl) return;
             
             pctEl.innerText = `${pct}%`;
             
@@ -712,7 +732,9 @@
         }
 
         function runCityReports() {
-            const list = document.getElementById('city-report-list'); list.innerHTML = '';
+            const list = document.getElementById('city-report-list'); 
+            if(!list) return;
+            list.innerHTML = '';
             const citiesArray = Object.values(CITY_DATA).sort((a,b) => b.score - a.score);
             
             if(citiesArray.length === 0) {
@@ -747,8 +769,8 @@
         }
 
         window.openMairieIncarnation = function(tenantId) {
-            if(!tenantId || tenantId === 'Orphelin') return App.toast("Ce site n'est rattaché à aucun SIRET de Mairie. Veuillez utiliser le Chasseur d'Orphelins.", "error");
-            App.toast(`Pont d'Incarnation (God Mode) activé vers la Mairie...`, "info");
+            if(!tenantId || tenantId === 'Orphelin') return App.toast("Ce site n'est rattaché à aucun SIRET de Mairie. Utilisez le Chasseur d'Orphelins.", "warning");
+            App.toast(`Pont d'Incarnation (God Mode) activé...`, "info");
             setTimeout(() => { window.location.href = `/mairie?force_tenant=${tenantId}`; }, 800);
         }
 
@@ -764,10 +786,9 @@
                 L.control.zoom({ position: 'topright' }).addTo(mapInstance);
             }
 
-            // Nettoyage des vieux marqueurs
             mapInstance.eachLayer(layer => { if(layer instanceof L.CircleMarker) mapInstance.removeLayer(layer); });
 
-            const cities = Object.values(CITY_DATA).sort((a,b) => b.vol - a.vol).slice(0, 30); // Top 30 pour API
+            const cities = Object.values(CITY_DATA).sort((a,b) => b.vol - a.vol).slice(0, 30);
             
             for(let i=0; i < cities.length; i++) {
                 const c = cities[i];
@@ -785,7 +806,8 @@
                     await new Promise(r => setTimeout(r, 80)); // Anti rate-limit
                 }
             }
-            document.getElementById('map-loader').style.display = 'none';
+            const loader = document.getElementById('map-loader');
+            if(loader) loader.style.display = 'none';
         }
 
         // ==========================================
@@ -796,8 +818,9 @@
             if(solarHasRun) return;
             solarHasRun = true;
 
-            const roofs = [...FLEET_DATA].filter(s => s.surface > 0).sort((a,b) => b.surface - a.surface).slice(0, 5);
+            const roofs =[...FLEET_DATA].filter(s => s.surface > 0).sort((a,b) => b.surface - a.surface).slice(0, 5);
             const container = document.getElementById('solar-gold-roofs');
+            if(!container) return;
             container.innerHTML = '';
             
             let totalKwc = 0; let totalRoi = 0;
@@ -828,7 +851,7 @@
                 container.innerHTML += `
                     <div class="bg-black/40 p-4 rounded-2xl border border-white/5 flex justify-between items-center hover:bg-white/5 transition group">
                         <div>
-                            <div class="text-xs font-bold text-white uppercase tracking-widest">${s.name} <span class="text-[9px] text-gray-500 normal-case ml-2">(${s.city})</span></div>
+                            <div class="text-xs font-bold text-white uppercase tracking-widest">${s.name} <span class="text-[9px] text-gray-500 normal-case ml-2">(${s.city || 'Inconnu'})</span></div>
                             <div class="text-[10px] text-gray-400 font-mono mt-1"><i class="fa-solid fa-ruler-combined text-solar mr-1"></i> ${s.surface} m²</div>
                         </div>
                         <div class="text-right">
@@ -841,7 +864,6 @@
             safeSetText('solar-kpi-kwc', `${totalKwc} kWc`);
             safeSetText('solar-kpi-roi', `+ ${formatCurrency(totalRoi)}`);
             
-            // Simulation PMAC
             const epVol = TOTAL_SDE_VOL * 0.20; 
             const solarVol = totalKwc * 1.1; 
             const cover = epVol > 0 ? Math.min((solarVol / epVol) * 100, 100) : 0;
@@ -849,10 +871,12 @@
         }
 
         // ==========================================
-        // 5. CONSOLE SAGE (IA + VISION.OS)
+        // 5. CONSOLE SAGE
         // ==========================================
         function runSageEngine() {
-            const list = document.getElementById('sage-anomaly-list'); list.innerHTML = '';
+            const list = document.getElementById('sage-anomaly-list'); 
+            if(!list) return;
+            list.innerHTML = '';
             let count = 0;
             FLEET_DATA.sort((a,b) => (b.ghost_savings||0) - (a.ghost_savings||0)).forEach(s => {
                 const budget = s.budget || 0; const ghost = s.ghost_savings || 0;
@@ -904,7 +928,7 @@
         }
 
         // ==========================================
-        // 6. M57 SCINDÉ (PRINCIPAL, IRVE, ENR)
+        // 6. M57 SCINDÉ
         // ==========================================
         window.filterM57 = function(type) {
             document.querySelectorAll('#m57-btn-main, #m57-btn-irve, #m57-btn-enr').forEach(el => { el.className = "bg-white/5 text-gray-400 border border-white/10 px-8 py-3 rounded-[2rem] text-sm font-bold hover:bg-white/10 transition uppercase tracking-widest"; });
@@ -925,39 +949,44 @@
                 color = "from-yellow-600 to-gold"; 
             }
             
-            document.getElementById('m57-current-type').value = type;
+            const currTypeEl = document.getElementById('m57-current-type');
+            if(currTypeEl) currTypeEl.value = type;
             
             safeSetText('m57-bp', formatCurrency(db.bp));
             safeSetText('m57-consumed', formatCurrency(db.cons));
             
             const pct = db.bp > 0 ? (db.cons / db.bp) * 100 : 0;
             const bar = document.getElementById('m57-bar');
-            bar.style.width = Math.min(pct, 100) + "%"; 
-            
-            if (pct > 85) bar.className = `h-full bg-alert rounded-full transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]`;
-            else bar.className = `h-full bg-gradient-to-r ${color} rounded-full transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-lg`;
+            if(bar) {
+                bar.style.width = Math.min(pct, 100) + "%"; 
+                if (pct > 85) bar.className = `h-full bg-alert rounded-full transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]`;
+                else bar.className = `h-full bg-gradient-to-r ${color} rounded-full transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-lg`;
+            }
 
             if(type === "PRINCIPAL") {
-                const ctx = document.getElementById('m57Chart').getContext('2d');
-                if(m57ChartInst) m57ChartInst.destroy();
-                const top5 = Object.values(CITY_DATA).sort((a,b) => b.budget - a.budget).slice(0,5);
-                m57ChartInst = new Chart(ctx, { type: 'doughnut', data: { labels: top5.map(c => c.name), datasets:[{ data: top5.map(c => c.budget), backgroundColor:['#00E5FF','#10B981','#F59E0B','#A855F7','#EF4444'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{position:'right', labels:{color:'white', font:{family: 'JetBrains Mono', size:10}}}}, cutout:'75%' } });
+                const ctx = document.getElementById('m57Chart')?.getContext('2d');
+                if(ctx) {
+                    if(m57ChartInst) m57ChartInst.destroy();
+                    const top5 = Object.values(CITY_DATA).sort((a,b) => b.budget - a.budget).slice(0,5);
+                    m57ChartInst = new Chart(ctx, { type: 'doughnut', data: { labels: top5.map(c => c.name), datasets:[{ data: top5.map(c => c.budget), backgroundColor:['#00E5FF','#10B981','#F59E0B','#A855F7','#EF4444'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{position:'right', labels:{color:'white', font:{family: 'JetBrains Mono', size:10}}}}, cutout:'75%' } });
+                }
             }
         }
         
         window.openM57Modal = function() {
-            const type = document.getElementById('m57-current-type').value || 'PRINCIPAL';
+            const currTypeEl = document.getElementById('m57-current-type');
+            const type = currTypeEl ? currTypeEl.value : 'PRINCIPAL';
             document.getElementById('m57-input-bp').value = M57_DB[type].bp || 0;
             document.getElementById('m57-input-cons').value = M57_DB[type].cons || 0;
             document.getElementById('m57-edit-modal').classList.remove('hidden');
         }
 
         window.saveM57Data = async function() {
-            const type = document.getElementById('m57-current-type').value || 'PRINCIPAL';
+            const currTypeEl = document.getElementById('m57-current-type');
+            const type = currTypeEl ? currTypeEl.value : 'PRINCIPAL';
             const bp = parseFloat(document.getElementById('m57-input-bp').value) || 0;
             const cons = parseFloat(document.getElementById('m57-input-cons').value) || 0;
             
-            // Reconstitution du payload pour ta route existante
             const payload = { bp_elec: 0, consumed_elec: 0, bp_gaz: 0, consumed_gaz: 0, bp_irve: M57_DB['IRVE'].bp, consumed_irve: M57_DB['IRVE'].cons, bp_enr: M57_DB['ENR'].bp, consumed_enr: M57_DB['ENR'].cons };
             
             if(type === 'PRINCIPAL') { payload.bp_elec = bp; payload.consumed_elec = cons; }
@@ -975,10 +1004,12 @@
         }
 
         // ==========================================
-        // 7. CHORUS PRO & GED GO (ENTONNOIR IA)
+        // 7. CHORUS PRO & GED GO
         // ==========================================
         function runChorus() {
-            const list = document.getElementById('chorus-list'); list.innerHTML = ''; let litiges = 0; let totalValid = 0;
+            const list = document.getElementById('chorus-list'); 
+            if(!list) return;
+            list.innerHTML = ''; let litiges = 0; let totalValid = 0;
             Object.values(CITY_DATA).sort((a,b) => b.vol - a.vol).forEach(c => {
                 if (c.vol <= 0) return;
                 const pmp = c.budget / (c.vol * 1000);
@@ -996,11 +1027,10 @@
                 list.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5 transition"><td class="px-8 py-4 font-bold text-white text-xs">${c.name}</td><td class="px-8 py-4 text-gray-500 font-mono text-xs">${c.provider || 'SDE PMP'}</td><td class="px-8 py-4 text-right font-mono text-xs">${Math.round(c.vol)}</td><td class="px-8 py-4 text-right font-mono text-xs ${pmpColor}">${pmp.toFixed(3)} €</td><td class="px-8 py-4 text-center">${status}</td></tr>`;
             });
             
-            const badge = document.getElementById('chorus-litiges');
             safeSetText('chorus-litiges', `${litiges} Litiges ouverts`);
-            if(litiges === 0) badge.className = "bg-success/20 text-success px-4 py-2 rounded-xl text-xs font-bold border border-success/50 uppercase tracking-widest";
+            const badge = document.getElementById('chorus-litiges');
+            if(badge && litiges === 0) badge.className = "bg-success/20 text-success px-4 py-2 rounded-xl text-xs font-bold border border-success/50 uppercase tracking-widest";
             
-            // Remplissage Funnel initial (Théorique)
             safeSetText('funnel-total', formatCurrency(TOTAL_SDE_BUDGET));
             safeSetText('funnel-valid', formatCurrency(totalValid));
             safeSetText('funnel-reject', formatCurrency(TOTAL_SDE_BUDGET - totalValid));
@@ -1008,11 +1038,10 @@
 
         window.auditChorusMassif = async function(input) {
             if(!input.files[0]) return;
-            App.toast("CORTEX audite la facture globale (Shadow Pricing)...", "info");
+            App.toast("CORTEX audite la facture PDF (Shadow Pricing)...", "info");
             const resDiv = document.getElementById('chorus-audit-result');
-            resDiv.classList.remove('hidden'); resDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-chorus mr-2 text-xl"></i> Vérification ligne à ligne de la facture EDF/Total en cours...';
+            resDiv.classList.remove('hidden'); resDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-chorus mr-2 text-xl"></i> Vérification ligne à ligne de la facture EDF/Total...';
             try {
-                // L'IA lit la vraie facture
                 const formData = new FormData(); formData.append('file', input.files[0]); formData.append('site_id', FLEET_DATA[0].id);
                 const res = await fetch('/api/finance/upload', { method: 'POST', body: formData });
                 
@@ -1060,11 +1089,13 @@
         }
 
         // ==========================================
-        // 8. CENTRALE ACHAT (DQE & GREEN PPA)
+        // 8. CENTRALE ACHAT (DQE)
         // ==========================================
         function runDqeUI() {
-            const list = document.getElementById('dqe-city-list'); list.innerHTML = '';
-            Object.values(CITY_DATA).sort((a,b) => a.name.localeCompare(b.name)).forEach(c => {
+            const list = document.getElementById('dqe-city-list'); 
+            if(!list) return;
+            list.innerHTML = '';
+            Object.values(CITY_DATA).sort((a,b) => String(a.name).localeCompare(String(b.name))).forEach(c => {
                 list.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5 cursor-pointer transition" onclick="window.toggleDqeCity('${c.name}')"><td class="px-8 py-4 text-center border-b border-white/5" onclick="event.stopPropagation()"><input type="checkbox" class="accent-sde w-4 h-4 dqe-city-chk cursor-pointer" value="${c.name}" data-vol="${c.vol}" onchange="window.updateDqeVol()"></td><td class="px-8 py-4 font-bold text-white text-xs border-b border-white/5">${c.name}</td><td class="px-8 py-4 text-center font-mono text-cyan font-bold text-xs border-b border-white/5">${c.count}</td><td class="px-8 py-4 text-right font-mono font-bold text-xs text-gray-300 border-b border-white/5">${Math.round(c.vol)} MWh</td></tr>`;
             });
         }
