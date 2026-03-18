@@ -5,11 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ENERGISTRAT V12.6 | Syndic.OS (Master Copropriétés)</title>
     
+    <!-- TAILWIND & CHART.JS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- LEAFLET MAPS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
+    <!-- FONTS & ICONS -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -31,6 +35,7 @@
     <style>
         body { background-color: #001529; color: #e2e8f0; overflow: hidden; font-family: 'Inter', sans-serif; }
         
+        /* BENTO DESIGN */
         .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 2rem; transition: all 0.3s ease; }
         .bento-card:hover { border-color: rgba(99, 102, 241, 0.4); transform: translateY(-2px); box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.2); }
         
@@ -445,7 +450,6 @@
                     </label>
                     <div id="invoice-loader" class="hidden mt-8 text-alert font-bold uppercase tracking-widest text-lg"><i class="fa-solid fa-microchip fa-spin text-2xl mr-2"></i> Extraction OCR CORTEX...</div>
                     <div id="invoice-result" class="hidden mt-8 p-6 bg-abysse rounded-2xl border border-white/10 text-base font-bold"></div>
-                    <!-- BOUTON RAPPORT D'ERREUR -->
                     <button id="btn-export-litige" onclick="App.toast('Génération de la lettre de contestation PDF...', 'info')" class="hidden mx-auto mt-6 bg-alert text-white px-8 py-4 rounded-[2rem] text-sm font-black hover:bg-white hover:text-alert transition shadow-lg items-center gap-3 uppercase tracking-widest"><i class="fa-solid fa-gavel"></i> Éditer Lettre de Contestation</button>
                 </div>
             </div>
@@ -591,9 +595,16 @@
         let GREEN_LEAGUE =[];
         let SUBVENTIONS_DATA =[];
         let MARKET_DATA = { elec: 85.0, trve: 230.0 };
-        let IS_GLOBAL = true;
-        let chartInstance = null;
         let MAP_GROUP_DATA = {};
+        
+        let IS_GLOBAL = true;
+        let CURRENT_ID = null;
+        let CURRENT_NAME = null;
+        let CURRENT_BUDGET = 0;
+        let CURRENT_SURFACE = 0;
+        
+        let chartInstance = null;
+        let mapInstance = null;
 
         // --- GOD MODE INTERCEPTOR ---
         const urlParams = new URLSearchParams(window.location.search);
@@ -640,8 +651,9 @@
         // 2. DATA LOAD & ZÉRO MOCK
         // ==========================================
         async function initSyndic() {
-            await fetchMarketData();
-            await fetchSubventions();
+            try { fetchMarketData(); } catch(e) {}
+            try { fetchSubventions(); } catch(e) {}
+            
             try {
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
@@ -652,13 +664,15 @@
                     const selector = document.getElementById('site-selector');
                     selector.innerHTML = '<option value="ALL">🏢 Vision Globale (Tout le Cabinet)</option>';
                     
-                    const groupedNames =[...new Set(FLEET_DATA.map(s => s.name))];
+                    // Groupement par Immeuble (Nom)
+                    const groupedNames = [...new Set(FLEET_DATA.map(s => s.name))];
                     groupedNames.forEach(name => {
                         const opt = document.createElement('option');
                         opt.value = name; opt.innerText = `Copropriété : ${name}`;
                         selector.appendChild(opt);
                     });
 
+                    // Lancement des moteurs
                     window.applyMapFilters();
                     window.loadSite("ALL");
                 }
@@ -666,23 +680,19 @@
         }
 
         async function fetchMarketData() {
-            try {
-                const res = await fetch('/api/tools/sniper/market');
-                const data = await res.json();
-                if(data.success && data.current_prices) {
-                    MARKET_DATA.elec = data.current_prices.elec || 85.0;
-                    MARKET_DATA.trve = data.current_prices.trve || 230.0;
-                    safeSetText('badge-trve-price', `${MARKET_DATA.trve} €/MWh`);
-                }
-            } catch(e) {}
+            const res = await fetch('/api/tools/sniper/market');
+            const data = await res.json();
+            if(data.success && data.current_prices) {
+                MARKET_DATA.elec = data.current_prices.elec || 85.0;
+                MARKET_DATA.trve = data.current_prices.trve || 230.0;
+                safeSetText('badge-trve-price', `${MARKET_DATA.trve} €/MWh`);
+            }
         }
 
         async function fetchSubventions() {
-            try {
-                const res = await fetch('/api/tools/subventions');
-                const data = await res.json();
-                if(data.success && data.results) SUBVENTIONS_DATA = data.results;
-            } catch(e) {}
+            const res = await fetch('/api/tools/subventions');
+            const data = await res.json();
+            if(data.success && data.results) SUBVENTIONS_DATA = data.results;
         }
 
         // ==========================================
@@ -708,9 +718,9 @@
                     MAP_GROUP_DATA[coproName] = { name: coproName, city: s.city || 'Inconnue', vol: 0, budget: 0, ghost: 0, count: 0, ids:[] };
                     totalCount++;
                 }
-                MAP_GROUP_DATA[coproName].vol += (s.volume || 0); 
-                MAP_GROUP_DATA[coproName].budget += (s.budget || 0); 
-                MAP_GROUP_DATA[coproName].ghost += (s.ghost_savings || 0);
+                MAP_GROUP_DATA[coproName].vol += (parseFloat(s.volume) || 0); 
+                MAP_GROUP_DATA[coproName].budget += (parseFloat(s.budget) || 0); 
+                MAP_GROUP_DATA[coproName].ghost += (parseFloat(s.ghost_savings) || 0);
                 MAP_GROUP_DATA[coproName].count += 1; 
                 MAP_GROUP_DATA[coproName].ids.push(s.id);
             });
@@ -789,6 +799,7 @@
                         const coords = data[0].centre.coordinates;
                         let color = c.score >= 80 ? '#10B981' : (c.score < 50 ? '#EF4444' : '#F59E0B');
                         
+                        // Décalage pour éviter superposition si même ville
                         const offsetLat = (Math.random() - 0.5) * 0.02;
                         const offsetLon = (Math.random() - 0.5) * 0.02;
                         
@@ -796,7 +807,7 @@
                         marker.bindPopup(`<div class="text-center p-3"><b class="text-white font-black text-xs block mb-1 uppercase tracking-widest">${c.name}</b><span style="color:${color};" class="font-black text-lg font-mono">Score: ${c.score}</span><br><span class="text-[10px] text-gray-400 mt-2 block border-t border-white/20 pt-2 uppercase">${c.city}</span><br><button onclick="window.selectSiteFromMap('${c.name.replace(/'/g, "\\'")}')" class="mt-2 w-full bg-syndic text-white font-bold py-2 rounded-xl uppercase tracking-widest text-[9px] hover:bg-white hover:text-syndic transition shadow-lg">Ouvrir Dossier</button></div>`);
                     }
                 } catch(e) {}
-                await new Promise(r => setTimeout(r, 50)); 
+                await new Promise(r => setTimeout(r, 50));
             }
             
             const loader = document.getElementById('map-loader');
@@ -842,7 +853,7 @@
                     if(banner) banner.className = "bg-gradient-to-r from-card to-abysse border border-white/10 rounded-2xl p-4 flex items-center gap-4 shadow-[0_0_20px_rgba(249,115,22,0.15)] mb-6";
                     if(iconEl) { iconEl.className = "w-12 h-12 rounded-full flex items-center justify-center text-2xl text-gas shadow-inner bg-gas/10 border border-gas/30"; iconEl.innerHTML = '<i class="fa-solid fa-fire"></i>'; }
                     if(titleEl) { titleEl.innerText = "CHAUFFAGE COLLECTIF"; titleEl.className = "text-white font-black uppercase tracking-widest text-sm"; }
-                    if(descEl) descEl.innerText = "L'IA analyse la signature thermique (DPE) pour les Appels de Fonds.";
+                    if(descEl) descEl.innerText = "L'IA analyse la signature thermique (DPE) pour la rénovation.";
                     if(thermicCard) thermicCard.style.display = "flex"; 
                 } else {
                     if(banner) banner.className = "bg-gradient-to-r from-card to-abysse border border-white/10 rounded-2xl p-4 flex items-center gap-4 shadow-[0_0_20px_rgba(0,229,255,0.15)] mb-6";
@@ -882,16 +893,17 @@
             runCeeHunter(dataToAnalyze);
             runContractHistory(dataToAnalyze);
             runB2B2CConsole(dataToAnalyze);
+            runGamification();
         }
 
         function runFinancials(data) {
             let totalVol = 0; let totalBudget = 0; let totalGhost = 0; let totalSurface = 0;
             const processedSurfaces = new Set();
 
-            data.sort((a,b) => b.budget - a.budget).forEach(s => {
+            data.forEach(s => {
                 let vol = parseFloat(s.volume) || 0;
                 let budg = parseFloat(s.budget) || 0;
-                totalVol += vol; totalBudget += budg; totalGhost += (s.ghost_savings || 0);
+                totalVol += vol; totalBudget += budg; totalGhost += (parseFloat(s.ghost_savings) || 0);
 
                 if(s.surface > 0 && !processedSurfaces.has(s.name)) {
                     totalSurface += s.surface;
@@ -1059,7 +1071,7 @@
         // 8. STUDIO DE CAMPAGNE AG (B2B2C)
         // ==========================================
         function runB2B2CConsole(data) {
-            // Approx: 1 bâtiment = ~25 logements pour une copropriété
+            // Approx: 1 bâtiment = ~25 logements
             const totalFoyers = IS_GLOBAL ? (FLEET_DATA.length * 25) : (data.length * 25);
             const votesTotal = Math.floor(totalFoyers * 0.55); 
             const votesPour = Math.floor(votesTotal * 0.88); 
@@ -1070,10 +1082,35 @@
             if(vBar) vBar.style.width = `${Math.round((votesPour/votesTotal)*100)}%`;
             safeSetText('b2b2c-active-users', Math.floor(totalFoyers * 0.70));
 
-            // Loi LOM (Droit à la prise)
+            // Loi LOM
             const lomSigned = Math.floor(totalFoyers * 0.12); 
             safeSetText('lom-signed', lomSigned);
             safeSetText('lom-budget', formatCurrency(Math.round(lomSigned * 120))); 
+        }
+
+        function runGamification() {
+            const list = document.getElementById('gaming-leaderboard'); 
+            if(!list) return;
+            list.innerHTML = '';
+            
+            let rankingData = GREEN_LEAGUE.length > 0 ? GREEN_LEAGUE : FLEET_DATA.map(s => ({
+                name: s.name, city: s.city, ghost_savings: s.ghost_savings || 0, score: Math.max(0, Math.round(100 - (((s.ghost_savings||0) / (s.budget||1000))*100)))
+            }));
+            
+            rankingData.sort((a,b) => b.score - a.score).slice(0, 10).forEach((c, idx) => {
+                const medal = idx === 0 ? "🥇" : (idx === 1 ? "🥈" : (idx === 2 ? "🥉" : `<span class="text-gray-600 font-bold">${idx+1}</span>`));
+                list.innerHTML += `
+                    <div class="border rounded-2xl p-4 flex justify-between items-center bg-white/5 border-white/5 hover:border-gaming/50 transition">
+                        <div class="flex items-center gap-4">
+                            <div class="w-8 text-center text-2xl drop-shadow-md">${medal}</div>
+                            <div><div class="text-sm font-bold text-white">${c.name || 'Copropriété'}</div><div class="text-[10px] text-gray-500 mt-1 font-mono"><i class="fa-solid fa-location-dot mr-1"></i>${c.city || 'Ville'}</div></div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-mono font-black text-gaming text-2xl">${c.score}<span class="text-[10px] font-normal">/100</span></div>
+                            <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest mt-1">Score Immeuble</div>
+                        </div>
+                    </div>`;
+            });
         }
 
         window.openVoteModal = function() {
