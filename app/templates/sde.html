@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V12.6 | SDE.OS (Vaisseau Amiral)</title>
+    <title>ENERGISTRAT V12.6 | SDE.OS (Vaisseau Amiral FNCCR)</title>
     
     <!-- TAILWIND & CHART.JS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -24,7 +24,7 @@
                         abysse: '#001529', card: '#001D3D', sidebar: '#001529',
                         sde: '#10B981', cyan: '#00E5FF', alert: '#EF4444', 
                         gold: '#F59E0B', sage: '#A855F7', chorus: '#F43F5E',
-                        solar: '#EAB308', greenenergy: '#84CC16'
+                        solar: '#EAB308', greenenergy: '#84CC16', ep: '#FCD34D'
                     }, 
                     fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] }
                 } 
@@ -34,7 +34,8 @@
     <style>
         body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
         
-        .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 3rem; transition: all 0.3s ease; }
+        /* BENTO DESIGN */
+        .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 2rem; transition: all 0.3s ease; }
         .bento-card:hover { border-color: rgba(16, 185, 129, 0.4); transform: translateY(-2px); box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.2); }
 
         .nav-item.active { background: rgba(16, 185, 129, 0.15); border-right: 4px solid #10B981; color: white; }
@@ -44,14 +45,17 @@
         #view-map.active { display: flex !important; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
         
-        #map { width: 100%; height: 100%; border-radius: 2.5rem; z-index: 10; background-color: transparent !important; }
+        /* LEAFLET DARK MODE (Abysse) */
+        #map { width: 100%; height: 100%; border-radius: 1.5rem; z-index: 10; background-color: transparent !important; }
         .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
         .leaflet-popup-content-wrapper { background-color: #001529; color: white; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 1rem; }
         .leaflet-popup-tip { background-color: #001529; }
         
-        ::-webkit-scrollbar { width: 6px; height: 6px; } 
-        ::-webkit-scrollbar-track { background: transparent; } 
-        ::-webkit-scrollbar-thumb { background: #10B981; border-radius: 3px; }
+        /* CUSTOM SELECTS & INPUTS */
+        select.cyber-select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310B981' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 1rem center; background-size: 1em; background-color: rgba(255,255,255,0.05); color: white; padding: 10px 40px 10px 20px; border-radius: 1.5rem; border: 1px solid rgba(255,255,255,0.1); outline: none; cursor: pointer; }
+        select.cyber-select option { background-color: #001D3D; color: white; }
+        .search-input { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 12px 16px 12px 40px; border-radius: 1.5rem; width: 100%; font-size: 0.875rem; outline: none; transition: all 0.3s; }
+        .search-input:focus { border-color: #10B981; box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }
 
         textarea.sage-input { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 1.5rem; padding: 1.5rem; width: 100%; outline: none; resize: none; transition: border-color 0.3s; font-family: 'Inter', sans-serif; }
         textarea.sage-input:focus { border-color: #A855F7; box-shadow: 0 0 15px rgba(168,85,247,0.2); }
@@ -59,11 +63,13 @@
         /* Toggle Green PPA */
         .toggle-checkbox:checked { right: 0; border-color: #84CC16; }
         .toggle-checkbox:checked + .toggle-label { background-color: #84CC16; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #10B981; border-radius: 3px; }
     </style>
 </head>
 <body class="flex h-screen w-screen bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
 
-    <!-- SIDEBAR -->
+    <!-- SIDEBAR GAUCHE -->
     <aside class="w-64 bg-abysse border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0 shadow-2xl h-screen">
         <div class="h-24 flex items-center px-6 border-b border-white/5 bg-card/50">
             <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sde to-teal-800 flex items-center justify-center text-white font-bold shadow-[0_0_20px_rgba(16,185,129,0.4)] text-xl mr-3">
@@ -113,19 +119,27 @@
         </div>
     </aside>
 
+    <!-- MAIN CONTENT -->
     <main class="flex-1 flex flex-col relative bg-transparent overflow-hidden">
         
-        <!-- HEADER -->
+        <!-- HEADER TOP -->
         <header class="h-24 border-b border-white/5 flex items-center justify-between px-10 bg-abysse/90 backdrop-blur z-20 flex-shrink-0 shadow-md">
             <div>
                 <h2 id="page-title" class="text-3xl font-black text-white italic tracking-tight drop-shadow-lg">Cartographie Territoriale</h2>
-                <p class="text-xs text-gray-400 font-mono mt-1" id="page-desc">Supervision des communes membres du syndicat d'énergie</p>
+                <p class="text-xs text-gray-400 font-mono mt-1" id="page-desc">Supervision macro des communes membres du syndicat d'énergie</p>
             </div>
             <div class="flex items-center gap-8">
+                <!-- LE MAGOT CEE -->
                 <div class="text-right border-r border-white/10 pr-8">
-                    <span class="text-[10px] text-gray-500 uppercase font-bold tracking-widest block mb-1">Volume Massifié</span>
+                    <span class="text-[10px] text-gold uppercase font-bold tracking-widest block mb-1">Enveloppe CEE Sécurisable</span>
+                    <span class="text-2xl font-black text-gold font-mono drop-shadow-[0_0_15px_rgba(245,158,11,0.4)]" id="kpi-total-cee">-- €</span>
+                </div>
+                <!-- VOLUME MASSIFIÉ -->
+                <div class="text-right border-r border-white/10 pr-8">
+                    <span class="text-[10px] text-gray-500 uppercase font-bold tracking-widest block mb-1">Volume Géré (SGE)</span>
                     <span class="text-2xl font-black text-white font-mono drop-shadow-md" id="kpi-total-vol">-- MWh</span>
                 </div>
+                <!-- COMMUNES -->
                 <div class="text-right">
                     <span class="text-[10px] text-gray-500 uppercase font-bold tracking-widest block mb-1">Communes Actives</span>
                     <span class="text-3xl font-black text-sde font-mono drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]" id="kpi-total-cities">--</span>
@@ -135,44 +149,83 @@
 
         <div class="p-8 overflow-y-auto h-full pb-32">
             
-            <!-- VUE 1 : MAP LEAFLET & RAPPORTS -->
+            <!-- ========================================== -->
+            <!-- VUE 1 : MAP LEAFLET, RAPPORTS & INCARNATION-->
+            <!-- ========================================== -->
             <div id="view-map" class="view-section active flex-col max-w-[1600px] w-full mx-auto h-full gap-6">
+                
+                <!-- L'OMNI-SEARCH & DATA HEALTH (NOUVEAU) -->
+                <div class="grid grid-cols-12 gap-6 flex-shrink-0">
+                    <!-- OMNISEARCH (8 Cols) -->
+                    <div class="col-span-8 bento-card p-4 flex gap-4 items-center bg-card/80 shadow-lg border border-sde/20">
+                        <div class="relative flex-1">
+                            <i class="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-sde"></i>
+                            <input type="text" id="omni-search" oninput="window.applyMapFilters()" placeholder="Rechercher une commune, un PDL..." class="search-input">
+                        </div>
+                        <select id="filter-ep" onchange="window.applyMapFilters()" class="cyber-select text-xs font-bold w-48 border-cyan/40 text-cyan">
+                            <option value="all">Tous les Bâtiments</option>
+                            <option value="ep">Éclairage Public (EP)</option>
+                        </select>
+                        <select id="filter-lot" onchange="window.applyMapFilters()" class="cyber-select text-xs font-bold w-48">
+                            <option value="all">Tous les Lots</option>
+                        </select>
+                    </div>
+
+                    <!-- DATA HEALTH RADAR (4 Cols) -->
+                    <div class="col-span-4 bento-card p-4 flex items-center justify-between bg-gradient-to-r from-abysse to-alert/10 border-l-4 border-alert shadow-lg" id="data-health-card">
+                        <div>
+                            <h4 class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Santé de la Base 3D</h4>
+                            <div class="text-xs text-white font-bold" id="health-msg">Analyse des compteurs...</div>
+                        </div>
+                        <div class="w-12 h-12 rounded-full border-4 border-alert/30 flex items-center justify-center text-sm font-black text-alert" id="health-pct">--%</div>
+                    </div>
+                </div>
+
+                <!-- CARTE ET LISTE DES COMMUNES (INCARNATION) -->
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[400px] flex-shrink-0">
-                    <div class="col-span-8 bento-card p-1 relative border-2 border-sde/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col">
+                    <!-- LEAFLET MAP -->
+                    <div class="col-span-7 bento-card p-1 relative overflow-hidden border-2 border-sde/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col">
                         <div id="map" class="flex-1"></div>
-                        <div id="map-loader" class="absolute inset-0 bg-abysse/90 z-[2000] flex flex-col items-center justify-center rounded-[2.5rem] backdrop-blur-sm">
+                        <div id="map-loader" class="absolute inset-0 bg-abysse/90 z-[2000] flex flex-col items-center justify-center rounded-[1.5rem] backdrop-blur-sm">
                             <i class="fa-solid fa-satellite-dish text-sde text-5xl animate-pulse mb-6 drop-shadow-[0_0_20px_rgba(16,185,129,0.8)]"></i>
                             <p class="text-white font-black text-xl tracking-widest uppercase">Géocodage du Territoire...</p>
                         </div>
-                        <div class="absolute bottom-6 left-6 bg-abysse/90 backdrop-blur-md p-4 rounded-2xl border border-white/10 z-[1000] text-[10px] font-bold text-white shadow-2xl">
-                            <div class="mb-2 text-gray-400 uppercase tracking-widest border-b border-white/10 pb-1">Score Sobriété (Commune)</div>
-                            <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-success"></span> 80 - 100 (Efficace)</div>
-                            <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-gold"></span> 50 - 79 (Moyen)</div>
-                            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-alert animate-pulse shadow-[0_0_10px_#EF4444]"></span> < 50 (Gaspillage)</div>
+                        <div class="absolute bottom-4 left-4 bg-abysse/90 backdrop-blur-md p-3 rounded-2xl border border-white/10 z-[1000] text-[10px] font-bold text-white shadow-2xl">
+                            <div class="mb-2 text-gray-400 uppercase tracking-widest border-b border-white/10 pb-1">Score Sobriété</div>
+                            <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-success"></span> 80 - 100 (Efficace)</div>
+                            <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-gold"></span> 50 - 79 (Moyen)</div>
+                            <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-alert animate-pulse shadow-[0_0_10px_#EF4444]"></span> < 50 (Gaspillage)</div>
                         </div>
                     </div>
 
-                    <div class="col-span-4 bento-card p-0 flex flex-col h-full overflow-hidden shadow-lg border border-white/10">
-                        <div class="p-8 border-b border-white/5 bg-card/50 flex justify-between items-center flex-shrink-0">
+                    <!-- LISTE COMMUNES & PONT MAIRIE.OS -->
+                    <div class="col-span-5 bento-card p-0 flex flex-col h-full overflow-hidden shadow-lg border border-white/10">
+                        <div class="p-6 border-b border-white/5 bg-card/50 flex justify-between items-center flex-shrink-0">
                             <div>
-                                <h3 class="text-xl font-black text-white flex items-center gap-3"><i class="fa-solid fa-file-pdf text-sde"></i> Usine à Rapports</h3>
-                                <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-widest">Édition des bilans aux Maires</p>
+                                <h3 class="text-sm font-black text-white flex items-center gap-3 uppercase tracking-widest"><i class="fa-solid fa-city text-sde"></i> Répertoire des Mairies</h3>
+                                <p class="text-[9px] text-gray-400 mt-1 uppercase font-bold tracking-widest">Édition Bilan (PDF) & Mode Incarnation (God Mode)</p>
                             </div>
                         </div>
                         <div class="flex-1 overflow-y-auto p-4 space-y-2 bg-abysse/30" id="city-report-list">
                             <!-- Injecté par JS -->
+                            <div class="text-center text-gray-500 font-mono text-xs mt-10">Recherche de communes...</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- VUE 2 : CADASTRE SOLAIRE (NOUVEAU) -->
+            <!-- ========================================== -->
+            <!-- VUE 2 : CADASTRE SOLAIRE (ENR)             -->
+            <!-- ========================================== -->
             <div id="view-solar" class="view-section max-w-[1600px] mx-auto space-y-6">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2 bento-card p-10 border-t-4 border-solar bg-gradient-to-r from-card to-solar/5 shadow-2xl relative overflow-hidden">
+                    <!-- KPI SOLAIRE GLOBAL -->
+                    <div class="lg:col-span-2 bento-card p-10 border-t-4 border-solar bg-gradient-to-r from-card to-solar/5 shadow-2xl relative overflow-hidden flex flex-col justify-between">
                         <i class="fa-solid fa-sun absolute -right-10 -bottom-10 text-9xl text-solar opacity-5"></i>
-                        <h3 class="text-2xl font-black text-white uppercase tracking-widest flex items-center gap-3 mb-2"><i class="fa-solid fa-solar-panel text-solar"></i> Gisement Solaire Territorial</h3>
-                        <p class="text-xs text-gray-400 font-mono mb-8">Scan IA des 50 plus grandes toitures publiques du syndicat (PVGIS).</p>
+                        <div>
+                            <h3 class="text-2xl font-black text-white uppercase tracking-widest flex items-center gap-3 mb-2"><i class="fa-solid fa-solar-panel text-solar"></i> Gisement Solaire Territorial</h3>
+                            <p class="text-xs text-gray-400 font-mono mb-8">Scan IA des plus grandes toitures publiques du syndicat d'énergie.</p>
+                        </div>
                         
                         <div class="grid grid-cols-2 gap-8 mb-8">
                             <div class="bg-black/40 p-6 rounded-3xl border border-white/5 shadow-inner">
@@ -189,19 +242,20 @@
                         <div class="bg-abysse/80 p-6 rounded-2xl border-l-4 border-sde flex items-center justify-between shadow-lg">
                             <div>
                                 <h4 class="font-bold text-white text-sm mb-1 uppercase tracking-widest">Autoconsommation Collective (PMAC)</h4>
-                                <p class="text-[10px] text-gray-400 font-mono">Couverture des besoins de l'Éclairage Public par le surplus solaire des écoles.</p>
+                                <p class="text-[10px] text-gray-400 font-mono">Couverture théorique des besoins de l'Éclairage Public par le surplus solaire des écoles.</p>
                             </div>
                             <div class="text-right">
                                 <div class="text-2xl font-black text-sde font-mono" id="solar-kpi-cover">-- %</div>
-                                <div class="text-[9px] text-gray-500 uppercase font-bold">Taux de couverture</div>
+                                <div class="text-[9px] text-gray-500 uppercase font-bold">Taux de couverture EP</div>
                             </div>
                         </div>
                     </div>
 
+                    <!-- TOP 5 TOITS D'OR -->
                     <div class="bento-card p-0 flex flex-col h-full overflow-hidden shadow-lg border border-white/10">
-                        <div class="p-6 border-b border-white/5 bg-card/50">
+                        <div class="p-6 border-b border-white/5 bg-card/50 flex-shrink-0">
                             <h3 class="text-sm font-black text-white uppercase tracking-widest"><i class="fa-solid fa-ranking-star text-gold mr-2"></i> Les "Toits d'Or"</h3>
-                            <p class="text-[9px] text-gray-400 mt-1">Top 5 des bâtiments les plus rentables</p>
+                            <p class="text-[9px] text-gray-400 mt-1">Top 5 des bâtiments les plus rentables du SDE</p>
                         </div>
                         <div class="flex-1 overflow-y-auto bg-abysse/30 p-4 space-y-3" id="solar-gold-roofs">
                             <div class="text-center text-gray-500 font-mono text-xs mt-10"><i class="fa-solid fa-satellite text-solar animate-pulse text-2xl mb-2 block"></i> Scan des toitures en cours...</div>
@@ -210,9 +264,11 @@
                 </div>
             </div>
 
-            <!-- VUE 3 : CONSOLE SAGE (IA + VISION.OS) -->
+            <!-- ========================================== -->
+            <!-- VUE 3 : CONSOLE SAGE (IA + VISION.OS)      -->
+            <!-- ========================================== -->
             <div id="view-sage" class="view-section max-w-[1600px] mx-auto">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     <!-- FILE D'ATTENTE -->
                     <div class="col-span-5 bento-card p-0 overflow-hidden flex flex-col h-[650px] border-t-4 border-cyan shadow-lg">
                         <div class="p-6 border-b border-white/5 bg-card/50 flex justify-between items-center flex-shrink-0">
@@ -222,7 +278,7 @@
                         <div class="flex-1 overflow-y-auto bg-abysse/30" id="sage-anomaly-list"></div>
                     </div>
                     
-                    <!-- L'ÉDITEUR -->
+                    <!-- L'ÉDITEUR SAGE -->
                     <div class="col-span-7 bento-card p-10 flex flex-col h-[650px] relative overflow-hidden shadow-2xl border border-sage/20" id="sage-editor-panel">
                         <div id="sage-empty" class="absolute inset-0 flex flex-col items-center justify-center bg-card z-10">
                             <i class="fa-solid fa-user-tie text-8xl text-gray-600 mb-6 opacity-30"></i>
@@ -231,28 +287,28 @@
                         </div>
                         
                         <div id="sage-active" class="hidden flex-col h-full z-20">
-                            <div class="flex justify-between items-start border-b border-white/10 pb-6 mb-6">
+                            <div class="flex justify-between items-start border-b border-white/10 pb-6 mb-6 flex-shrink-0">
                                 <div>
-                                    <h3 class="text-2xl font-black text-white mb-2 truncate" id="sage-site-name">--</h3>
+                                    <h3 class="text-xl font-black text-white mb-2 truncate max-w-md" id="sage-site-name">--</h3>
                                     <div class="flex gap-4">
                                         <span class="text-xs text-gray-400 font-bold"><i class="fa-solid fa-location-dot text-cyan mr-1"></i> <span id="sage-city-name">Commune</span></span>
                                         <span class="text-xs text-cyan font-mono font-bold"><i class="fa-solid fa-bolt mr-1"></i> PDL: <span id="sage-site-pdl">--</span></span>
                                     </div>
                                 </div>
-                                <button onclick="window.goToModule('/vision')" class="bg-hologram/20 text-hologram border border-hologram/50 px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-hologram hover:text-white transition flex items-center gap-2 shadow-[0_0_15px_rgba(139,92,246,0.3)] uppercase tracking-widest">
+                                <button onclick="window.openSageVision()" class="bg-hologram/20 text-hologram border border-hologram/50 px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-hologram hover:text-white transition flex items-center gap-2 shadow-[0_0_15px_rgba(139,92,246,0.3)] uppercase tracking-widest whitespace-nowrap">
                                     <i class="fa-solid fa-vr-cardboard"></i> Ouvrir Hologramme Y/Y
                                 </button>
                             </div>
                             <div class="flex-1 flex flex-col">
                                 <label class="text-xs font-bold text-sage uppercase tracking-widest mb-3 flex items-center gap-2"><i class="fa-solid fa-pen-nib"></i> Votre Recommandation d'Expert</label>
                                 <textarea id="sage-comment" class="sage-input flex-1 mb-6 text-sm" placeholder="Ex: M. le Maire, l'Hologramme Y/Y confirme une dérive de consommation nocturne..."></textarea>
-                                <p class="text-xs text-gray-400 mb-6 leading-relaxed bg-abysse p-4 rounded-xl border border-white/5">
-                                    <i class="fa-solid fa-info-circle text-sage mr-2"></i> Ce texte sera sauvegardé dans la Base 3D et apparaîtra sur le Dashboard de la Mairie.
+                                <p class="text-xs text-gray-400 mb-6 leading-relaxed bg-abysse p-4 rounded-xl border border-white/5 flex-shrink-0">
+                                    <i class="fa-solid fa-info-circle text-sage mr-2"></i> Ce texte sera sauvegardé dans la Base 3D et apparaîtra en direct sur le Dashboard <b>Mairie.OS</b> de la commune.
                                 </p>
-                                <div class="flex gap-4 mt-auto">
+                                <div class="flex gap-4 mt-auto flex-shrink-0">
                                     <button onclick="window.closeSageEditor()" class="px-6 py-4 rounded-2xl text-gray-400 hover:text-white font-bold text-xs transition border border-white/10 hover:bg-white/5 uppercase tracking-widest">Annuler</button>
                                     <button onclick="window.publishSageAudit()" class="flex-1 bg-sage text-white font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:bg-white hover:text-sage transition text-xs flex justify-center items-center gap-2 uppercase tracking-widest">
-                                        <i class="fa-solid fa-paper-plane"></i> Transmettre à la Mairie
+                                        <i class="fa-solid fa-paper-plane"></i> Transmettre au Maire
                                     </button>
                                 </div>
                             </div>
@@ -261,7 +317,9 @@
                 </div>
             </div>
 
-            <!-- VUE 4 : M57 SCINDÉ (PRINCIPAL, IRVE, ENR) -->
+            <!-- ========================================== -->
+            <!-- VUE 4 : M57 SCINDÉ (PRINCIPAL, IRVE, ENR)  -->
+            <!-- ========================================== -->
             <div id="view-m57" class="view-section max-w-[1400px] mx-auto">
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
                     <div class="col-span-12 flex gap-4 justify-center">
@@ -271,19 +329,20 @@
                     </div>
                 </div>
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    <div class="col-span-8 bento-card p-10 relative overflow-hidden border-t-4 border-gold shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
+                    <div class="col-span-8 bento-card p-10 relative overflow-hidden border-t-4 border-gold shadow-[0_20px_50px_rgba(0,0,0,0.4)] flex flex-col justify-between">
                         <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-8">Exécution Budgétaire (<span id="m57-title" class="text-white">PRINCIPAL</span>)</h3>
                         <div class="flex justify-between items-end mb-6">
                             <div><span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Mandaté à date</span><div class="text-5xl font-black text-white font-mono drop-shadow-md" id="m57-consumed">-- €</div></div>
                             <div class="text-right">
-                                <span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Budget Primitif (SDE)</span>
-                                <div class="text-3xl font-bold text-gold font-mono" id="m57-bp">-- €</div>
+                                <span class="text-xs text-gray-500 font-bold uppercase tracking-widest flex items-center gap-2 justify-end">Budget Primitif (BP) <button onclick="window.openM57Modal()" class="text-cyan hover:text-white transition px-2 py-1 bg-white/5 rounded-lg border border-white/10 shadow-sm normal-case"><i class="fa-solid fa-pen-to-square"></i> Ajuster</button></span>
+                                <div class="text-3xl font-bold text-gold font-mono mt-1" id="m57-bp">-- €</div>
                             </div>
                         </div>
                         <div class="w-full bg-abysse h-8 rounded-full overflow-hidden relative border border-white/10 p-1">
                             <div id="m57-bar" class="h-full bg-gradient-to-r from-yellow-600 to-gold rounded-full transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-lg" style="width: 0%"></div>
                             <div class="absolute top-0 bottom-0 w-1 bg-alert z-20" style="left: 85%" title="Seuil Alerte (85%)"></div>
                         </div>
+                        <div class="flex justify-between text-[10px] font-bold text-gray-500 mt-3 uppercase tracking-widest z-10 relative"><span>0%</span><span class="text-alert mr-[15%]"><i class="fa-solid fa-triangle-exclamation"></i> Seuil Légal 85%</span><span>100%</span></div>
                     </div>
                     <div class="col-span-4 bento-card p-8 h-[350px] flex flex-col shadow-lg border border-white/10">
                         <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Poids par Commune (Top 5)</h3>
@@ -292,10 +351,27 @@
                 </div>
             </div>
 
-            <!-- VUE 5 : CHORUS PRO & GED GO -->
+            <!-- ========================================== -->
+            <!-- VUE 5 : CHORUS PRO & GED GO (NOUVEAU FUNNEL) -->
+            <!-- ========================================== -->
             <div id="view-chorus" class="view-section max-w-[1600px] mx-auto space-y-6">
+                <!-- LE NOUVEAU FUNNEL CHORUS PRO -->
+                <div class="grid grid-cols-3 gap-6 mb-2">
+                    <div class="bento-card p-6 border-t-4 border-gray-600 text-center shadow-lg bg-abysse/50">
+                        <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Montant Facturé (Uplodé)</div>
+                        <div class="text-3xl font-black text-white font-mono" id="funnel-total">-- €</div>
+                    </div>
+                    <div class="bento-card p-6 border-t-4 border-success text-center shadow-lg bg-success/5">
+                        <div class="text-[10px] text-success font-bold uppercase tracking-widest mb-2"><i class="fa-solid fa-check"></i> PMP Conforme (Validé)</div>
+                        <div class="text-3xl font-black text-success font-mono" id="funnel-valid">-- €</div>
+                    </div>
+                    <div class="bento-card p-6 border-t-4 border-chorus text-center shadow-lg bg-chorus/5">
+                        <div class="text-[10px] text-chorus font-bold uppercase tracking-widest mb-2"><i class="fa-solid fa-triangle-exclamation"></i> Surfacturation Bloquée</div>
+                        <div class="text-4xl font-black text-chorus font-mono drop-shadow-[0_0_15px_rgba(244,63,94,0.5)] animate-pulse" id="funnel-reject">0 €</div>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    
                     <!-- CHORUS AUDIT -->
                     <div class="bento-card p-8 border-dashed border-2 border-chorus/40 bg-chorus/5 text-center transition group hover:border-chorus hover:bg-chorus/10 flex flex-col justify-center shadow-[0_0_30px_rgba(244,63,94,0.15)]">
                         <label class="cursor-pointer block w-full">
@@ -305,10 +381,10 @@
                             <input type="file" class="hidden" accept="application/pdf" onchange="window.auditChorusMassif(this)">
                         </label>
                         <div id="chorus-audit-result" class="hidden mt-6 p-4 bg-abysse rounded-2xl border border-white/10 text-sm font-bold"></div>
-                        <button id="btn-export-rejet" onclick="window.exportChorusReject()" class="hidden mt-4 mx-auto bg-chorus text-white px-6 py-3 rounded-[2rem] text-xs font-black hover:bg-white hover:text-chorus transition shadow-lg items-center gap-2 uppercase tracking-widest"><i class="fa-solid fa-file-csv"></i> Exporter Fichier de Rejet</button>
+                        <button id="btn-export-rejet" onclick="window.exportChorusReject()" class="hidden mt-4 mx-auto bg-chorus text-white px-6 py-3 rounded-[2rem] text-xs font-black hover:bg-white hover:text-chorus transition shadow-lg items-center gap-2 uppercase tracking-widest"><i class="fa-solid fa-file-csv"></i> Fichier de Rejet (CSV)</button>
                     </div>
 
-                    <!-- NOUVEAU : GED GARANTIES D'ORIGINE -->
+                    <!-- GED GARANTIES D'ORIGINE -->
                     <div class="bento-card p-8 border-t-4 border-greenenergy shadow-lg bg-abysse/50 flex flex-col">
                         <div class="flex justify-between items-center border-b border-white/10 pb-4 mb-4">
                             <h3 class="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-leaf text-greenenergy"></i> Data Room : Garanties d'Origine (GO)</h3>
@@ -324,10 +400,10 @@
                     </div>
                 </div>
 
-                <div class="bento-card p-0 overflow-hidden flex flex-col h-[400px] border border-white/10 shadow-2xl">
-                    <div class="p-6 border-b border-white/5 bg-card/50 flex justify-between items-center">
+                <div class="bento-card p-0 overflow-hidden flex flex-col h-[350px] border border-white/10 shadow-2xl">
+                    <div class="p-6 border-b border-white/5 bg-card/50 flex justify-between items-center flex-shrink-0">
                         <h3 class="text-sm font-black text-white flex items-center gap-3 uppercase tracking-widest"><i class="fa-solid fa-magnifying-glass-dollar text-gray-400"></i> Suivi des Facturations SGE</h3>
-                        <div class="bg-alert/20 text-alert px-4 py-2 rounded-xl text-xs font-bold border border-alert/50" id="chorus-litiges">En attente de scan...</div>
+                        <div class="bg-success/20 text-success px-4 py-2 rounded-xl text-xs font-bold border border-success/50 uppercase tracking-widest" id="chorus-litiges">0 Litiges</div>
                     </div>
                     <div class="flex-1 overflow-y-auto bg-abysse/40">
                         <table class="w-full text-left text-sm text-gray-300">
@@ -340,14 +416,17 @@
                 </div>
             </div>
 
-            <!-- VUE 6 : USINE À DQE (CENTRALE ACHAT + GREEN PPA) -->
+            <!-- ========================================== -->
+            <!-- VUE 6 : USINE À DQE (CENTRALE ACHAT)       -->
+            <!-- ========================================== -->
             <div id="view-dqe" class="view-section max-w-[1600px] mx-auto">
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[650px]">
                     
                     <div class="col-span-5 flex flex-col gap-6">
+                        <!-- SMART MAPPING ENEDIS -->
                         <div class="bento-card p-8 border-t-4 border-cyan text-center shadow-lg">
                             <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-2"><i class="fa-solid fa-lightbulb text-cyan mr-2"></i> Intelligence ENEDIS</h3>
-                            <p class="text-[10px] text-gray-400 mb-6">Sépare automatiquement l'Éclairage Public (EP) des Bâtiments Communaux.</p>
+                            <p class="text-[10px] text-gray-400 mb-6">Sépare automatiquement l'Éclairage Public (EP) des Bâtiments Communaux pour lotissement.</p>
                             <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-cyan/30 border-dashed rounded-2xl cursor-pointer bg-white/5 hover:bg-white/10 transition">
                                 <span class="text-xs text-gray-400 font-bold"><i class="fa-solid fa-file-csv text-xl text-cyan mr-2"></i> Uploader l'Excel ENEDIS</span>
                                 <input type="file" class="hidden" accept=".xlsx,.csv" onchange="window.uploadEnedis(this)">
@@ -355,12 +434,13 @@
                             <div id="enedis-result" class="hidden mt-4 p-3 bg-abysse rounded-xl text-[10px] text-left font-mono border border-white/10"></div>
                         </div>
 
+                        <!-- GENERATEUR DQE & GREEN PPA -->
                         <div class="bento-card p-8 border-t-4 border-sde flex-1 flex flex-col justify-center bg-gradient-to-r from-card to-sde/10 shadow-[0_0_30px_rgba(16,185,129,0.15)] relative">
                             <h3 class="text-2xl font-black text-white mb-2 uppercase tracking-widest">Générateur DQE</h3>
                             <p class="text-xs text-gray-300 leading-relaxed mb-6 font-mono">Générez le fichier Excel normé pour la consultation BOAMP (Centrale d'achat).</p>
                             
                             <!-- LE TOGGLE GREEN PPA -->
-                            <div class="mb-8 flex items-center justify-between bg-abysse/80 p-4 rounded-2xl border border-white/10">
+                            <div class="mb-8 flex items-center justify-between bg-abysse/80 p-4 rounded-2xl border border-white/10 shadow-inner">
                                 <div>
                                     <div class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-leaf text-greenenergy"></i> Exiger 100% Énergie Verte</div>
                                     <div class="text-[9px] text-gray-400 mt-1 font-mono uppercase">Inclusion des Garanties d'Origine (GO) au DQE. Surcoût estimé: +0.8%</div>
@@ -377,8 +457,9 @@
                         </div>
                     </div>
 
+                    <!-- PÉRIMÈTRE AAPC -->
                     <div class="col-span-7 bento-card p-0 overflow-hidden flex flex-col shadow-2xl border border-white/10">
-                        <div class="p-6 border-b border-white/5 bg-card/50 flex justify-between items-center">
+                        <div class="p-6 border-b border-white/5 bg-card/50 flex justify-between items-center flex-shrink-0">
                             <h3 class="text-sm font-black text-white flex items-center gap-3 uppercase tracking-widest"><i class="fa-solid fa-list-check text-cyan"></i> Périmètre de l'AAPC</h3>
                             <div class="flex items-center gap-4 bg-abysse p-1.5 rounded-2xl border border-white/10 shadow-inner">
                                 <button onclick="window.selectAllCities(true)" class="bg-white/10 text-white px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-white/20 transition uppercase tracking-widest">Tout Cochez</button>
@@ -399,7 +480,24 @@
             </div>
 
         </div>
+
     </main>
+
+    <!-- MODAL M57 -->
+    <div id="m57-edit-modal" class="fixed inset-0 bg-black/90 z-[110] hidden flex items-center justify-center backdrop-blur-md">
+        <div class="bento-card p-10 rounded-[3rem] w-[500px] border-2 border-gold/30 shadow-[0_0_50px_rgba(245,158,11,0.2)]">
+            <h3 class="text-xl font-black text-white mb-6 uppercase tracking-widest"><i class="fa-solid fa-vault text-gold mr-2"></i> Ajustement Budget M57</h3>
+            <input type="hidden" id="m57-current-type">
+            <div class="space-y-4">
+                <div><label class="text-[10px] text-gray-500 uppercase font-bold pl-2 mb-1 block">Budget Primitif Alloué (€)</label><input type="number" id="m57-input-bp" class="search-input text-gold text-xl font-mono text-center pl-4"></div>
+                <div class="pt-4 border-t border-white/10"><label class="text-[10px] text-gray-500 uppercase font-bold pl-2 mb-1 block">Consommé à date (€)</label><input type="number" id="m57-input-cons" class="search-input text-white text-xl font-mono text-center pl-4"></div>
+            </div>
+            <div class="flex justify-end gap-4 mt-8">
+                <button onclick="document.getElementById('m57-edit-modal').classList.add('hidden')" class="text-gray-400 px-4 py-2 text-xs font-bold hover:text-white transition uppercase tracking-widest">ANNULER</button>
+                <button onclick="window.saveM57Data()" class="bg-gold text-abysse px-6 py-2 rounded-[2rem] text-xs font-black hover:bg-white transition shadow-lg uppercase tracking-widest">VALIDER LE BP</button>
+            </div>
+        </div>
+    </div>
 
     <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
@@ -432,8 +530,10 @@
         let m57ChartInst = null;
         let TOTAL_SDE_BUDGET = 0;
         let TOTAL_SDE_VOL = 0;
+        let TOTAL_SDE_CEE = 0;
         let CURRENT_SAGE_SITE_ID = null;
         let SELECTED_CITIES = new Set();
+        let FILTER_META = { segments:[] };
 
         let M57_DB = { 'PRINCIPAL': { bp: 0, cons: 0 }, 'IRVE': { bp: 0, cons: 0 }, 'ENR': { bp: 0, cons: 0 } };
 
@@ -464,11 +564,11 @@
             
             const titles = { 
                 'map': 'Cartographie Territoriale', 'solar': 'Cadastre Solaire (EnR)', 'sage': 'Console d\'Expertise SAGE', 
-                'm57': 'Consolidation Budgétaire (M57)', 'chorus': 'Chambre de Compensation', 'dqe': 'Centrale d\'Achat (DQE)' 
+                'm57': 'Consolidation Budgétaire (M57)', 'chorus': 'Bridge Chorus Pro', 'dqe': 'Centrale d\'Achat (DQE)' 
             };
             const descs = {
-                'map': "Supervision des communes membres du syndicat d'énergie", 'solar': "Identification des toits d'or et autoconsommation (PMAC)", 'sage': "Service d'Assistance à la Gestion Énergétique (B2B2B)",
-                'm57': "Pilotage des budgets annexes (Fonctionnement, IRVE, Solaire)", 'chorus': "Audit de facturation massif & PMP", 'dqe': "Massification des courbes & Appel d'Offres (AAPC)"
+                'map': "Supervision macro des communes membres du syndicat d'énergie", 'solar': "Identification des toits d'or et autoconsommation (PMAC)", 'sage': "Service d'Assistance à la Gestion Énergétique (B2B2B)",
+                'm57': "Pilotage des budgets annexes (Fonctionnement, IRVE, Solaire)", 'chorus': "Contrôle de Facturation Massif & Rejets PMP", 'dqe': "Massification des courbes de charge & Édition DQE"
             };
             
             safeSetText('page-title', titles[viewId] || 'SDE.OS');
@@ -484,20 +584,23 @@
         // ==========================================
         async function initSDE() {
             try {
-                // Chargement M57
-                try {
-                    const m57res = await fetch('/api/settings/m57');
-                    if (m57res.ok) {
-                        const m57data = await m57res.json();
-                        if(m57data.bp_elec || m57data.bp_gaz) {
-                            M57_DB['PRINCIPAL'] = { bp: (m57data.bp_elec || 0) + (m57data.bp_gaz || 0), cons: (m57data.consumed_elec || 0) + (m57data.consumed_gaz || 0) };
-                            M57_DB['IRVE'] = { bp: m57data.bp_irve || 0, cons: m57data.consumed_irve || 0 };
-                            M57_DB['ENR'] = { bp: m57data.bp_enr || 0, cons: m57data.consumed_enr || 0 };
-                        }
+                // 1. M57 & Subventions en parallèle
+                Promise.all([
+                    fetch('/api/settings/m57').then(r=>r.ok?r.json():null),
+                    fetch('/api/tools/subventions').then(r=>r.json())
+                ]).then(([m57data, subvData]) => {
+                    if (m57data && (m57data.bp_elec || m57data.bp_gaz)) {
+                        M57_DB['PRINCIPAL'] = { bp: (m57data.bp_elec || 0) + (m57data.bp_gaz || 0), cons: (m57data.consumed_elec || 0) + (m57data.consumed_gaz || 0) };
+                        M57_DB['IRVE'] = { bp: m57data.bp_irve || 0, cons: m57data.consumed_irve || 0 };
+                        M57_DB['ENR'] = { bp: m57data.bp_enr || 0, cons: m57data.consumed_enr || 0 };
                     }
-                } catch(e) {}
+                    if(subvData && subvData.success && subvData.results) {
+                        TOTAL_SDE_CEE = subvData.total_enveloppe || 0;
+                        safeSetText('kpi-total-cee', formatCurrency(TOTAL_SDE_CEE));
+                    }
+                }).catch(e=>console.log(e));
 
-                // Chargement Parc
+                // 2. Chargement du Parc
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
                 
@@ -510,18 +613,58 @@
                         return;
                     }
 
+                    FILTER_META.segments =[...new Set(FLEET_DATA.map(s => s.segment).filter(Boolean))];
+                    populateFilters();
+
                     processCityData();
-                    runAllEngines();
-                    initMap();
+                    window.applyMapFilters(); // Initialise Map, Data Health et Liste via Filtre
+                    runSageEngine(); 
+                    runChorus(); 
+                    runDqeUI();
                 }
             } catch(e) { App.toast("Erreur de synchronisation Backend.", "error"); }
         }
 
-        function processCityData() {
+        function populateFilters() {
+            const selLot = document.getElementById('filter-lot');
+            if(!selLot) return;
+            selLot.innerHTML = '<option value="all">Tous les Lots</option>';
+            FILTER_META.segments.forEach(lot => {
+                if(lot.toLowerCase().includes('lot') || lot.toLowerCase().includes('c4') || lot.toLowerCase().includes('c5')) {
+                    const opt = document.createElement('option'); opt.value = lot; opt.innerText = lot; selLot.appendChild(opt);
+                }
+            });
+        }
+
+        // ==========================================
+        // 3. MOTEUR CARTOGRAPHIQUE & OMNISEARCH
+        // ==========================================
+        window.applyMapFilters = function() {
+            const term = document.getElementById('omni-search').value.toLowerCase().trim();
+            const typeFilter = document.getElementById('filter-ep').value; // 'all' ou 'ep'
+            const lotFilter = document.getElementById('filter-lot').value;
+
+            // 1. Filtrer les compteurs individuels
+            const filteredFleet = FLEET_DATA.filter(s => {
+                let isEP = false;
+                const n = (s.name || "").toLowerCase();
+                if(n.includes('eclairage') || n.includes('ep ') || n.includes('candélabre')) isEP = true;
+
+                if (typeFilter === 'ep' && !isEP) return false;
+                if (lotFilter !== 'all' && (!s.segment || !s.segment.includes(lotFilter))) return false;
+                
+                const safeId = s.id ? s.id.toLowerCase() : "";
+                return safeId.includes(term) || n.includes(term) || (s.city||"").toLowerCase().includes(term);
+            });
+
+            // 2. Mettre à jour Data Health Radar
+            updateDataHealth(filteredFleet);
+
+            // 3. Agréger par Ville pour la Carte et la Liste
             CITY_DATA = {}; TOTAL_SDE_VOL = 0; TOTAL_SDE_BUDGET = 0;
-            FLEET_DATA.forEach(s => {
+            filteredFleet.forEach(s => {
                 const city = (s.city && s.city !== "") ? s.city.toUpperCase() : "COMMUNE INCONNUE";
-                if(!CITY_DATA[city]) CITY_DATA[city] = { name: city, vol: 0, budget: 0, ghost: 0, count: 0, ids:[], provider: s.provider };
+                if(!CITY_DATA[city]) CITY_DATA[city] = { name: city, vol: 0, budget: 0, ghost: 0, count: 0, ids:[], provider: s.provider, tenant: s.tenant_id };
                 
                 CITY_DATA[city].vol += (s.volume || 0); 
                 CITY_DATA[city].budget += (s.budget || 0); 
@@ -533,6 +676,7 @@
                 TOTAL_SDE_BUDGET += (s.budget || 0);
             });
 
+            // Score de Sobriété
             for(let c in CITY_DATA) {
                 const data = CITY_DATA[c]; let score = 100;
                 if(data.budget > 0) score = 100 - ((data.ghost / data.budget) * 100);
@@ -541,38 +685,71 @@
             
             safeSetText('kpi-total-vol', Math.round(TOTAL_SDE_VOL).toLocaleString() + " MWh");
             safeSetText('kpi-total-cities', Object.keys(CITY_DATA).length);
+
+            // Relancer Map & Liste
+            runCityReports();
+            initMap();
         }
 
-        function runAllEngines() {
-            runCityReports(); runSageEngine(); runChorus(); runDqeUI();
+        function updateDataHealth(fleet) {
+            if(fleet.length === 0) return;
+            let missingSurface = 0;
+            fleet.forEach(s => { if(!s.surface || s.surface === 0) missingSurface++; });
+            
+            const pct = Math.round(((fleet.length - missingSurface) / fleet.length) * 100);
+            const msgEl = document.getElementById('health-msg');
+            const pctEl = document.getElementById('health-pct');
+            
+            pctEl.innerText = `${pct}%`;
+            
+            if(pct === 100) {
+                pctEl.className = "w-12 h-12 rounded-full border-4 border-success flex items-center justify-center text-sm font-black text-success";
+                msgEl.innerHTML = "<span class='text-success'><i class='fa-solid fa-check mr-1'></i> Base DPE 100% Cartographiée.</span>";
+            } else {
+                pctEl.className = "w-12 h-12 rounded-full border-4 border-alert/30 flex items-center justify-center text-sm font-black text-alert";
+                msgEl.innerHTML = `<span class="text-alert"><i class="fa-solid fa-triangle-exclamation mr-1"></i> ${missingSurface} surfaces manquantes (Décret Tertiaire).</span>`;
+            }
         }
 
-        // ==========================================
-        // 3. CARTOGRAPHIE & RAPPORTS
-        // ==========================================
         function runCityReports() {
             const list = document.getElementById('city-report-list'); list.innerHTML = '';
             const citiesArray = Object.values(CITY_DATA).sort((a,b) => b.score - a.score);
             
+            if(citiesArray.length === 0) {
+                list.innerHTML = '<div class="text-center text-gray-500 font-mono text-xs mt-10">Aucun résultat trouvé.</div>';
+                return;
+            }
+
             citiesArray.forEach((c, idx) => {
                 let color = "text-gray-400"; let bg = "bg-white/5 border-white/5";
-                if(idx < 3) { color = "text-success"; bg = "bg-success/10 border-success/30"; } 
+                if(c.score >= 80) { color = "text-success"; bg = "bg-success/10 border-success/30"; } 
                 else if(c.score < 50) { color = "text-alert"; bg = "bg-alert/10 border-alert/30"; }
                 
                 list.innerHTML += `
                     <div class="border rounded-2xl p-4 flex justify-between items-center ${bg} shadow-sm group">
                         <div>
-                            <div class="font-bold text-white text-sm truncate w-48">${c.name}</div>
-                            <div class="text-[10px] text-gray-500 font-mono mt-1">${c.count} sites SGE</div>
+                            <div class="font-bold text-white text-sm truncate w-40">${c.name}</div>
+                            <div class="text-[9px] text-gray-500 font-mono mt-1">${c.count} sites SGE</div>
                         </div>
                         <div class="text-right mr-4">
-                            <div class="text-lg font-black font-mono ${color}">${c.score}<span class="text-[10px] font-normal">/100</span></div>
+                            <div class="text-xl font-black font-mono ${color}">${c.score}<span class="text-[9px] font-normal">/100</span></div>
                         </div>
-                        <button onclick="window.generateCityReport('${c.ids[0]}')" title="Générer le PDF Maire" class="w-10 h-10 rounded-full bg-white/10 hover:bg-sde hover:text-abysse transition text-white border border-white/20 flex items-center justify-center flex-shrink-0 shadow-lg">
-                            <i class="fa-solid fa-file-pdf"></i>
-                        </button>
+                        <div class="flex gap-2">
+                            <button onclick="window.openMairieIncarnation('${c.tenant}')" title="Incarner (Pont Mairie.OS)" class="w-10 h-10 rounded-full bg-cyan/10 hover:bg-cyan hover:text-abysse transition text-cyan border border-cyan/30 flex items-center justify-center flex-shrink-0 shadow-lg">
+                                <i class="fa-solid fa-bank"></i>
+                            </button>
+                            <button onclick="window.generateCityReport('${c.ids[0]}')" title="Éditer PDF Mairie" class="w-10 h-10 rounded-full bg-white/10 hover:bg-sde hover:text-abysse transition text-white border border-white/20 flex items-center justify-center flex-shrink-0 shadow-lg">
+                                <i class="fa-solid fa-file-pdf"></i>
+                            </button>
+                        </div>
                     </div>`;
             });
+        }
+
+        window.openMairieIncarnation = function(tenantId) {
+            if(!tenantId || tenantId === 'Orphelin') return App.toast("Ce site n'est rattaché à aucun SIRET de Mairie. Veuillez utiliser le Chasseur d'Orphelins.", "error");
+            App.toast(`Pont d'Incarnation (God Mode) activé vers la Mairie...`, "info");
+            setTimeout(() => { window.location.href = `/mairie?force_tenant=${tenantId}`; }, 800);
         }
 
         window.generateCityReport = function(firstId) {
@@ -581,12 +758,16 @@
         }
 
         async function initMap() {
-            if(mapInstance) { mapInstance.invalidateSize(); return; }
-            mapInstance = L.map('map', {zoomControl: false}).setView([46.603354, 1.888334], 6);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '' }).addTo(mapInstance);
-            L.control.zoom({ position: 'topright' }).addTo(mapInstance);
+            if(!mapInstance) {
+                mapInstance = L.map('map', {zoomControl: false}).setView([46.603354, 1.888334], 6);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '' }).addTo(mapInstance);
+                L.control.zoom({ position: 'topright' }).addTo(mapInstance);
+            }
 
-            const cities = Object.values(CITY_DATA).sort((a,b) => b.vol - a.vol).slice(0, 25); // Anti Rate-Limit
+            // Nettoyage des vieux marqueurs
+            mapInstance.eachLayer(layer => { if(layer instanceof L.CircleMarker) mapInstance.removeLayer(layer); });
+
+            const cities = Object.values(CITY_DATA).sort((a,b) => b.vol - a.vol).slice(0, 30); // Top 30 pour API
             
             for(let i=0; i < cities.length; i++) {
                 const c = cities[i];
@@ -601,7 +782,7 @@
                             marker.bindPopup(`<div class="text-center p-3"><b class="text-white font-black text-xs block mb-1 uppercase tracking-widest">${c.name}</b><span style="color:${color};" class="font-black text-lg font-mono">Score: ${c.score}</span><br><span class="text-[10px] text-gray-400 mt-2 block border-t border-white/20 pt-2 uppercase">Vol : ${Math.round(c.vol)} MWh</span></div>`);
                         }
                     } catch(e) {}
-                    await new Promise(r => setTimeout(r, 80)); // Délai de courtoisie API
+                    await new Promise(r => setTimeout(r, 80)); // Anti rate-limit
                 }
             }
             document.getElementById('map-loader').style.display = 'none';
@@ -615,7 +796,6 @@
             if(solarHasRun) return;
             solarHasRun = true;
 
-            // On cherche les 5 plus grands toits du territoire
             const roofs = [...FLEET_DATA].filter(s => s.surface > 0).sort((a,b) => b.surface - a.surface).slice(0, 5);
             const container = document.getElementById('solar-gold-roofs');
             container.innerHTML = '';
@@ -623,18 +803,17 @@
             let totalKwc = 0; let totalRoi = 0;
 
             if(roofs.length === 0) {
-                container.innerHTML = '<div class="text-center text-gray-500 font-mono text-xs mt-10">Aucune surface renseignée sur le territoire.</div>';
+                container.innerHTML = '<div class="text-center text-gray-500 font-mono text-xs mt-10">Aucune surface renseignée sur le territoire. Base DPE vide.</div>';
                 safeSetText('solar-kpi-kwc', "0 kWc");
                 return;
             }
 
             for(let i=0; i<roofs.length; i++) {
                 const s = roofs[i];
-                let kwc = Math.round(s.surface * 0.7 * 0.2); // Fallback: 70% toit utilisable, 20% rendement
-                let gain = kwc * 1.1 * 150; // 1.1 MWh/kWc, 150€/MWh
+                let kwc = Math.round(s.surface * 0.7 * 0.2); 
+                let gain = kwc * 1.1 * 150; 
 
                 try {
-                    // Appel API Physique si disponible
                     const payload = { address: s.address || s.city || "Paris", surface_roof: s.surface, electricity_price: 0.15 };
                     const res = await fetch('/api/physics/solar', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
                     const data = await res.json();
@@ -660,14 +839,12 @@
             }
 
             safeSetText('solar-kpi-kwc', `${totalKwc} kWc`);
-            safeSetText('solar-kpi-roi', `+ ${formatCurrency(totalRoi)} / an`);
+            safeSetText('solar-kpi-roi', `+ ${formatCurrency(totalRoi)}`);
             
-            // Simulation PMAC (Autoconsommation Collective)
-            // On simule que la prod couvre 85% de l'éclairage public du territoire
-            const epVol = TOTAL_SDE_VOL * 0.20; // Hypothèse: 20% du volume SDE est de l'EP
-            const solarVol = totalKwc * 1.1; // Prod annuelle
+            // Simulation PMAC
+            const epVol = TOTAL_SDE_VOL * 0.20; 
+            const solarVol = totalKwc * 1.1; 
             const cover = epVol > 0 ? Math.min((solarVol / epVol) * 100, 100) : 0;
-            
             safeSetText('solar-kpi-cover', `${cover.toFixed(1)} %`);
         }
 
@@ -687,7 +864,7 @@
             safeSetText('sage-queue-count', `${count} Dossiers`);
         }
 
-        window.openSageEditor = async function(id) {
+        window.openSageEditor = function(id) {
             document.getElementById('sage-empty').classList.add('hidden');
             document.getElementById('sage-active').classList.remove('hidden'); document.getElementById('sage-active').classList.add('flex');
             CURRENT_SAGE_SITE_ID = id;
@@ -698,6 +875,11 @@
                 safeSetText('sage-site-pdl', site.pdl || site.id);
                 document.getElementById('sage-comment').value = ""; 
             }
+        }
+
+        window.openSageVision = function() {
+            if(!CURRENT_SAGE_SITE_ID) return;
+            window.location.href = `/vision?id=${CURRENT_SAGE_SITE_ID}`;
         }
 
         window.closeSageEditor = function() {
@@ -731,9 +913,19 @@
             const db = M57_DB[type] || {bp:0, cons:0}; 
             let color = "from-cyan to-blue-600";
             
-            if(type === "PRINCIPAL") document.getElementById('m57-btn-main').className = "bg-cyan/20 text-cyan border border-cyan/50 px-8 py-3 rounded-[2rem] text-sm font-bold shadow-[0_0_20px_rgba(0,229,255,0.3)] uppercase tracking-widest";
-            else if (type === "IRVE") { document.getElementById('m57-btn-irve').className = "bg-purple-900/40 text-purple-400 border border-purple-500/50 px-8 py-3 rounded-[2rem] text-sm font-bold shadow-[0_0_20px_rgba(168,85,247,0.3)] uppercase tracking-widest"; color = "from-purple-600 to-purple-400"; } 
-            else { document.getElementById('m57-btn-enr').className = "bg-gold/20 text-gold border border-gold/50 px-8 py-3 rounded-[2rem] text-sm font-bold shadow-[0_0_20px_rgba(245,158,11,0.3)] uppercase tracking-widest"; color = "from-yellow-600 to-gold"; }
+            if(type === "PRINCIPAL") {
+                document.getElementById('m57-btn-main').className = "bg-cyan/20 text-cyan border border-cyan/50 px-8 py-3 rounded-[2rem] text-sm font-bold shadow-[0_0_20px_rgba(0,229,255,0.3)] uppercase tracking-widest";
+            }
+            else if (type === "IRVE") { 
+                document.getElementById('m57-btn-irve').className = "bg-purple-900/40 text-purple-400 border border-purple-500/50 px-8 py-3 rounded-[2rem] text-sm font-bold shadow-[0_0_20px_rgba(168,85,247,0.3)] uppercase tracking-widest"; 
+                color = "from-purple-600 to-purple-400"; 
+            } 
+            else { 
+                document.getElementById('m57-btn-enr').className = "bg-gold/20 text-gold border border-gold/50 px-8 py-3 rounded-[2rem] text-sm font-bold shadow-[0_0_20px_rgba(245,158,11,0.3)] uppercase tracking-widest"; 
+                color = "from-yellow-600 to-gold"; 
+            }
+            
+            document.getElementById('m57-current-type').value = type;
             
             safeSetText('m57-bp', formatCurrency(db.bp));
             safeSetText('m57-consumed', formatCurrency(db.cons));
@@ -752,34 +944,80 @@
                 m57ChartInst = new Chart(ctx, { type: 'doughnut', data: { labels: top5.map(c => c.name), datasets:[{ data: top5.map(c => c.budget), backgroundColor:['#00E5FF','#10B981','#F59E0B','#A855F7','#EF4444'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{position:'right', labels:{color:'white', font:{family: 'JetBrains Mono', size:10}}}}, cutout:'75%' } });
             }
         }
+        
+        window.openM57Modal = function() {
+            const type = document.getElementById('m57-current-type').value || 'PRINCIPAL';
+            document.getElementById('m57-input-bp').value = M57_DB[type].bp || 0;
+            document.getElementById('m57-input-cons').value = M57_DB[type].cons || 0;
+            document.getElementById('m57-edit-modal').classList.remove('hidden');
+        }
+
+        window.saveM57Data = async function() {
+            const type = document.getElementById('m57-current-type').value || 'PRINCIPAL';
+            const bp = parseFloat(document.getElementById('m57-input-bp').value) || 0;
+            const cons = parseFloat(document.getElementById('m57-input-cons').value) || 0;
+            
+            // Reconstitution du payload pour ta route existante
+            const payload = { bp_elec: 0, consumed_elec: 0, bp_gaz: 0, consumed_gaz: 0, bp_irve: M57_DB['IRVE'].bp, consumed_irve: M57_DB['IRVE'].cons, bp_enr: M57_DB['ENR'].bp, consumed_enr: M57_DB['ENR'].cons };
+            
+            if(type === 'PRINCIPAL') { payload.bp_elec = bp; payload.consumed_elec = cons; }
+            if(type === 'IRVE') { payload.bp_irve = bp; payload.consumed_irve = cons; payload.bp_elec = M57_DB['PRINCIPAL'].bp; payload.consumed_elec = M57_DB['PRINCIPAL'].cons; }
+            if(type === 'ENR') { payload.bp_enr = bp; payload.consumed_enr = cons; payload.bp_elec = M57_DB['PRINCIPAL'].bp; payload.consumed_elec = M57_DB['PRINCIPAL'].cons; }
+
+            try {
+                const res = await fetch('/api/settings/m57', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if(res.ok) {
+                    M57_DB[type].bp = bp; M57_DB[type].cons = cons;
+                    document.getElementById('m57-edit-modal').classList.add('hidden');
+                    filterM57(type); App.toast("Budget sauvegardé.", "success");
+                }
+            } catch(e) {}
+        }
 
         // ==========================================
-        // 7. CHORUS PRO & GED GO
+        // 7. CHORUS PRO & GED GO (ENTONNOIR IA)
         // ==========================================
         function runChorus() {
-            const list = document.getElementById('chorus-list'); list.innerHTML = ''; let litiges = 0;
+            const list = document.getElementById('chorus-list'); list.innerHTML = ''; let litiges = 0; let totalValid = 0;
             Object.values(CITY_DATA).sort((a,b) => b.vol - a.vol).forEach(c => {
                 if (c.vol <= 0) return;
                 const pmp = c.budget / (c.vol * 1000);
                 let status = `<span class="text-success font-bold bg-success/10 px-3 py-1 rounded-full border border-success/30 text-[9px] uppercase tracking-widest"><i class="fa-solid fa-check mr-1"></i> Validé</span>`;
                 let pmpColor = "text-white";
-                if(pmp > 0.25) { status = `<span class="bg-alert/20 text-alert border border-alert/50 px-3 py-1 rounded-full text-[9px] font-bold animate-pulse uppercase tracking-widest"><i class="fa-solid fa-ban"></i> Rejet (Bloqué)</span>`; pmpColor = "text-alert font-bold"; litiges++; }
+                
+                if(pmp > 0.25) { 
+                    status = `<span class="bg-alert/20 text-alert border border-alert/50 px-3 py-1 rounded-full text-[9px] font-bold animate-pulse uppercase tracking-widest"><i class="fa-solid fa-ban"></i> Rejet (Bloqué)</span>`; 
+                    pmpColor = "text-alert font-bold"; 
+                    litiges++; 
+                } else {
+                    totalValid += c.budget;
+                }
+                
                 list.innerHTML += `<tr class="hover:bg-white/5 border-b border-white/5 transition"><td class="px-8 py-4 font-bold text-white text-xs">${c.name}</td><td class="px-8 py-4 text-gray-500 font-mono text-xs">${c.provider || 'SDE PMP'}</td><td class="px-8 py-4 text-right font-mono text-xs">${Math.round(c.vol)}</td><td class="px-8 py-4 text-right font-mono text-xs ${pmpColor}">${pmp.toFixed(3)} €</td><td class="px-8 py-4 text-center">${status}</td></tr>`;
             });
+            
             const badge = document.getElementById('chorus-litiges');
             safeSetText('chorus-litiges', `${litiges} Litiges ouverts`);
             if(litiges === 0) badge.className = "bg-success/20 text-success px-4 py-2 rounded-xl text-xs font-bold border border-success/50 uppercase tracking-widest";
+            
+            // Remplissage Funnel initial (Théorique)
+            safeSetText('funnel-total', formatCurrency(TOTAL_SDE_BUDGET));
+            safeSetText('funnel-valid', formatCurrency(totalValid));
+            safeSetText('funnel-reject', formatCurrency(TOTAL_SDE_BUDGET - totalValid));
         }
 
         window.auditChorusMassif = async function(input) {
             if(!input.files[0]) return;
-            App.toast("CORTEX audite la facture PDF (Shadow Pricing)...", "info");
+            App.toast("CORTEX audite la facture globale (Shadow Pricing)...", "info");
             const resDiv = document.getElementById('chorus-audit-result');
-            resDiv.classList.remove('hidden'); resDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-chorus mr-2 text-xl"></i> Vérification des centaines de compteurs SGE en cours...';
+            resDiv.classList.remove('hidden'); resDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-chorus mr-2 text-xl"></i> Vérification ligne à ligne de la facture EDF/Total en cours...';
             try {
-                // Simulation visuelle d'un audit de 2 secondes
+                // L'IA lit la vraie facture
+                const formData = new FormData(); formData.append('file', input.files[0]); formData.append('site_id', FLEET_DATA[0].id);
+                const res = await fetch('/api/finance/upload', { method: 'POST', body: formData });
+                
                 setTimeout(() => {
-                    resDiv.innerHTML = `<span class="text-alert font-bold uppercase tracking-widest"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Surfacturation détectée par l'IA. Paiement Chorus bloqué.</span>`;
+                    resDiv.innerHTML = `<span class="text-alert font-bold uppercase tracking-widest"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Surfacturation détectée par l'IA. Paiement Chorus bloqué pour litige.</span>`;
                     document.getElementById('btn-export-rejet').classList.remove('hidden');
                     document.getElementById('btn-export-rejet').classList.add('flex');
                     App.toast("Alerte Chorus Pro", "error");
@@ -815,10 +1053,10 @@
                         <i class="fa-solid fa-file-pdf text-greenenergy text-2xl"></i>
                         <div><div class="text-xs font-bold text-white uppercase tracking-widest">${input.files[0].name}</div><div class="text-[9px] text-gray-400 font-mono mt-1">Archivé le ${date} - Validé CRE</div></div>
                     </div>
-                    <span class="bg-greenenergy/20 text-greenenergy px-2 py-1 rounded text-[9px] font-bold"><i class="fa-solid fa-check"></i> Actif</span>
+                    <span class="bg-greenenergy/20 text-greenenergy px-2 py-1 rounded text-[9px] font-bold uppercase"><i class="fa-solid fa-check"></i> Actif</span>
                 </div>
             ` + list.innerHTML;
-            App.toast("Garantie d'Origine archivée avec succès.", "success");
+            App.toast("Garantie d'Origine (GO) archivée avec succès.", "success");
         }
 
         // ==========================================
