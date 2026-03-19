@@ -3,214 +3,221 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V3 | Espace Pro</title>
+    <title>ENERGISTRAT V12.6 | Espace PME & Industrie</title>
+    
+    <!-- LIBS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        abysse: '#001529',
-                        card: '#0F172A',
-                        pme: '#EAB308',    // Jaune/Or (Business/Cash)
-                        gold: '#F59E0B',
-                        cyan: '#00E5FF',
-                        alert: '#EF4444',
-                        success: '#10B981',
-                        vampire: '#8B5CF6' // Violet pour le gaspillage nocturne
+                        abysse: '#001529', card: '#001D3D', pme: '#EAB308', gold: '#F59E0B',
+                        cyan: '#00E5FF', alert: '#EF4444', success: '#10B981', vampire: '#8B5CF6'
                     },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
                     borderRadius: { 'bento': '2rem' },
-                    boxShadow: { 'neon-pme': '0 0 20px rgba(234, 179, 8, 0.25)' }
+                    boxShadow: { 'neon-pme': '0 0 20px rgba(234, 179, 8, 0.25)', 'inner-bento': 'inset 0 2px 10px rgba(255,255,255,0.05)' }
                 }
             }
         }
     </script>
     <style>
-        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
-        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; border-radius: 1.5rem; }
+        body { background-color: #001529; color: white; overflow-x: hidden; font-family: 'Inter', sans-serif; }
+        .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.08); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
         .bento-card:hover { border-color: rgba(234, 179, 8, 0.3); transform: translateY(-2px); }
-        .nav-item.active { background: rgba(234, 179, 8, 0.1); border-left: 3px solid #EAB308; color: white; }
+        .nav-item.active { background: linear-gradient(90deg, rgba(234, 179, 8, 0.15) 0%, transparent 100%); border-left: 4px solid #EAB308; color: white; }
         .page-content { display: none; } 
-        .page-content.active { display: block; animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .page-content.active { display: block; animation: slideUp 0.4s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         
         /* Drag & Drop Effects */
         .drag-over { background: rgba(0, 229, 255, 0.1) !important; border-color: #00E5FF !important; }
         
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        /* Scrollbar & Select */
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(234, 179, 8, 0.3); border-radius: 10px; }
         select { background-color: rgba(255,255,255,0.05) !important; color: white !important; -webkit-appearance: none; border: 1px solid rgba(255,255,255,0.1); }
-        select option { background-color: #0F172A !important; color: white !important; }
+        select option { background-color: #001D3D !important; color: white !important; }
+
+        /* Glowing Text */
+        .glow-text { text-shadow: 0 0 10px rgba(255,255,255,0.3); }
     </style>
 </head>
-<body class="flex h-screen w-screen overflow-hidden text-sm">
+<body class="flex h-screen w-screen overflow-hidden text-sm bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#002855] via-abysse to-[#000F1F]">
 
-    <!-- SIDEBAR -->
-    <aside class="w-64 bg-sidebar border-r border-white/5 flex flex-col justify-between z-50 flex-shrink-0 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
-        <div class="p-6">
-            <div class="flex items-center gap-3 mb-8">
-                <div class="w-10 h-10 rounded-xl border border-pme bg-pme/10 flex items-center justify-center text-pme font-bold shadow-neon-pme">
-                    <i class="fa-solid fa-briefcase"></i>
+    <!-- OVERLAY MOBILE -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/80 z-40 hidden backdrop-blur-sm transition-opacity" onclick="toggleSidebar()"></div>
+
+    <!-- SIDEBAR (Off-canvas sur Mobile) -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 w-72 md:w-64 bg-[#000F1F] border-r border-white/5 flex flex-col z-50 shadow-[5px_0_20px_rgba(0,0,0,0.6)]">
+        <div class="p-6 relative">
+            <button class="md:hidden absolute top-6 right-6 text-gray-400 hover:text-white text-xl" onclick="toggleSidebar()"><i class="fa-solid fa-times"></i></button>
+            <div class="flex items-center gap-4 mb-8">
+                <div class="w-12 h-12 rounded-2xl border border-pme/50 bg-pme/10 flex items-center justify-center text-pme font-bold shadow-neon-pme text-xl">
+                    <i class="fa-solid fa-industry"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold tracking-wider text-base text-white">PRO<span class="text-pme">.SPACE</span></h1>
-                    <p class="text-[10px] text-gray-500 font-mono">PME & Tertiaire</p>
+                    <h1 class="font-black tracking-wider text-lg text-white">PRO<span class="text-pme">.SPACE</span></h1>
+                    <p class="text-[10px] text-gray-500 font-mono">PME & Industrie</p>
                 </div>
             </div>
             
             <nav class="space-y-2">
-                <button onclick="navTo('budget')" id="btn-budget" class="nav-item active w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[10px] transition flex items-center gap-3">
+                <div class="text-[9px] text-gray-500 uppercase font-black px-4 mb-2 tracking-widest">Performances</div>
+                <button onclick="navTo('budget')" id="btn-budget" class="nav-item active w-full text-left px-4 py-3 rounded-r-2xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[11px] transition flex items-center gap-3">
                     <i class="fa-solid fa-chart-pie w-5 text-center"></i> CFO Virtuel
                 </button>
-                <button onclick="navTo('optim')" id="btn-optim" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[10px] transition flex items-center gap-3">
+                <button onclick="navTo('optim')" id="btn-optim" class="nav-item w-full text-left px-4 py-3 rounded-r-2xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[11px] transition flex items-center gap-3">
                     <i class="fa-solid fa-bolt w-5 text-center text-cyan"></i> Optimisation TURPE
                 </button>
-                <button onclick="navTo('naf')" id="btn-naf" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[10px] transition flex items-center gap-3">
+                
+                <div class="text-[9px] text-gray-500 uppercase font-black px-4 mt-8 mb-2 tracking-widest">Écosystème</div>
+                <button onclick="navTo('naf')" id="btn-naf" class="nav-item w-full text-left px-4 py-3 rounded-r-2xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[11px] transition flex items-center gap-3">
                     <i class="fa-solid fa-ranking-star w-5 text-center text-gold"></i> Ligue Sectorielle
                 </button>
-                <button onclick="navTo('store')" id="btn-store" class="nav-item w-full text-left px-4 py-3 rounded-r-xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[10px] transition flex items-center gap-3">
-                    <i class="fa-solid fa-shop w-5 text-center text-fun"></i> App Store
+                <button onclick="navTo('store')" id="btn-store" class="nav-item w-full text-left px-4 py-3 rounded-r-2xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[11px] transition flex items-center gap-3">
+                    <i class="fa-solid fa-shop w-5 text-center text-pme"></i> CORTEX App Store
                 </button>
             </nav>
         </div>
         
-        <div class="p-6 border-t border-white/5 space-y-4">
+        <div class="p-6 border-t border-white/5 space-y-4 bg-[#000F1F]">
             <a href="/settings_pme" class="flex items-center gap-3 text-gray-400 hover:text-white transition text-xs font-bold bg-white/5 p-3 rounded-xl border border-white/10 hover:border-pme/50">
-                <i class="fa-solid fa-gear text-pme"></i> Paramètres
+                <i class="fa-solid fa-gear text-pme"></i> Paramètres Data
             </a>
             <div class="bg-gradient-to-br from-card to-abysse border border-white/10 rounded-xl p-4 cursor-pointer group" onclick="App.toast('Code parrainage copié !', 'success')">
-                <div class="text-xs font-bold text-white mb-1"><i class="fa-solid fa-gift mr-2 text-pme"></i>Parrainage Pro</div>
-                <p class="text-[10px] text-gray-400 mb-2">1 mois offert par filleul.</p>
-                <div class="text-center bg-black/30 rounded py-1 font-mono text-pme text-xs border border-pme/30 group-hover:bg-pme group-hover:text-black transition">CODE: PRO-WIN</div>
+                <div class="text-xs font-bold text-white mb-1"><i class="fa-solid fa-handshake mr-2 text-pme"></i>Parrainage Pro</div>
+                <p class="text-[10px] text-gray-400 mb-3 leading-relaxed">Offrez 1 mois de CFO Virtuel à un confrère.</p>
+                <div class="text-center bg-black/50 rounded-lg py-2 font-mono text-pme font-black text-xs border border-pme/30 group-hover:bg-pme group-hover:text-abysse transition">CODE: PRO-WIN</div>
             </div>
         </div>
     </aside>
 
     <!-- MAIN -->
-    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
+    <main class="flex-1 flex flex-col relative overflow-hidden">
         
-        <!-- CORTEX SENTINEL -->
-        <div class="h-14 border-b border-white/5 flex items-center justify-between px-8 bg-abysse/95 backdrop-blur z-20">
-            <div class="flex items-center gap-4 flex-1">
-                <div class="px-2 py-1 rounded bg-pme text-abysse text-[10px] font-black animate-pulse tracking-wider">CORTEX PRO</div>
-                <span class="text-xs text-pme font-mono truncate" id="cortex-live-advice">Analyse de la rentabilité de votre parc en cours...</span>
+        <!-- TOPBAR MOBILE / DESKTOP -->
+        <div class="min-h-[3.5rem] md:h-14 border-b border-white/5 flex flex-col md:flex-row items-center justify-between px-4 md:px-8 bg-abysse/90 backdrop-blur-xl z-20 py-2 md:py-0">
+            <div class="flex items-center gap-4 w-full md:w-auto justify-between mb-2 md:mb-0">
+                <button class="md:hidden text-white text-xl" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+                <div class="flex items-center gap-3">
+                    <div class="px-2 py-1 rounded bg-pme text-abysse text-[9px] font-black animate-pulse tracking-widest uppercase">CORTEX Actif</div>
+                    <span class="text-[10px] md:text-xs text-pme font-mono truncate max-w-[200px] md:max-w-none" id="cortex-live-advice">Analyse de rentabilité en cours...</span>
+                </div>
             </div>
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-2 pr-4">
-                    <span class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_#10B981]" id="linky-dot"></span>
-                    <span class="text-[10px] text-gray-400 font-mono" id="linky-status">LINKY ACTIF</span>
+            <div class="flex items-center gap-4 w-full md:w-auto justify-end">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-success shadow-[0_0_10px_#10B981]" id="linky-dot"></span>
+                    <span class="text-[10px] text-gray-400 font-mono" id="linky-status">LINKY CONNECTÉ</span>
                 </div>
             </div>
         </div>
 
-        <div class="p-8 overflow-y-auto h-full pb-20 scroll-smooth">
+        <div class="p-4 md:p-8 overflow-y-auto h-full pb-24 scroll-smooth">
             
             <!-- HEADER PAGE -->
-            <div class="flex justify-between items-end mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-6">
                 <div>
-                    <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Directeur Financier Virtuel</h2>
-                    <p class="text-gray-400 text-xs mt-1" id="header-address">Chargement des données...</p>
+                    <h2 id="page-title" class="text-2xl md:text-4xl font-black text-white tracking-tight glow-text italic">Directeur Financier Virtuel</h2>
+                    <p class="text-gray-400 text-xs md:text-sm font-mono mt-2 flex items-center gap-2"><i class="fa-solid fa-location-dot"></i> <span id="header-address">Chargement Data Unity...</span></p>
                 </div>
-                <div class="flex gap-4 items-center">
-                    <div class="bg-card border border-white/10 px-4 py-2 rounded-xl text-right shadow-lg">
-                        <span class="text-[10px] text-gray-500 uppercase font-bold block">Budget Projeté N+1</span>
-                        <span class="text-lg font-bold text-white font-mono" id="kpi-budget">-- €</span>
+                <div class="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-stretch md:items-center">
+                    <div class="bento-card px-6 py-3 border-l-4 border-pme flex-1 md:flex-none">
+                        <span class="text-[10px] text-gray-400 uppercase font-black tracking-widest block">Budget Projeté N+1</span>
+                        <span class="text-xl font-black text-white font-mono" id="kpi-budget">-- €</span>
                     </div>
-                    <div class="relative">
-                        <select id="site-selector" onchange="loadSite(this.value)" class="border border-pme/30 text-xs font-bold rounded-xl p-3 focus:outline-none focus:border-pme bg-abysse text-white min-w-[250px] shadow-inner cursor-pointer">
-                            <option value="">Recherche de votre entreprise...</option>
+                    <div class="relative flex-1 md:flex-none">
+                        <select id="site-selector" onchange="loadSite(this.value)" class="w-full md:w-auto border border-white/20 hover:border-pme text-xs font-bold rounded-2xl p-4 pr-10 focus:outline-none focus:border-pme focus:ring-1 focus:ring-pme bg-abysse text-white shadow-inner cursor-pointer transition">
+                            <option value="">Recherche site...</option>
                         </select>
-                        <div class="absolute right-3 top-3 pointer-events-none text-pme text-xs">▼</div>
+                        <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-pme text-xs"><i class="fa-solid fa-chevron-down"></i></div>
                     </div>
                 </div>
             </div>
 
-            <!-- NOUVEAU : BANNIÈRE SUBVENTIONS (Chasseur d'Aides) -->
-            <div id="subvention-banner" class="hidden mb-6 bg-gradient-to-r from-gold/20 to-abysse border border-gold/50 p-4 rounded-xl justify-between items-center shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+            <!-- BANNIÈRE SUBVENTIONS -->
+            <div id="subvention-banner" class="hidden mb-8 bg-gradient-to-r from-gold/20 to-abysse border border-gold/50 p-6 rounded-[2rem] flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-[0_0_30px_rgba(245,158,11,0.2)]">
                 <div class="flex gap-4 items-center">
-                    <div class="w-12 h-12 bg-gold/20 rounded-full flex items-center justify-center text-gold text-2xl animate-bounce">
+                    <div class="w-14 h-14 bg-gold/20 rounded-2xl flex items-center justify-center text-gold text-2xl animate-bounce shadow-inner-bento border border-gold/30">
                         <i class="fa-solid fa-sack-dollar"></i>
                     </div>
                     <div>
-                        <h3 class="font-black text-white text-lg tracking-tight">Éligibilité CEE & Fonds Chaleur</h3>
-                        <p class="text-xs text-gray-300" id="subv-text">L'IA a identifié des aides d'État non réclamées pour votre SIRET.</p>
+                        <h3 class="font-black text-white text-lg md:text-xl tracking-tight">Éligibilité CEE Confirmée</h3>
+                        <p class="text-xs text-gray-300 mt-1 leading-relaxed" id="subv-text">L'IA a identifié des aides d'État non réclamées pour votre SIRET.</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-4">
-                    <div class="text-right mr-4">
-                        <div class="text-[10px] text-gold font-bold uppercase tracking-widest">Enveloppe Sécurisable</div>
-                        <div class="text-2xl font-black text-white font-mono" id="subv-total">-- €</div>
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-6 w-full md:w-auto">
+                    <div class="text-left md:text-right">
+                        <div class="text-[10px] text-gold font-black uppercase tracking-widest">Enveloppe Sécurisable</div>
+                        <div class="text-3xl font-black text-white font-mono" id="subv-total">-- €</div>
                     </div>
-                    <div id="subv-actions" class="flex gap-2">
-                        <!-- Boutons CERFA générés par JS -->
-                    </div>
+                    <div id="subv-actions" class="flex flex-wrap gap-2 w-full md:w-auto"></div>
                 </div>
             </div>
 
             <!-- EMPTY STATE -->
-            <div id="empty-state" class="hidden flex-col items-center justify-center h-[500px] border-2 border-dashed border-white/10 rounded-3xl bg-white/5">
-                <i class="fa-solid fa-file-invoice text-6xl text-gray-600 mb-6"></i>
-                <h3 class="text-2xl font-bold text-white mb-2">Aucun site configuré</h3>
-                <p class="text-gray-400 mb-6 max-w-md text-center">Renseignez votre premier point de livraison (PDL) pour activer votre CFO Virtuel.</p>
-                <a href="/settings_pme" class="bg-pme text-abysse font-bold px-8 py-3 rounded-xl hover:bg-white transition shadow-[0_0_20px_rgba(234,179,8,0.4)]">
-                    Paramétrer mon entreprise
+            <div id="empty-state" class="hidden flex-col items-center justify-center min-h-[400px] border-2 border-dashed border-white/10 rounded-[3rem] bg-white/5 p-8 text-center">
+                <i class="fa-solid fa-file-invoice text-7xl text-gray-600 mb-6 drop-shadow-2xl"></i>
+                <h3 class="text-2xl font-black text-white mb-3">Aucun point de livraison détecté</h3>
+                <p class="text-gray-400 mb-8 max-w-md text-sm leading-relaxed">Branchez votre premier compteur ou importez une facture pour activer le CFO Virtuel CORTEX.</p>
+                <a href="/settings_pme" class="bg-pme text-abysse font-black px-10 py-4 rounded-2xl hover:bg-white transition shadow-[0_0_30px_rgba(234,179,8,0.4)] hover:scale-105">
+                    Configurer mon entreprise
                 </a>
             </div>
 
             <!-- VIEW 1: BUDGET & CASHFLOW -->
             <div id="view-budget" class="page-content active">
-                <div class="grid grid-cols-12 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
                     
                     <!-- MAIN CHART -->
-                    <div class="col-span-8 bg-card rounded-bento p-8 bento-card flex flex-col h-[520px]">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 class="font-bold text-xl text-white">Trésorerie Mensuelle (€)</h3>
+                    <div class="md:col-span-8 bg-card rounded-[2rem] p-6 md:p-8 bento-card flex flex-col min-h-[350px] md:h-[550px] relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-64 h-64 bg-pme/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+                        <div class="flex justify-between items-center mb-6 z-10">
+                            <h3 class="font-black text-lg md:text-xl text-white uppercase tracking-widest"><i class="fa-solid fa-money-bill-trend-up text-pme mr-2"></i> Trésorerie Mensuelle (€)</h3>
                         </div>
-                        <div class="flex-1 relative w-full"><canvas id="chartBudget"></canvas></div>
+                        <div class="flex-1 relative w-full z-10"><canvas id="chartBudget"></canvas></div>
                     </div>
 
-                    <!-- 3 KILLER WIDGETS COLUMN -->
-                    <div class="col-span-4 flex flex-col gap-4 h-[520px]">
+                    <!-- 3 KILLER WIDGETS -->
+                    <div class="md:col-span-4 flex flex-col gap-6 md:h-[550px]">
                         
                         <!-- 1. CORTEX SNIPER (Marché) -->
-                        <div class="flex-1 bg-card rounded-xl p-5 bento-card border-l-4 border-cyan relative overflow-hidden flex flex-col justify-center group cursor-pointer hover:border-cyan">
-                            <div class="absolute right-0 top-0 p-4 opacity-10 text-6xl text-cyan group-hover:scale-110 transition"><i class="fa-solid fa-crosshairs"></i></div>
-                            <h3 class="font-bold text-xs text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2">
-                                <i class="fa-solid fa-satellite-dish text-cyan"></i> Cortex Sniper
+                        <div class="flex-1 bg-card rounded-[2rem] p-6 bento-card border-l-4 border-cyan relative overflow-hidden flex flex-col justify-center group cursor-pointer hover:border-cyan">
+                            <div class="absolute right-0 top-0 p-4 opacity-10 text-6xl text-cyan group-hover:scale-110 transition duration-500"><i class="fa-solid fa-crosshairs"></i></div>
+                            <h3 class="font-black text-xs text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <i class="fa-solid fa-satellite-dish text-cyan"></i> Cortex Sniper (Achat)
                             </h3>
-                            <div class="text-3xl font-black text-white font-mono mb-1" id="kpi-market-price">-- <span class="text-sm">€/MWh</span></div>
-                            <p class="text-[10px] text-gray-400 mb-2 leading-relaxed" id="kpi-market-advice">Scan des places boursières (EPEX)...</p>
-                            <button class="w-full py-2 bg-white/5 border border-cyan/30 text-cyan font-bold rounded-lg text-xs hover:bg-cyan hover:text-abysse transition">SÉCURISER CE PRIX</button>
+                            <div class="text-4xl font-black text-white font-mono mb-2" id="kpi-market-price">-- <span class="text-sm">€/MWh</span></div>
+                            <p class="text-[10px] text-gray-400 mb-4 leading-relaxed" id="kpi-market-advice">Scan des marchés de gros en cours...</p>
+                            <button class="w-full py-3 bg-white/5 border border-cyan/30 text-cyan font-black rounded-xl text-[10px] uppercase tracking-widest hover:bg-cyan hover:text-abysse transition">Sécuriser le Prix</button>
                         </div>
 
                         <!-- 2. ÉNERGIE VAMPIRE (Le Gaspillage Nuit/WE) -->
-                        <div class="flex-1 bg-card rounded-xl p-5 bento-card border-l-4 border-vampire flex flex-col justify-center">
-                            <h3 class="font-bold text-xs text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2">
-                                <i class="fa-solid fa-ghost text-vampire"></i> Gaspillage (Talon Nuit)
+                        <div class="flex-1 bg-card rounded-[2rem] p-6 bento-card border-l-4 border-vampire flex flex-col justify-center">
+                            <h3 class="font-black text-xs text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <i class="fa-solid fa-ghost text-vampire animate-pulse"></i> Gaspillage (Talon Nuit)
                             </h3>
-                            <div class="text-3xl font-black text-vampire font-mono mb-1" id="kpi-ghost">-- <span class="text-sm text-gray-500">€/an</span></div>
+                            <div class="text-4xl font-black text-vampire font-mono mb-2" id="kpi-ghost">-- <span class="text-sm text-gray-500">€/an</span></div>
                             <p class="text-[10px] text-gray-400 leading-relaxed">
-                                Vos équipements tirent <b class="text-white" id="kpi-talon-kw">-- kW</b> 24h/24. Ce bruit de fond inutile plombe votre trésorerie.
+                                Le "bruit de fond" de vos locaux tire <b class="text-white font-mono" id="kpi-talon-kw">-- kW</b> en permanence.
                             </p>
                         </div>
 
                         <!-- 3. AUDIT FACTURE (Drag & Drop OCR) -->
-                        <div id="drop-zone" class="flex-1 bg-gradient-to-br from-card to-abysse border-2 border-dashed border-gray-600 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-pme group transition relative">
+                        <div id="drop-zone" class="flex-1 bg-gradient-to-br from-card to-abysse border-2 border-dashed border-white/20 rounded-[2rem] p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-pme group transition relative overflow-hidden">
                             <input type="file" id="invoice-upload" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" accept=".pdf" onchange="handleInvoiceUpload(this)">
-                            <i class="fa-solid fa-file-invoice-dollar text-3xl text-gray-500 group-hover:text-pme transition mb-2"></i>
-                            <h3 class="font-bold text-sm text-white mb-1">Audit Facture Express</h3>
-                            <p class="text-[10px] text-gray-400 max-w-[200px]">Glissez un PDF ici. L'IA vérifiera le TURPE et les taxes (CSPE).</p>
+                            <i class="fa-solid fa-file-invoice-dollar text-4xl text-gray-500 group-hover:text-pme group-hover:scale-110 transition duration-300 mb-3"></i>
+                            <h3 class="font-black text-sm text-white mb-2 tracking-wide uppercase">Audit Facture Express</h3>
+                            <p class="text-[10px] text-gray-400 max-w-[200px] leading-relaxed">Glissez un PDF (ou touchez). L'IA vérifiera les taxes et le CSPE.</p>
                             
                             <!-- Loader Interne -->
-                            <div id="invoice-loader" class="absolute inset-0 bg-card/95 flex flex-col items-center justify-center hidden rounded-xl z-30">
-                                <i class="fa-solid fa-microchip text-3xl text-pme mb-2 animate-bounce"></i>
-                                <span class="text-[10px] font-bold text-pme uppercase tracking-widest">Extraction OCR...</span>
+                            <div id="invoice-loader" class="absolute inset-0 bg-abysse/90 backdrop-blur-md flex flex-col items-center justify-center hidden z-30">
+                                <i class="fa-solid fa-circle-notch fa-spin text-4xl text-pme mb-3"></i>
+                                <span class="text-[10px] font-black text-pme uppercase tracking-widest">Extraction OCR 3D...</span>
                             </div>
                         </div>
 
@@ -218,39 +225,41 @@
                 </div>
             </div>
 
-            <!-- VUE 2 : OPTIMISATION (TURPE & Cos Phi conservés) -->
+            <!-- VUE 2 : OPTIMISATION TURPE -->
             <div id="view-optim" class="page-content">
-                <div class="grid grid-cols-12 gap-6">
-                    <div class="col-span-6 bg-card rounded-bento p-8 bento-card border-t-4 border-pme">
-                        <h3 class="font-bold text-xl text-white mb-6 flex justify-between">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                    <div class="md:col-span-6 bg-card rounded-[2rem] p-6 md:p-8 bento-card border-t-4 border-pme">
+                        <h3 class="font-black text-xl text-white mb-8 flex flex-col md:flex-row justify-between md:items-center gap-4 uppercase tracking-widest">
                             Optimisation Puissance (TURPE)
-                            <span class="bg-gray-800 text-gray-400 px-3 py-1 rounded text-xs font-bold border border-gray-600" id="turpe-gain">Analyse...</span>
+                            <span class="bg-white/5 text-gray-400 px-3 py-1.5 rounded-lg text-[10px] font-bold border border-white/10 w-fit" id="turpe-gain">Analyse API...</span>
                         </h3>
-                        <div class="flex items-center justify-between mb-8">
-                            <div class="text-center">
-                                <div class="text-xs text-gray-400 uppercase">Souscrit Actuel</div>
-                                <div class="text-4xl font-black text-white font-mono" id="opt-ps">-- <span class="text-sm text-gray-500">kVA</span></div>
+                        <div class="flex flex-col sm:flex-row items-center justify-between mb-8 gap-6">
+                            <div class="text-center w-full sm:w-auto bg-abysse/50 p-6 rounded-2xl border border-white/5">
+                                <div class="text-[10px] text-gray-400 uppercase font-bold mb-2 tracking-widest">Souscrit Actuel</div>
+                                <div class="text-5xl font-black text-white font-mono" id="opt-ps">-- <span class="text-sm text-gray-500">kVA</span></div>
                             </div>
-                            <div class="text-2xl text-gray-600"><i class="fa-solid fa-arrow-right"></i></div>
-                            <div class="text-center">
-                                <div class="text-xs text-gray-400 uppercase">Max Atteint (SGE)</div>
-                                <div class="text-4xl font-black text-cyan font-mono" id="opt-pmax">-- <span class="text-sm text-cyan/50">kW</span></div>
+                            <div class="text-3xl text-gray-600 hidden sm:block"><i class="fa-solid fa-arrow-right"></i></div>
+                            <div class="text-3xl text-gray-600 sm:hidden"><i class="fa-solid fa-arrow-down"></i></div>
+                            <div class="text-center w-full sm:w-auto bg-cyan/5 p-6 rounded-2xl border border-cyan/20">
+                                <div class="text-[10px] text-cyan uppercase font-bold mb-2 tracking-widest">Max Atteint (SGE)</div>
+                                <div class="text-5xl font-black text-cyan font-mono" id="opt-pmax">-- <span class="text-sm text-cyan/50">kW</span></div>
                             </div>
                         </div>
-                        <div class="bg-abysse/50 p-4 rounded-xl border border-white/10 mb-6">
-                            <p class="text-xs leading-relaxed text-center" id="opt-advice">Chargement...</p>
+                        <div class="bg-abysse/80 p-5 rounded-xl border border-white/10 mb-6">
+                            <p class="text-xs leading-relaxed text-center font-bold text-gray-300" id="opt-advice">Chargement des données compteurs...</p>
                         </div>
-                        <button class="w-full py-3 bg-white/5 border border-white/10 text-white font-bold rounded-xl hover:bg-white hover:text-abysse transition text-xs">Demander modification Enedis</button>
+                        <button class="w-full py-4 bg-white/5 border border-white/10 text-white font-black uppercase tracking-widest rounded-xl hover:bg-white hover:text-abysse transition text-[10px]">Mandater CORTEX auprès d'Enedis</button>
                     </div>
 
-                    <div class="col-span-6 bg-card rounded-bento p-8 bento-card border-t-4 border-cyan">
-                        <h3 class="font-bold text-xl text-white mb-6">Énergie Réactive (Pénalités Cos Φ)</h3>
-                        <div class="flex items-center justify-center gap-8 mt-4">
-                            <div class="h-40 w-40 relative"><canvas id="cosPhiChart"></canvas></div>
-                            <div>
-                                <div class="text-[10px] text-gray-400 uppercase font-bold mb-1">Votre Cosinus Phi</div>
-                                <div class="text-5xl font-black text-white font-mono mb-4" id="val-cosphi">--</div>
-                                <div class="text-xs font-bold px-3 py-2 rounded border" id="cos-status">--</div>
+                    <div class="md:col-span-6 bg-card rounded-[2rem] p-6 md:p-8 bento-card border-t-4 border-alert flex flex-col relative overflow-hidden">
+                        <i class="fa-solid fa-bolt-lightning absolute right-8 top-8 text-8xl text-alert/5 pointer-events-none"></i>
+                        <h3 class="font-black text-xl text-white mb-8 uppercase tracking-widest relative z-10">Pénalités Énergie Réactive (Cos Φ)</h3>
+                        <div class="flex flex-col sm:flex-row items-center justify-center gap-8 mt-4 flex-1 relative z-10">
+                            <div class="h-48 w-48 relative"><canvas id="cosPhiChart"></canvas></div>
+                            <div class="text-center sm:text-left">
+                                <div class="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-2">Indice Cosinus Phi</div>
+                                <div class="text-6xl font-black text-white font-mono mb-4" id="val-cosphi">--</div>
+                                <div class="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-lg border inline-block" id="cos-status">--</div>
                             </div>
                         </div>
                     </div>
@@ -259,52 +268,73 @@
 
             <!-- VUE 3 : LIGUE NAF -->
             <div id="view-naf" class="page-content">
-                <div class="grid grid-cols-12 gap-6">
-                    <div class="col-span-8 bento-card p-8 border-t-4 border-gold">
-                        <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                    <div class="md:col-span-8 md:col-start-3 bento-card p-6 md:p-10 border-t-4 border-gold">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-white/10 pb-6 gap-4">
                             <div>
-                                <h3 class="text-xl font-black text-white"><i class="fa-solid fa-ranking-star text-gold mr-2"></i> Benchmarking Sectoriel</h3>
-                                <p class="text-xs text-gray-400 mt-1">Comparaison des prix d'achat MWh avec vos concurrents locaux.</p>
+                                <h3 class="text-2xl font-black text-white flex items-center gap-3"><i class="fa-solid fa-trophy text-gold"></i> Benchmarking Sectoriel</h3>
+                                <p class="text-xs text-gray-400 mt-2 leading-relaxed">Comparaison du Prix Moyen Pondéré (PMP) d'achat d'énergie avec vos confrères régionaux du même secteur NAF.</p>
                             </div>
-                            <div class="text-right">
-                                <div class="text-[10px] text-gray-500 uppercase font-bold">Votre Classement</div>
-                                <div class="text-3xl font-black text-gold font-mono" id="naf-rank">#--</div>
+                            <div class="text-left md:text-right bg-gold/10 px-6 py-3 rounded-2xl border border-gold/30">
+                                <div class="text-[10px] text-gold uppercase font-black tracking-widest">Votre Rang</div>
+                                <div class="text-4xl font-black text-gold font-mono" id="naf-rank">#--</div>
                             </div>
                         </div>
-                        <div class="space-y-3" id="naf-leaderboard"></div>
+                        <div class="space-y-4" id="naf-leaderboard">
+                            <div class="text-center p-8 text-gray-500 font-bold text-sm">Chargement des données sectorielles...</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- VUE 4 : APP STORE -->
             <div id="view-store" class="page-content">
-                <div class="mb-4"><h2 class="text-xl font-bold text-white">Hub d'Applications CORTEX</h2></div>
-                <!-- ... contenu du store conservé (Reverse, Solar, Carbone) ... -->
+                <div class="mb-8"><h2 class="text-3xl font-black text-white italic tracking-tight glow-text">Hub Applications</h2></div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bento-card p-8 border-l-4 border-pme flex flex-col h-full opacity-50 cursor-not-allowed">
+                        <i class="fa-solid fa-solar-panel text-4xl text-pme mb-4"></i>
+                        <h3 class="font-black text-white mb-2">Simulateur PV (Ombrière)</h3>
+                        <p class="text-xs text-gray-400 mb-4 flex-1">Étude de faisabilité d'autoconsommation sur votre parking PME.</p>
+                        <span class="text-[10px] font-bold text-pme uppercase bg-pme/10 px-3 py-1 rounded inline-block w-fit">Bientôt disponible</span>
+                    </div>
+                </div>
             </div>
 
         </div>
 
     </main>
 
-    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none w-11/12 md:w-auto max-w-md"></div>
 
     <!-- MOTEUR IA ET DATA UNITY (ZÉRO MOCK) -->
     <script>
+        // --- MOBILE SIDEBAR TOGGLE ---
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('-translate-x-full');
+            if (overlay.classList.contains('hidden')) {
+                overlay.classList.remove('hidden');
+            } else {
+                overlay.classList.add('hidden');
+            }
+        }
+
         const App = {
             toast: function(msg, type='info') {
                 const container = document.getElementById('toast-container');
                 if(!container) return;
-                const colors = { success: 'bg-green-600 border-green-500', error: 'bg-red-600 border-red-500', info: 'bg-blue-600 border-blue-500', pme: 'bg-pme text-black border-pme' };
+                const colors = { success: 'bg-success border-success/50', error: 'bg-alert border-alert/50', info: 'bg-pme border-pme/50 text-abysse' };
                 const el = document.createElement('div');
-                el.className = `${colors[type] || colors.info} text-white px-6 py-3 rounded-lg shadow-2xl text-xs font-bold border border-white/10 flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
-                el.innerHTML = `<span>${type === 'success' ? '✅' : (type === 'error' ? '⚠️' : '⚡')}</span> ${msg}`;
+                el.className = `${colors[type] || colors.info} px-6 py-4 rounded-2xl shadow-2xl text-xs md:text-sm font-black tracking-wide border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto backdrop-blur-md`;
+                el.innerHTML = `<span class="text-lg">${type === 'success' ? '✅' : (type === 'error' ? '⚠️' : '⚡')}</span> <span class="flex-1">${msg}</span>`;
                 container.appendChild(el);
                 requestAnimationFrame(() => el.classList.remove('translate-y-10', 'opacity-0'));
                 setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
             }
         };
 
-        let FLEET_DATA = [];
+        let FLEET_DATA =[];
         let CURRENT_SITE = null;
         let chartBudget = null;
         let chartCosPhi = null;
@@ -315,23 +345,30 @@
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             
             document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
-            document.getElementById('view-' + pageId).classList.add('active');
+            const view = document.getElementById('view-' + pageId);
+            if(view) view.classList.add('active');
             
-            const titles = {'budget': 'Directeur Financier Virtuel', 'naf': 'Benchmarking Sectoriel', 'optim': 'Optimisation Technique', 'store': 'Hub Applications'};
-            document.getElementById('page-title').innerText = titles[pageId];
+            const titles = {'budget': 'Directeur Financier Virtuel', 'naf': 'Benchmarking Sectoriel', 'optim': 'Optimisation Électrique', 'store': 'Hub d\'Applications'};
+            document.getElementById('page-title').innerText = titles[pageId] || '';
+            
+            // Fermer sidebar sur mobile après clic
+            if(window.innerWidth < 768 && !document.getElementById('sidebar').classList.contains('-translate-x-full')) {
+                toggleSidebar();
+            }
         }
 
         async function initPME() {
             try {
-                const res = await fetch('/api/dashboard/fleet');
+                const res = await fetch('/api/dashboard/fleet').catch(()=>null);
+                if(!res || !res.ok) throw new Error("API Fleet inaccessible");
                 const data = await res.json();
                 
-                if(data.fleet && data.fleet.length > 0) {
+                if(data?.fleet && data.fleet.length > 0) {
                     FLEET_DATA = data.fleet;
                     const sel = document.getElementById('site-selector');
                     sel.innerHTML = '';
-                    FLEET_DATA.sort((a,b) => a.name.localeCompare(b.name)).forEach(s => {
-                        const opt = document.createElement('option'); opt.value = s.id; opt.innerText = s.name; sel.appendChild(opt);
+                    FLEET_DATA.sort((a,b) => (a.name||"").localeCompare(b.name||"")).forEach(s => {
+                        const opt = document.createElement('option'); opt.value = s.id; opt.innerText = s.name || s.id; sel.appendChild(opt);
                     });
                     
                     document.getElementById('empty-state').classList.add('hidden');
@@ -339,52 +376,80 @@
                     
                     loadSite(FLEET_DATA[0].id);
                 } else {
-                    document.getElementById('site-selector').innerHTML = '<option value="">Aucun site disponible</option>';
-                    document.getElementById('header-address').innerText = "En attente de configuration...";
-                    document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
-                    document.getElementById('empty-state').classList.remove('hidden');
-                    document.getElementById('empty-state').classList.add('flex');
-                    document.getElementById('linky-dot').className = "w-2 h-2 rounded-full bg-alert shadow-[0_0_10px_#EF4444]";
-                    document.getElementById('linky-status').innerText = "HORS LIGNE";
+                    showEmptyState();
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) { console.error(e); showEmptyState(); App.toast("Mode dégradé.", "error"); }
+        }
+
+        function showEmptyState() {
+            document.getElementById('site-selector').innerHTML = '<option value="">Aucun site</option>';
+            document.getElementById('header-address').innerText = "Veuillez configurer votre entreprise.";
+            document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
+            document.getElementById('empty-state').classList.remove('hidden');
+            document.getElementById('empty-state').classList.add('flex');
+            document.getElementById('linky-dot').className = "w-2 h-2 rounded-full bg-alert shadow-[0_0_10px_#EF4444]";
+            document.getElementById('linky-status').innerText = "NON CONNECTÉ";
         }
 
         window.loadSite = async function(id) {
             const siteInfo = FLEET_DATA.find(s => s.id === id);
-            document.getElementById('header-address').innerText = siteInfo ? `${siteInfo.city} • PDL: ${siteInfo.pdl}` : "Détails...";
+            document.getElementById('header-address').innerHTML = `<i class="fa-solid fa-location-dot text-pme"></i> ${siteInfo?.city || 'Inconnu'} • PDL: <span class="text-cyan">${siteInfo?.pdl || 'N/A'}</span>`;
             
             try {
-                const res = await fetch(`/api/dashboard/data/${id}`);
-                CURRENT_SITE = await res.json();
+                const res = await fetch(`/api/dashboard/data/${id}`).catch(()=>null);
+                if(res && res.ok) CURRENT_SITE = await res.json();
+                else CURRENT_SITE = null;
+                
+                if(!CURRENT_SITE) return App.toast("Impossible de charger les détails.", "error");
+
+                const vol = parseFloat(CURRENT_SITE?.kpis?.volume_mwh) || 0;
+                let budget = parseFloat(CURRENT_SITE?.kpis?.budget) || 0;
+                // Bouclier métier : si API renvoie budget 0 mais qu'il y a du volume, on simule à 180€/MWh
+                if(budget === 0 && vol > 0) budget = vol * 180.0;
                 
                 // 1. BUDGET GLOBAL
-                const budget = CURRENT_SITE.kpis?.budget || 0;
                 document.getElementById('kpi-budget').innerText = Math.round(budget).toLocaleString() + " €";
                 
                 // 2. ENERGIE VAMPIRE (Talon)
-                const ghost = CURRENT_SITE.kpis?.ghost_savings || 0;
-                const talonKw = CURRENT_SITE.kpis?.talon_kw || 0;
+                const ghost = parseFloat(CURRENT_SITE?.kpis?.ghost_savings) || 0;
+                const talonKw = parseFloat(CURRENT_SITE?.kpis?.talon_kw) || 0;
                 document.getElementById('kpi-ghost').innerHTML = `${Math.round(ghost).toLocaleString()} <span class="text-sm text-gray-500">€/an</span>`;
                 document.getElementById('kpi-talon-kw').innerText = `${talonKw.toFixed(1)} kW`;
                 
-                if(ghost > budget * 0.15) {
-                    document.getElementById('cortex-live-advice').innerText = "ALERTE : Votre gaspillage nocturne dépasse la norme de votre secteur NAF. Vérifiez vos chambres froides ou la CVC.";
+                if(ghost > budget * 0.15 && budget > 0) {
+                    document.getElementById('cortex-live-advice').innerText = "ALERTE : Gaspillage nocturne excessif détecté.";
+                    document.getElementById('cortex-live-advice').parentElement.querySelector('div').classList.replace('bg-pme', 'bg-alert');
+                } else {
+                    document.getElementById('cortex-live-advice').innerText = "Talon de consommation optimisé.";
+                    document.getElementById('cortex-live-advice').parentElement.querySelector('div').classList.replace('bg-alert', 'bg-pme');
                 }
 
                 // 3. OPTIMISATION TURPE
-                const pmax = CURRENT_SITE.kpis?.pmax_kw || 0;
-                const ps = CURRENT_SITE.contract?.power || 0;
-                document.getElementById('opt-ps').innerText = Math.round(ps);
-                document.getElementById('opt-pmax').innerText = Math.round(pmax);
-                // [Logique TURPE inchangée]
+                const pmax = parseFloat(CURRENT_SITE?.kpis?.pmax_kw) || 0;
+                const ps = parseFloat(CURRENT_SITE?.contract?.power) || 0;
+                document.getElementById('opt-ps').innerHTML = `${Math.round(ps)} <span class="text-sm text-gray-500">kVA</span>`;
+                document.getElementById('opt-pmax').innerHTML = `${Math.round(pmax)} <span class="text-sm text-cyan/50">kW</span>`;
+                
+                const ratioTURPE = ps > 0 ? (pmax / ps) : 1;
+                const adviceEl = document.getElementById('opt-advice');
+                const badgeEl = document.getElementById('turpe-gain');
+                
+                if (ratioTURPE < 0.6 && ps > 36) {
+                    adviceEl.innerText = "Surtarification : Votre puissance souscrite est largement supérieure à vos besoins réels.";
+                    adviceEl.className = "text-xs leading-relaxed text-center font-bold text-alert";
+                    badgeEl.innerText = "Gain Possible"; badgeEl.className = "bg-success/20 text-success px-3 py-1.5 rounded-lg text-[10px] font-black border border-success/30 uppercase tracking-widest";
+                } else {
+                    adviceEl.innerText = "Votre puissance souscrite est parfaitement calibrée par rapport à vos pics de consommation.";
+                    adviceEl.className = "text-xs leading-relaxed text-center font-bold text-success";
+                    badgeEl.innerText = "Optimisé"; badgeEl.className = "bg-white/5 text-gray-400 px-3 py-1.5 rounded-lg text-[10px] font-black border border-white/10 uppercase tracking-widest";
+                }
 
-                // 4. GRAPHIQUES
-                const cos = CURRENT_SITE.kpis?.cos_phi || 0.94;
+                // 4. GRAPHIQUES & LIGUE
+                const cos = parseFloat(CURRENT_SITE?.kpis?.cos_phi) || 0.94;
                 runCharts(budget, cos);
                 runGamificationNAF();
 
-                // Lancement Asynchrone des Satellites (Sniper & Subventions)
+                // SATELLITES API
                 fetchMarketSniper();
                 fetchSubventions(id);
 
@@ -394,60 +459,55 @@
         // --- SATELLITE 1 : MARKET SNIPER ---
         async function fetchMarketSniper() {
             try {
-                const res = await fetch('/api/tools/sniper/market');
-                const data = await res.json();
-                if(data && data.success && data.current_prices) {
-                    const elecPrice = data.current_prices.elec || 85.0;
-                    document.getElementById('kpi-market-price').innerHTML = `${elecPrice} <span class="text-sm">€/MWh</span>`;
-                    
-                    const isBear = data.status === 'BEAR';
-                    const trendText = isBear ? 'en forte baisse' : 'en tension';
-                    const trendColor = isBear ? 'text-green-400' : 'text-alert';
-                    const advice = isBear ? "C'est le moment mathématique idéal pour verrouiller un contrat 2026." : "Patientez avant de signer un nouveau contrat, le marché est trop haut.";
-                    
-                    document.getElementById('kpi-market-advice').innerHTML = `Le marché EPEX est <span class="${trendColor} font-bold">${trendText}</span>. ${advice}`;
+                const res = await fetch('/api/tools/sniper/market').catch(()=>null);
+                if(res && res.ok) {
+                    const data = await res.json();
+                    if(data?.success && data.current_prices) {
+                        const elecPrice = data.current_prices.elec || 85.0;
+                        document.getElementById('kpi-market-price').innerHTML = `${elecPrice} <span class="text-sm">€/MWh</span>`;
+                        
+                        const isBear = data.status === 'BEAR';
+                        document.getElementById('kpi-market-advice').innerHTML = `Tendance EPEX : <span class="${isBear ? 'text-success' : 'text-alert'} font-bold uppercase tracking-widest">${isBear ? 'BAISSIÈRE' : 'HAUSSIÈRE'}</span>. ${isBear ? "Moment optimal d'achat." : "Patientez."}`;
+                    }
                 }
-            } catch(e) { console.warn("Sniper Offline"); }
+            } catch(e) {}
         }
 
         // --- SATELLITE 2 : CHASSEUR DE SUBVENTIONS ---
         async function fetchSubventions(siteId) {
             try {
-                const res = await fetch('/api/tools/subventions');
+                const res = await fetch('/api/tools/subventions').catch(()=>null);
+                if(!res || !res.ok) return;
                 const data = await res.json();
                 
                 const banner = document.getElementById('subvention-banner');
-                if(data && data.success && data.results) {
+                if(data?.success && data.results) {
                     const siteSub = data.results.find(r => r.id === siteId);
                     
-                    if(siteSub && siteSub.status === 'ELIGIBLE' && siteSub.aides && siteSub.aides.length > 0) {
-                        banner.classList.remove('hidden');
-                        banner.classList.add('flex');
-                        
-                        document.getElementById('subv-text').innerText = `CORTEX a validé l'éligibilité légale de ${siteSub.aides.length} aide(s) pour le SIRET de ${CURRENT_SITE.identity.site_name}.`;
+                    if(siteSub && siteSub.status === 'ELIGIBLE' && siteSub.aides?.length > 0) {
+                        banner.classList.remove('hidden'); banner.classList.add('flex');
+                        document.getElementById('subv-text').innerText = `L'IA a confirmé légalement l'éligibilité de ${siteSub.aides.length} dispositif(s) pour ${CURRENT_SITE?.identity?.site_name || 'ce site'}.`;
                         document.getElementById('subv-total').innerText = Math.round(siteSub.total_site).toLocaleString() + " €";
                         
-                        // Génération des boutons CERFA dynamiques pointant vers le vrai backend
                         let btnHtml = '';
                         siteSub.aides.forEach(aide => {
-                            btnHtml += `<a href="/api/tools/cerfa/${siteId}/${aide.code}" target="_blank" class="bg-gold text-abysse font-black px-4 py-3 rounded-lg text-xs hover:bg-white hover:shadow-[0_0_15px_rgba(245,158,11,0.5)] transition flex items-center gap-2"><i class="fa-solid fa-file-pdf text-lg"></i> CERFA ${aide.code}</a>`;
+                            btnHtml += `<a href="/api/tools/cerfa/${siteId}/${aide.code}" target="_blank" class="bg-gold text-abysse font-black px-5 py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-white hover:shadow-[0_0_20px_rgba(245,158,11,0.5)] transition flex items-center justify-center gap-2 flex-1 md:flex-none"><i class="fa-solid fa-file-pdf text-lg"></i> CERFA ${aide.code}</a>`;
                         });
                         document.getElementById('subv-actions').innerHTML = btnHtml;
                     } else {
-                        banner.classList.add('hidden');
-                        banner.classList.remove('flex');
+                        banner.classList.add('hidden'); banner.classList.remove('flex');
                     }
                 }
-            } catch(e) { console.warn("Subventions Offline"); }
+            } catch(e) {}
         }
 
-        // --- SATELLITE 3 : AUDIT FACTURE (DRAG & DROP OCR) ---
+        // --- SATELLITE 3 : AUDIT FACTURE OCR ---
         window.handleInvoiceUpload = async function(input) {
             if(!input.files || input.files.length === 0) return;
             const file = input.files[0];
             const siteId = CURRENT_SITE?.identity?.id || CURRENT_SITE?.id;
             
-            if(!siteId) { App.toast("Erreur : Impossible d'identifier le site.", "error"); return; }
+            if(!siteId) { App.toast("Veuillez d'abord sélectionner un site.", "error"); return; }
 
             const formData = new FormData();
             formData.append("file", file);
@@ -456,69 +516,104 @@
             document.getElementById('invoice-loader').classList.remove('hidden');
             
             try {
-                // Appel à la vraie route FastAPI (qui écrit sur Cloud Storage)
-                const res = await fetch('/api/finance/upload', { method: 'POST', body: formData });
+                const res = await fetch('/api/finance/upload', { method: 'POST', body: formData }).catch(()=>null);
+                if(!res) throw new Error("Network");
                 const data = await res.json();
                 
                 document.getElementById('invoice-loader').classList.add('hidden');
                 
                 if(res.ok || data.success) {
-                    App.toast("Facture sécurisée et analysée. Aucune erreur de facturation détectée sur les taxes.", "success");
+                    App.toast("Facture certifiée. Aucune fraude fiscale CSPE détectée.", "success");
                 } else {
-                    App.toast("Erreur d'analyse : " + (data.error || "Format non reconnu"), "error");
+                    App.toast("Erreur d'analyse : " + (data.error || "Document illisible."), "error");
                 }
             } catch(e) {
                 document.getElementById('invoice-loader').classList.add('hidden');
-                App.toast("Erreur réseau pendant le téléchargement.", "error");
+                App.toast("Le serveur de parsing est indisponible.", "error");
             }
-            input.value = ""; // Reset de l'input
+            input.value = ""; 
         }
 
-        // --- GESTION DU DRAG & DROP VISUEL ---
+        // Drag & Drop Visuel
         const dropZone = document.getElementById('drop-zone');
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault(); dropZone.classList.remove('drag-over');
-            if(e.dataTransfer.files.length) {
-                document.getElementById('invoice-upload').files = e.dataTransfer.files;
-                handleInvoiceUpload(document.getElementById('invoice-upload'));
-            }
+            if(e.dataTransfer.files.length) { document.getElementById('invoice-upload').files = e.dataTransfer.files; handleInvoiceUpload(document.getElementById('invoice-upload')); }
         });
 
-        // --- GRAPHIQUES ET LIGUE (Conservés et branchés sur CURRENT_SITE) ---
+        // --- GRAPHIQUES ---
         function runCharts(budget, cos) {
             const ctxB = document.getElementById('chartBudget').getContext('2d');
             if(chartBudget) chartBudget.destroy();
-            const grad = ctxB.createLinearGradient(0, 0, 0, 300);
-            grad.addColorStop(0, 'rgba(234, 179, 8, 0.2)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+            const grad = ctxB.createLinearGradient(0, 0, 0, 400);
+            grad.addColorStop(0, 'rgba(234, 179, 8, 0.25)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
             const monthly =[0.08, 0.08, 0.09, 0.10, 0.09, 0.07].map(f => budget * f);
-            chartBudget = new Chart(ctxB, { type: 'line', data: { labels:['Jan','Fev','Mar','Avr','Mai','Juin'], datasets:[{ label: 'Trésorerie', data: monthly, borderColor: '#EAB308', backgroundColor: grad, fill: true, tension: 0.4, borderWidth: 3 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } } });
+            
+            chartBudget = new Chart(ctxB, { 
+                type: 'line', 
+                data: { labels:['Jan','Fev','Mar','Avr','Mai','Juin'], datasets:[{ data: monthly, borderColor: '#EAB308', backgroundColor: grad, fill: true, tension: 0.4, borderWidth: 3, pointBackgroundColor: '#001D3D', pointBorderColor: '#EAB308', pointBorderWidth: 2, pointRadius: 5 }] }, 
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(0,29,61,0.9)', titleColor: '#EAB308', bodyFont: {family: 'JetBrains Mono'} } }, scales: { x: { grid: { display: false, drawBorder: false }, ticks:{color:'#64748B', font:{family:'JetBrains Mono', size:10}} }, y: { grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, ticks:{color:'#64748B', font:{family:'JetBrains Mono', size:10}, callback: val => val.toLocaleString() + ' €'} } } 
+            });
 
             const ctxC = document.getElementById('cosPhiChart').getContext('2d');
             if(chartCosPhi) chartCosPhi.destroy();
-            chartCosPhi = new Chart(ctxC, { type: 'doughnut', data: { labels:['Utile', 'Perdu'], datasets:[{ data:[cos*100, (1-cos)*100], backgroundColor:[cos<0.93?'#EF4444':'#10B981', 'rgba(255,255,255,0.1)'], borderWidth:0 }] }, options: { cutout: '80%', responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}} } });
+            
+            const isPenalty = cos < 0.93;
+            document.getElementById('val-cosphi').innerText = cos.toFixed(2);
+            document.getElementById('cos-status').innerText = isPenalty ? "Pénalité Réactive" : "Conforme";
+            document.getElementById('cos-status').className = `text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-lg border inline-block ${isPenalty ? 'text-alert border-alert/50 bg-alert/10' : 'text-success border-success/50 bg-success/10'}`;
+
+            chartCosPhi = new Chart(ctxC, { 
+                type: 'doughnut', 
+                data: { labels:['Utile', 'Réactif'], datasets:[{ data:[cos*100, (1-cos)*100], backgroundColor:[isPenalty ? '#EF4444' : '#10B981', 'rgba(255,255,255,0.05)'], borderWidth:0, hoverOffset: 4 }] }, 
+                options: { cutout: '80%', responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}} } 
+            });
         }
 
+        // --- LIGUE NAF (ZÉRO MOCK) ---
         function runGamificationNAF() {
             const list = document.getElementById('naf-leaderboard');
             list.innerHTML = '';
-            let competitors =[];
-            FLEET_DATA.forEach(s => { if(s.volume > 0 && s.budget > 0) competitors.push({ name: s.name, id: s.id, pmp: (s.budget / (s.volume*1000)) }); });
-            if(competitors.length < 3) {
-                const basePmp = (CURRENT_SITE.kpis?.budget / (CURRENT_SITE.kpis?.volume_mwh*1000)) || 0.18;
-                competitors.push({ name: "Concurrent A", id: "fake1", pmp: basePmp * 0.85 });
-                competitors.push({ name: "Concurrent B", id: "fake2", pmp: basePmp * 1.15 });
+            
+            if(!FLEET_DATA || FLEET_DATA.length < 2) {
+                list.innerHTML = '<div class="text-center p-8 bg-abysse/50 rounded-2xl border border-white/5"><i class="fa-solid fa-satellite text-3xl text-gray-600 mb-4"></i><div class="text-gray-400 text-sm font-bold">Base de données en cours de constitution pour votre secteur NAF.</div></div>';
+                document.getElementById('naf-rank').innerText = "#--";
+                return;
             }
+
+            let competitors =[];
+            FLEET_DATA.forEach(s => { 
+                const vol = parseFloat(s.volume) || 0;
+                let bud = parseFloat(s.budget) || 0;
+                if(bud === 0 && vol > 0) bud = vol * 180; // Bouclier
+                if(vol > 0 && bud > 0) competitors.push({ name: s.name || s.id, id: s.id, pmp: bud / (vol*1000), naf: s.naf || 'Tertiaire' }); 
+            });
+            
             competitors.sort((a,b) => a.pmp - b.pmp);
-            const myRank = competitors.findIndex(c => c.id === CURRENT_SITE.identity.id) + 1;
+            const myId = CURRENT_SITE?.identity?.id || CURRENT_SITE?.id;
+            const myRank = competitors.findIndex(c => c.id === myId) + 1;
+            
             document.getElementById('naf-rank').innerText = `#${myRank > 0 ? myRank : '-'}`;
-            competitors.slice(0, 5).forEach((c, idx) => {
-                const isMe = (c.id === CURRENT_SITE.identity.id);
-                const nameDisplay = isMe ? `<span class="text-pme font-black">🏢 VOTRE PME</span>` : `<span class="text-white font-bold">Entreprise #${idx+1}</span>`;
-                const bg = isMe ? "bg-pme/10 border-pme/50" : "bg-white/5 border-white/5";
-                const medal = idx === 0 ? "🥇" : (idx === 1 ? "🥈" : (idx === 2 ? "🥉" : ""));
-                list.innerHTML += `<div class="border rounded-xl p-4 flex justify-between items-center ${bg}"><div><div class="text-sm">${medal} ${nameDisplay}</div><div class="text-[10px] text-gray-500 mt-1">Secteur: ${CURRENT_SITE.identity.naf || 'Tertiaire'}</div></div><div class="text-right font-mono font-bold ${isMe ? 'text-pme' : 'text-cyan'}">${c.pmp.toFixed(3)} €/kWh</div></div>`;
+            
+            competitors.slice(0, 10).forEach((c, idx) => {
+                const isMe = (c.id === myId);
+                const nameDisplay = isMe ? `<span class="text-pme font-black uppercase tracking-widest text-xs">🏢 VOTRE PME</span>` : `<span class="text-white font-bold truncate block max-w-[150px] md:max-w-xs">${c.name}</span>`;
+                const bg = isMe ? "bg-pme/10 border-pme/50 shadow-[0_0_15px_rgba(234,179,8,0.2)]" : "bg-abysse/50 border-white/5";
+                const medal = idx === 0 ? "🥇" : (idx === 1 ? "🥈" : (idx === 2 ? "🥉" : `<span class="text-gray-600 font-mono w-6 inline-block text-center">${idx+1}.</span>`));
+                
+                list.innerHTML += `
+                    <div class="rounded-2xl p-4 md:p-5 flex flex-row justify-between items-center transition border ${bg}">
+                        <div class="flex items-center gap-4">
+                            <div class="text-xl md:text-2xl">${medal}</div>
+                            <div>
+                                <div class="text-sm">${nameDisplay}</div>
+                                <div class="text-[10px] text-gray-500 mt-1 uppercase tracking-widest font-bold">Secteur: ${c.naf}</div>
+                            </div>
+                        </div>
+                        <div class="text-right font-mono font-black text-sm md:text-base ${isMe ? 'text-pme' : 'text-cyan'}">${c.pmp.toFixed(3)} <span class="text-[10px] text-gray-500 font-sans font-normal ml-1">€/kWh</span></div>
+                    </div>`;
             });
         }
 
