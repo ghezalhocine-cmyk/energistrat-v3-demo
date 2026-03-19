@@ -19,7 +19,7 @@
                         abysse: '#001529', card: '#001D3D', pme: '#EAB308', gold: '#F59E0B',
                         cyan: '#00E5FF', alert: '#EF4444', success: '#10B981', vampire: '#8B5CF6'
                     },
-                    fontFamily: { sans: ['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
                     borderRadius: { 'bento': '2rem' },
                     boxShadow: { 'neon-pme': '0 0 20px rgba(234, 179, 8, 0.25)', 'inner-bento': 'inset 0 2px 10px rgba(255,255,255,0.05)' }
                 }
@@ -86,7 +86,8 @@
         </div>
         
         <div class="p-6 border-t border-white/5 space-y-4 bg-[#000F1F]">
-            <a href="/settings_pme" class="flex items-center gap-3 text-gray-400 hover:text-white transition text-xs font-bold bg-white/5 p-3 rounded-xl border border-white/10 hover:border-pme/50">
+            <!-- Link Settings : Sera dynamiquement mis à jour par le JS pour inclure ?force_tenant= -->
+            <a href="/settings_pme" class="nexus-link flex items-center gap-3 text-gray-400 hover:text-white transition text-xs font-bold bg-white/5 p-3 rounded-xl border border-white/10 hover:border-pme/50">
                 <i class="fa-solid fa-gear text-pme"></i> Paramètres Data
             </a>
             <div class="bg-gradient-to-br from-card to-abysse border border-white/10 rounded-xl p-4 cursor-pointer group" onclick="App.toast('Code parrainage copié !', 'success')">
@@ -106,7 +107,9 @@
                 <button class="md:hidden text-white text-xl" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
                 <div class="flex items-center gap-3">
                     <div class="px-2 py-1 rounded bg-pme text-abysse text-[9px] font-black animate-pulse tracking-widest uppercase">CORTEX Actif</div>
-                    <span class="text-[10px] md:text-xs text-pme font-mono truncate max-w-[200px] md:max-w-none" id="cortex-live-advice">Analyse de rentabilité en cours...</span>
+                    <!-- LE BADGE GOD MODE NEXUS OPS -->
+                    <div id="god-mode-badge" class="hidden px-2 py-1 bg-alert/20 text-alert border border-alert/50 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-1"></div>
+                    <span class="text-[10px] md:text-xs text-pme font-mono truncate max-w-[150px] md:max-w-none" id="cortex-live-advice">Analyse de rentabilité en cours...</span>
                 </div>
             </div>
             <div class="flex items-center gap-4 w-full md:w-auto justify-end">
@@ -164,7 +167,7 @@
                 <i class="fa-solid fa-file-invoice text-7xl text-gray-600 mb-6 drop-shadow-2xl"></i>
                 <h3 class="text-2xl font-black text-white mb-3">Aucun point de livraison détecté</h3>
                 <p class="text-gray-400 mb-8 max-w-md text-sm leading-relaxed">Branchez votre premier compteur ou importez une facture pour activer le CFO Virtuel CORTEX.</p>
-                <a href="/settings_pme" class="bg-pme text-abysse font-black px-10 py-4 rounded-2xl hover:bg-white transition shadow-[0_0_30px_rgba(234,179,8,0.4)] hover:scale-105">
+                <a href="/settings_pme" class="nexus-link bg-pme text-abysse font-black px-10 py-4 rounded-2xl hover:bg-white transition shadow-[0_0_30px_rgba(234,179,8,0.4)] hover:scale-105">
                     Configurer mon entreprise
                 </a>
             </div>
@@ -306,8 +309,30 @@
 
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none w-11/12 md:w-auto max-w-md"></div>
 
-    <!-- MOTEUR IA ET DATA UNITY (ZÉRO MOCK) -->
+    <!-- MOTEUR IA ET DATA UNITY (ZÉRO MOCK & GOD MODE OPS) -->
     <script>
+        // --- 👁️ GOD MODE (NEXUS OPS) : INTERCEPTEUR D'URL ---
+        function getApiUrl(basePath) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const forceTenant = urlParams.get('force_tenant');
+            if (!forceTenant) return basePath;
+            return basePath + (basePath.includes('?') ? '&' : '?') + 'force_tenant=' + encodeURIComponent(forceTenant);
+        }
+
+        // --- GESTION VISUELLE DU GOD MODE ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const forceTenant = new URLSearchParams(window.location.search).get('force_tenant');
+            if(forceTenant) {
+                const badge = document.getElementById('god-mode-badge');
+                badge.classList.remove('hidden');
+                badge.innerHTML = `<i class="fa-solid fa-eye"></i> OPS : ${forceTenant}`;
+                // Mise à jour de tous les liens statiques (Paramètres)
+                document.querySelectorAll('a.nexus-link').forEach(a => {
+                    a.href = getApiUrl(a.getAttribute('href'));
+                });
+            }
+        });
+
         // --- MOBILE SIDEBAR TOGGLE ---
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -359,7 +384,8 @@
 
         async function initPME() {
             try {
-                const res = await fetch('/api/dashboard/fleet').catch(()=>null);
+                // Utilisation de getApiUrl pour faire suivre le God Mode
+                const res = await fetch(getApiUrl('/api/dashboard/fleet')).catch(()=>null);
                 if(!res || !res.ok) throw new Error("API Fleet inaccessible");
                 const data = await res.json();
                 
@@ -378,7 +404,7 @@
                 } else {
                     showEmptyState();
                 }
-            } catch(e) { console.error(e); showEmptyState(); App.toast("Mode dégradé.", "error"); }
+            } catch(e) { console.error(e); showEmptyState(); App.toast("Mode dégradé ou tenant vide.", "error"); }
         }
 
         function showEmptyState() {
@@ -396,7 +422,8 @@
             document.getElementById('header-address').innerHTML = `<i class="fa-solid fa-location-dot text-pme"></i> ${siteInfo?.city || 'Inconnu'} • PDL: <span class="text-cyan">${siteInfo?.pdl || 'N/A'}</span>`;
             
             try {
-                const res = await fetch(`/api/dashboard/data/${id}`).catch(()=>null);
+                // Fetch avec injection God Mode
+                const res = await fetch(getApiUrl(`/api/dashboard/data/${id}`)).catch(()=>null);
                 if(res && res.ok) CURRENT_SITE = await res.json();
                 else CURRENT_SITE = null;
                 
@@ -404,7 +431,6 @@
 
                 const vol = parseFloat(CURRENT_SITE?.kpis?.volume_mwh) || 0;
                 let budget = parseFloat(CURRENT_SITE?.kpis?.budget) || 0;
-                // Bouclier métier : si API renvoie budget 0 mais qu'il y a du volume, on simule à 180€/MWh
                 if(budget === 0 && vol > 0) budget = vol * 180.0;
                 
                 // 1. BUDGET GLOBAL
@@ -459,7 +485,7 @@
         // --- SATELLITE 1 : MARKET SNIPER ---
         async function fetchMarketSniper() {
             try {
-                const res = await fetch('/api/tools/sniper/market').catch(()=>null);
+                const res = await fetch(getApiUrl('/api/tools/sniper/market')).catch(()=>null);
                 if(res && res.ok) {
                     const data = await res.json();
                     if(data?.success && data.current_prices) {
@@ -467,7 +493,7 @@
                         document.getElementById('kpi-market-price').innerHTML = `${elecPrice} <span class="text-sm">€/MWh</span>`;
                         
                         const isBear = data.status === 'BEAR';
-                        document.getElementById('kpi-market-advice').innerHTML = `Tendance EPEX : <span class="${isBear ? 'text-success' : 'text-alert'} font-bold uppercase tracking-widest">${isBear ? 'BAISSIÈRE' : 'HAUSSIÈRE'}</span>. ${isBear ? "Moment optimal d'achat." : "Patientez."}`;
+                        document.getElementById('kpi-market-advice').innerHTML = `Tendance EPEX : <span class="${isBear ? 'text-success' : 'text-alert'} font-bold uppercase tracking-widest">${isBear ? 'BAISSIÈRE' : 'HAUSSIÈRE'}</span>. ${isBear ? "Moment optimal." : "Patientez."}`;
                     }
                 }
             } catch(e) {}
@@ -476,7 +502,7 @@
         // --- SATELLITE 2 : CHASSEUR DE SUBVENTIONS ---
         async function fetchSubventions(siteId) {
             try {
-                const res = await fetch('/api/tools/subventions').catch(()=>null);
+                const res = await fetch(getApiUrl('/api/tools/subventions')).catch(()=>null);
                 if(!res || !res.ok) return;
                 const data = await res.json();
                 
@@ -491,7 +517,9 @@
                         
                         let btnHtml = '';
                         siteSub.aides.forEach(aide => {
-                            btnHtml += `<a href="/api/tools/cerfa/${siteId}/${aide.code}" target="_blank" class="bg-gold text-abysse font-black px-5 py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-white hover:shadow-[0_0_20px_rgba(245,158,11,0.5)] transition flex items-center justify-center gap-2 flex-1 md:flex-none"><i class="fa-solid fa-file-pdf text-lg"></i> CERFA ${aide.code}</a>`;
+                            // Injection God Mode dans les liens CERFA générés !
+                            const cerfaUrl = getApiUrl(`/api/tools/cerfa/${siteId}/${aide.code}`);
+                            btnHtml += `<a href="${cerfaUrl}" target="_blank" class="bg-gold text-abysse font-black px-5 py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-white hover:shadow-[0_0_20px_rgba(245,158,11,0.5)] transition flex items-center justify-center gap-2 flex-1 md:flex-none"><i class="fa-solid fa-file-pdf text-lg"></i> CERFA ${aide.code}</a>`;
                         });
                         document.getElementById('subv-actions').innerHTML = btnHtml;
                     } else {
@@ -516,7 +544,8 @@
             document.getElementById('invoice-loader').classList.remove('hidden');
             
             try {
-                const res = await fetch('/api/finance/upload', { method: 'POST', body: formData }).catch(()=>null);
+                // Ici aussi on ajoute le God Mode à l'URL pour la route POST !
+                const res = await fetch(getApiUrl('/api/finance/upload'), { method: 'POST', body: formData }).catch(()=>null);
                 if(!res) throw new Error("Network");
                 const data = await res.json();
                 
