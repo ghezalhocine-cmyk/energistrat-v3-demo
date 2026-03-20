@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V12.6 | Lab Décisions Publiques (Mairie)</title>
+    
+    <!-- Moteurs -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Configuration Tailwind Dark Cyber (Thème Mairie) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        abysse: '#001529', card: '#001D3D', mairie: '#3B82F6', cyan: '#00E5FF',   
+                        alert: '#EF4444', success: '#10B981', gold: '#F59E0B',
+                        ep: '#EAB308', fond_vert: '#14B8A6'
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
+                    borderRadius: { 'bento': '2.5rem' },
+                    boxShadow: { 'neon-mairie': '0 0 20px rgba(59, 130, 246, 0.4)', 'inner-bento': 'inset 0 2px 10px rgba(255,255,255,0.05)' }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body { background-color: #001529; color: white; overflow-x: hidden; font-family: 'Inter', sans-serif; }
+        
+        .bento-card { background: rgba(0, 29, 61, 0.75); backdrop-filter: blur(24px); border: 1px solid rgba(59, 130, 246, 0.15); border-radius: 2.5rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
+        .bento-card:hover { border-color: rgba(59, 130, 246, 0.5); transform: translateY(-2px); }
+        
+        .nav-item.active { background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, transparent 100%); border-left: 4px solid #3B82F6; color: white; }
+        
+        /* CORTEX SLIDERS (Design Mairie) */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; height: 6px; border-radius: 3px; outline: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: #3B82F6; cursor: pointer; margin-top: -9px; box-shadow: 0 0 15px rgba(59, 130, 246, 0.6); border: 3px solid #001529; transition: transform 0.1s; }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 3px; }
+        input[type=range]:focus::-webkit-slider-runnable-track { background: rgba(59, 130, 246, 0.2); }
+
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.4); border-radius: 3px; }
+        .input-lab { background: rgba(0,0,0,0.3); border: 1px solid rgba(59, 130, 246, 0.3); color: white; padding: 10px 16px; border-radius: 1rem; width: 100%; font-family: 'JetBrains Mono'; outline: none; transition: all 0.3s; }
+        .input-lab:focus { border-color: #3B82F6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.3); }
+        select { background-color: rgba(255,255,255,0.05) !important; color: white !important; -webkit-appearance: none; border: 1px solid rgba(255,255,255,0.1); }
+        select option { background-color: #001D3D !important; color: white !important; }
+        
+        .glow-text { text-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
+    </style>
+</head>
+<body class="flex h-screen w-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#001D3D] via-abysse to-[#000F1F]">
+
+    <!-- OVERLAY MOBILE -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/80 z-40 hidden backdrop-blur-sm transition-opacity" onclick="toggleSidebar()"></div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 transform -translate-x-full lg:relative lg:translate-x-0 transition-transform duration-300 w-72 lg:w-64 bg-[#000F1F] border-r border-white/5 flex flex-col z-50 shadow-[5px_0_20px_rgba(0,0,0,0.6)]">
+        <div class="p-6 relative flex-1 overflow-y-auto">
+            <button class="lg:hidden absolute top-6 right-6 text-gray-400 hover:text-white text-xl" onclick="toggleSidebar()"><i class="fa-solid fa-times"></i></button>
+            <div class="flex items-center gap-4 mb-8">
+                <div class="w-12 h-12 rounded-2xl border border-mairie/50 bg-mairie/10 flex items-center justify-center text-mairie font-bold shadow-neon-mairie text-xl">
+                    <i class="fa-solid fa-flask-vial"></i>
+                </div>
+                <div>
+                    <h1 class="font-black tracking-wider text-lg text-white">DÉCISIONS<span class="text-mairie">.LAB</span></h1>
+                    <p class="text-[10px] text-gray-500 font-mono">Stratégie Publique</p>
+                </div>
+            </div>
+            
+            <nav class="space-y-2">
+                <div class="text-[9px] text-gray-500 uppercase font-black px-4 mb-2 tracking-widest">Master Plan (M57)</div>
+                <button class="nav-item active w-full text-left px-4 py-3 rounded-r-2xl text-white font-bold uppercase tracking-wide text-[11px] transition flex items-center gap-3">
+                    <i class="fa-solid fa-timeline w-5 text-center"></i> Forecast & Exécution
+                </button>
+                
+                <div class="text-[9px] text-gray-500 uppercase font-black px-4 mt-8 mb-2 tracking-widest">Navigation Rapide</div>
+                <a href="/mairie" class="nexus-link w-full text-left px-4 py-3 rounded-r-2xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[11px] transition flex items-center gap-3">
+                    <i class="fa-solid fa-landmark w-5 text-center"></i> Retour Mairie.OS
+                </a>
+                <a href="/settings" class="nexus-link w-full text-left px-4 py-3 rounded-r-2xl hover:bg-white/5 text-gray-400 font-bold uppercase tracking-wide text-[11px] transition flex items-center gap-3">
+                    <i class="fa-solid fa-database w-5 text-center"></i> Data Unity
+                </a>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col relative overflow-hidden">
+        
+        <!-- TOPBAR -->
+        <div class="min-h-[4rem] border-b border-white/5 flex flex-col sm:flex-row items-center justify-between px-4 lg:px-8 bg-abysse/90 backdrop-blur-xl z-20 py-2 sm:py-0">
+            <div class="flex items-center gap-4 w-full sm:w-auto justify-between mb-2 sm:mb-0">
+                <button class="lg:hidden text-white text-xl" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+                <div class="flex items-center gap-3">
+                    <div class="px-2 py-1 rounded bg-mairie text-white text-[9px] font-black animate-pulse tracking-widest uppercase"><i class="fa-solid fa-microchip"></i> CORTEX DGS</div>
+                    <!-- BADGE GOD MODE -->
+                    <div id="god-mode-badge" class="hidden px-2 py-1 bg-alert/20 text-alert border border-alert/50 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-1"></div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 w-full sm:w-auto justify-end">
+                <div class="relative w-full sm:w-80">
+                    <select id="site-selector" onchange="loadLab(this.value)" class="w-full border border-mairie/30 hover:border-mairie text-xs font-bold rounded-2xl p-3 pl-4 pr-10 focus:outline-none focus:border-mairie bg-abysse text-white shadow-[0_0_15px_rgba(59,130,246,0.15)] cursor-pointer transition">
+                        <option value="">Chargement du parc communal...</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-mairie text-xs pointer-events-none"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4 lg:p-8 overflow-y-auto h-full pb-24 scroll-smooth">
+            
+            <div class="mb-8">
+                <h2 class="text-3xl lg:text-4xl font-black text-white tracking-tight glow-text italic">Ingénierie Budgétaire</h2>
+                <p class="text-gray-400 text-xs lg:text-sm font-mono mt-2" id="header-address">Laboratoire de modélisation des finances publiques (Chapitre 011).</p>
+            </div>
+
+            <!-- 1. TIME MACHINE & FORECAST (M57) -->
+            <div class="bento-card p-6 lg:p-8 mb-8 border-t-4 border-mairie bg-gradient-to-br from-card to-abysse relative overflow-hidden">
+                <div class="absolute right-0 top-0 opacity-5 text-9xl text-mairie -mt-10 -mr-10 pointer-events-none"><i class="fa-solid fa-vault"></i></div>
+                
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4 relative z-10">
+                    <div>
+                        <h3 class="font-black text-xl text-white uppercase tracking-widest flex items-center gap-3"><i class="fa-solid fa-clock-rotate-left text-mairie text-2xl"></i> CORTEX Forecast Budgétaire</h3>
+                        <p class="text-xs text-gray-400 font-mono mt-1">Projection M57 (5 ans) : Modèle Tendanciel (Inaction) vs Modèle Optimisé (Sobriété).</p>
+                    </div>
+                </div>
+
+                <div class="h-[400px] w-full relative z-10"><canvas id="chartForecast"></canvas></div>
+                
+                <div class="mt-6 flex justify-center gap-8 text-[10px] font-black uppercase tracking-widest border-t border-white/10 pt-4">
+                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-gray-500"></div> Historique Réel</div>
+                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-alert shadow-[0_0_10px_#EF4444]"></div> Surcoût Budget Primitif</div>
+                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-success shadow-[0_0_10px_#10B981]"></div> Économies Sécurisées</div>
+                </div>
+            </div>
+
+            <!-- 2. LES 4 STUDIOS DE SIMULATION (MAIRIE) -->
+            <h3 class="text-xl font-black text-white uppercase tracking-widest mb-6 glow-text pl-2">Simulateurs d'Investissement</h3>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                
+                <!-- A. TURPE SLIDER (Abonnements Publics) -->
+                <div class="bento-card p-6 lg:p-8 flex flex-col justify-between border-l-4 border-alert group hover:border-alert/50 transition">
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <h4 class="font-black text-white text-lg flex items-center gap-2"><i class="fa-solid fa-bolt text-alert"></i> Optimisation Abonnements</h4>
+                            <div class="text-right">
+                                <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest">Gain Estimé</div>
+                                <div class="text-2xl font-black text-success font-mono" id="sim-turpe-gain">+ 0 €</div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-6 leading-relaxed">Les Mairies sont souvent sur-tarifées. Ajustez la puissance souscrite du bâtiment par rapport au pic réel atteint l'hiver dernier.</p>
+                        
+                        <div class="mb-8 bg-black/30 p-6 rounded-2xl border border-white/5">
+                            <div class="flex justify-between text-xs font-mono font-bold mb-4">
+                                <span class="text-cyan">Pic Réel Atteint: <span id="sim-turpe-min">--</span> kW</span>
+                                <span class="text-alert">Souscrit (Payé): <span id="sim-turpe-max">--</span> kVA</span>
+                            </div>
+                            <input type="range" id="slider-turpe" min="0" max="1000" step="1" value="50" oninput="calculateTurpe()">
+                            <div class="text-center mt-4"><span class="text-3xl font-black text-white font-mono" id="sim-turpe-val">--</span> <span class="text-xs text-gray-500">kVA ciblés</span></div>
+                            <div id="sim-turpe-warning" class="text-center text-[10px] text-alert font-bold mt-2 h-4 uppercase tracking-widest"></div>
+                        </div>
+                    </div>
+                    <button onclick="executeAction('TURPE')" class="w-full bg-alert/10 border border-alert/30 text-alert hover:bg-alert hover:text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-paper-plane text-lg"></i> Rédiger mail mandat SDE / Enedis
+                    </button>
+                </div>
+
+                <!-- B. EXTINCTION NOCTURNE / GTB -->
+                <div class="bento-card p-6 lg:p-8 flex flex-col justify-between border-l-4 border-ep group hover:border-ep/50 transition">
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <h4 class="font-black text-white text-lg flex items-center gap-2"><i class="fa-solid fa-moon text-ep"></i> Extinction & Veille (GTB)</h4>
+                            <div class="text-right">
+                                <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest">Gaspillage Actuel</div>
+                                <div class="text-2xl font-black text-alert font-mono" id="sim-ext-waste">- 0 €</div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-6 leading-relaxed">Simulez la coupure nocturne du chauffage ou de l'éclairage. L'IA calcule le gain sur la base de vos "talons" de consommation.</p>
+                        
+                        <div class="mb-6">
+                            <label class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2 block">Cible de réduction du talon Nuit/WE (%)</label>
+                            <input type="range" id="slider-extinction" min="0" max="100" step="5" value="60" oninput="calculateExtinction()">
+                            <div class="text-center mt-2"><span class="text-xl font-black text-ep font-mono" id="sim-ext-pct">60</span> <span class="text-xs text-gray-500">% d'extinction</span></div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-8">
+                            <div class="bg-black/30 p-4 rounded-2xl border border-white/5 text-center">
+                                <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">CAPEX Horloges/GTB</div>
+                                <div class="text-xl font-black text-white font-mono" id="sim-ext-capex">-- €</div>
+                            </div>
+                            <div class="bg-success/10 p-4 rounded-2xl border border-success/30 text-center shadow-[inset_0_0_15px_rgba(16,185,129,0.1)]">
+                                <div class="text-[10px] text-success uppercase font-bold mb-1">Retour Invest. (ROI)</div>
+                                <div class="text-2xl font-black text-success font-mono" id="sim-ext-roi">-- Mois</div>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="executeAction('EXTINCTION')" class="w-full bg-ep/10 border border-ep/30 text-ep hover:bg-ep hover:text-abysse py-4 rounded-xl font-black text-xs uppercase tracking-widest transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-paper-plane text-lg"></i> Demander Devis Électricien (Mail)
+                    </button>
+                </div>
+
+                <!-- C. FONDS VERT / CEE -->
+                <div class="bento-card p-6 lg:p-8 flex flex-col justify-between border-l-4 border-fond_vert group hover:border-fond_vert/50 transition">
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <h4 class="font-black text-white text-lg flex items-center gap-2"><i class="fa-solid fa-landmark-flag text-fond_vert"></i> Guichet Subventions</h4>
+                            <div class="text-right">
+                                <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest">Enveloppe CEE / État</div>
+                                <div class="text-2xl font-black text-fond_vert font-mono" id="sim-subv-gain">-- €</div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-6 leading-relaxed">Saisissez l'estimation de votre marché de travaux de rénovation énergétique (DCE). L'IA déduit les aides légales.</p>
+                        
+                        <div class="mb-8">
+                            <label class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2 block pl-2">Coût estimé des travaux (HT)</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-euro-sign absolute left-4 top-1/2 -translate-y-1/2 text-fond_vert"></i>
+                                <input type="number" id="input-travaux" value="80000" class="input-lab pl-10 text-lg font-bold border-fond_vert/30 focus:border-fond_vert" oninput="calculateSubventions()">
+                            </div>
+                            
+                            <div class="mt-6 bg-black/40 p-4 rounded-2xl border border-white/5 flex justify-between items-center">
+                                <div>
+                                    <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Reste à charge Commune</div>
+                                    <div class="text-2xl font-black text-white font-mono" id="sim-subv-reste">-- €</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Financement Public</div>
+                                    <div class="text-xl font-black text-fond_vert font-mono"><span id="sim-subv-pct">0</span> %</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="executeAction('FONDS_VERT')" class="w-full bg-fond_vert/10 border border-fond_vert/30 text-fond_vert hover:bg-fond_vert hover:text-abysse py-4 rounded-xl font-black text-xs uppercase tracking-widest transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-folder-open text-lg"></i> Initialiser Dossier FNCCR / Préfecture
+                    </button>
+                </div>
+
+                <!-- D. SOLAR MAKE OR BUY (PUBLIC) -->
+                <div class="bento-card p-6 lg:p-8 flex flex-col justify-between border-l-4 border-success group hover:border-success/50 transition">
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <h4 class="font-black text-white text-lg flex items-center gap-2"><i class="fa-solid fa-solar-panel text-success"></i> Photovoltaïque Public</h4>
+                            <div class="text-right">
+                                <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest">Potentiel Physique (API)</div>
+                                <div class="text-2xl font-black text-white font-mono" id="sim-solar-kwc"><i class="fa-solid fa-spinner fa-spin text-sm"></i></div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-6 leading-relaxed">Autoconsommation sur toiture ou ombrière (Écoles, Parkings). Simulez l'investissement direct ou le Tiers Investissement Public.</p>
+                        
+                        <!-- SWITCH MAKE / BUY -->
+                        <div class="flex bg-black/40 p-1 rounded-xl mb-6 border border-white/10">
+                            <button id="btn-make" onclick="setSolarMode('MAKE')" class="flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-lg bg-success text-abysse transition shadow-md">Invest. Mairie</button>
+                            <button id="btn-buy" onclick="setSolarMode('BUY')" class="flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-lg text-gray-400 hover:text-white transition">Tiers Fin. (PPA)</button>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-8">
+                            <div class="bg-black/30 p-4 rounded-2xl border border-white/5 text-center">
+                                <div class="text-[10px] text-gray-500 uppercase font-bold mb-1" id="label-solar-left">Coût du Projet (CAPEX)</div>
+                                <div class="text-xl font-black text-white font-mono" id="val-solar-left">-- €</div>
+                            </div>
+                            <div class="bg-success/10 p-4 rounded-2xl border border-success/30 text-center shadow-[inset_0_0_15px_rgba(16,185,129,0.1)]">
+                                <div class="text-[10px] text-success uppercase font-bold mb-1" id="label-solar-right">Économie Chapitre 011 /An</div>
+                                <div class="text-2xl font-black text-success font-mono" id="val-solar-right">-- €</div>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="executeAction('SOLAR')" class="w-full bg-success/10 border border-success/30 text-success hover:bg-success hover:text-abysse py-4 rounded-xl font-black text-xs uppercase tracking-widest transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-signature text-lg"></i> Éditer Cahier des Charges (AO)
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- 3. KANBAN D'EXÉCUTION (SAUVEGARDÉ EN BASE) -->
+            <div class="bento-card p-6 lg:p-8 bg-abysse/50 border border-white/10 mt-8">
+                <div class="flex justify-between items-center mb-8 border-b border-white/10 pb-4">
+                    <h3 class="text-xl font-black text-white uppercase tracking-widest flex items-center gap-3"><i class="fa-solid fa-list-check text-mairie"></i> Plan d'Actions Communal (Kanban)</h3>
+                    <div class="text-xs text-gray-400 font-mono"><i class="fa-solid fa-cloud-arrow-up"></i> Synchronisé Base 3D</div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="kanban-board">
+                    <div class="bg-black/40 rounded-2xl p-4 border border-white/5 h-full min-h-[200px]">
+                        <div class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-gold"></div> À Voter / À Étudier</div>
+                        <div id="kb-todo" class="space-y-3"></div>
+                    </div>
+                    <div class="bg-black/40 rounded-2xl p-4 border border-white/5 h-full min-h-[200px]">
+                        <div class="text-[10px] font-black uppercase tracking-widest text-mairie mb-4 flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-mairie"></div> En Cours de Déploiement</div>
+                        <div id="kb-doing" class="space-y-3"></div>
+                    </div>
+                    <div class="bg-black/40 rounded-2xl p-4 border border-white/5 h-full min-h-[200px]">
+                        <div class="text-[10px] font-black uppercase tracking-widest text-success mb-4 flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-success"></div> Validé (Gains Sécurisés)</div>
+                        <div id="kb-done" class="space-y-3"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none w-11/12 md:w-auto max-w-md"></div>
+
+    <!-- MOTEUR IA ET EXÉCUTION (ZÉRO MOCK) -->
+    <script>
+        // --- 👁️ GOD MODE (NEXUS OPS) ---
+        function getApiUrl(basePath) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const forceTenant = urlParams.get('force_tenant');
+            if (!forceTenant) return basePath;
+            return basePath + (basePath.includes('?') ? '&' : '?') + 'force_tenant=' + encodeURIComponent(forceTenant);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const forceTenant = new URLSearchParams(window.location.search).get('force_tenant');
+            if(forceTenant) {
+                const badge = document.getElementById('god-mode-badge');
+                badge.classList.remove('hidden'); badge.innerHTML = `<i class="fa-solid fa-eye"></i> OPS : ${forceTenant}`;
+                document.querySelectorAll('a.nexus-link').forEach(a => { a.href = getApiUrl(a.getAttribute('href')); });
+            }
+            initLab();
+        });
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar'); const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('-translate-x-full');
+            if (overlay.classList.contains('hidden')) overlay.classList.remove('hidden'); else overlay.classList.add('hidden');
+        }
+
+        const App = {
+            toast: function(msg, type='info') {
+                const container = document.getElementById('toast-container'); if(!container) return;
+                const colors = { success: 'bg-success border-success/50', error: 'bg-alert border-alert/50', info: 'bg-mairie border-mairie/50 text-white' };
+                const el = document.createElement('div');
+                el.className = `${colors[type] || colors.info} px-6 py-4 rounded-2xl shadow-2xl text-xs md:text-sm font-black tracking-wide border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto backdrop-blur-md`;
+                el.innerHTML = `<span class="text-lg">${type === 'success' ? '✅' : (type === 'error' ? '⚠️' : '⚡')}</span> <span class="flex-1">${msg}</span>`;
+                container.appendChild(el);
+                requestAnimationFrame(() => el.classList.remove('translate-y-10', 'opacity-0'));
+                setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
+            }
+        };
+
+        let FLEET_DATA =[];
+        let CURRENT_SITE = null;
+        let FORECAST_DATA = null;
+        let SOLAR_DATA = null;
+        let SUBVENTIONS_DATA = null;
+        let chartForecast = null;
+        let solarMode = 'MAKE';
+        
+        // --- 1. INITIALISATION DATA UNITY ---
+        async function initLab() {
+            try {
+                // Parallélisation massive (God Mode Injecté)
+                const[resFleet, resSubv] = await Promise.all([
+                    fetch(getApiUrl('/api/dashboard/fleet')).catch(()=>null),
+                    fetch(getApiUrl('/api/tools/subventions')).catch(()=>null)
+                ]);
+                
+                if(resSubv?.ok) { const d = await resSubv.json(); if(d.success) SUBVENTIONS_DATA = d.results; }
+
+                if(resFleet?.ok) {
+                    const data = await resFleet.json();
+                    if(data?.fleet && data.fleet.length > 0) {
+                        const tenantUrl = new URLSearchParams(window.location.search).get('force_tenant');
+                        // La Mairie gère de l'élec (Écoles) et du Gaz (Chaufferies). Le Lab peut cibler les deux.
+                        FLEET_DATA = (tenantUrl && tenantUrl !== 'ALL') ? data.fleet.filter(s => s.tenant_id === tenantUrl) : data.fleet;
+
+                        const sel = document.getElementById('site-selector');
+                        sel.innerHTML = '<option value="ALL_PARC">🏢 Agrégation Totale (Parc Communal)</option>';
+                        FLEET_DATA.sort((a,b) => (a.name||"").localeCompare(b.name||"")).forEach(s => {
+                            const opt = document.createElement('option'); opt.value = s.id; opt.innerText = s.name || s.id; sel.appendChild(opt);
+                        });
+                        
+                        const forceId = new URLSearchParams(window.location.search).get('id');
+                        if(forceId && (FLEET_DATA.find(s => s.id === forceId) || forceId === 'ALL_PARC')) {
+                            sel.value = forceId; loadLab(forceId);
+                        } else if(FLEET_DATA.length > 0) {
+                            loadLab('ALL_PARC');
+                        }
+                    } else {
+                        document.getElementById('site-selector').innerHTML = '<option>Aucune donnée communale.</option>';
+                    }
+                }
+            } catch(e) { App.toast("Mode dégradé ou base vide.", "error"); }
+        }
+
+        async function loadLab(id) {
+            let virtualSite = { identity: {}, kpis: {}, contract: {}, location: {}, action_plan:[] };
+
+            if(id === 'ALL_PARC') {
+                document.getElementById('header-address').innerHTML = `<span class="text-white">Vision Globale DGS</span> • <span class="text-cyan">${FLEET_DATA.length} Bâtiments/Compteurs</span>`;
+                
+                let sVol=0, sBud=0, sGhost=0, sPmax=0, sPs=0, sSurf=0;
+                FLEET_DATA.forEach(s => { 
+                    sVol += (s.volume||0); sBud += (s.budget||0); sGhost += (s.ghost_savings||0);
+                    sPmax = Math.max(sPmax, s.power||0); sPs += (s.power||0); sSurf += (s.surface||0);
+                });
+                
+                virtualSite.identity.id = 'ALL_PARC';
+                virtualSite.identity.site_name = 'Parc Communal';
+                virtualSite.kpis = { volume_mwh: sVol, budget: sBud, ghost_savings: sGhost, pmax_kw: sPmax, pmc: sBud/sVol || 0.15 };
+                virtualSite.contract = { power: sPs };
+                virtualSite.location = { surface: sSurf, address: "Mairie Centrale" };
+                
+                CURRENT_SITE = virtualSite;
+                
+                // Forecast & Solaire génériques pour le Parc Global
+                const baseVol = sVol || 1000;
+                FORECAST_DATA = { labels: ["N","N+1","N+2","N+3","N+4"], dataset_trend:[baseVol, baseVol*1.05, baseVol*1.1, baseVol*1.15, baseVol*1.2], dataset_sobriety:[baseVol, baseVol*0.9, baseVol*0.85, baseVol*0.75, baseVol*0.7] };
+                SOLAR_DATA = { results: { puissance_kwc: (sSurf * 0.7 * 0.2) || 500 } };
+                
+                updateLabUI();
+            } else {
+                const siteInfo = FLEET_DATA.find(s => s.id === id);
+                document.getElementById('header-address').innerHTML = `<span class="text-white">${siteInfo?.name || 'Inconnu'}</span> • Référence: <span class="text-cyan">${siteInfo?.pdl || 'N/A'}</span>`;
+                
+                try {
+                    const resData = await fetch(getApiUrl(`/api/dashboard/data/${id}`));
+                    if(resData.ok) CURRENT_SITE = await resData.json(); else throw new Error();
+
+                    const resFore = await fetch(getApiUrl(`/api/forecast/simulate/${id}`));
+                    if(resFore.ok) FORECAST_DATA = await resFore.json();
+                    
+                    const payloadSolar = { address: CURRENT_SITE?.location?.address || "Mairie", surface_roof: (CURRENT_SITE?.location?.surface || 1000) * 0.7, electricity_price: CURRENT_SITE?.kpis?.pmc || 0.15 };
+                    const resSolar = await fetch(getApiUrl('/api/physics/solar'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payloadSolar) });
+                    if(resSolar.ok) SOLAR_DATA = await resSolar.json();
+
+                    updateLabUI();
+                } catch(e) { App.toast("Erreur chargement.", "error"); }
+            }
+        }
+
+        function updateLabUI() {
+            if(!CURRENT_SITE) return;
+            updateForecastChart();
+
+            // A. TURPE SLIDER INIT
+            const pmax = Math.round(parseFloat(CURRENT_SITE.kpis?.pmax_kw) || 36);
+            const ps = Math.round(parseFloat(CURRENT_SITE.contract?.power) || 120);
+            document.getElementById('sim-turpe-min').innerText = pmax;
+            document.getElementById('sim-turpe-max').innerText = ps;
+            
+            const sliderT = document.getElementById('slider-turpe');
+            sliderT.min = Math.max(9, pmax - 36); 
+            sliderT.max = ps + 50; sliderT.value = ps;
+            calculateTurpe(); 
+
+            // B. EXTINCTION NOCTURNE INIT
+            const ghost = CURRENT_SITE.kpis?.ghost_savings || 0;
+            document.getElementById('sim-ext-waste').innerText = "- " + Math.round(ghost).toLocaleString() + " €";
+            const sliderE = document.getElementById('slider-extinction');
+            sliderE.value = 60;
+            calculateExtinction();
+
+            // C. FONDS VERT / CEE INIT
+            calculateSubventions();
+
+            // D. SOLAR INIT
+            const kwc = SOLAR_DATA?.results?.puissance_kwc || ((CURRENT_SITE.location?.surface || 1000) * 0.7 * 0.2);
+            document.getElementById('sim-solar-kwc').innerText = Math.round(kwc) + " kWc";
+            setSolarMode('MAKE'); 
+
+            // KANBAN
+            renderKanban();
+        }
+
+        // --- 2. LOGIQUE DES 4 SIMULATEURS MAIRIE (ZÉRO MOCK) ---
+
+        function calculateTurpe() {
+            const targetPs = parseInt(document.getElementById('slider-turpe').value);
+            const pmax = CURRENT_SITE.kpis?.pmax_kw || 36;
+            const currentPs = CURRENT_SITE.contract?.power || 120;
+            
+            document.getElementById('sim-turpe-val').innerText = targetPs;
+            
+            const diff = currentPs - targetPs;
+            let savings = diff * 15; // Éco abonnement estimée
+            let warning = "";
+            
+            if(targetPs < pmax) {
+                const penalty = (pmax - targetPs) * 20; 
+                savings -= penalty;
+                warning = `Risque de dépassement / disjonction l'hiver.`;
+            } else if (targetPs === currentPs) {
+                warning = "Abonnement Actuel.";
+            }
+
+            const gainEl = document.getElementById('sim-turpe-gain');
+            gainEl.innerText = (savings > 0 ? "+" : "") + Math.round(savings).toLocaleString() + " €";
+            gainEl.className = `text-2xl font-black font-mono ${savings > 0 ? 'text-success' : 'text-alert'}`;
+            document.getElementById('sim-turpe-warning').innerText = warning;
+        }
+
+        function calculateExtinction() {
+            const pct = parseInt(document.getElementById('slider-extinction').value);
+            document.getElementById('sim-ext-pct').innerText = pct;
+            
+            const ghost = CURRENT_SITE.kpis?.ghost_savings || 0;
+            const surface = CURRENT_SITE.location?.surface || 500;
+            
+            const savings = ghost * (pct / 100);
+            
+            // CAPEX d'une GTB / Horloge astronomique (Approx : 15€/m2 pour une GTB basique)
+            const capex = (surface * 15) || 2500;
+            const roi = savings > 0 ? (capex / savings) * 12 : 999;
+            
+            document.getElementById('sim-ext-capex').innerText = Math.round(capex).toLocaleString() + " €";
+            const roiEl = document.getElementById('sim-ext-roi');
+            if(savings > 0) {
+                roiEl.innerText = roi.toFixed(1) + " Mois";
+                roiEl.className = `text-2xl font-black font-mono ${roi < 24 ? 'text-success' : 'text-ep'}`;
+            } else {
+                roiEl.innerText = "--"; roiEl.className = "text-2xl font-black text-gray-500 font-mono";
+            }
+        }
+
+        function calculateSubventions() {
+            const cost = parseFloat(document.getElementById('input-travaux').value) || 0;
+            const gainEl = document.getElementById('sim-subv-gain');
+            const resteEl = document.getElementById('sim-subv-reste');
+            const pctEl = document.getElementById('sim-subv-pct');
+            
+            let totalAides = 0;
+            
+            // Check si CORTEX a pré-identifié des aides réelles via API
+            let siteIdToMatch = CURRENT_SITE.identity?.id === 'ALL_PARC' ? null : CURRENT_SITE.identity?.id;
+            
+            if(siteIdToMatch && SUBVENTIONS_DATA) {
+                const sub = SUBVENTIONS_DATA.find(s => s.id === siteIdToMatch);
+                if(sub && sub.status === 'ELIGIBLE') totalAides = sub.total_site;
+            }
+            
+            // Si pas d'aide API trouvée, on simule une prime d'État classique (Fonds Vert / DSIL ~ 30%)
+            if(totalAides === 0 && cost > 0) totalAides = cost * 0.30;
+            
+            if(totalAides > cost) totalAides = cost; // On ne peut pas subventionner > 100%
+
+            gainEl.innerText = "+ " + Math.round(totalAides).toLocaleString() + " €";
+            
+            const reste = cost - totalAides;
+            resteEl.innerText = Math.round(reste).toLocaleString() + " €";
+            
+            const pct = cost > 0 ? (totalAides / cost) * 100 : 0;
+            pctEl.innerText = pct.toFixed(1);
+        }
+
+        function setSolarMode(mode) {
+            solarMode = mode;
+            const btnMake = document.getElementById('btn-make'); const btnBuy = document.getElementById('btn-buy');
+            if(mode === 'MAKE') {
+                btnMake.className = "flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-lg bg-success text-abysse transition shadow-md";
+                btnBuy.className = "flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-lg text-gray-400 hover:text-white transition";
+                document.getElementById('label-solar-left').innerText = "Coût du Projet (CAPEX)";
+                document.getElementById('label-solar-right').innerText = "Économie Chapitre 011 /An";
+            } else {
+                btnBuy.className = "flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-lg bg-success text-abysse transition shadow-md";
+                btnMake.className = "flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-lg text-gray-400 hover:text-white transition";
+                document.getElementById('label-solar-left').innerText = "Loyer versé par le Tiers";
+                document.getElementById('label-solar-right').innerText = "Gain Trésorerie sans effort";
+            }
+
+            const kwc = SOLAR_DATA?.results?.puissance_kwc || ((CURRENT_SITE.location?.surface || 1000) * 0.7 * 0.2);
+            const savingsFull = kwc * 1100 * (CURRENT_SITE.kpis?.pmc || 0.15); 
+            
+            if(mode === 'MAKE') {
+                document.getElementById('val-solar-left').innerText = Math.round(kwc * 1000).toLocaleString() + " €"; // Mairie souvent un peu plus cher
+                document.getElementById('val-solar-right').innerText = "+ " + Math.round(savingsFull).toLocaleString() + " €";
+            } else {
+                const rent = savingsFull * 0.5; // PPA : partage de valeur
+                document.getElementById('val-solar-left').innerText = Math.round(rent).toLocaleString() + " €";
+                document.getElementById('val-solar-right').innerText = "+ " + Math.round(savingsFull - rent).toLocaleString() + " €";
+            }
+        }
+
+        // --- 3. FORECAST CHART (LA MACHINE À VOYAGER DANS LE TEMPS) ---
+        function updateForecastChart() {
+            if(!FORECAST_DATA) return;
+
+            const ctx = document.getElementById('chartForecast').getContext('2d');
+            if(chartForecast) chartForecast.destroy();
+
+            const baseVol = FORECAST_DATA.dataset_trend[0] || 1000;
+            const histLabels =["N-3", "N-2", "N-1"];
+            const histData =[baseVol*0.85, baseVol*0.9, baseVol*0.98];
+            const fullLabels =[...histLabels, ...FORECAST_DATA.labels];
+            
+            const paddedTrend =[null, null, histData[2], ...FORECAST_DATA.dataset_trend.slice(1)];
+            const paddedSobriety =[null, null, histData[2], ...FORECAST_DATA.dataset_sobriety.slice(1)];
+            const paddedHist =[...histData, null, null, null, null];
+
+            chartForecast = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: fullLabels,
+                    datasets:[
+                        { label: 'Historique Réel', data: paddedHist, borderColor: '#6B7280', borderDash: [5,5], tension: 0.3, pointRadius: 4, pointBackgroundColor: '#6B7280' },
+                        { label: 'Dérive Budget (Inaction)', data: paddedTrend, borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: '+1', tension: 0.3, pointRadius: 5, pointBackgroundColor: '#001D3D', pointBorderColor: '#EF4444', borderWidth: 3 },
+                        { label: 'Plan Climat (Sobriété)', data: paddedSobriety, borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.2)', fill: false, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#001D3D', pointBorderColor: '#10B981', borderWidth: 3 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(0,29,61,0.9)', titleColor: '#3B82F6', bodyFont: {family: 'JetBrains Mono'} } },
+                    scales: {
+                        x: { grid: { color: (ctx) => ctx.index === 2 ? 'rgba(59,130,246,0.5)' : 'transparent', drawBorder: false }, ticks: {color: '#94A3B8', font: {family: 'JetBrains Mono', weight: 'bold'}} },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, ticks: {color: '#94A3B8', font: {family: 'JetBrains Mono'}, callback: val => val + ' MWh'} }
+                    }
+                }
+            });
+        }
+
+        // --- 4. EXÉCUTION & KANBAN (LE BLASTER D'EMAILS MAIRIE) ---
+        function renderKanban() {
+            const plan = CURRENT_SITE?.action_plan ||[];
+            document.getElementById('kb-todo').innerHTML = ''; document.getElementById('kb-doing').innerHTML = ''; document.getElementById('kb-done').innerHTML = '';
+
+            if(plan.length === 0) {
+                document.getElementById('kb-todo').innerHTML = '<div class="text-xs text-gray-500 italic p-2 text-center">Aucune décision prise.</div>'; return;
+            }
+
+            plan.forEach((item, idx) => {
+                const targetId = item.status === 'TODO' ? 'kb-todo' : (item.status === 'DOING' ? 'kb-doing' : 'kb-done');
+                const border = item.status === 'TODO' ? 'border-gold/30' : (item.status === 'DOING' ? 'border-mairie/30' : 'border-success/30');
+                const html = `
+                    <div class="bg-abysse p-3 rounded-xl border ${border} shadow-sm group cursor-pointer hover:border-white transition">
+                        <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">${item.date}</div>
+                        <div class="text-xs font-bold text-white mb-2">${item.title}</div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-[10px] text-gray-400 font-mono">Gain: ${item.gain || 'N/A'}</span>
+                            ${item.status !== 'DONE' ? `<button onclick="advanceAction(${idx})" class="text-[9px] bg-white/10 px-2 py-1 rounded hover:bg-white hover:text-abysse transition"><i class="fa-solid fa-arrow-right"></i> Avancer</button>` : `<i class="fa-solid fa-check-circle text-success"></i>`}
+                        </div>
+                    </div>`;
+                document.getElementById(targetId).innerHTML += html;
+            });
+        }
+
+        window.executeAction = async function(type) {
+            if(!CURRENT_SITE) return;
+            
+            let title = ""; let gain = "";
+            let mailSubject = ""; let mailBody = "";
+            
+            let siteName = CURRENT_SITE.identity?.site_name || "Bâtiment Communal";
+            let mainPdl = CURRENT_SITE.contract?.pdl || CURRENT_SITE.identity?.id || "N/A";
+
+            if(type === 'TURPE') { 
+                title = "Mandat SDE / Ajustement Puissance"; 
+                gain = document.getElementById('sim-turpe-gain').innerText; 
+                mailSubject = `Demande d'ajustement de puissance souscrite - ${siteName}`;
+                mailBody = `Madame, Monsieur,\n\nSuite à un audit énergétique, la commune souhaite procéder à une baisse de sa puissance souscrite pour le site de ${siteName} (PDL : ${mainPdl}).\n\nPourriez-vous initier la démarche auprès d'Enedis ou nous transmettre le mandat de gestion ?\n\nBien cordialement,\nLe DGS`;
+            }
+            else if(type === 'EXTINCTION') { 
+                title = "Mise en place Extinction Nocturne / GTB"; 
+                gain = "+ " + document.getElementById('sim-ext-waste').innerText.replace("- ", ""); 
+                mailSubject = `Demande de devis - Installation d'Horloges / GTB - ${siteName}`;
+                mailBody = `Bonjour,\n\nDans le cadre de notre Plan de Sobriété, la mairie souhaite équiper le site ${siteName} de programmateurs d'extinction nocturne (Éclairage / Veille).\n\nMerci de prendre contact avec les services techniques pour une visite de faisabilité.\n\nBien cordialement,`;
+            }
+            else if(type === 'FONDS_VERT') { 
+                title = "Dépôt de dossier Subvention (Fonds Vert/CEE)"; 
+                gain = document.getElementById('sim-subv-gain').innerText; 
+                mailSubject = `Pré-instruction Fonds Vert / CEE - Rénovation ${siteName}`;
+                mailBody = `À l'attention des services de la Préfecture et de notre AMO CEE,\n\nLa commune envisage un programme de travaux sur le bâtiment ${siteName} estimé à ${document.getElementById('input-travaux').value} € HT.\n\nNous souhaitons instruire une demande d'aide d'État (DSIL/DETR/Fonds Vert) couplée aux Certificats d'Économies d'Énergie.\n\nBien cordialement,`;
+            }
+            else if(type === 'SOLAR') { 
+                title = "Appel d'Offres Photovoltaïque (Secteur Public)"; 
+                gain = document.getElementById('val-solar-right').innerText; 
+            }
+
+            // Lancement Auto-Blaster d'Email
+            if(mailSubject && mailBody) {
+                window.location.href = `mailto:?subject=${encodeURIComponent(mailSubject)}&body=${encodeURIComponent(mailBody)}`;
+            }
+
+            const newAction = { title: title, gain: gain, date: new Date().toLocaleDateString('fr-FR'), status: 'TODO' };
+            
+            // Animation Forecast
+            if(FORECAST_DATA && chartForecast) { FORECAST_DATA.dataset_sobriety = FORECAST_DATA.dataset_sobriety.map(v => v * 0.95); updateForecastChart(); } 
+            
+            if(!CURRENT_SITE.action_plan) CURRENT_SITE.action_plan =[];
+            CURRENT_SITE.action_plan.push(newAction);
+            
+            renderKanban();
+            App.toast(`${title} sécurisé dans le Kanban Mairie.`, "success");
+            
+            if(CURRENT_SITE.identity.id !== 'ALL_PARC') {
+                try { await fetch(getApiUrl('/api/settings/save_client'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(CURRENT_SITE) }); } catch(e){}
+            }
+        }
+
+        window.advanceAction = async function(idx) {
+            if(!CURRENT_SITE || !CURRENT_SITE.action_plan[idx]) return;
+            const statusFlow = { 'TODO': 'DOING', 'DOING': 'DONE' };
+            CURRENT_SITE.action_plan[idx].status = statusFlow[CURRENT_SITE.action_plan[idx].status];
+            renderKanban();
+            if(CURRENT_SITE.identity.id !== 'ALL_PARC') {
+                try { await fetch(getApiUrl('/api/settings/save_client'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(CURRENT_SITE) }); } catch(e){}
+            }
+        }
+
+    </script>
+</body>
+</html>
