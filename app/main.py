@@ -127,6 +127,16 @@ pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.6-SECURE")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+# ==============================================================================
+# INJECTION DU NOUVEAU MOTEUR V4 (STRANGLER FIG PATTERN - ANTI-CRASH)
+# ==============================================================================
+try:
+    from app.core import api_v4
+    app.include_router(api_v4.router, prefix="/api/v4", tags=["CORTEX V4"])
+    print("🟢 Routeur V4 activé avec succès.")
+except Exception as e:
+    print(f"🔴 ERREUR V4 IGNORE: Le système V4 n'a pas pu charger ({e}). La plateforme V3 continue de tourner normalement.")
+
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR, exist_ok=True)
