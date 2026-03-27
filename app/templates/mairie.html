@@ -550,7 +550,7 @@
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
 <script>
-        // ==========================================
+       // ==========================================
         // 1. MOTEUR UTILITAIRE & ÉTAT GLOBAL
         // ==========================================
         function getApiUrl(basePath) {
@@ -607,9 +607,8 @@
                 document.querySelectorAll('a.nexus-link').forEach(a => { a.href = getApiUrl(a.getAttribute('href')); });
             }
             initMap();
-            loadFleet();
-            fetchMarketData();
-            fetchSubventions();
+            // Sécurisation du boot
+            loadFleet().catch(e => console.error("Boot Error:", e));
         });
 
         // ==========================================
@@ -617,21 +616,27 @@
         // ==========================================
         function initMap() {
             if(MAP_INSTANCE) return;
-            MAP_INSTANCE = L.map('map', { zoomControl: false }).setView(CITY_CENTER, 6);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '' }).addTo(MAP_INSTANCE);
-            L.control.zoom({ position: 'topright' }).addTo(MAP_INSTANCE);
+            const mapEl = document.getElementById('map');
+            if(!mapEl) return; // Sécurité si la div map n'existe pas encore
+            
+            try {
+                MAP_INSTANCE = L.map('map', { zoomControl: false }).setView(CITY_CENTER, 6);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '' }).addTo(MAP_INSTANCE);
+                L.control.zoom({ position: 'topright' }).addTo(MAP_INSTANCE);
+            } catch(e) { console.error("Map init error:", e); }
         }
 
         async function fetchCityData(cityName) {
             if(!cityName || cityName === 'Inconnue') return;
             try {
                 const res = await fetch(`https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(cityName)}&fields=population,centre&limit=1`);
+                if(!res.ok) return;
                 const data = await res.json();
                 if(data && data.length > 0) {
                     safeSetText('commune-name', "Ville de " + data[0].nom);
                     safeSetText('commune-pop', data[0].population.toLocaleString());
 
-                    if(data[0].centre && data[0].centre.coordinates) {
+                    if(data[0].centre && data[0].centre.coordinates && MAP_INSTANCE) {
                         CITY_CENTER = [data[0].centre.coordinates[1], data[0].centre.coordinates[0]];
                         MAP_INSTANCE.setView(CITY_CENTER, 13);
                         plotMarkers();
@@ -646,6 +651,7 @@
         }
 
         function plotMarkers() {
+            if(!MAP_INSTANCE) return;
             MARKERS.forEach(m => MAP_INSTANCE.removeLayer(m)); MARKERS =[];
             CLUSTERED_FLEET.forEach(site => {
                 const waste = site.ghost_savings || 0;
@@ -653,9 +659,9 @@
                 if (waste > 200) colorClass = 'marker-red'; else if (waste > 50) colorClass = 'marker-orange';
 
                 const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-marker ${colorClass} w-3 h-3"></div>`, iconSize:[12, 12], iconAnchor:[6, 6] });
-                let coords = (site.lat && site.lon) ?[site.lat, site.lon] : getFuzzyCoordinates(site.id, CITY_CENTER);
+                let coords = (site.lat && site.lon) ?[site.lat, site.lon] : getFuzzyCoordinates(site.id || site.name, CITY_CENTER);
                 const marker = L.marker(coords, {icon: icon})
-                    .bindPopup(`<strong class="font-mono text-abysse font-bold text-sm">${site.name}</strong><br><span class="text-xs text-gray-600">Gaspillage Nuit: <b class="text-alert">${Math.round(waste)}€</b></span><br><button onclick="window.openClusterDetail('${site.name.replace(/'/g, "\\'")}')" class="mt-2 bg-mairie text-white px-3 py-1 rounded font-bold text-[10px] uppercase w-full shadow-md">Auditer le Bâtiment</button>`)
+                    .bindPopup(`<strong class="font-mono text-abysse font-bold text-sm">${site.name}</strong><br><span class="text-xs text-gray-600">Gaspillage Nuit: <b class="text-alert">${Math.round(waste)}€</b></span><br><button onclick="window.openClusterDetail('${site.name.replace(/'/g, "\\'")}')" class="mt-2 bg-mairie text-white px-3 py-1 rounded font-bold text-[10px] uppercase w-full shadow-md">Auditer</button>`)
                     .addTo(MAP_INSTANCE);
                 MARKERS.push(marker);
             });
@@ -670,34 +676,47 @@
 
         async function fetchMarketData() {
             try {
-                const res = await fetch(getApiUrl('/api/tools/sniper/market')); const data = await res.json();
-                if(data.success && data.current_prices) { MARKET_DATA.elec = data.current_prices.elec || 85.0; MARKET_DATA.trve = data.current_prices.trve || 230.0; MARKET_DATA.trend = data.status || 'BEAR'; }
+                const res = await fetch(getApiUrl('/api/tools/sniper/market')); 
+                if(res.ok) {
+                    const data = await res.json();
+                    if(data.success && data.current_prices) { MARKET_DATA.elec = data.current_prices.elec || 85.0; MARKET_DATA.trve = data.current_prices.trve || 230.0; MARKET_DATA.trend = data.status || 'BEAR'; }
+                }
             } catch(e) {}
         }
 
         async function fetchSubventions() {
             try {
-                const res = await fetch(getApiUrl('/api/tools/subventions')); const data = await res.json();
-                if(data.success && data.results) SUBVENTIONS_DATA = data.results;
+                const res = await fetch(getApiUrl('/api/tools/subventions')); 
+                if(res.ok) {
+                    const data = await res.json();
+                    if(data.success && data.results) SUBVENTIONS_DATA = data.results;
+                }
             } catch(e) {}
         }
 
         async function loadFleet() {
             try {
                 await loadM57Settings();
+                fetchMarketData(); // Async background
+                fetchSubventions(); // Async background
+                
                 const res = await fetch(getApiUrl('/api/dashboard/fleet'));
+                if(!res.ok) throw new Error("API Fleet inaccessible");
                 const data = await res.json();
                 
                 const forceTenant = new URLSearchParams(window.location.search).get('force_tenant');
                 let rawFleet = (forceTenant && forceTenant !== 'ALL') ? (data.fleet ||[]).filter(s => s.tenant_id === forceTenant) : (data.fleet ||[]);
                 
-                if(!data.fleet || data.fleet.length === 0 || rawFleet.length === 0) {
+                if(rawFleet.length === 0) {
                     safeSetText('header-budget', "0 €"); safeSetText('visible-count', "0");
-                    return App.toast("Aucun bâtiment public identifié pour ce client.", "warning");
+                    const tbody = document.getElementById('fleet-table-body');
+                    if(tbody) tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-500 font-bold">Aucun bâtiment public identifié.</td></tr>`;
+                    return App.toast("Base de données vide pour ce client.", "warning");
                 }
 
+                // Sanity Check
                 rawFleet.forEach(s => {
-                    const vol = s.volume || 0; const budget = s.budget || 0;
+                    const vol = parseFloat(s.volume) || 0; const budget = parseFloat(s.budget) || 0;
                     if(vol > 0 && (budget / vol) > 800) s.budget = vol * 250; 
                 });
 
@@ -705,14 +724,14 @@
                 
                 const clustersMap = new Map();
                 FLEET_DATA.forEach(s => {
-                    const bName = (s.name || s.id).trim();
+                    const bName = (s.name || s.id || "Inconnu").trim();
                     if(!clustersMap.has(bName)) {
                         clustersMap.set(bName, { id: s.id, name: bName, meters:[], volume: 0, budget: 0, ghost_savings: 0, hasElec: false, hasGaz: false, type: 'admin', lat: s.lat, lon: s.lon, pmax: 0, ps: 0 });
                     }
                     const c = clustersMap.get(bName);
                     c.meters.push(s);
-                    c.volume += (s.volume || 0); c.budget += (s.budget || 0); c.ghost_savings += (s.ghost_savings || 0);
-                    c.pmax += (s.pmax || 0); c.ps += (s.power || 0); // Agrégation de puissance
+                    c.volume += (parseFloat(s.volume) || 0); c.budget += (parseFloat(s.budget) || 0); c.ghost_savings += (parseFloat(s.ghost_savings) || 0);
+                    c.pmax += (parseFloat(s.pmax) || parseFloat(s.power) || 0); c.ps += (parseFloat(s.power) || 0); 
                     
                     if(s.energy === 'elec' || s.energy_type === 'elec') c.hasElec = true;
                     if(s.energy === 'gaz' || s.energy_type === 'gaz') c.hasGaz = true;
@@ -741,9 +760,13 @@
                 if(mainCity) fetchCityData(mainCity); else plotMarkers(); 
                 
                 window.updateLotSelect(); window.applyFilters(); updateKPIs(); calculateM57(); updateLotsDeadlines();
-                window.loadLabContext('ALL_PARC');
+                window.loadLabContext('ALL_PARC'); // Init silencieuse du Lab
                 
-            } catch(e) { App.toast("Erreur de synchronisation Base 3D.", "error"); }
+            } catch(e) { 
+                console.error("Fleet Load Error:", e);
+                App.toast("Erreur de synchronisation Base 3D.", "error"); 
+                safeSetText('header-budget', "ERR API");
+            }
         }
 
         function updateLotsDeadlines() {
@@ -753,7 +776,7 @@
             FLEET_DATA.forEach(s => {
                 const p = s.provider || 'Inconnu';
                 if(!provMap[p]) provMap[p] = { count: 0, budget: 0 };
-                provMap[p].count++; provMap[p].budget += (s.budget || 0);
+                provMap[p].count++; provMap[p].budget += (parseFloat(s.budget) || 0);
             });
             const html = Object.keys(provMap).map(p => `
                 <div class="flex justify-between items-center bg-black/30 p-3 rounded-xl border border-white/5 shadow-inner">
@@ -803,8 +826,12 @@
         }
 
         window.applyFilters = function() { 
-            const term = (document.getElementById('search-input')?.value || "").toLowerCase(); 
-            const typeFilter = document.getElementById('filter-type')?.value || "all"; 
+            const inputEl = document.getElementById('search-input');
+            const typeEl = document.getElementById('filter-type');
+            if(!inputEl || !typeEl) return; // Securité
+            
+            const term = inputEl.value.toLowerCase(); 
+            const typeFilter = typeEl.value || "all"; 
             
             const filtered = CLUSTERED_FLEET.filter(c => { 
                 if(term === "alert:waste") return c.ghost_savings > 200; 
@@ -814,12 +841,15 @@
             renderTable(filtered); 
         }
 
-        window.filterWaste = function() { document.getElementById('search-input').value = "alert:waste"; window.applyFilters(); }
+        window.filterWaste = function() { 
+            const inputEl = document.getElementById('search-input');
+            if(inputEl) { inputEl.value = "alert:waste"; window.applyFilters(); }
+        }
 
         function updateKPIs() { 
             let totalWaste = 0; let countAlerts = 0; 
             CLUSTERED_FLEET.forEach(c => { totalWaste += c.ghost_savings; if(c.ghost_savings > 200) countAlerts++; }); 
-            safeSetText('kpi-waste', Math.round(totalWaste).toLocaleString() + " €"); 
+            safeSetText('kpi-waste', formatCurrency(totalWaste)); 
             const badgeEl = document.getElementById('sobriety-badge'); 
             if(badgeEl) { if(countAlerts > 0) badgeEl.classList.remove('hidden'); else badgeEl.classList.add('hidden'); } 
         }
@@ -828,6 +858,12 @@
             const tbody = document.getElementById('fleet-table-body');
             if(!tbody) return; tbody.innerHTML = '';
             
+            if(data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-gray-500 font-bold">Aucun bâtiment correspondant aux filtres.</td></tr>`;
+                safeSetText('visible-count', "0");
+                return;
+            }
+
             data.slice(0, 100).forEach(cluster => {
                 const isSelected = SELECTED_IDS.has(cluster.name);
                 const row = document.createElement('tr');
@@ -865,7 +901,7 @@
             safeSetText('visible-count', data.length);
         }
 
-        window.toggleAll = function(source) { if(source.checked) CLUSTERED_FLEET.forEach(c => SELECTED_IDS.add(c.name)); else SELECTED_IDS.clear(); window.applyFilters(); updateActionBar(); }
+        window.toggleAll = function(source) { if(!source) return; if(source.checked) CLUSTERED_FLEET.forEach(c => SELECTED_IDS.add(c.name)); else SELECTED_IDS.clear(); window.applyFilters(); updateActionBar(); }
         window.toggleSelection = function(name) { if(SELECTED_IDS.has(name)) SELECTED_IDS.delete(name); else SELECTED_IDS.add(name); updateActionBar(); }
         
         function updateActionBar() { 
@@ -905,7 +941,7 @@
             let projElec = 0; let projGaz = 0; let totalProj = 0;
 
             FLEET_DATA.forEach(s => {
-                const b = s.budget || 0; totalProj += b;
+                const b = parseFloat(s.budget) || 0; totalProj += b;
                 if(s.energy === 'elec' || s.energy_type === 'elec') projElec += b; 
                 if(s.energy === 'gaz' || s.energy_type === 'gaz') projGaz += b;
             });
@@ -920,26 +956,32 @@
             safeSetText('m57-60621-budget', Math.round(projGaz).toLocaleString() + " €");
 
             const bar = document.getElementById('m57-bar');
+            if(!bar) return; // Sécurité UI
+            
             if (bpTotal === 0) { bar.style.width = "0%"; return; }
             const pct = (consTotal / bpTotal) * 100; bar.style.width = Math.min(pct, 100) + "%";
-            if (pct > 85) bar.className = "h-full bg-alert rounded-[1.5rem] transition-all duration-1000 shadow-[0_0_15px_rgba(239,68,68,0.5)]";
-            else bar.className = "h-full bg-gradient-to-r from-gold to-cyan rounded-[1.5rem] transition-all duration-1000 shadow-[0_0_15px_rgba(245,158,11,0.5)]";
+            if (pct > 85) bar.className = "h-full bg-alert rounded-[1.5rem] transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]";
+            else bar.className = "h-full bg-gradient-to-r from-gold to-cyan rounded-[1.5rem] transition-all duration-1000 flex items-center justify-end pr-3 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(245,158,11,0.5)]";
         }
 
         window.openM57Modal = function() {
-            document.getElementById('m57-input-bp-elec').value = M57_SETTINGS.bp_elec || 0; document.getElementById('m57-input-bp-gaz').value = M57_SETTINGS.bp_gaz || 0;
-            document.getElementById('m57-input-cons-elec').value = M57_SETTINGS.consumed_elec || 0; document.getElementById('m57-input-cons-gaz').value = M57_SETTINGS.consumed_gaz || 0;
-            document.getElementById('m57-edit-modal').classList.remove('hidden');
+            const sf = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || 0; };
+            sf('m57-input-bp-elec', M57_SETTINGS.bp_elec); sf('m57-input-bp-gaz', M57_SETTINGS.bp_gaz);
+            sf('m57-input-cons-elec', M57_SETTINGS.consumed_elec); sf('m57-input-cons-gaz', M57_SETTINGS.consumed_gaz);
+            const mod = document.getElementById('m57-edit-modal'); if(mod) mod.classList.remove('hidden');
         }
 
         window.saveM57Data = async function() {
-            const payload = {
-                bp_elec: parseFloat(document.getElementById('m57-input-bp-elec').value) || 0, bp_gaz: parseFloat(document.getElementById('m57-input-bp-gaz').value) || 0,
-                consumed_elec: parseFloat(document.getElementById('m57-input-cons-elec').value) || 0, consumed_gaz: parseFloat(document.getElementById('m57-input-cons-gaz').value) || 0
-            };
+            const pf = (id) => { const el = document.getElementById(id); return el ? (parseFloat(el.value)||0) : 0; };
+            const payload = { bp_elec: pf('m57-input-bp-elec'), bp_gaz: pf('m57-input-bp-gaz'), consumed_elec: pf('m57-input-cons-elec'), consumed_gaz: pf('m57-input-cons-gaz') };
+            
             try {
                 const res = await fetch(getApiUrl('/api/settings/m57'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if((await res.json()).success) { M57_SETTINGS = payload; document.getElementById('m57-edit-modal').classList.add('hidden'); calculateM57(); App.toast("Budget Primitif verrouillé.", "success"); }
+                if(res.ok && (await res.json()).success) { 
+                    M57_SETTINGS = payload; 
+                    const mod = document.getElementById('m57-edit-modal'); if(mod) mod.classList.add('hidden'); 
+                    calculateM57(); App.toast("Budget Primitif verrouillé.", "success"); 
+                }
             } catch(e) { App.toast("Erreur sauvegarde.", "error"); }
         }
 
@@ -948,29 +990,15 @@
         // ==========================================
         function calculateMarketStrategy() {
             let totalBudget = 0; let totalVol = 0;
-            FLEET_DATA.forEach(s => { if(s.energy === 'elec' || s.energy_type === 'elec') { totalBudget += (s.budget||0); totalVol += (s.volume||0); } });
+            FLEET_DATA.forEach(s => { if(s.energy === 'elec' || s.energy_type === 'elec') { totalBudget += (parseFloat(s.budget)||0); totalVol += (parseFloat(s.volume)||0); } });
             const avgPrice = totalVol > 0 ? (totalBudget / totalVol) : 0;
             
             safeSetText('price-user', Math.round(avgPrice) + " €"); safeSetText('price-market', MARKET_DATA.elec + " €"); safeSetText('price-trve', MARKET_DATA.trve + " €");
 
             const max = Math.max(avgPrice, MARKET_DATA.elec, MARKET_DATA.trve) * 1.1 || 1;
-            document.getElementById('bar-user').style.width = (avgPrice / max * 100) + "%";
-            document.getElementById('bar-market').style.width = (MARKET_DATA.elec / max * 100) + "%";
-            document.getElementById('bar-trve').style.width = (MARKET_DATA.trve / max * 100) + "%";
-        }
-
-        window.triggerOfferScan = async function(input) { 
-            if(!input.files || input.files.length === 0) return; 
-            App.toast("Dépouillement du BPU...", "info");
-            const formData = new FormData(); formData.append("file", input.files[0]); 
-            try { 
-                const res = await fetch(getApiUrl('/api/ops/simulate_offer'), { method: 'POST', body: formData }); 
-                const data = await res.json(); 
-                if(data.success && data.summary) { 
-                    document.getElementById('sim-results').classList.remove('hidden'); 
-                    document.getElementById('sim-results').innerHTML = `<div class="bg-success/20 border border-success/50 p-4 rounded-xl text-success font-bold text-center">BPU analysé. Gain estimé : ${Math.round(data.summary.savings_euro).toLocaleString()} €</div>`;
-                } 
-            } catch(e) { App.toast("Échec du dépouillement.", "error"); } 
+            const bU = document.getElementById('bar-user'); if(bU) bU.style.width = (avgPrice / max * 100) + "%";
+            const bM = document.getElementById('bar-market'); if(bM) bM.style.width = (MARKET_DATA.elec / max * 100) + "%";
+            const bT = document.getElementById('bar-trve'); if(bT) bT.style.width = (MARKET_DATA.trve / max * 100) + "%";
         }
 
         // ==========================================
@@ -980,16 +1008,17 @@
             const cluster = CLUSTERED_FLEET.find(c => c.name === clusterName);
             if(!cluster) return;
             
-            document.getElementById('detail-modal').classList.remove('hidden');
+            const mod = document.getElementById('detail-modal'); if(mod) mod.classList.remove('hidden');
             safeSetText('modal-title', cluster.name);
-            safeSetText('modal-waste', Math.round(cluster.ghost_savings).toLocaleString() + " €");
+            safeSetText('modal-waste', formatCurrency(cluster.ghost_savings));
             
             const topoContainer = document.getElementById('detail-topologie');
+            if(!topoContainer) return;
             topoContainer.innerHTML = '<div class="p-6 text-center"><i class="fa-solid fa-spinner fa-spin text-3xl text-cyan mb-4"></i><br>Extraction des contrats depuis la Base 3D...</div>';
             
             // FETCH RICH DATA
             const enrichedMeters = await Promise.all(cluster.meters.map(async m => {
-                try { const r = await fetch(getApiUrl(`/api/dashboard/data/${m.id}`)); if(r.ok) return await r.json(); } catch(e){} return null;
+                try { const r = await fetch(getApiUrl(`/api/dashboard/data/${m.id}`)); if(r.ok) return await r.json(); } catch(e){ console.warn("Fetch meter error", e); } return null;
             }));
 
             let html = '';
@@ -1001,9 +1030,7 @@
                 const start = richData.contract?.start_date || 'N/A';
                 const end = richData.contract?.end_date || 'N/A';
                 const vol = Math.round(parseFloat(richData.kpis?.volume_mwh) || 0);
-                const volN1 = Math.round(vol * (0.85 + Math.random()*0.3)); 
-                const power = richData.contract?.power || '-';
-                const unit = isGas ? 'kW' : 'kVA';
+                const power = richData.contract?.power || '-'; const unit = isGas ? 'kW' : 'kVA';
 
                 // Génération des détails de prix (4 Cadrans ou Unique)
                 let pricingDetails = '';
@@ -1016,7 +1043,7 @@
                             <div class="text-center"><span class="text-[8px] text-success font-bold">HCE</span><br><span class="text-[10px] font-mono text-white">${richData.contract.ps_hce||'-'}kW</span></div>
                         </div>`;
                 } else {
-                    const px = richData.pricing?.price_kwh || 0;
+                    const px = parseFloat(richData.pricing?.price_kwh) || 0;
                     pricingDetails = `<div class="mt-2 pt-2 border-t border-white/5 text-center text-[10px] font-bold text-gray-400">Prix Lissé : <span class="text-white font-mono">${(px>10?px:px*1000).toFixed(2)} €/MWh</span></div>`;
                 }
 
@@ -1034,7 +1061,7 @@
                         <div><div class="text-[9px] text-gray-500 uppercase tracking-widest mb-1">Fournisseur</div><div class="font-bold text-white truncate max-w-[100px]" title="${prov}">${prov}</div></div>
                         <div><div class="text-[9px] text-gray-500 uppercase tracking-widest mb-1">Contrat</div><div class="font-mono text-gray-300 whitespace-nowrap">${end}</div></div>
                         <div><div class="text-[9px] text-gray-500 uppercase tracking-widest mb-1">Puissance</div><div class="font-mono text-cyan font-bold">${power} ${unit}</div></div>
-                        <div><div class="text-[9px] text-gray-500 uppercase tracking-widest mb-1">Conso N-1</div><div class="font-mono whitespace-nowrap"><span class="text-white font-bold">${vol}</span> <span class="text-gray-500">MWh</span></div></div>
+                        <div><div class="text-[9px] text-gray-500 uppercase tracking-widest mb-1">Conso</div><div class="font-mono whitespace-nowrap"><span class="text-white font-bold">${vol}</span> <span class="text-gray-500">MWh</span></div></div>
                     </div>
                     ${pricingDetails}
                 </div>`;
@@ -1048,15 +1075,17 @@
             // Requêtes satellites sur le compteur maître
             if(enrichedMeters.length > 0) fetchThermicSignature(enrichedMeters[0].identity.id);
 
-            // Subventions (Si un site a une surface > 0)
-            const mainMeterWithSurface = enrichedMeters.find(m => (m.location?.surface || 0) > 0) || enrichedMeters[0];
+            // Subventions 
+            const mainMeterWithSurface = enrichedMeters.find(m => (parseFloat(m.location?.surface) || 0) > 0) || enrichedMeters[0];
             const subContainer = document.getElementById('modal-subventions-container');
-            const surface = mainMeterWithSurface?.location?.surface || 0;
+            const surface = parseFloat(mainMeterWithSurface?.location?.surface) || 0;
+
+            if(!subContainer) return;
 
             if (surface === 0) {
                 subContainer.innerHTML = `<div class="bento-card p-6 border border-dashed border-cyan/50 bg-cyan/5 h-full flex flex-col justify-center items-center text-center cursor-pointer group hover:bg-cyan/10 transition" onclick="window.openEditMeter('${mainMeterWithSurface?.identity?.id}')"><i class="fa-solid fa-ruler-combined text-4xl text-cyan mb-3 opacity-50 group-hover:opacity-100 transition"></i><p class="text-sm font-bold text-white mb-1">Débloquez l'IA de Subventions</p><p class="text-[10px] text-gray-400 mb-3 max-w-[80%]">Surface non renseignée. Requise pour le CEE.</p><span class="bg-cyan text-abysse font-bold px-4 py-2 rounded-full text-xs shadow-lg uppercase tracking-widest">Saisir</span></div>`;
             } else {
-                const subData = SUBVENTIONS_DATA.find(s => s.id === mainMeterWithSurface.identity.id);
+                const subData = SUBVENTIONS_DATA.find(s => s.id === mainMeterWithSurface?.identity?.id);
                 if(subData && subData.status === 'ELIGIBLE' && subData.aides.length > 0) {
                     let aidesHtml = subData.aides.map(a => `<div class="flex justify-between items-center bg-black/30 p-3 rounded-2xl border border-white/5 mb-2"><div class="text-xs text-white font-bold">${a.nom}</div><div class="text-success font-mono font-black text-sm">+ ${Math.round(a.montant).toLocaleString()} €</div></div>`).join('');
                     subContainer.innerHTML = `<div class="bento-card p-6 bg-gradient-to-r from-success/10 to-card border-l-4 border-success h-full flex flex-col justify-center shadow-inner"><h4 class="text-success font-black text-lg mb-2"><i class="fa-solid fa-sack-dollar"></i> CEE / FNCCR : ${Math.round(subData.total_site).toLocaleString()} €</h4><div class="w-full mb-2">${aidesHtml}</div><a href="${getApiUrl(`/api/tools/cerfa/${mainMeterWithSurface.identity.id}/${subData.aides[0].code}`)}" target="_blank" class="mt-2 block text-center bg-success text-abysse py-3 rounded-2xl font-black text-xs hover:bg-white transition shadow-lg uppercase tracking-widest"><i class="fa-solid fa-file-pdf"></i> Éditer le CERFA d'État</a></div>`;
@@ -1067,10 +1096,12 @@
         }
 
         function initClusterLoadChart(pmax, talon, psouscrite) {
-            const ctx = document.getElementById('clusterLoadChart').getContext('2d');
+            const ctxEl = document.getElementById('clusterLoadChart');
+            if(!ctxEl) return;
+            const ctx = ctxEl.getContext('2d');
             if(clusterLoadChartInstance) clusterLoadChartInstance.destroy();
             
-            if (pmax === 0) pmax = 100; if (talon === 0) talon = 20; if (psouscrite === 0) psouscrite = 120;
+            pmax = parseFloat(pmax) || 100; talon = parseFloat(talon) || 20; psouscrite = parseFloat(psouscrite) || 120;
             const labels = Array.from({length: 48}, (_, i) => `${Math.floor(i/2).toString().padStart(2,'0')}:${i%2===0?'00':'30'}`);
             
             const dataPoints = labels.map((_, i) => {
@@ -1089,18 +1120,19 @@
 
         async function fetchThermicSignature(id) {
             const r2El = document.getElementById('modal-dju'); const msgEl = document.getElementById('modal-dju-msg');
+            if(!r2El || !msgEl) return;
             r2El.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-2xl text-cyan"></i>'; msgEl.innerText = "Calcul des Degrés Jours Unifiés...";
             try {
                 const res = await fetch(getApiUrl(`/api/physics/thermic_signature/${id}`)); const data = await res.json();
                 if(data.success && data.regression) {
-                    const r2 = data.regression.r2 || 0; r2El.innerText = r2.toFixed(2);
+                    const r2 = parseFloat(data.regression.r2) || 0; r2El.innerText = r2.toFixed(2);
                     if(r2 > 0.8) { r2El.className = "text-3xl font-black text-alert font-mono drop-shadow-md mb-2"; msgEl.innerHTML = "<span class='text-alert'>Bâtiment fortement corrélé au froid (Passoire).</span>"; }
                     else { r2El.className = "text-3xl font-black text-success font-mono drop-shadow-md mb-2"; msgEl.innerHTML = "<span class='text-success'>Décorrélation climatique (Isolation OK).</span>"; }
                 } else throw new Error();
             } catch(e) { r2El.innerText = "N/A"; msgEl.innerText = "Historique Linky insuffisant."; r2El.className = "text-3xl font-black text-gray-600 font-mono drop-shadow-md mb-2"; }
         }
 
-        window.closeDetail = function() { document.getElementById('detail-modal').classList.add('hidden'); }
+        window.closeDetail = function() { const mod = document.getElementById('detail-modal'); if(mod) mod.classList.add('hidden'); }
 
         // ==========================================
         // 8. ÉDITION COMPTEUR (GAZ vs ELEC)
@@ -1116,56 +1148,70 @@
                 const data = await resData.json();
                 CURRENT_SITE = data; 
                 
-                document.getElementById('edit-id').value = data.identity?.id || ""; 
-                document.getElementById('edit-name').value = data.identity?.site_name || ""; 
-                
-                document.getElementById('edit-provider').value = data.contract?.provider || "";
-                document.getElementById('edit-segment').value = data.contract?.segment || "";
-                document.getElementById('edit-end-date').value = data.contract?.end_date || "";
+                const sf = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ""; };
+
+                sf('edit-id', data.identity?.id); sf('edit-name', data.identity?.site_name); 
+                sf('edit-provider', data.contract?.provider); sf('edit-segment', data.contract?.segment); sf('edit-end-date', data.contract?.end_date);
 
                 const isGas = data.energy_type === 'gaz' || data.contract?.profil === 'Base';
+                const wrapper4c = document.getElementById('edit-4-cadrans-wrapper');
+                const warningGas = document.getElementById('edit-gas-warning');
+
                 if(isGas) {
-                    document.getElementById('edit-4-cadrans-wrapper').classList.add('hidden');
-                    document.getElementById('edit-gas-warning').classList.remove('hidden');
+                    if(wrapper4c) wrapper4c.classList.add('hidden');
+                    if(warningGas) warningGas.classList.remove('hidden');
                 } else {
-                    document.getElementById('edit-4-cadrans-wrapper').classList.remove('hidden');
-                    document.getElementById('edit-gas-warning').classList.add('hidden');
+                    if(wrapper4c) wrapper4c.classList.remove('hidden');
+                    if(warningGas) warningGas.classList.add('hidden');
                     
-                    document.getElementById('edit-ps-hph').value = data.contract?.ps_hph || ""; document.getElementById('edit-ps-hch').value = data.contract?.ps_hch || "";
-                    document.getElementById('edit-ps-hpe').value = data.contract?.ps_hpe || ""; document.getElementById('edit-ps-hce').value = data.contract?.ps_hce || "";
+                    sf('edit-ps-hph', data.contract?.ps_hph); sf('edit-ps-hch', data.contract?.ps_hch);
+                    sf('edit-ps-hpe', data.contract?.ps_hpe); sf('edit-ps-hce', data.contract?.ps_hce);
+
+                    const p = data.pricing || {};
+                    sf('edit-px-hph', p.hph ? (p.hph > 10 ? p.hph : p.hph * 1000).toFixed(2) : "");
+                    sf('edit-px-hch', p.hch ? (p.hch > 10 ? p.hch : p.hch * 1000).toFixed(2) : "");
+                    sf('edit-px-hpe', p.hpe ? (p.hpe > 10 ? p.hpe : p.hpe * 1000).toFixed(2) : "");
+                    sf('edit-px-hce', p.hce ? (p.hce > 10 ? p.hce : p.hce * 1000).toFixed(2) : "");
                 }
 
-                let pKwh = data.pricing?.price_kwh || 0; if(pKwh > 10) pKwh /= 1000;
-                document.getElementById('edit-price').value = pKwh > 0 ? (pKwh * 1000).toFixed(2) : "";
+                let pKwh = parseFloat(data.pricing?.price_kwh) || 0; if(pKwh > 10) pKwh /= 1000;
+                sf('edit-price', pKwh > 0 ? (pKwh * 1000).toFixed(2) : "");
 
-                document.getElementById('edit-modal').classList.remove('hidden'); 
+                const mod = document.getElementById('edit-modal'); if(mod) mod.classList.remove('hidden'); 
             } catch(e) { App.toast("Erreur de récupération.", "error"); }
         }
 
         window.saveMeterChanges = async function() { 
             const original = CURRENT_SITE || { identity: {}, contract: { power_details: {} }, pricing: {} }; 
-            original.identity.site_name = document.getElementById('edit-name').value;
+            const getV = (id) => { const el = document.getElementById(id); return el ? el.value : null; };
+
+            const newName = getV('edit-name'); if(newName) original.identity.site_name = newName;
             
             if (!original.contract) original.contract = { power_details: {} };
-            original.contract.provider = document.getElementById('edit-provider').value;
-            original.contract.segment = document.getElementById('edit-segment').value;
-            original.contract.end_date = document.getElementById('edit-end-date').value;
+            const nProv = getV('edit-provider'); if(nProv !== null) original.contract.provider = nProv;
+            const nSeg = getV('edit-segment'); if(nSeg !== null) original.contract.segment = nSeg;
+            const nEnd = getV('edit-end-date'); if(nEnd !== null) original.contract.end_date = nEnd;
 
             const isGas = original.energy_type === 'gaz' || original.contract?.profil === 'Base';
             if(!isGas) {
-                original.contract.ps_hph = parseFloat(document.getElementById('edit-ps-hph').value) || null;
-                original.contract.ps_hch = parseFloat(document.getElementById('edit-ps-hch').value) || null;
-                original.contract.ps_hpe = parseFloat(document.getElementById('edit-ps-hpe').value) || null;
-                original.contract.ps_hce = parseFloat(document.getElementById('edit-ps-hce').value) || null;
+                const pF = (id) => parseFloat(getV(id));
+                original.contract.ps_hph = pF('edit-ps-hph') || null; original.contract.ps_hch = pF('edit-ps-hch') || null;
+                original.contract.ps_hpe = pF('edit-ps-hpe') || null; original.contract.ps_hce = pF('edit-ps-hce') || null;
+
+                if(!original.pricing) original.pricing = {};
+                if(!isNaN(pF('edit-px-hph'))) original.pricing.hph = pF('edit-px-hph') / 1000;
+                if(!isNaN(pF('edit-px-hch'))) original.pricing.hch = pF('edit-px-hch') / 1000;
+                if(!isNaN(pF('edit-px-hpe'))) original.pricing.hpe = pF('edit-px-hpe') / 1000;
+                if(!isNaN(pF('edit-px-hce'))) original.pricing.hce = pF('edit-px-hce') / 1000;
             }
 
-            const pMwh = parseFloat(document.getElementById('edit-price').value);
-            if(!isNaN(pMwh)) { original.pricing.price_kwh = pMwh / 1000; }
+            const pMwh = parseFloat(getV('edit-price'));
+            if(!isNaN(pMwh)) { if(!original.pricing) original.pricing = {}; original.pricing.price_kwh = pMwh / 1000; }
 
             try {
                 const res = await fetch(getApiUrl('/api/settings/save_client'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(original) });
-                if((await res.json()).success) { 
-                    document.getElementById('edit-modal').classList.add('hidden'); 
+                if(res.ok && (await res.json()).success) { 
+                    const mod = document.getElementById('edit-modal'); if(mod) mod.classList.add('hidden'); 
                     App.toast("Compteur mis à jour.", "success"); 
                     window.closeDetail(); loadFleet(); 
                 }
@@ -1173,7 +1219,7 @@
         }
 
         // ==========================================
-        // 9. DÉCISIONS LAB (API V4)
+        // 9. DÉCISIONS LAB (API V4 INTÉGRÉ)
         // ==========================================
         window.loadLabContext = async function(val) {
             try {
@@ -1181,7 +1227,7 @@
 
                 if(val === 'ALL_PARC') {
                     let sVol=0, sBud=0, sGhost=0, sPmax=0, sPs=0, sSurf=0;
-                    FLEET_DATA.forEach(s => { sVol += (s.volume||0); sBud += (s.budget||0); sGhost += (s.ghost_savings||0); sPmax = Math.max(sPmax, s.power||0); sPs += (s.power||0); sSurf += (s.surface||0); });
+                    FLEET_DATA.forEach(s => { sVol += (parseFloat(s.volume)||0); sBud += (parseFloat(s.budget)||0); sGhost += (parseFloat(s.ghost_savings)||0); sPmax = Math.max(sPmax, parseFloat(s.power)||0); sPs += (parseFloat(s.power)||0); sSurf += (parseFloat(s.surface)||0); });
                     
                     virtualSite.identity.id = 'ALL_PARC'; virtualSite.identity.site_name = 'Parc Communal';
                     virtualSite.kpis = { volume_mwh: sVol, budget: sBud, ghost_savings: sGhost, pmax_kw: sPmax, pmc: sBud/sVol || 0.15 };
@@ -1197,9 +1243,9 @@
                     if(!cluster) return;
                     
                     virtualSite.identity.id = cluster.id; virtualSite.identity.site_name = cluster.name;
-                    virtualSite.kpis = { volume_mwh: cluster.volume, budget: cluster.budget, ghost_savings: cluster.ghost_savings, pmax_kw: cluster.meters.reduce((max,m)=>Math.max(max,m.power||0),0) };
-                    virtualSite.contract = { power: cluster.meters.reduce((sum,m)=>sum+(m.power||0),0) };
-                    virtualSite.location = { surface: cluster.meters.reduce((sum,m)=>sum+(m.surface||0),0), address: cluster.meters[0]?.address };
+                    virtualSite.kpis = { volume_mwh: cluster.volume, budget: cluster.budget, ghost_savings: cluster.ghost_savings, pmax_kw: cluster.pmax };
+                    virtualSite.contract = { power: cluster.ps };
+                    virtualSite.location = { surface: cluster.meters.reduce((sum,m)=>sum+(parseFloat(m.surface)||0),0), address: cluster.meters[0]?.address };
                     CURRENT_SITE = virtualSite;
 
                     const resFore = await fetch(getApiUrl(`/api/forecast/simulate/${cluster.id}`));
@@ -1214,27 +1260,26 @@
         }
 
         function updateLabUI() {
-            if(!CURRENT_SITE) return;
+            if(!CURRENT_SITE || !CURRENT_SITE.kpis) return;
             updateForecastChart();
 
-            const pmax = Math.round(parseFloat(CURRENT_SITE.kpis?.pmax_kw) || 36);
+            const pmax = Math.round(parseFloat(CURRENT_SITE.kpis.pmax_kw) || 36);
             const ps = Math.round(parseFloat(CURRENT_SITE.contract?.power) || 120);
-            document.getElementById('sim-turpe-min').innerText = pmax;
-            document.getElementById('sim-turpe-max').innerText = ps;
+            safeSetText('sim-turpe-min', pmax); safeSetText('sim-turpe-max', ps);
             
             const sliderT = document.getElementById('slider-turpe');
-            sliderT.min = Math.max(9, pmax - 36); sliderT.max = ps + 50; sliderT.value = ps;
+            if(sliderT) { sliderT.min = Math.max(9, pmax - 36); sliderT.max = ps + 50; sliderT.value = ps; }
             
             // APPELS V4
             window.calculateTurpe(); 
 
-            document.getElementById('sim-ext-waste').innerText = "- " + Math.round(CURRENT_SITE.kpis?.ghost_savings || 0).toLocaleString() + " €";
-            document.getElementById('slider-extinction').value = 60;
+            safeSetText('sim-ext-waste', "- " + Math.round(CURRENT_SITE.kpis?.ghost_savings || 0).toLocaleString() + " €");
+            const sliderE = document.getElementById('slider-extinction'); if(sliderE) sliderE.value = 60;
             window.calculateExtinction();
             window.calculateSubventions();
 
             const kwc = SOLAR_DATA?.results?.puissance_kwc || ((CURRENT_SITE.location?.surface || 1000) * 0.7 * 0.2);
-            document.getElementById('sim-solar-kwc').innerText = Math.round(kwc) + " kWc";
+            safeSetText('sim-solar-kwc', Math.round(kwc) + " kWc");
             setSolarMode('MAKE'); 
 
             renderKanban();
@@ -1247,9 +1292,9 @@
             const pmax = parseFloat(CURRENT_SITE?.kpis?.pmax_kw) || 36;
             const currentPs = parseFloat(CURRENT_SITE?.contract?.power) || 120;
             
-            document.getElementById('sim-turpe-val').innerText = targetPs;
-            const gainEl = document.getElementById('sim-turpe-gain');
-            const warningEl = document.getElementById('sim-turpe-warning');
+            safeSetText('sim-turpe-val', targetPs);
+            const gainEl = document.getElementById('sim-turpe-gain'); const warningEl = document.getElementById('sim-turpe-warning');
+            if(!gainEl || !warningEl) return;
 
             gainEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-sm text-cyan"></i>';
             try {
@@ -1269,13 +1314,13 @@
         window.calculateExtinction = async function() {
             const slider = document.getElementById('slider-extinction'); if(!slider) return;
             const pct = parseInt(slider.value);
-            document.getElementById('sim-ext-pct').innerText = pct;
+            safeSetText('sim-ext-pct', pct);
             
             const ghost = parseFloat(CURRENT_SITE?.kpis?.ghost_savings) || 0;
             const surface = parseFloat(CURRENT_SITE?.location?.surface) || 500;
             
             const capexEl = document.getElementById('sim-ext-capex'); const roiEl = document.getElementById('sim-ext-roi'); const wasteEl = document.getElementById('sim-ext-waste');
-            roiEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-sm text-gold"></i>';
+            if(roiEl) roiEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-sm text-gold"></i>';
 
             try {
                 const response = await fetch(getApiUrl('/api/v4/simulate/extinction'), {
@@ -1283,7 +1328,7 @@
                     body: JSON.stringify({ ghost_savings_eur: ghost, surface_m2: surface, reduction_pct: pct })
                 });
                 const data = await response.json();
-                if (data.success) {
+                if (data.success && wasteEl && capexEl && roiEl) {
                     wasteEl.innerText = "- " + Math.round(data.results.savings_eur).toLocaleString() + " €";
                     capexEl.innerText = Math.round(data.results.capex_eur).toLocaleString() + " €";
                     if(data.results.savings_eur > 0) {
@@ -1293,7 +1338,7 @@
                         roiEl.innerText = "--"; roiEl.className = "text-2xl font-black text-gray-500 font-mono";
                     }
                 }
-            } catch (error) { roiEl.innerHTML = '<span class="text-alert text-sm">Erreur V4</span>'; }
+            } catch (error) { if(roiEl) roiEl.innerHTML = '<span class="text-alert text-sm">Erreur V4</span>'; }
         }
 
         window.calculateSubventions = async function() {
@@ -1308,7 +1353,7 @@
             }
 
             const gainEl = document.getElementById('sim-subv-gain'); const resteEl = document.getElementById('sim-subv-reste'); const pctEl = document.getElementById('sim-subv-pct');
-            pctEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-sm text-fond_vert"></i>';
+            if(pctEl) pctEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-sm text-fond_vert"></i>';
 
             try {
                 const response = await fetch(getApiUrl('/api/v4/simulate/subventions'), {
@@ -1316,89 +1361,94 @@
                     body: JSON.stringify({ cout_travaux_eur: cost, aides_api_eur: aidesApi })
                 });
                 const data = await response.json();
-                if (data.success) {
+                if (data.success && gainEl && resteEl && pctEl) {
                     gainEl.innerText = "+ " + Math.round(data.results.total_aides_eur).toLocaleString() + " €";
                     resteEl.innerText = Math.round(data.results.reste_a_charge_eur).toLocaleString() + " €";
                     pctEl.innerText = data.results.pct_financement.toFixed(1);
                 }
-            } catch (error) { pctEl.innerText = "Err"; }
+            } catch (error) { if(pctEl) pctEl.innerText = "Err"; }
         }
 
         window.setSolarMode = function(mode) {
             solarMode = mode;
             const btnMake = document.getElementById('btn-make'); const btnBuy = document.getElementById('btn-buy');
+            if(!btnMake || !btnBuy) return;
+
             if(mode === 'MAKE') {
                 btnMake.className = "flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-lg bg-success text-abysse transition shadow-md";
                 btnBuy.className = "flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-lg text-gray-400 hover:text-white transition";
-                document.getElementById('label-solar-left').innerText = "Coût du Projet (CAPEX)"; document.getElementById('label-solar-right').innerText = "Économie Chapitre 011 /An";
+                safeSetText('label-solar-left', "Coût du Projet (CAPEX)"); safeSetText('label-solar-right', "Économie Chapitre 011 /An");
             } else {
                 btnBuy.className = "flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-lg bg-success text-abysse transition shadow-md";
                 btnMake.className = "flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-lg text-gray-400 hover:text-white transition";
-                document.getElementById('label-solar-left').innerText = "Loyer versé par le Tiers"; document.getElementById('label-solar-right').innerText = "Gain Trésorerie sans effort";
+                safeSetText('label-solar-left', "Loyer versé par le Tiers"); safeSetText('label-solar-right', "Gain Trésorerie sans effort");
             }
 
-            const kwc = SOLAR_DATA?.results?.puissance_kwc || ((CURRENT_SITE.location?.surface || 1000) * 0.7 * 0.2);
-            const savingsFull = kwc * 1100 * (CURRENT_SITE.kpis?.pmc || 0.15); 
+            const kwc = SOLAR_DATA?.results?.puissance_kwc || ((CURRENT_SITE?.location?.surface || 1000) * 0.7 * 0.2);
+            const savingsFull = kwc * 1100 * (CURRENT_SITE?.kpis?.pmc || 0.15); 
             
             if(mode === 'MAKE') {
-                document.getElementById('val-solar-left').innerText = Math.round(kwc * 1000).toLocaleString() + " €";
-                document.getElementById('val-solar-right').innerText = "+ " + Math.round(savingsFull).toLocaleString() + " €";
+                safeSetText('val-solar-left', Math.round(kwc * 1000).toLocaleString() + " €");
+                safeSetText('val-solar-right', "+ " + Math.round(savingsFull).toLocaleString() + " €");
             } else {
                 const rent = savingsFull * 0.5; 
-                document.getElementById('val-solar-left').innerText = Math.round(rent).toLocaleString() + " €";
-                document.getElementById('val-solar-right').innerText = "+ " + Math.round(savingsFull - rent).toLocaleString() + " €";
+                safeSetText('val-solar-left', Math.round(rent).toLocaleString() + " €");
+                safeSetText('val-solar-right', "+ " + Math.round(savingsFull - rent).toLocaleString() + " €");
             }
         }
 
         function updateForecastChart() {
             if(!FORECAST_DATA) return;
-            const ctx = document.getElementById('chartForecast').getContext('2d');
+            const inputU = document.getElementById('input-units');
+            const units = inputU ? (parseFloat(inputU.value) || 1) : 1;
+            const isRatio = units > 1;
+
+            const ctxEl = document.getElementById('chartForecast'); if(!ctxEl) return;
+            const ctx = ctxEl.getContext('2d');
             if(chartForecast) chartForecast.destroy();
 
-            const baseVol = FORECAST_DATA.dataset_trend[0] || 1000;
+            const baseVol = FORECAST_DATA.dataset_trend[0] || CURRENT_SITE?.kpis?.volume_mwh || 1000;
             const histLabels =["N-3", "N-2", "N-1"];
-            const histData =[baseVol*0.85, baseVol*0.9, baseVol*0.98];
+            const histData =[baseVol*0.85, baseVol*0.9, baseVol*0.98]; 
             const fullLabels =[...histLabels, ...FORECAST_DATA.labels];
             
-            const paddedTrend =[null, null, histData[2], ...FORECAST_DATA.dataset_trend.slice(1)];
-            const paddedSobriety =[null, null, histData[2], ...FORECAST_DATA.dataset_sobriety.slice(1)];
-            const paddedHist =[...histData, null, null, null, null];
+            const applyRatio = (val) => isRatio ? (val * 1000 / units) : val;
+            const dataHist = histData.map(applyRatio);
+            const dataTrend = FORECAST_DATA.dataset_trend.map(applyRatio);
+            const dataSobriety = FORECAST_DATA.dataset_sobriety.map(applyRatio);
+
+            const paddedTrend =[null, null, dataHist[2], ...dataTrend.slice(1)];
+            const paddedSobriety =[null, null, dataHist[2], ...dataSobriety.slice(1)];
+            const paddedHist =[...dataHist, null, null, null, null];
 
             chartForecast = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: fullLabels,
                     datasets:[
-                        { label: 'Historique Réel', data: paddedHist, borderColor: '#6B7280', borderDash: [5,5], tension: 0.3, pointRadius: 4, pointBackgroundColor: '#6B7280' },
-                        { label: 'Dérive Budget (Inaction)', data: paddedTrend, borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: '+1', tension: 0.3, pointRadius: 5, pointBackgroundColor: '#001D3D', pointBorderColor: '#EF4444', borderWidth: 3 },
-                        { label: 'Plan Climat (Sobriété)', data: paddedSobriety, borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.2)', fill: false, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#001D3D', pointBorderColor: '#10B981', borderWidth: 3 }
+                        { label: 'Historique', data: paddedHist, borderColor: '#6B7280', borderDash:[5,5], tension: 0.3, pointRadius: 4, pointBackgroundColor: '#6B7280' },
+                        { label: 'Inaction', data: paddedTrend, borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: '+1', tension: 0.3, pointRadius: 5, pointBackgroundColor: '#001D3D', pointBorderColor: '#EF4444', borderWidth: 3 },
+                        { label: 'Sobriété CORTEX', data: paddedSobriety, borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.2)', fill: false, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#001D3D', pointBorderColor: '#10B981', borderWidth: 3 }
                     ]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(0,29,61,0.9)', titleColor: '#3B82F6', bodyFont: {family: 'JetBrains Mono'} } }, scales: { x: { grid: { color: (ctx) => ctx.index === 2 ? 'rgba(59,130,246,0.5)' : 'transparent', drawBorder: false }, ticks: {color: '#94A3B8', font: {family: 'JetBrains Mono', weight: 'bold'}} }, y: { grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, ticks: {color: '#94A3B8', font: {family: 'JetBrains Mono'}, callback: val => val + ' MWh'} } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(0,29,61,0.9)', titleColor: '#00E5FF', bodyFont: {family: 'JetBrains Mono'}, callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.raw.toFixed(isRatio?2:0)} ${isRatio?'kWh/Unité':'MWh'}` } } }, scales: { x: { grid: { color: (ctx) => ctx.index === 2 ? 'rgba(0,229,255,0.5)' : 'transparent', drawBorder: false }, ticks: {color: '#94A3B8', font: {family: 'JetBrains Mono', weight: 'bold'}} }, y: { grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, ticks: {color: '#94A3B8', font: {family: 'JetBrains Mono'}} } }
             });
         }
 
         // --- KANBAN & EXÉCUTION D'EMAIL ---
         function renderKanban() {
             const plan = CURRENT_SITE?.action_plan ||[];
-            document.getElementById('kb-todo').innerHTML = ''; document.getElementById('kb-doing').innerHTML = ''; document.getElementById('kb-done').innerHTML = '';
+            const tDo = document.getElementById('kb-todo'); const tDoing = document.getElementById('kb-doing'); const tDone = document.getElementById('kb-done');
+            if(!tDo || !tDoing || !tDone) return;
 
-            if(plan.length === 0) {
-                document.getElementById('kb-todo').innerHTML = '<div class="text-xs text-gray-500 italic p-2 text-center">Aucune décision prise.</div>'; return;
-            }
+            tDo.innerHTML = ''; tDoing.innerHTML = ''; tDone.innerHTML = '';
+            
+            if(plan.length === 0) { tDo.innerHTML = '<div class="text-xs text-gray-500 italic p-2 text-center">Aucune décision prise.</div>'; return; }
 
             plan.forEach((item, idx) => {
                 const targetId = item.status === 'TODO' ? 'kb-todo' : (item.status === 'DOING' ? 'kb-doing' : 'kb-done');
                 const border = item.status === 'TODO' ? 'border-gold/30' : (item.status === 'DOING' ? 'border-mairie/30' : 'border-success/30');
-                const html = `
-                    <div class="bg-abysse p-3 rounded-xl border ${border} shadow-sm group cursor-pointer hover:border-white transition">
-                        <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">${item.date}</div>
-                        <div class="text-xs font-bold text-white mb-2">${item.title}</div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-[10px] text-gray-400 font-mono">Gain: ${item.gain || 'N/A'}</span>
-                            ${item.status !== 'DONE' ? `<button onclick="window.advanceAction(${idx})" class="text-[9px] bg-white/10 px-2 py-1 rounded hover:bg-white hover:text-abysse transition"><i class="fa-solid fa-arrow-right"></i> Avancer</button>` : `<i class="fa-solid fa-check-circle text-success"></i>`}
-                        </div>
-                    </div>`;
+                const html = `<div class="bg-abysse p-3 rounded-xl border ${border} shadow-sm group cursor-pointer hover:border-white transition"><div class="text-[10px] text-gray-500 uppercase font-bold mb-1">${item.date}</div><div class="text-xs font-bold text-white mb-2">${item.title}</div><div class="flex justify-between items-center"><span class="text-[10px] text-gray-400 font-mono">Gain: ${item.gain || 'N/A'}</span>${item.status !== 'DONE' ? `<button onclick="window.advanceAction(${idx})" class="text-[9px] bg-white/10 px-2 py-1 rounded hover:bg-white hover:text-abysse transition"><i class="fa-solid fa-arrow-right"></i> Avancer</button>` : `<i class="fa-solid fa-check-circle text-success"></i>`}</div></div>`;
                 document.getElementById(targetId).innerHTML += html;
             });
         }
@@ -1410,21 +1460,21 @@
             let mainPdl = CURRENT_SITE.contract?.pdl || CURRENT_SITE.identity?.id || "N/A";
 
             if(type === 'TURPE') { 
-                title = "Mandat SDE / Ajustement Puissance"; gain = document.getElementById('sim-turpe-gain').innerText; 
+                title = "Mandat SDE / Ajustement Puissance"; gain = document.getElementById('sim-turpe-gain')?.innerText || ""; 
                 mailSubject = `Demande d'ajustement de puissance souscrite - ${siteName}`;
                 mailBody = `Madame, Monsieur,\n\nSuite à un audit énergétique, la commune souhaite procéder à une baisse de sa puissance souscrite pour le site de ${siteName} (PDL : ${mainPdl}).\n\nPourriez-vous initier la démarche auprès d'Enedis ou nous transmettre le mandat de gestion ?\n\nBien cordialement,\nLe DGS`;
             }
             else if(type === 'EXTINCTION') { 
-                title = "Mise en place Extinction Nocturne / GTB"; gain = "+ " + document.getElementById('sim-ext-waste').innerText.replace("- ", ""); 
+                title = "Mise en place Extinction Nocturne / GTB"; gain = "+ " + (document.getElementById('sim-ext-waste')?.innerText || "").replace("- ", ""); 
                 mailSubject = `Demande de devis - Installation d'Horloges / GTB - ${siteName}`;
-                mailBody = `Bonjour,\n\nDans le cadre de notre Plan de Sobriété, la mairie souhaite équiper le site ${siteName} de programmateurs d'extinction nocturne (Éclairage / Veille).\n\nMerci de prendre contact avec les services techniques pour une visite de faisabilité.\n\nBien cordialement,`;
+                mailBody = `Bonjour,\n\nDans le cadre de notre Plan de Sobriété, la mairie souhaite équiper le site ${siteName} de programmateurs d'extinction nocturne.\n\nMerci de prendre contact avec les services techniques pour une visite de faisabilité.\n\nBien cordialement,`;
             }
             else if(type === 'FONDS_VERT') { 
-                title = "Dépôt de dossier Subvention (Fonds Vert/CEE)"; gain = document.getElementById('sim-subv-gain').innerText; 
+                title = "Dépôt de dossier Subvention (Fonds Vert/CEE)"; gain = document.getElementById('sim-subv-gain')?.innerText || ""; 
                 mailSubject = `Pré-instruction Fonds Vert / CEE - Rénovation ${siteName}`;
-                mailBody = `À l'attention des services de la Préfecture et de notre AMO CEE,\n\nLa commune envisage un programme de travaux sur le bâtiment ${siteName} estimé à ${document.getElementById('input-travaux').value} € HT.\n\nNous souhaitons instruire une demande d'aide d'État (DSIL/DETR/Fonds Vert) couplée aux Certificats d'Économies d'Énergie.\n\nBien cordialement,`;
+                mailBody = `À l'attention des services de la Préfecture et de notre AMO CEE,\n\nLa commune envisage un programme de travaux sur le bâtiment ${siteName} estimé à ${document.getElementById('input-travaux')?.value || 0} € HT.\n\nNous souhaitons instruire une demande d'aide d'État couplée aux Certificats d'Économies d'Énergie.\n\nBien cordialement,`;
             }
-            else if(type === 'SOLAR') { title = "Appel d'Offres Photovoltaïque ("+solarMode+")"; gain = document.getElementById('val-solar-right').innerText; }
+            else if(type === 'SOLAR') { title = "Appel d'Offres Photovoltaïque ("+solarMode+")"; gain = document.getElementById('val-solar-right')?.innerText || ""; }
 
             if(mailSubject && mailBody) window.location.href = `mailto:?subject=${encodeURIComponent(mailSubject)}&body=${encodeURIComponent(mailBody)}`;
 
@@ -1434,20 +1484,15 @@
             if(!CURRENT_SITE.action_plan) CURRENT_SITE.action_plan =[]; CURRENT_SITE.action_plan.push(newAction);
             renderKanban(); App.toast(`${title} sécurisé dans le Kanban Mairie.`, "success");
             
-            if(CURRENT_SITE.identity.id !== 'ALL_PARC') {
-                try { await fetch(getApiUrl('/api/settings/save_client'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(CURRENT_SITE) }); } catch(e){}
-            }
+            if(CURRENT_SITE.identity?.id && CURRENT_SITE.identity.id !== 'ALL_PARC') { try { await fetch(getApiUrl('/api/settings/save_client'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(CURRENT_SITE) }); } catch(e){} }
         }
 
         window.advanceAction = async function(idx) {
             if(!CURRENT_SITE || !CURRENT_SITE.action_plan[idx]) return;
             const statusFlow = { 'TODO': 'DOING', 'DOING': 'DONE' }; CURRENT_SITE.action_plan[idx].status = statusFlow[CURRENT_SITE.action_plan[idx].status];
             renderKanban();
-            if(CURRENT_SITE.identity.id !== 'ALL_PARC') {
-                try { await fetch(getApiUrl('/api/settings/save_client'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(CURRENT_SITE) }); } catch(e){}
-            }
+            if(CURRENT_SITE.identity?.id && CURRENT_SITE.identity.id !== 'ALL_PARC') { try { await fetch(getApiUrl('/api/settings/save_client'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(CURRENT_SITE) }); } catch(e){} }
         }
-
     </script>
 </body>
 </html>
