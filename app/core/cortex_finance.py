@@ -280,4 +280,25 @@ class CortexFinance:
     def simulate_landing(self, site_data: Dict) -> Dict[str, Any]:
         return {"year": 2025, "landing_euro": 0, "trajectory": []} # Simplifié pour la taille de la réponse
 
+# =========================================================
+    # 6. SIMULATEUR STRATÉGIQUE (M&A / EBITDA)
+    # =========================================================
+    def simulate_ebitda(self, ca_k_eur: float, marge_pct: float, gains_eur: float, multiple: float) -> Dict[str, Any]:
+        try:
+            ca_reel = ca_k_eur * 1000
+            marge_decimal = marge_pct / 100.0
+            
+            val_creation = gains_eur * multiple
+            nouvelle_marge = (((ca_reel * marge_decimal) + gains_eur) / ca_reel) * 100 if ca_reel > 0 else 0
+            equivalent_ca = (gains_eur / marge_decimal) if marge_decimal > 0 else 0
+
+            return {
+                "val_creation_eur": val_creation,
+                "nouvelle_marge_pct": round(nouvelle_marge, 2),
+                "equivalent_ca_eur": equivalent_ca
+            }
+        except Exception as e:
+            self.logger.error(f"Erreur simulation EBITDA : {e}")
+            return {"error": str(e)}
+
 finance = CortexFinance()
