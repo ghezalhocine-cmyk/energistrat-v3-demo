@@ -205,7 +205,7 @@
     <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none w-11/12 md:w-auto max-w-md"></div>
 
-<script>
+    <script>
     // ==========================================
     // 1. MOTEUR UTILITAIRE & GOD MODE
     // ==========================================
@@ -261,10 +261,14 @@
 
         try {
             const res = await fetch(getApiUrl('/api/dashboard/fleet'));
+            
+            // Sécurité anti-HTML (Catch-all FastAPI)
+            const contentType = res.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) throw new Error("API_ERROR");
+
             const data = await res.json();
             
             if (data?.fleet && data.fleet.length > 0) {
-                // Application du God Mode
                 FLEET_DATA = (forceTenant && forceTenant !== 'ALL') ? data.fleet.filter(s => s.tenant_id === forceTenant) : data.fleet;
                 
                 const sel = document.getElementById('site-selector');
@@ -289,7 +293,7 @@
                 document.getElementById('site-selector').innerHTML = '<option value="">Aucun actif trouvé pour ce profil.</option>';
             }
         } catch(e) {
-            App.toast("Erreur de connexion CORTEX", "error");
+            App.toast("Erreur de connexion à la Base 3D.", "error");
         }
     });
 
@@ -300,7 +304,6 @@
         const id = document.getElementById('site-selector').value;
         if(!id) return;
 
-        // Transition UI
         document.getElementById('blank-state').style.display = 'none';
         const dashboard = document.getElementById('immo-dashboard');
         dashboard.classList.remove('hidden');
@@ -312,12 +315,20 @@
         document.querySelectorAll('.dpe-step').forEach(el => el.classList.remove('active'));
         document.getElementById('kpi-intensity').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i>';
         document.getElementById('kpi-baseline').innerHTML = '--';
+        document.getElementById('val-impact').innerText = "-- €";
+        document.getElementById('val-theorique').innerText = "-- €";
+        document.getElementById('val-pct').innerText = "-- %";
+        document.getElementById('dpe-verdict').innerText = "En attente d'analyse...";
+        document.getElementById('dpe-verdict').className = "text-2xl font-black text-white drop-shadow-md";
 
         try {
             const res = await fetch(getApiUrl(`/api/tools/immo/${id}`));
             
-            // 🛡️ SÉCURITÉ : Interception 404 si l'API n'est pas encore dans main.py
-            if(res.status === 404) {
+            // 🛡️ BOUCLIER ANTI-CRASH (Le Patch)
+            // Si le backend renvoie de l'HTML (index.html de secours) au lieu d'un JSON,
+            // c'est que la route Python n'est pas encore codée.
+            const contentType = res.headers.get("content-type");
+            if (res.status === 404 || !contentType || !contentType.includes("application/json")) {
                 throw new Error("API_NOT_DEPLOYED");
             }
 
@@ -364,7 +375,6 @@
             const iconEl = document.getElementById('finance-icon');
             const bgIconEl = document.getElementById('finance-bg-icon');
 
-            // Changement dynamique des couleurs en fonction de la Valorisation (Rouge, Vert, Gris)
             if (impact < 0) {
                 impactEl.innerText = formatter.format(impact);
                 impactEl.className = "text-5xl font-black text-alert font-mono drop-shadow-[0_0_15px_rgba(239,68,68,0.4)]";
@@ -396,16 +406,22 @@
         } catch(e) { 
             console.error(e);
             if(e.message === "API_NOT_DEPLOYED") {
-                App.toast("L'API Cortex IMMO n'est pas encore déployée en Python.", "warning");
-                document.getElementById('dpe-verdict').innerText = "API HORS LIGNE";
-                document.getElementById('dpe-verdict').className = "text-2xl font-black text-alert drop-shadow-md";
-                document.getElementById('kpi-intensity').innerText = "ERR";
+                // 🛡️ GESTION ÉLÉGANTE DU MANQUE D'API BACKEND
+                App.toast("L'API Cortex IMMO n'est pas encore déployée côté Serveur.", "warning");
+                
+                document.getElementById('kpi-intensity').innerText = "HORS LIGNE";
+                document.getElementById('kpi-intensity').className = "text-xl font-black text-gold font-mono mt-2";
+                
+                const verdictEl = document.getElementById('dpe-verdict');
+                verdictEl.innerText = "CONNEXION ADEME REQUISE";
+                verdictEl.className = "text-2xl font-black text-gold drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]";
+                
+                document.getElementById('dpe-visual').style.opacity = '0.3';
             } else {
                 App.toast("Échec de l'analyse immobilière.", "error"); 
             }
         }
     }
 </script>
-    
 </body>
 </html>
