@@ -77,6 +77,9 @@ class MockCortex:
     def simulate_budget_from_bpu(self, b, s): return {}
     def analyze_load_curve(self, f, n): return {}
 
+class MockAdeme:
+    def analyze_immo(self, s): return {"error": "Moteur CORTEX ADEME hors ligne."}
+
 class MockRTE:
     def get_wholesale_market(self): return {"success": False, "error": "RTE Offline"}
     def get_pulse_dashboard_data(self): return {"success": False, "error": "RTE Offline"}
