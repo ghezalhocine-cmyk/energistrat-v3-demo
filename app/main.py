@@ -166,6 +166,26 @@ class AcademyAnswerRequest(BaseModel): question_id: str; is_correct: bool
 class CPQQuoteRequest(BaseModel): site_id: Optional[str] = None; volume_mwh: float; energy_type: str; segment: str; duration_years: int = 1; franchise_cee: bool = False; green_option: str = "none"; mask: Dict[str, Any] = {}
 class NewContactModel(BaseModel): firstname: str; lastname: str; role: str; email: str; phone: str
 
+class EbitdaRequest(BaseModel):
+    ca_k_eur: float
+    marge_nette_pct: float
+    multiple_valo: float
+    gains_energie_eur: float
+
+class TurpeRequest(BaseModel):
+    puissance_souscrite_kVA: float
+    puissance_max_atteinte_kW: float
+    puissance_cible_kVA: float
+
+class ExtinctionRequest(BaseModel):
+    ghost_savings_eur: float
+    surface_m2: float
+    reduction_pct: float
+
+class SubventionRequest(BaseModel):
+    cout_travaux_eur: float
+    aides_api_eur: float
+
 def json_compliant(data):
     if isinstance(data, dict): return {k: json_compliant(v) for k, v in data.items()}
     elif isinstance(data, list): return[json_compliant(v) for v in data]
@@ -1041,6 +1061,41 @@ async def api_finance_upload(file: UploadFile = File(...), site_id: str = Form(.
         site_data = db.get_site(site_id) or {}
         return JSONResponse(json_compliant(finance.audit_invoice(parsed, site_data)))
     except Exception as e: return JSONResponse({"error": str(e)}, 500)
+
+# ==============================================================================
+# API DÉCISIONS LAB (Orchestration vers les Moteurs CORTEX)
+# ==============================================================================
+@app.post("/api/v4/simulate/ebitda")
+async def api_simulate_ebitda(payload: EbitdaRequest, user = Depends(get_current_user)):
+    try:
+        res = finance.simulate_ebitda(payload.ca_k_eur, payload.marge_nette_pct, payload.gains_energie_eur, payload.multiple_valo)
+        if "error" in res: return JSONResponse({"success": False, "error": res["error"]})
+        return JSONResponse(json_compliant({"success": True, "results": res}))
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
+
+@app.post("/api/v4/simulate/turpe")
+async def api_simulate_turpe(payload: TurpeRequest, user = Depends(get_current_user)):
+    try:
+        res = cortex.simulate_turpe(payload.puissance_souscrite_kVA, payload.puissance_max_atteinte_kW, payload.puissance_cible_kVA)
+        if "error" in res: return JSONResponse({"success": False, "error": res["error"]})
+        return JSONResponse(json_compliant({"success": True, "results": res}))
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
+
+@app.post("/api/v4/simulate/extinction")
+async def api_simulate_extinction(payload: ExtinctionRequest, user = Depends(get_current_user)):
+    try:
+        res = cortex.simulate_extinction(payload.ghost_savings_eur, payload.surface_m2, payload.reduction_pct)
+        if "error" in res: return JSONResponse({"success": False, "error": res["error"]})
+        return JSONResponse(json_compliant({"success": True, "results": res}))
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
+
+@app.post("/api/v4/simulate/subventions")
+async def api_simulate_subventions(payload: SubventionRequest, user = Depends(get_current_user)):
+    try:
+        res = cortex.simulate_subventions(payload.cout_travaux_eur, payload.aides_api_eur)
+        if "error" in res: return JSONResponse({"success": False, "error": res["error"]})
+        return JSONResponse(json_compliant({"success": True, "results": res}))
+    except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
 
 VALID_VIEWS =["settings", "settings_pme", "settings_light", "settings_partner", "settings_ops", "ops_nexus", "ops_ingest", "ops_aggregator", "ops_market", "pme", "industry", "retail", "mairie", "sde", "oph", "syndic", "sante", "supplier", "citoyen", "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance", "dashboard_finance", "sales_workspace", "sales_playbook", "sales_outreach", "sales_academy", "sales_cpq", "vision","decisions_lab", "decisions_lab_mairie"]
 PUBLIC_PAGES =["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html"]
