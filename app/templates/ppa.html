@@ -213,7 +213,7 @@
     <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none w-11/12 md:w-auto max-w-md"></div>
 
-<script>
+    <script>
     // ==========================================
     // 1. MOTEUR UTILITAIRE & GOD MODE
     // ==========================================
@@ -246,12 +246,13 @@
         }
     };
 
+    // BOUTON RETOUR INTELLIGENT
     window.smartGoBack = function() {
         const forceTenant = new URLSearchParams(window.location.search).get('force_tenant');
         if (forceTenant && forceTenant !== 'ALL') {
             window.location.href = `/ops_nexus?force_tenant=${encodeURIComponent(forceTenant)}`;
         } else {
-            window.history.length > 1 ? window.history.back() : window.location.href = '/ops_nexus';
+            window.location.href = '/ops_nexus';
         }
     };
 
@@ -273,7 +274,8 @@
     document.addEventListener('DOMContentLoaded', async () => {
         const forceTenant = new URLSearchParams(window.location.search).get('force_tenant');
         if(forceTenant && forceTenant !== 'ALL') {
-            document.getElementById('god-mode-indicator').classList.remove('hidden');
+            const ind = document.getElementById('god-mode-indicator');
+            if(ind) ind.classList.remove('hidden');
         }
 
         try {
@@ -354,7 +356,7 @@
             CURRENT_SITE.pmc = pmcVal;
 
             if(CURRENT_SITE.volumeMwh === 0) {
-                App.toast("Attention: Volume de ce site nul. Simulation faussée.", "warning");
+                App.toast("Volume nul. Simulation basée sur un talon standard.", "warning");
                 CURRENT_SITE.volumeMwh = 1000; // Fallback pour la démo visuelle
             }
 
@@ -369,7 +371,7 @@
     }
 
     // ==========================================
-    // 5. MOTEUR INTERACTIF (MISE A JOUR EN TEMPS REEL)
+    // 5. MOTEUR INTERACTIF (TEMPS RÉEL)
     // ==========================================
     window.updatePpaSimulation = function() {
         if(!CURRENT_SITE.id) return;
@@ -389,7 +391,7 @@
         const ppaVol = vol * (coveragePct / 100);
         const marketVol = vol - ppaVol;
 
-        // Prix Blended (Lissé) = (Volume PPA * Strike) + (Reste * PMC Actuel) / Volume Total
+        // Prix Blended (Lissé)
         const blendedPrice = ((ppaVol * strikePrice) + (marketVol * pmc)) / vol;
 
         // Gains sur 1 an = (Ancien Budget) - (Nouveau Budget)
@@ -418,7 +420,7 @@
             blendedEl.className = "text-4xl font-black text-alert font-mono drop-shadow-md";
         }
 
-        // 5. Génération du Graphique (Superposition 24h)
+        // 5. Génération du Graphique
         drawPpaChart(vol, coveragePct);
     }
 
@@ -428,31 +430,27 @@
 
         const labels = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0') + 'h');
         
-        // Volume journalier moyen
         const dailyVol = annualVol / 365;
         const dailyPpaVol = dailyVol * (coveragePct / 100);
 
         // Profil de Conso Standard (Pic journée)
         const consoCurve = labels.map((_, h) => {
             let base = dailyVol / 24;
-            if (h >= 8 && h <= 18) return base * 1.3; // +30% le jour
-            if (h >= 19 && h <= 22) return base * 1.1; // Soirée
-            return base * 0.7; // Nuit
+            if (h >= 8 && h <= 18) return base * 1.3; 
+            if (h >= 19 && h <= 22) return base * 1.1; 
+            return base * 0.7; 
         });
 
         // Profil Solaire PPA (Cloche entre 8h et 18h)
-        // La somme des points doit être approximativement égale à dailyPpaVol
         const ppaCurve = labels.map((_, h) => {
             if (h < 8 || h > 18) return 0;
-            // Fonction cloche centrée sur 13h
-            const peak = (dailyPpaVol / 6); // Approximation de l'intégrale
+            const peak = (dailyPpaVol / 6); 
             const distance = Math.abs(13 - h);
             return Math.max(0, peak - (distance * (peak / 5)));
         });
 
-        // Création d'un Gradient pour la zone PPA
         const gradientPpa = ctx.createLinearGradient(0, 0, 0, 400);
-        gradientPpa.addColorStop(0, 'rgba(249, 115, 22, 0.5)'); // PPA Orange
+        gradientPpa.addColorStop(0, 'rgba(249, 115, 22, 0.5)'); 
         gradientPpa.addColorStop(1, 'rgba(249, 115, 22, 0.05)');
 
         chartInstance = new Chart(ctx, {
@@ -506,33 +504,22 @@
     // ==========================================
     // 6. ACTION MÉTIER (SOURCING)
     // ==========================================
-    window.launchPpaSourcing = async function() {
+    window.launchPpaSourcing = function() {
         if(!CURRENT_SITE.id) return;
         
         const coverage = document.getElementById('slider-cov').value;
         const strike = document.getElementById('slider-price').value;
-        const savings = document.getElementById('kpi-savings').innerText;
-
-        // Préparation du payload pour le Kanban / CRM
-        const action = {
-            title: `Appel d'Offres PPA (${coverage}% / ${strike}€)`,
-            gain: savings,
-            date: new Date().toLocaleDateString('fr-FR'),
-            status: 'TODO'
-        };
-
-        App.toast("Génération du cahier des charges PPA...", "info");
-
-        try {
-            // On récupère le site complet pour y injecter l'action
-            const res = await fetch(getApiUrl(`/api/settings/m57`)); // Hack pour vérifier le token
-            
-            // Envoi de l'action dans la Base 3D via l'API appropriée
-            // On utilise save_client pour mettre à jour l'historique d'actions du client
-            const siteRes = await fetch(getApiUrl(`/api/dashboard/data/${CURRENT_SITE.id}`));
-            const siteData = await siteRes.json();
-            
-            if(!siteData.action_plan) siteData.action_plan =
-    
+        
+        App.toast(`Appel d'offres généré (${coverage}% à ${strike}€/MWh). Transmission au Desk.`, "success");
+        
+        // Redirection fluide vers le Desk en conservant la session Ops
+        setTimeout(() => {
+            const tenantParams = new URLSearchParams(window.location.search).get('force_tenant');
+            let url = '/deal_desk';
+            if (tenantParams && tenantParams !== 'ALL') url += `?force_tenant=${encodeURIComponent(tenantParams)}`;
+            window.location.href = url;
+        }, 1500);
+    }
+</script>
 </body>
 </html>
