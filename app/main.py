@@ -126,6 +126,7 @@ crm_engine = load_module("cortex_crm", "crm_engine", MockCRM())
 academy_engine = load_module("cortex_academy", "academy_engine", MockAcademy())
 pricer_engine = load_module("cortex_pricer", "pricer_engine", MockPricer())
 pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
+ademe_engine = load_module("cortex_ademe", "ademe_engine", MockAdeme())
 
 app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.6-SECURE")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
