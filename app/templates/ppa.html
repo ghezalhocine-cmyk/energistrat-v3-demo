@@ -2,109 +2,537 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V3 | PPA Builder</title>
+    <title>ENERGISTRAT V12.8 | PPA Builder</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script>
-        tailwind.config = { theme: { extend: { colors: { abysse: '#001529', card: '#0F172A', ppa: '#F97316', success: '#10B981' }, fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] } } } }
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        abysse: '#001529', card: '#001D3D', cyan: '#00E5FF',   
+                        alert: '#EF4444', success: '#10B981', steam: '#94A3B8',  
+                        ppa: '#F97316', gold: '#F59E0B'
+                    },
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] }
+                }
+            }
+        }
     </script>
+    
     <style>
         body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
-        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 1.5rem; transition: all 0.3s ease; }
+        
+        /* BENTO DESIGN */
+        .bento-card { background: rgba(0, 29, 61, 0.75); backdrop-filter: blur(20px); border: 1px solid rgba(249, 115, 22, 0.2); border-radius: 2.5rem; transition: all 0.3s ease; }
+        .bento-card:hover { border-color: rgba(249, 115, 22, 0.5); transform: translateY(-2px); box-shadow: 0 10px 30px -10px rgba(249, 115, 22, 0.2); }
+        
+        /* MEGA SELECTOR (HEADER) */
+        select.mega-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23F97316%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat; background-position: right 1.5rem center; background-size: 1rem auto;
+            background-color: rgba(0, 29, 61, 0.8); border: 2px solid rgba(249, 115, 22, 0.5);
+            color: #F97316; border-radius: 2rem; cursor: pointer; text-align: center;
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.15); transition: all 0.3s ease;
+        }
+        select.mega-select:hover { border-color: #F97316; box-shadow: 0 0 30px rgba(249, 115, 22, 0.3); }
+        select.mega-select:focus { outline: none; }
+        select.mega-select option { background-color: #001529; color: white; padding: 15px; font-size: 1rem; }
+
+        /* SLIDERS PPA */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; height: 6px; border-radius: 3px; outline: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: #F97316; cursor: pointer; margin-top: -9px; box-shadow: 0 0 15px rgba(249, 115, 22, 0.6); border: 2px solid #001529; transition: transform 0.1s; }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(249, 115, 22, 0.3); border-radius: 3px; }
+        .glow-text { text-shadow: 0 0 15px rgba(249, 115, 22, 0.5); }
     </style>
 </head>
-<body class="flex h-screen w-screen text-sm">
+<body class="flex h-screen w-screen bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
 
-    <aside class="w-20 bg-sidebar border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50">
-        <button onclick="window.location.href='/ops_nexus'" class="w-12 h-12 rounded-xl bg-white/5 text-gray-400 hover:text-white flex items-center justify-center transition mb-8"><i class="fa-solid fa-arrow-left"></i></button>
-        <div class="w-12 h-12 rounded-xl bg-ppa/20 text-ppa flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(249,115,22,0.4)] mb-2"><i class="fa-solid fa-handshake-simple"></i></div>
-        <div class="text-[8px] font-bold text-ppa uppercase tracking-widest text-center">PPA<br>BUILDER</div>
+    <!-- SIDEBAR -->
+    <aside class="w-24 bg-abysse border-r border-ppa/20 flex flex-col items-center py-8 z-50 flex-shrink-0 shadow-[10px_0_30px_rgba(0,0,0,0.5)]">
+        
+        <!-- BOUTON RETOUR INTELLIGENT -->
+        <button onclick="window.smartGoBack()" class="w-12 h-12 rounded-[1rem] bg-card border border-white/10 text-gray-400 hover:text-white hover:border-white hover:bg-white/10 transition mb-10 flex items-center justify-center text-xl shadow-lg" title="Retour au Dashboard">
+            <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        
+        <!-- LOGO SATELLITE (PPA) -->
+        <div class="w-14 h-14 rounded-[1.2rem] bg-gradient-to-br from-ppa to-abysse border border-ppa/50 text-white flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(249,115,22,0.5)] relative overflow-hidden group">
+            <i class="fa-solid fa-handshake-simple group-hover:scale-110 transition duration-300"></i>
+            <div class="absolute inset-0 bg-ppa/20 animate-pulse"></div>
+        </div>
+        
     </aside>
 
-    <main class="flex-1 flex flex-col relative bg-abysse overflow-hidden">
-        <header class="h-20 border-b border-white/5 flex items-center px-8 bg-abysse/95 backdrop-blur z-20 justify-between">
-            <div>
-                <h2 class="text-2xl font-black text-white italic tracking-tight">CORTEX <span class="text-ppa">PPA</span></h2>
-                <p class="text-xs text-gray-400 font-mono mt-1">Corporate Power Purchase Agreement - Achat Direct EnR</p>
+    <!-- MAIN WRAPPER -->
+    <main class="flex-1 flex flex-col relative overflow-hidden">
+        
+        <!-- HEADER AVEC MEGA-SELECTEUR (GOD MODE) -->
+        <header class="h-24 border-b border-ppa/20 flex items-center justify-between px-10 bg-abysse/90 backdrop-blur z-40 flex-shrink-0 shadow-md">
+            <div class="flex-shrink-0 w-1/4">
+                <h2 class="text-2xl font-black text-white tracking-tight drop-shadow-lg flex items-center gap-3">
+                    <i class="fa-solid fa-satellite text-ppa glow-text"></i> PPA<span class="text-ppa">.BUILDER</span>
+                </h2>
+                <p class="text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-widest flex items-center gap-2">
+                    <span id="god-mode-indicator" class="hidden text-alert animate-pulse font-bold">● GOD MODE</span> 
+                    Contrat d'Achat Direct EnR
+                </p>
             </div>
-            <div class="bg-card border border-white/10 px-6 py-2 rounded-xl text-right">
-                <span class="text-[10px] text-gray-500 uppercase font-bold block">Couverture Verte</span>
-                <span class="text-xl font-bold text-success font-mono" id="val-couverture">-- %</span>
+            
+            <!-- MEGA SELECTOR FLOTTE -->
+            <div class="flex-1 flex justify-center">
+                <select id="site-selector" onchange="runPpaBuilder()" class="mega-select w-3/4 max-w-2xl px-8 py-3 text-lg font-black font-mono tracking-wide">
+                    <option value="">Chargement de la flotte (God Mode)...</option>
+                </select>
+            </div>
+
+            <div class="flex items-center justify-end w-1/4">
+                <div class="text-right">
+                    <div class="text-[10px] text-ppa uppercase font-bold tracking-widest mb-1">Horizon Couverture</div>
+                    <div class="text-2xl font-black text-white font-mono drop-shadow-[0_0_10px_rgba(249,115,22,0.3)]">10 ANS</div>
+                </div>
             </div>
         </header>
 
-        <div class="p-8 overflow-y-auto h-full pb-20">
-            <div class="grid grid-cols-12 gap-6 h-full">
+        <div class="flex-1 overflow-y-auto p-8 pb-10">
+            
+            <!-- BLANK STATE INITIAL -->
+            <div id="blank-state" class="h-full flex flex-col items-center justify-center text-gray-600 border-2 border-dashed border-ppa/20 rounded-[3rem] bg-card/30">
+                <i class="fa-solid fa-solar-panel text-6xl mb-6 text-ppa/40"></i>
+                <p class="text-xl font-bold font-mono text-white">Sélectionnez un Actif Énergétique</p>
+                <p class="text-sm mt-2">CORTEX simulera l'impact d'un Corporate PPA sur votre budget à long terme.</p>
+            </div>
+
+            <!-- DASHBOARD ACTIF -->
+            <div id="ppa-dashboard" class="hidden space-y-6 max-w-[1600px] mx-auto">
                 
-                <div class="col-span-8 flex flex-col gap-6">
-                    <div class="bento-card p-6 h-[450px] flex flex-col border-t-4 border-ppa">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-sm font-bold text-white uppercase tracking-wider">Superposition : Conso Globale vs Parc Solaire/Éolien</h3>
+                <!-- 4 RADARS (BENTO) -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 shrink-0">
+                    <!-- 1. VOLUME GLOBAL -->
+                    <div class="bento-card p-6 border-t-4 border-cyan relative overflow-hidden">
+                        <div class="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">Volume Actuel</div>
+                        <div class="flex items-end gap-2 mb-1">
+                            <div class="text-3xl font-black text-white font-mono" id="kpi-vol">--</div>
+                            <div class="text-sm font-bold text-gray-500 mb-1">MWh</div>
                         </div>
-                        <div class="flex-1 relative w-full"><canvas id="ppaChart"></canvas></div>
+                        <div class="text-[9px] text-cyan font-bold uppercase tracking-widest bg-cyan/10 inline-block px-2 py-1 rounded border border-cyan/20">Base 3D CORTEX</div>
+                    </div>
+                    <!-- 2. PRIX MARCHÉ (PMC) -->
+                    <div class="bento-card p-6 border-t-4 border-alert relative overflow-hidden">
+                        <div class="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">Prix Moyen Actuel (PMC)</div>
+                        <div class="flex items-end gap-2 mb-1">
+                            <div class="text-3xl font-black text-alert font-mono" id="kpi-pmc">--</div>
+                            <div class="text-sm font-bold text-gray-500 mb-1">€/MWh</div>
+                        </div>
+                        <div class="text-[9px] text-alert font-bold uppercase tracking-widest bg-alert/10 inline-block px-2 py-1 rounded border border-alert/20">Exposé à la volatilité</div>
+                    </div>
+                    <!-- 3. PRIX MOYEN LISSÉ (APRÈS PPA) -->
+                    <div class="bento-card p-6 border-t-4 border-success relative overflow-hidden group shadow-[0_0_20px_rgba(16,185,129,0.15)] bg-gradient-to-br from-card to-success/10">
+                        <div class="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">Nouveau Prix Lissé (Blended)</div>
+                        <div class="flex items-end gap-2 mb-1">
+                            <div class="text-4xl font-black text-success font-mono drop-shadow-md" id="kpi-blended">--</div>
+                            <div class="text-sm font-bold text-success mb-2">€/MWh</div>
+                        </div>
+                        <div class="text-[9px] text-success font-bold uppercase tracking-widest bg-success/10 inline-block px-2 py-1 rounded border border-success/30">PPA + Complément Marché</div>
+                    </div>
+                    <!-- 4. GAIN POTENTIEL (10 ANS) -->
+                    <div class="bento-card p-6 bg-gradient-to-br from-card to-ppa/20 border-t-4 border-ppa relative flex flex-col justify-center items-center text-center shadow-[0_0_30px_rgba(249,115,22,0.15)]">
+                        <div class="text-[10px] font-bold text-ppa uppercase tracking-widest mb-1">Économie Sécurisée (10 Ans)</div>
+                        <div class="text-3xl font-black text-white font-mono drop-shadow-md my-2" id="kpi-savings">-- €</div>
+                        <div class="text-[9px] font-bold text-gray-400 uppercase tracking-widest bg-abysse/50 px-2 py-1 rounded-lg border border-white/10 mt-1">Cash Flow Libéré</div>
                     </div>
                 </div>
 
-                <div class="col-span-4 flex flex-col gap-6">
-                    <div class="bento-card p-8 bg-gradient-to-b from-card to-ppa/10 border border-ppa/30 flex-1 flex flex-col justify-between">
-                        <div>
-                            <h3 class="text-xl font-black text-white mb-4">Analyse de Couverture PPA</h3>
-                            <p class="text-sm text-gray-300 leading-relaxed mb-6">
-                                En achetant directement la production d'une ferme solaire locale sur 10 ans à prix fixe, vous vous protégez de la volatilité du marché.
-                            </p>
-                            <div class="bg-abysse/50 p-4 rounded-xl border border-white/10 space-y-4">
-                                <div class="flex justify-between text-xs"><span class="text-gray-400">Prix PPA Négocié</span><span class="font-mono text-success font-bold">55 €/MWh</span></div>
-                                <div class="flex justify-between text-xs"><span class="text-gray-400">Prix Marché (Reste)</span><span class="font-mono text-alert font-bold">90 €/MWh</span></div>
-                                <div class="flex justify-between text-sm border-t border-white/10 pt-3"><span class="text-gray-200 font-bold">Prix Moyen Lissé</span><span class="font-mono text-ppa font-black">69 €/MWh</span></div>
+                <!-- ZONE DU BUILDER (GRAPHIQUE + SLIDERS) -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- LEFT: CHART -->
+                    <div class="lg:col-span-2 bento-card p-8 relative border border-ppa/30 shadow-[0_20px_50px_rgba(0,0,0,0.4)] flex flex-col min-h-[450px]">
+                        <div class="flex justify-between items-start mb-6 border-b border-white/10 pb-4 shrink-0">
+                            <div>
+                                <h3 class="text-lg font-bold text-white uppercase tracking-widest flex items-center gap-3">
+                                    <i class="fa-solid fa-layer-group text-ppa text-2xl"></i> Modélisation du Profil de Couverture (24h)
+                                </h3>
+                                <p class="text-xs text-gray-400 mt-1 font-mono">Superposition : Consommation Globale vs Production du Parc (Solaire Standard).</p>
+                            </div>
+                            <div class="flex gap-4 text-[10px] uppercase tracking-widest font-bold bg-abysse p-3 rounded-2xl border border-white/10 shadow-inner">
+                                <span class="text-cyan flex items-center gap-2"><div class="w-3 h-1 bg-cyan border-dashed border-t rounded"></div> Conso Client</span>
+                                <span class="text-ppa flex items-center gap-2"><div class="w-3 h-3 bg-ppa/30 border border-ppa rounded-sm"></div> Injection PPA</span>
                             </div>
                         </div>
-                        <button onclick="alert('Demande de sourcing PPA envoyée aux producteurs locaux.')" class="w-full bg-ppa text-abysse font-black py-4 rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.4)] hover:bg-white transition mt-6">
-                            SOURCER UN PRODUCTEUR
+                        <div class="flex-1 w-full relative">
+                            <canvas id="ppaChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT: CONTROL DESK -->
+                    <div class="bento-card p-8 bg-gradient-to-b from-card to-abysse border-l-4 border-ppa flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-xl font-black text-white uppercase tracking-widest flex items-center gap-3 mb-6"><i class="fa-solid fa-sliders text-ppa"></i> Paramétrage PPA</h3>
+                            
+                            <!-- SLIDER 1 : COUVERTURE -->
+                            <div class="mb-8 bg-black/40 p-5 rounded-2xl border border-white/5">
+                                <div class="flex justify-between items-center mb-4">
+                                    <label class="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Taux de Couverture</label>
+                                    <span class="text-xl font-black text-ppa font-mono bg-ppa/10 px-3 py-1 rounded-lg border border-ppa/30"><span id="val-slider-cov">30</span> %</span>
+                                </div>
+                                <input type="range" id="slider-cov" min="10" max="80" step="5" value="30" oninput="updatePpaSimulation()">
+                                <div class="flex justify-between text-[9px] text-gray-500 font-mono mt-3 px-1 font-bold"><span>10% (Test)</span><span>80% (Max Légal)</span></div>
+                            </div>
+
+                            <!-- SLIDER 2 : STRIKE PRICE -->
+                            <div class="mb-8 bg-black/40 p-5 rounded-2xl border border-white/5">
+                                <div class="flex justify-between items-center mb-4">
+                                    <label class="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Prix Strike Négocié</label>
+                                    <span class="text-xl font-black text-white font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/10"><span id="val-slider-price">65</span> €/MWh</span>
+                                </div>
+                                <input type="range" id="slider-price" min="45" max="110" step="1" value="65" oninput="updatePpaSimulation()">
+                                <div class="flex justify-between text-[9px] text-gray-500 font-mono mt-3 px-1 font-bold"><span>45 € (Opti)</span><span>110 € (Haut)</span></div>
+                            </div>
+                        </div>
+
+                        <button onclick="launchPpaSourcing()" class="w-full bg-ppa/10 border border-ppa/40 text-ppa hover:bg-ppa hover:text-abysse py-4 rounded-xl font-black text-xs uppercase tracking-widest transition shadow-[0_0_20px_rgba(249,115,22,0.2)] flex items-center justify-center gap-3">
+                            <i class="fa-solid fa-file-signature text-lg"></i> Lancer l'Appel d'Offres PPA
                         </button>
                     </div>
+
                 </div>
+
             </div>
         </div>
     </main>
 
-    <script>
-        let chartInstance = null;
+    <!-- TOAST ENGINE -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none w-11/12 md:w-auto max-w-md"></div>
 
-        async function initPPA() {
-            try {
-                const res = await fetch('/api/dashboard/fleet');
-                const data = await res.json();
-                let totalVol = 0;
-                if(data.fleet) data.fleet.forEach(s => { if(s.energy === 'elec') totalVol += s.volume; });
-                
-                if(totalVol === 0) totalVol = 15000; // Fallback Demo
+<script>
+    // ==========================================
+    // 1. MOTEUR UTILITAIRE & GOD MODE
+    // ==========================================
+    function getApiUrl(basePath) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceTenant = urlParams.get('force_tenant');
+        if (!forceTenant) return basePath;
+        return basePath + (basePath.includes('?') ? '&' : '?') + 'force_tenant=' + encodeURIComponent(forceTenant);
+    }
 
-                document.getElementById('val-couverture').innerText = "40 %";
-                
-                const ctx = document.getElementById('ppaChart').getContext('2d');
-                const labels = Array.from({length: 24}, (_, i) => i + 'h');
-                
-                const consoCurve = labels.map(h => (totalVol/365/24) * (parseInt(h)>7 && parseInt(h)<19 ? 1.2 : 0.8));
-                const ppaCurve = labels.map(h => { let hour = parseInt(h); return (hour > 9 && hour < 17) ? (totalVol/365/24)*1.5 : 0; });
-
-                chartInstance = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets:[
-                            { label: 'Production Ferme PPA', data: ppaCurve, backgroundColor: 'rgba(249, 115, 22, 0.4)', borderColor: '#F97316', fill: true, tension: 0.4 },
-                            { label: 'Consommation Réelle', data: consoCurve, borderColor: '#00E5FF', borderWidth: 2, borderDash: [5,5], pointRadius: 0 }
-                        ]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid:{display:false} }, y: { grid:{color:'rgba(255,255,255,0.05)'} } } }
-                });
-            } catch(e) {}
+    const App = {
+        toast: function(msg, type='info') {
+            const container = document.getElementById('toast-container');
+            if(!container) return;
+            const colors = { 
+                success: 'bg-success border-success/50 text-abysse', 
+                error: 'bg-alert border-alert/50 text-white', 
+                warning: 'bg-gold border-gold/50 text-abysse',
+                info: 'bg-ppa border-ppa/50 text-abysse' 
+            };
+            const icons = { success: 'fa-check', error: 'fa-triangle-exclamation', warning: 'fa-bolt', info: 'fa-info' };
+            
+            const el = document.createElement('div');
+            el.className = `${colors[type] || colors.info} px-6 py-4 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-xs font-black tracking-wide border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto backdrop-blur-md`;
+            el.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} text-lg"></i> <span>${msg}</span>`;
+            container.appendChild(el);
+            
+            requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
+            setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
         }
-        document.addEventListener('DOMContentLoaded', initPPA);
-    </script>
+    };
+
+    window.smartGoBack = function() {
+        const forceTenant = new URLSearchParams(window.location.search).get('force_tenant');
+        if (forceTenant && forceTenant !== 'ALL') {
+            window.location.href = `/ops_nexus?force_tenant=${encodeURIComponent(forceTenant)}`;
+        } else {
+            window.history.length > 1 ? window.history.back() : window.location.href = '/ops_nexus';
+        }
+    };
+
+    // ==========================================
+    // 2. ÉTAT GLOBAL & VARIABLES
+    // ==========================================
+    let chartInstance = null;
+    let FLEET_DATA =[];
+    let CURRENT_SITE = {
+        id: null,
+        volumeMwh: 0,
+        pmc: 0,
+        name: ""
+    };
+
+    // ==========================================
+    // 3. INGESTION DE LA FLOTTE (GOD MODE)
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', async () => {
+        const forceTenant = new URLSearchParams(window.location.search).get('force_tenant');
+        if(forceTenant && forceTenant !== 'ALL') {
+            document.getElementById('god-mode-indicator').classList.remove('hidden');
+        }
+
+        try {
+            const res = await fetch(getApiUrl('/api/dashboard/fleet'));
+            const data = await res.json();
+            
+            if (data?.fleet && data.fleet.length > 0) {
+                // Application du God Mode
+                FLEET_DATA = (forceTenant && forceTenant !== 'ALL') ? data.fleet.filter(s => s.tenant_id === forceTenant) : data.fleet;
+                
+                const sel = document.getElementById('site-selector');
+                sel.innerHTML = '<option value="">-- Sélectionnez un Point de Livraison (ELEC) --</option>';
+                
+                // Ne garder que l'électricité pour le PPA
+                const elecSites = FLEET_DATA.filter(s => s.energy === 'elec' || !s.energy);
+                
+                elecSites.sort((a,b) => (b.volume || 0) - (a.volume || 0)).forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.innerText = `${s.name || s.id} - ${Math.round(s.volume || 0)} MWh`;
+                    sel.appendChild(opt);
+                });
+
+                if(elecSites.length === 0) {
+                    sel.innerHTML = '<option value="">Aucun compteur électrique trouvé.</option>';
+                    return;
+                }
+
+                const urlSite = new URLSearchParams(window.location.search).get('cluster');
+                if (urlSite) {
+                    sel.value = urlSite;
+                    if(sel.value) runPpaBuilder();
+                } else if(elecSites.length === 1) {
+                    sel.value = elecSites[0].id;
+                    runPpaBuilder();
+                }
+            } else {
+                document.getElementById('site-selector').innerHTML = '<option value="">Aucun site trouvé.</option>';
+            }
+        } catch(e) {
+            App.toast("Erreur de connexion CORTEX", "error");
+        }
+    });
+
+    // ==========================================
+    // 4. RÉCUPÉRATION DU CONTEXTE CLIENT (NULL-SAFE)
+    // ==========================================
+    window.runPpaBuilder = async function() {
+        const id = document.getElementById('site-selector').value;
+        if(!id) return;
+
+        // Transition UI
+        document.getElementById('blank-state').style.display = 'none';
+        const dashboard = document.getElementById('ppa-dashboard');
+        dashboard.classList.remove('hidden');
+        dashboard.classList.add('animate-[slideUp_0.4s_ease-out]');
+
+        App.toast("Extraction des données tarifaires...", "info");
+
+        try {
+            const res = await fetch(getApiUrl(`/api/dashboard/data/${id}`));
+            const data = await res.json();
+
+            if(data?.error) return App.toast(data.error, "error");
+
+            // Extraction robuste : Volume et Prix Moyen (PMC)
+            CURRENT_SITE.id = id;
+            CURRENT_SITE.name = data?.identity?.site_name || "Actif Inconnu";
+            CURRENT_SITE.volumeMwh = parseFloat(data?.kpis?.volume_mwh) || parseFloat(data?.volume_mwh) || 0;
+            
+            // Le PMC est sanctuarisé dans kpis.pmc
+            let pmcVal = parseFloat(data?.kpis?.pmc);
+            if(isNaN(pmcVal) || pmcVal === 0) {
+                // Fallback si PMC introuvable : on prend le prix unitaire + taxes
+                const px = parseFloat(data?.pricing?.price_kwh) || parseFloat(data?.pricing?.hph) || 0.15;
+                pmcVal = (px > 2 ? px / 1000 : px) * 1000; // Conversion en €/MWh
+            }
+            CURRENT_SITE.pmc = pmcVal;
+
+            if(CURRENT_SITE.volumeMwh === 0) {
+                App.toast("Attention: Volume de ce site nul. Simulation faussée.", "warning");
+                CURRENT_SITE.volumeMwh = 1000; // Fallback pour la démo visuelle
+            }
+
+            // Mise à jour initiale des sliders et des KPIs
+            updatePpaSimulation();
+            App.toast("Simulation PPA prête.", "success");
+
+        } catch(e) {
+            console.error(e);
+            App.toast("Échec de chargement des données CORTEX.", "error");
+        }
+    }
+
+    // ==========================================
+    // 5. MOTEUR INTERACTIF (MISE A JOUR EN TEMPS REEL)
+    // ==========================================
+    window.updatePpaSimulation = function() {
+        if(!CURRENT_SITE.id) return;
+
+        // 1. Lecture des curseurs
+        const coveragePct = parseFloat(document.getElementById('slider-cov').value) || 30;
+        const strikePrice = parseFloat(document.getElementById('slider-price').value) || 65;
+
+        // 2. Mise à jour de l'UI des curseurs
+        document.getElementById('val-slider-cov').innerText = coveragePct;
+        document.getElementById('val-slider-price').innerText = strikePrice;
+
+        // 3. Calculs Financiers PPA
+        const vol = CURRENT_SITE.volumeMwh;
+        const pmc = CURRENT_SITE.pmc;
+        
+        const ppaVol = vol * (coveragePct / 100);
+        const marketVol = vol - ppaVol;
+
+        // Prix Blended (Lissé) = (Volume PPA * Strike) + (Reste * PMC Actuel) / Volume Total
+        const blendedPrice = ((ppaVol * strikePrice) + (marketVol * pmc)) / vol;
+
+        // Gains sur 1 an = (Ancien Budget) - (Nouveau Budget)
+        const oldBudget = vol * pmc;
+        const newBudget = vol * blendedPrice;
+        const annualSavings = oldBudget - newBudget;
+        
+        // Gains sur 10 ans (Horizon PPA classique)
+        const tenYearSavings = annualSavings * 10;
+
+        // 4. Injection dans les KPIs
+        document.getElementById('kpi-vol').innerText = Math.round(vol).toLocaleString('fr-FR');
+        document.getElementById('kpi-pmc').innerText = Math.round(pmc).toLocaleString('fr-FR');
+        
+        const blendedEl = document.getElementById('kpi-blended');
+        blendedEl.innerText = Math.round(blendedPrice).toLocaleString('fr-FR');
+        
+        const savingsEl = document.getElementById('kpi-savings');
+        if (tenYearSavings > 0) {
+            savingsEl.innerText = "+ " + Math.round(tenYearSavings).toLocaleString('fr-FR') + " €";
+            savingsEl.className = "text-3xl font-black text-white font-mono drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] my-2";
+            blendedEl.className = "text-4xl font-black text-success font-mono drop-shadow-md";
+        } else {
+            savingsEl.innerText = Math.round(tenYearSavings).toLocaleString('fr-FR') + " €";
+            savingsEl.className = "text-3xl font-black text-alert font-mono drop-shadow-[0_0_15px_rgba(239,68,68,0.8)] my-2";
+            blendedEl.className = "text-4xl font-black text-alert font-mono drop-shadow-md";
+        }
+
+        // 5. Génération du Graphique (Superposition 24h)
+        drawPpaChart(vol, coveragePct);
+    }
+
+    function drawPpaChart(annualVol, coveragePct) {
+        const ctx = document.getElementById('ppaChart').getContext('2d');
+        if(chartInstance) chartInstance.destroy();
+
+        const labels = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0') + 'h');
+        
+        // Volume journalier moyen
+        const dailyVol = annualVol / 365;
+        const dailyPpaVol = dailyVol * (coveragePct / 100);
+
+        // Profil de Conso Standard (Pic journée)
+        const consoCurve = labels.map((_, h) => {
+            let base = dailyVol / 24;
+            if (h >= 8 && h <= 18) return base * 1.3; // +30% le jour
+            if (h >= 19 && h <= 22) return base * 1.1; // Soirée
+            return base * 0.7; // Nuit
+        });
+
+        // Profil Solaire PPA (Cloche entre 8h et 18h)
+        // La somme des points doit être approximativement égale à dailyPpaVol
+        const ppaCurve = labels.map((_, h) => {
+            if (h < 8 || h > 18) return 0;
+            // Fonction cloche centrée sur 13h
+            const peak = (dailyPpaVol / 6); // Approximation de l'intégrale
+            const distance = Math.abs(13 - h);
+            return Math.max(0, peak - (distance * (peak / 5)));
+        });
+
+        // Création d'un Gradient pour la zone PPA
+        const gradientPpa = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientPpa.addColorStop(0, 'rgba(249, 115, 22, 0.5)'); // PPA Orange
+        gradientPpa.addColorStop(1, 'rgba(249, 115, 22, 0.05)');
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets:[
+                    { 
+                        label: 'Injection Parc Solaire (PPA)', 
+                        data: ppaCurve, 
+                        backgroundColor: gradientPpa, 
+                        borderColor: '#F97316', 
+                        fill: true, 
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 3
+                    },
+                    { 
+                        label: 'Consommation Client', 
+                        data: consoCurve, 
+                        borderColor: '#00E5FF', 
+                        borderWidth: 2, 
+                        borderDash: [5,5], 
+                        pointRadius: 0,
+                        fill: false,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0,29,61,0.9)',
+                        titleColor: '#F97316',
+                        bodyFont: { family: 'JetBrains Mono' },
+                        callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw.toFixed(2)} MWh` }
+                    }
+                },
+                scales: { 
+                    x: { grid: { display: false }, ticks: { color: '#94A3B8', font: { family: 'JetBrains Mono' } } }, 
+                    y: { grid: { color: 'rgba(249,115,22,0.1)', drawBorder: false }, ticks: { color: '#94A3B8', font: { family: 'JetBrains Mono' } } } 
+                } 
+            }
+        });
+    }
+
+    // ==========================================
+    // 6. ACTION MÉTIER (SOURCING)
+    // ==========================================
+    window.launchPpaSourcing = async function() {
+        if(!CURRENT_SITE.id) return;
+        
+        const coverage = document.getElementById('slider-cov').value;
+        const strike = document.getElementById('slider-price').value;
+        const savings = document.getElementById('kpi-savings').innerText;
+
+        // Préparation du payload pour le Kanban / CRM
+        const action = {
+            title: `Appel d'Offres PPA (${coverage}% / ${strike}€)`,
+            gain: savings,
+            date: new Date().toLocaleDateString('fr-FR'),
+            status: 'TODO'
+        };
+
+        App.toast("Génération du cahier des charges PPA...", "info");
+
+        try {
+            // On récupère le site complet pour y injecter l'action
+            const res = await fetch(getApiUrl(`/api/settings/m57`)); // Hack pour vérifier le token
+            
+            // Envoi de l'action dans la Base 3D via l'API appropriée
+            // On utilise save_client pour mettre à jour l'historique d'actions du client
+            const siteRes = await fetch(getApiUrl(`/api/dashboard/data/${CURRENT_SITE.id}`));
+            const siteData = await siteRes.json();
+            
+            if(!siteData.action_plan) siteData.action_plan =
+    
 </body>
 </html>
