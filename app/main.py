@@ -822,6 +822,32 @@ async def api_physics_solar(payload: SolarRequest, user = Depends(get_current_us
         return JSONResponse(result)
     except Exception as e: return JSONResponse({"success": False, "error": str(e)})
 
+@app.get("/api/tools/immo/{client_id}")
+async def api_immo_analyze(client_id: str, user = Depends(get_current_user)):
+    """Aiguilleur CORTEX IMMO (Délègue à cortex_ademe.py)"""
+    if not user: 
+        return JSONResponse({"error": "Non autorisé"}, status_code=401)
+    
+    site_data = db.get_site(client_id)
+    if not site_data: 
+        return JSONResponse({"error": "Actif foncier introuvable dans la Base 3D."}, status_code=404)
+    
+    # Sécurité Multi-Tenant (God Mode)
+    profile = db.get_user_profile(user.get("uid"))
+    if user.get("role") != "ADMIN" and site_data.get("identity", {}).get("tenant_id") != profile.get("tenant_id"):
+        return JSONResponse({"error": "Accès refusé. Propriété d'un autre tenant."}, status_code=403)
+
+    # Le routeur délègue TOUT le calcul au moteur ADEME
+    result = ademe_engine.analyze_immo(site_data)
+
+    # Si l'ADEME a trouvé une surface manquante, on met à jour la BDD silencieusement
+    if result.get("success") and result.get("surface_updated"):
+        if 'location' not in site_data: site_data['location'] = {}
+        site_data['location']['surface'] = result.get("new_surface")
+        db.save_site(client_id, site_data)
+
+    return JSONResponse(result)
+
 @app.get("/api/tools/subventions")
 async def api_subventions_analyze(user = Depends(get_current_user)):
     profile = db.get_user_profile(user.get("uid")) if user else {}
