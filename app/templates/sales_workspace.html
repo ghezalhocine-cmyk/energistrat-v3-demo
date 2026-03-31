@@ -520,8 +520,396 @@
     <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
+      <!-- ============================================================================== -->
+    <!-- LOGIQUE JAVASCRIPT (CORTEX SALES V12.8 - LE VRAI MOTEUR 100% COMPLET)          -->
+    <!-- ============================================================================== -->
     <script>
-        // Le Moteur JS se trouve dans le Bloc 2
+        // --- 1. UTILITAIRES & GOD MODE ---
+        const App = {
+            toast: function(msg, type='info') {
+                const container = document.getElementById('toast-container');
+                if(!container) return;
+                const colors = { success: 'bg-success border-success/50 text-abysse', error: 'bg-alert border-alert/50 text-white', info: 'bg-cyan border-cyan/50 text-abysse' };
+                const icon = type === 'success' ? 'ph-check-circle' : (type === 'error' ? 'ph-warning' : 'ph-info');
+                const el = document.createElement('div');
+                el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto z-[9999]`;
+                el.innerHTML = `<i class="${icon} text-xl"></i> <span>${msg}</span>`;
+                container.appendChild(el);
+                requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
+                setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
+            }
+        };
+
+        function getApiUrl(basePath) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const forceTenant = urlParams.get('force_tenant');
+            if (!forceTenant) return basePath;
+            return basePath + (basePath.includes('?') ? '&' : '?') + 'force_tenant=' + encodeURIComponent(forceTenant);
+        }
+
+        // VARIABLES GLOBALES
+        let currentPipeline = 'saas';
+        let currentView = 'kanban'; 
+        let dealsData = {};
+        let currentDealId = null;
+        let mapInstance = null;
+        let mapMarkers =[];
+
+        const STAGES = {'LEAD': 'Nouveau Lead', 'AUDIT': 'Audit / Pricing', 'PROPOSAL': 'Devis Envoyé', 'NEGOTIATION': 'Négociation', 'WON': 'Gagné (SASP)', 'LOST': 'Perdu'};
+
+        document.addEventListener('DOMContentLoaded', () => { 
+            switchPipeline('saas'); 
+        });
+
+        // --- 2. PIPELINE & KANBAN (AVEC DRAG & DROP FONCTIONNEL) ---
+        async function switchPipeline(type) {
+            currentPipeline = type;
+            document.querySelectorAll('.pipe-tab').forEach(t => { 
+                t.classList.remove('bg-cyan', 'text-abysse', 'bg-success', 'text-white', 'shadow-[0_0_15px_rgba(0,229,255,0.4)]', 'shadow-[0_0_15px_rgba(0,255,102,0.4)]'); 
+                t.classList.add('text-gray-400'); 
+            });
+            const activeTab = document.getElementById(`tab-${type}`);
+            if (type === 'fourniture') activeTab.classList.add('bg-success', 'text-abysse', 'shadow-[0_0_15px_rgba(0,255,102,0.4)]', 'text-white');
+            else activeTab.classList.add('bg-cyan', 'text-abysse', 'shadow-[0_0_15px_rgba(0,229,255,0.4)]', 'text-white');
+            fetchDeals(type);
+        }
+
+        function switchView(view) {
+            currentView = view;
+            const btnK = document.getElementById('view-kanban'); const btnL = document.getElementById('view-list');
+            const contK = document.getElementById('kanban-container'); const contL = document.getElementById('list-container');
+
+            if (view === 'kanban') {
+                btnK.className = "px-4 py-2 text-[10px] font-black rounded-lg bg-cyan/20 text-cyan uppercase tracking-widest transition";
+                btnL.className = "px-4 py-2 text-[10px] font-black rounded-lg text-gray-400 hover:text-white uppercase tracking-widest transition";
+                contL.classList.add('hidden'); contL.classList.remove('flex'); contK.classList.remove('hidden'); contK.classList.add('flex');
+            } else {
+                btnL.className = "px-4 py-2 text-[10px] font-black rounded-lg bg-cyan/20 text-cyan uppercase tracking-widest transition";
+                btnK.className = "px-4 py-2 text-[10px] font-black rounded-lg text-gray-400 hover:text-white uppercase tracking-widest transition";
+                contK.classList.add('hidden'); contK.classList.remove('flex'); contL.classList.remove('hidden'); contL.classList.add('flex');
+            }
+        }
+
+        async function fetchDeals(type) {
+            try {
+                const res = await fetch(getApiUrl(`/api/crm/pipeline/${type}`));
+                const data = await res.json();
+                if (data.success) {
+                    dealsData = {}; let totalValue = 0;
+                    const columns = { LEAD:[], AUDIT:[], PROPOSAL:[], NEGOTIATION:[], WON:[], LOST:[] };
+                    data.pipeline.forEach(deal => {
+                        dealsData[deal.id] = deal;
+                        if (columns[deal.stage]) { columns[deal.stage].push(deal); if (deal.stage !== 'LOST') totalValue += parseFloat(deal.commission_est || 0); }
+                    });
+                    document.getElementById('pipe-total-value').innerText = new Intl.NumberFormat('fr-FR').format(Math.round(totalValue)) + ' €';
+                    renderKanban(columns); renderList();
+                    if(!document.getElementById('map-container').classList.contains('hidden')) plotWarRoomMap();
+                }
+            } catch (err) { App.toast("Erreur de chargement du pipeline", "error"); }
+        }
+
+        function renderKanban(columns) {
+            const board = document.getElementById('kanban-container');
+            board.innerHTML = '';
+            for (const [stageKey, stageName] of Object.entries(STAGES)) {
+                const deals = columns[stageKey] ||[];
+                let colorClass = stageKey === 'WON' ? 'text-success border-success/30' : (stageKey === 'LOST' ? 'text-alert border-alert/30' : 'text-cyan border-cyan/30');
+                
+                let cardsHtml = deals.map(d => {
+                    let bColor = d.solvency_score === 'VERT' ? 'bg-success shadow-[0_0_5px_#00FF66]' : (d.solvency_score === 'ORANGE' ? 'bg-warning shadow-[0_0_8px_#FFB800]' : (d.solvency_score === 'ROUGE' ? 'bg-alert animate-pulse shadow-[0_0_10px_#FF0055]' : 'bg-gray-500'));
+                    let alertHtml = d.saas_alerts?.length > 0 ? `<div class="mt-4 text-[9px] text-alert bg-alert/10 px-2 py-1.5 rounded-lg border border-alert/20 flex items-center gap-2 font-bold uppercase tracking-widest"><i class="ph ph-warning-circle text-lg"></i> Alerte Base 3D</div>` : '';
+                    return `
+                        <div class="deal-card group" draggable="true" ondragstart="dragStart(event, '${d.id}')" onclick="openDeal('${d.id}')">
+                            <div class="flex justify-between items-start mb-3"><h4 class="font-black text-white text-base leading-tight group-hover:text-cyan transition-colors truncate max-w-[85%]">${d.holding_name || d.name || "Client"}</h4><div class="w-3 h-3 rounded-full ${bColor} flex-shrink-0 mt-1"></div></div>
+                            <p class="text-[10px] text-gray-400 font-mono mb-4 truncate bg-black/40 px-2 py-1 rounded border border-white/5 inline-block">${d.naf || "NAF inconnu"}</p>
+                            <div class="flex justify-between items-end border-t border-white/10 pt-3">
+                                <span class="text-xs text-gray-400 font-bold flex items-center gap-1"><i class="ph ph-buildings"></i> ${d.sites_count || 0}</span>
+                                <span class="text-sm font-black text-cyan drop-shadow-md">${new Intl.NumberFormat('fr-FR').format(Math.round(d.commission_est || 0))} €</span>
+                            </div>${alertHtml}
+                        </div>`;
+                }).join('');
+
+                board.insertAdjacentHTML('beforeend', `
+                    <div class="kanban-col bento-card bg-panel/40 border border-white/5 shadow-lg">
+                        <div class="p-4 border-b border-white/5 flex justify-between items-center mb-4 bg-card/50 rounded-t-[1.5rem]">
+                            <h3 class="text-[10px] font-black uppercase tracking-widest ${colorClass} border-b-2 pb-1">${stageName}</h3>
+                            <span class="text-xs font-mono text-white bg-abysse px-3 py-1 rounded-full border border-white/10 shadow-inner">${deals.length}</span>
+                        </div>
+                        <div class="kanban-cards" id="col-${stageKey}" ondrop="drop(event, '${stageKey}')" ondragover="allowDrop(event)" ondragenter="dragEnter(event, this)" ondragleave="dragLeave(event, this)">
+                            ${cardsHtml}
+                        </div>
+                    </div>`);
+            }
+        }
+
+        function renderList() {
+            const tbody = document.getElementById('list-tbody');
+            tbody.innerHTML = '';
+            Object.values(dealsData).forEach(d => {
+                let bColor = d.solvency_score === 'VERT' ? 'bg-success shadow-[0_0_5px_#00FF66]' : (d.solvency_score === 'ORANGE' ? 'bg-warning shadow-[0_0_5px_#FFB800]' : (d.solvency_score === 'ROUGE' ? 'bg-alert' : 'bg-gray-500'));
+                tbody.insertAdjacentHTML('beforeend', `
+                    <tr class="grid-row border-b border-white/5 transition-colors cursor-pointer hover:bg-white/5" onclick="openDeal('${d.id}')">
+                        <td class="p-5"><p class="font-black text-white text-base">${d.holding_name || d.name || "Client"}</p><p class="text-[10px] text-gray-500 font-mono mt-1">${d.name || ""}</p></td>
+                        <td class="p-5"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full ${bColor}"></div><span class="text-xs text-gray-300 font-mono font-bold">${d.company_id ? d.company_id.replace("COMP_", "") : "---"}</span></div></td>
+                        <td class="p-5"><span class="bg-abysse border border-cyan/30 text-cyan text-xs font-bold rounded-xl px-4 py-2 uppercase tracking-widest shadow-inner">${STAGES[d.stage]}</span></td>
+                        <td class="p-5 text-sm font-bold text-gray-300 flex items-center gap-2"><i class="ph ph-buildings text-lg text-gray-500"></i> ${d.sites_count || 0} sites</td>
+                        <td class="p-5 text-right text-lg font-black text-cyan drop-shadow-md">${new Intl.NumberFormat('fr-FR').format(Math.round(d.commission_est || 0))} €</td>
+                    </tr>`);
+            });
+        }
+
+        function filterList() {
+            const query = document.getElementById('search-list').value.toLowerCase();
+            const rows = document.getElementById('list-tbody').getElementsByTagName('tr');
+            for (let row of rows) row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+        }
+
+        // --- 3. DRAG & DROP KANBAN ---
+        function dragStart(event, dealId) { event.dataTransfer.setData("deal_id", dealId); }
+        function allowDrop(event) { event.preventDefault(); }
+        function dragEnter(event, element) { event.preventDefault(); element.classList.add('drag-over'); }
+        function dragLeave(event, element) { element.classList.remove('drag-over'); }
+        async function drop(event, newStage) { 
+            event.preventDefault(); 
+            document.querySelectorAll('.kanban-cards').forEach(el => el.classList.remove('drag-over'));
+            const dealId = event.dataTransfer.getData("deal_id");
+            if(dealId) quickChangeStage(dealId, newStage); 
+        }
+
+        async function quickChangeStage(dealId, newStage) {
+            if (dealsData[dealId] && dealsData[dealId].stage !== newStage) {
+                dealsData[dealId].stage = newStage;
+                const columns = { LEAD:[], AUDIT:[], PROPOSAL:[], NEGOTIATION:[], WON:[], LOST:[] };
+                Object.values(dealsData).forEach(d => { if (columns[d.stage]) columns[d.stage].push(d); });
+                renderKanban(columns); renderList();
+                
+                try {
+                    await fetch(getApiUrl('/api/crm/deal/move'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({deal_id: dealId, new_stage: newStage}) });
+                    if (currentDealId === dealId) {
+                        document.getElementById('fs-stage-select').value = newStage;
+                        fetchActivities(dealId); 
+                    }
+                } catch (e) { App.toast("Erreur de synchronisation", "error"); }
+            }
+        }
+
+        // --- 4. VUE DÉTAILLÉE DU DEAL (FULLSCREEN) ---
+        function openDeal(dealId) {
+            currentDealId = dealId;
+            const deal = dealsData[dealId];
+            if (!deal) return;
+
+            document.getElementById('fs-holding-name').innerText = deal.holding_name || deal.name || "Inconnu";
+            document.getElementById('fs-pipeline-badge').innerText = (deal.pipeline || currentPipeline).toUpperCase();
+            
+            const badge = document.getElementById('fs-solvency');
+            if (deal.solvency_score === 'VERT') badge.className = "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border bg-success/20 text-success border-success/50";
+            else if (deal.solvency_score === 'ORANGE') badge.className = "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border bg-warning/20 text-warning border-warning/50";
+            else if (deal.solvency_score === 'ROUGE') badge.className = "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border bg-alert/20 text-alert border-alert/50 animate-pulse";
+            else badge.className = "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border bg-gray-800 text-gray-300 border-gray-600";
+            badge.innerText = deal.solvency_msg || "Non vérifié";
+
+            document.getElementById('fs-siren').innerText = deal.company_id ? deal.company_id.replace("COMP_", "") : "---";
+            document.getElementById('fs-naf').innerText = deal.naf || "---";
+            document.getElementById('fs-address').innerText = deal.city || "---";
+            document.getElementById('fs-stage-select').value = deal.stage || 'LEAD';
+
+            // ICEBREAKER & MAILTO
+            if(deal.intelligence) {
+                document.getElementById('fs-icebreaker-box').classList.remove('hidden');
+                document.getElementById('fs-pain-point').innerText = deal.intelligence.pain_points || "N/A";
+                document.getElementById('fs-pitch').innerText = deal.intelligence.pitch || "N/A";
+                const mailtoBtn = document.getElementById('fs-mailto-btn');
+                if(deal.intelligence.mailto_link) { mailtoBtn.href = deal.intelligence.mailto_link; } 
+                else { mailtoBtn.href = `mailto:?subject=Audit Énergétique&body=${encodeURIComponent(deal.intelligence.pitch)}`; }
+            } else { document.getElementById('fs-icebreaker-box').classList.add('hidden'); }
+
+            // BIFURCATION VUE (FOURNITURE VS AUTRES)
+            if (currentPipeline === 'fourniture' || deal.pipeline === 'fourniture') {
+                document.getElementById('fs-tools-fourniture').classList.remove('hidden'); document.getElementById('fs-tools-fourniture').classList.add('flex');
+            } else {
+                document.getElementById('fs-tools-fourniture').classList.add('hidden'); document.getElementById('fs-tools-fourniture').classList.remove('flex');
+            }
+
+            renderDealSites(deal.company_id);
+            fetchActivities(dealId);
+            switchActionTab('note');
+            document.getElementById('deal-fullscreen').classList.add('open');
+        }
+
+        function closeDeal() { document.getElementById('deal-fullscreen').classList.remove('open'); currentDealId = null; }
+        function changeDealStage(newStage) { if(currentDealId) quickChangeStage(currentDealId, newStage); }
+        window.openDataUnity = function() { if(currentDealId && dealsData[currentDealId]) window.location.href = `/settings_ops?force_tenant=${dealsData[currentDealId].company_id}`; }
+
+        // --- 5. CPQ EXPERT (PRICER V12.8) ---
+        let currentDealSites =[];
+        async function renderDealSites(companyId) {
+            const container = document.getElementById('fs-sites-list');
+            if(!companyId) return;
+            container.innerHTML = '<div class="text-center py-6"><i class="ph ph-spinner animate-spin text-cyan text-3xl mb-2 block"></i><span class="text-xs font-mono text-gray-500">Scan 3D...</span></div>';
+            try {
+                const res = await fetch('/api/dashboard/fleet'); const data = await res.json();
+                const dealSites = data.fleet.filter(s => s.tenant_id === companyId);
+                
+                if (dealSites.length === 0) { container.innerHTML = '<div class="text-[10px] text-gray-400 font-mono text-center py-4 bg-black/40 rounded-xl border border-white/5 border-dashed">Aucun site.</div>'; populateCpqSites([]); return; }
+
+                container.innerHTML = dealSites.map(s => {
+                    const icon = s.energy === 'gaz' ? '<i class="ph ph-fire text-alert"></i>' : '<i class="ph ph-lightning text-cyan"></i>';
+                    return `<div class="bg-abysse border border-cyan/10 p-3 rounded-lg mb-2 shadow-inner"><div class="flex justify-between items-start mb-1"><div class="font-bold text-white text-xs flex items-center gap-2 truncate">${icon} ${s.name}</div><div class="text-[9px] text-cyan font-mono">${s.pdl}</div></div><div class="text-right"><span class="block font-bold text-white text-[10px]">${Math.round(s.volume)} MWh</span></div></div>`;
+                }).join('');
+                populateCpqSites(dealSites);
+            } catch (e) { container.innerHTML = '<div class="text-[10px] text-alert font-mono">Erreur.</div>'; }
+        }
+
+        function populateCpqSites(sites) {
+            currentDealSites = sites; const select = document.getElementById('cpq-site-select'); if(!select) return;
+            select.innerHTML = '<option value="">-- Sélectionnez un actif 3D --</option>';
+            sites.forEach(s => { const opt = document.createElement('option'); opt.value = s.id; opt.innerText = `${s.energy==='gaz'?'🔥':'⚡'} ${s.name} (${Math.round(s.volume)} MWh)`; select.appendChild(opt); });
+        }
+
+        async function runExpertCPQ() {
+            const siteId = document.getElementById('cpq-site-select').value;
+            const duration = document.getElementById('cpq-duration').value;
+            const greenOpt = document.getElementById('cpq-green').value;
+            const isFranchise = document.getElementById('cpq-franchise').checked;
+            const manualMarkup = document.getElementById('cpq-markup').value;
+
+            if(!siteId) return App.toast("Sélectionnez un site à pricer.", "error");
+            const site = currentDealSites.find(s => s.id === siteId);
+            if(!site || site.volume <= 0) return App.toast("Ce site n'a pas de volume.", "error");
+
+            const btn = document.getElementById('btn-cpq'); const orig = btn.innerHTML; 
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin text-xl"></i> CORTEX PRICER...`; btn.disabled = true;
+
+            try {
+                const payload = { site_id: siteId, volume_mwh: site.volume, energy_type: site.energy || 'elec', segment: site.segment || 'C5', duration_years: parseInt(duration), franchise_cee: isFranchise, green_option: greenOpt, mask: {} };
+                if(manualMarkup) payload.mask.markup = parseFloat(manualMarkup);
+
+                const res = await fetch(getApiUrl('/api/v1/cpq/quote'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await res.json();
+                if(!data.success) throw new Error(data.error);
+
+                const stack = data.stack;
+                document.getElementById('cpq-mol').innerText = new Intl.NumberFormat('fr-FR').format(stack.molecule_eur) + " €";
+                document.getElementById('cpq-capa').innerText = new Intl.NumberFormat('fr-FR').format(stack.capacite_eur) + " €";
+                document.getElementById('cpq-cee').innerText = new Intl.NumberFormat('fr-FR').format(stack.cee_eur) + " €";
+                document.getElementById('cpq-go').innerText = new Intl.NumberFormat('fr-FR').format(stack.go_eur) + " €";
+                document.getElementById('cpq-turpe').innerText = new Intl.NumberFormat('fr-FR').format(stack.acheminement_eur) + " €";
+                document.getElementById('cpq-tax').innerText = new Intl.NumberFormat('fr-FR').format(stack.taxes_eur) + " €";
+                document.getElementById('cpq-marge').innerText = new Intl.NumberFormat('fr-FR').format(stack.margin_eur) + " €";
+                document.getElementById('cpq-price').innerText = data.kpis.prix_moyen_mwh.toFixed(2);
+                document.getElementById('cpq-oracle-insight').innerHTML = `Win Prob: <b class="text-white">${data.oracle.win_probability}%</b> <br> ${data.oracle.insight}`;
+                document.getElementById('cpq-result').classList.remove('hidden');
+                App.toast("Pricer CORTEX : Cotation générée.", "success");
+
+            } catch (e) { App.toast("Erreur du Pricer.", "error"); } finally { btn.innerHTML = orig; btn.disabled = false; }
+        }
+
+        // --- 6. ACTION CENTER (NOTES, AGENDA, TICKETS) ---
+        function switchActionTab(tab) {['note', 'agenda', 'ticket'].forEach(t => { const el = document.getElementById(`action-${t}`); if(el) { el.classList.add('hidden'); el.classList.remove('flex'); } if(document.getElementById(`tab-${t}`)) document.getElementById(`tab-${t}`).classList.remove('active', 'bg-abysse/50'); }); const target = document.getElementById(`action-${tab}`); if(target) { target.classList.remove('hidden'); target.classList.add('flex'); } if(document.getElementById(`tab-${tab}`)) document.getElementById(`tab-${tab}`).classList.add('active', 'bg-abysse/50'); }
+
+        window.generateCalendarEvent = function() {
+            const dateVal = document.getElementById('agenda-date').value;
+            const titleVal = document.getElementById('agenda-title').value || "Point Énergie Energistrat";
+            if(!dateVal) return App.toast("Veuillez sélectionner une date.", "error");
+            const d = new Date(dateVal); const dateStr = d.toISOString().replace(/-|:|\.\d\d\d/g,"").slice(0,8); const nextDay = new Date(d); nextDay.setDate(d.getDate()+1); const endStr = nextDay.toISOString().replace(/-|:|\.\d\d\d/g,"").slice(0,8);
+            const details = encodeURIComponent("Réunion Audit Énergétique.\nLien de la War Room : https://energistrat.com/ops_nexus");
+            const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(titleVal)}&dates=${dateStr}/${endStr}&details=${details}`;
+            window.open(url, '_blank');
+            saveActivity('TASK', 'agenda-title'); document.getElementById('agenda-title').value = ''; App.toast("Lien Calendar ouvert.", "success");
+        }
+
+        async function saveActivity(type, inputId) {
+            const val = document.getElementById(inputId).value; if (!val || !currentDealId) return;
+            try { await fetch(getApiUrl('/api/crm/activity'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({deal_id: currentDealId, type: type, description: val}) }); document.getElementById(inputId).value = ''; fetchActivities(currentDealId); App.toast("Action logguée.", "success"); } catch (e) {}
+        }
+
+        async function fetchActivities(dealId) {
+            const list = document.getElementById('fs-activities-list');
+            try {
+                const res = await fetch(getApiUrl(`/api/crm/deal/${dealId}/activities`)); const data = await res.json();
+                list.innerHTML = '';
+                if (data.success && data.activities.length > 0) {
+                    list.innerHTML = data.activities.map(act => {
+                        let icon = 'ph-info'; let color = 'text-cyan bg-abysse border-cyan/30';
+                        if (act.type === 'TASK') { icon = 'ph-calendar-check'; color = 'text-purple bg-abysse border-purple/30'; }
+                        if (act.type === 'TICKET_ACHAT') { icon = 'ph-warning-circle'; color = 'text-white bg-alert border-alert/50 shadow-[0_0_15px_rgba(255,0,85,0.5)]'; }
+                        const dateStr = new Date(act.timestamp).toLocaleString('fr-FR', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
+                        return `<div class="relative pl-10 md:pl-0"><div class="md:flex items-start justify-between"><div class="md:w-1/3 flex items-center md:justify-end pr-6 text-[10px] text-gray-500 font-mono mt-2 md:mb-0 uppercase tracking-widest">${dateStr}</div><div class="absolute left-0 md:left-1/2 w-8 h-8 rounded-full border-2 ${color} flex items-center justify-center -translate-x-2 md:-translate-x-1/2 bg-panel z-10"><i class="ph ${icon} text-sm"></i></div><div class="md:w-1/2 pl-6"><div class="p-5 bg-card/80 border border-white/5 rounded-2xl shadow-lg"><h4 class="text-sm font-black text-white mb-2">${act.title}</h4><p class="text-xs text-gray-300 leading-relaxed font-mono">${act.description || ''}</p></div></div></div></div>`;
+                    }).join('');
+                } else { list.innerHTML = `<div class="text-center bg-black/30 p-8 rounded-3xl border border-white/5 border-dashed"><p class="text-xs text-gray-500 font-mono uppercase tracking-widest">Aucune interaction CRM.</p></div>`; }
+            } catch (e) {}
+        }
+
+        // --- 7. CREATION DE LEAD & API GOUV ---
+        function openNewLeadModal() { document.getElementById('lead-pipeline').value = currentPipeline; document.getElementById('new-lead-modal').classList.remove('hidden'); document.getElementById('new-lead-modal').classList.add('flex'); setTimeout(() => document.getElementById('new-lead-modal').classList.remove('opacity-0'), 10); }
+        function closeNewLeadModal() { document.getElementById('new-lead-modal').classList.add('opacity-0'); setTimeout(() => { document.getElementById('new-lead-modal').classList.add('hidden'); document.getElementById('new-lead-modal').classList.remove('flex'); document.getElementById('lead-form').reset(); }, 300); document.getElementById('siren-search-status').innerHTML = ''; }
+        
+        async function searchSirenAPI() {
+            const sirenInput = document.getElementById('lead-siren'); const siren = sirenInput.value.replace(/\s/g, '');
+            const statusBox = document.getElementById('siren-search-status'); const btn = document.getElementById('btn-search-siren');
+            if (siren.length < 9) { statusBox.innerHTML = '<span class="text-alert font-bold"><i class="ph ph-warning-circle"></i> 9 chiffres requis.</span>'; return; }
+            statusBox.innerHTML = '<span class="text-cyan font-bold"><i class="ph ph-spinner animate-spin inline-block"></i> Interrogation Base Nationale...</span>'; btn.classList.add('opacity-50', 'pointer-events-none');
+            try {
+                const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${siren}`); const data = await res.json();
+                if (data.results && data.results.length > 0) {
+                    document.getElementById('lead-company').value = data.results[0].nom_complet || "";
+                    sirenInput.classList.remove('border-warning', 'border-cyan/30'); sirenInput.classList.add('border-success', 'text-success', 'shadow-[0_0_15px_rgba(0,255,102,0.2)]');
+                    statusBox.innerHTML = '<span class="text-success font-bold"><i class="ph ph-check-circle text-lg"></i> Entité certifiée Open Data !</span>';
+                } else { sirenInput.classList.add('border-warning'); statusBox.innerHTML = '<span class="text-warning font-bold"><i class="ph ph-warning-circle"></i> Introuvable dans l\'Open Data.</span>'; }
+            } catch (e) { statusBox.innerHTML = '<span class="text-alert font-bold">Erreur API Gouv.</span>'; } finally { btn.classList.remove('opacity-50', 'pointer-events-none'); }
+        }
+
+        async function createLead(event) {
+            event.preventDefault(); const btn = document.getElementById('btn-create-lead'); const orig = btn.innerHTML; btn.innerHTML = '<i class="ph ph-spinner animate-spin text-xl mr-2"></i> Synchro...'; btn.disabled = true;
+            const nameParts = document.getElementById('lead-contact').value.split(' ');
+            const payload = { siren: document.getElementById('lead-siren').value, company_name: document.getElementById('lead-company').value || "Inconnu", holding_name: document.getElementById('lead-company').value, naf: "DEFAULT", address: "", city: "", source: "CRM 3D", pipeline: document.getElementById('lead-pipeline').value };
+            try {
+                const response = await fetch(getApiUrl('/api/crm/lead'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const data = await response.json();
+                if (response.ok && data.success) {
+                    closeNewLeadModal(); App.toast("Entité créée.", "success");
+                    if (data.company_id) { try { await fetch(getApiUrl(`/api/crm/company/${data.company_id}/contact`), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ firstname: nameParts[0] || "", lastname: nameParts.slice(1).join(' ') || "Inconnu", role: document.getElementById('lead-role').value, email: document.getElementById('lead-email').value, phone: "", company_id: data.company_id }) }); } catch(e) {} }
+                    if (currentPipeline !== payload.pipeline) switchPipeline(payload.pipeline); else fetchDeals(currentPipeline); setTimeout(() => openDeal(data.deal_id), 800);
+                } else { App.toast("Erreur de création.", "error"); }
+            } catch (err) { App.toast("Erreur serveur.", "error"); } finally { btn.innerHTML = orig; btn.disabled = false; }
+        }
+
+        // --- 8. INLINE EDIT (STYLO MAGIQUE) ---
+        function startInlineEdit(elementId, entityType, field) {
+            if (!currentDealId) return; const deal = dealsData[currentDealId]; const span = document.getElementById(elementId); const currentValue = span.innerText;
+            const input = document.createElement('input'); input.type = 'text'; input.value = currentValue === "---" || currentValue === "Non renseigné" ? "" : currentValue; input.className = 'inline-edit-input shadow-[0_0_10px_rgba(0,229,255,0.3)]';
+            span.parentNode.replaceChild(input, span); input.focus();
+            input.addEventListener('blur', () => saveInlineEdit(input, span, entityType, deal.company_id, field)); input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
+        }
+        async function saveInlineEdit(input, span, entityType, entityId, field) {
+            const newValue = input.value.trim(); span.innerText = newValue || "---"; input.parentNode.replaceChild(span, input);
+            if (newValue && newValue !== "---") { try { await fetch(getApiUrl(`/api/crm/edit/${entityType}/${entityId}`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ field: field, value: newValue }) }); fetchDeals(currentPipeline); } catch (e) {} }
+        }
+
+        // --- 9. MAP WAR ROOM ---
+        function openWarRoomMap() {
+            document.getElementById('kanban-container').classList.add('hidden'); document.getElementById('list-container').classList.add('hidden');
+            const mapCont = document.getElementById('map-container'); mapCont.classList.remove('hidden'); mapCont.classList.add('flex');
+            if(!mapInstance) { mapInstance = L.map('war-room-map', {zoomControl: false}).setView([46.6, 1.8], 5); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '' }).addTo(mapInstance); L.control.zoom({ position: 'topright' }).addTo(mapInstance); }
+            setTimeout(() => mapInstance.invalidateSize(), 300); plotWarRoomMap();
+        }
+        function closeWarRoomMap() { document.getElementById('map-container').classList.add('hidden'); document.getElementById('map-container').classList.remove('flex'); switchView('kanban'); }
+        function getFuzzyCoordinates(baseStr, center) { let hash = 0; for (let i = 0; i < baseStr.length; i++) hash = baseStr.charCodeAt(i) + ((hash << 5) - hash); const pseudoRandom1 = (Math.abs(hash) % 100) / 10000; const pseudoRandom2 = (Math.abs(hash >> 2) % 100) / 10000; return [center[0] + (pseudoRandom1 - 0.005), center[1] + (pseudoRandom2 - 0.005)]; }
+        
+        async function plotWarRoomMap() {
+            if(!mapInstance) return; mapMarkers.forEach(m => mapInstance.removeLayer(m)); mapMarkers =[];
+            for(const id in dealsData) {
+                const d = dealsData[id]; if(d.sites_count === 0) continue;
+                let colorClass = 'marker-green'; let hex = '#00FF66';
+                if (d.stage === 'LEAD' || d.stage === 'AUDIT') { colorClass = 'marker-blue'; hex = '#00E5FF'; } else if (d.stage === 'NEGOTIATION' || d.stage === 'PROPOSAL') { colorClass = 'marker-orange'; hex = '#FFB800'; }
+                const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-marker ${colorClass} w-4 h-4" style="background-color:${hex}; box-shadow:0 0 10px ${hex}"></div>`, iconSize:[16, 16], iconAnchor:[8, 8] });
+                let coords = getFuzzyCoordinates(d.id, [46.6, 1.8]);
+                if(d.city) { try { const res = await fetch(`https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(d.city)}&fields=centre&limit=1`); const geo = await res.json(); if(geo && geo.length > 0 && geo[0].centre) coords = [geo[0].centre.coordinates[1], geo[0].centre.coordinates[0]]; } catch(e) {} }
+                const marker = L.marker(coords, {icon: icon}).bindPopup(`<div class="text-center p-2"><b class="text-white font-bold text-sm block mb-1">${d.name}</b><span style="color:${hex};" class="font-black text-sm font-mono">${Math.round(d.commission_est)} €</span><br><button onclick="openDeal('${d.id}')" class="mt-2 bg-abysse border border-white/20 text-white px-4 py-2 rounded-lg font-bold text-xs w-full hover:bg-white hover:text-black transition">Ouvrir</button></div>`).addTo(mapInstance);
+                mapMarkers.push(marker);
+            }
+        }
+  
     </script>
 </body>
 </html>
