@@ -1,4 +1,3 @@
-# --- START OF FILE cortex_finance.py ---
 
 import re
 import io
