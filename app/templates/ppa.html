@@ -436,22 +436,64 @@
         }
     }
 
+     // ==========================================
+    // 5. MOTEUR INTERACTIF (APPEL AU PYTHON V4)
     // ==========================================
-    // 6. MOTEURS DE CALCULS (UI DYNAMIQUE)
-    // ==========================================
-    window.updatePpaSimulation = function() {
+    window.updatePpaSimulation = async function() {
         if(!CURRENT_SITE.id) return;
+
         const coveragePct = parseFloat(document.getElementById('slider-cov').value) || 30;
         const strikePrice = parseFloat(document.getElementById('slider-price').value) || 65;
 
+        // Mise à jour de l'UI des curseurs
         document.getElementById('val-slider-cov').innerText = coveragePct;
         document.getElementById('val-slider-price').innerText = strikePrice;
 
-        const vol = CURRENT_SITE.volumeMwh;
-        const ppaVol = vol * (coveragePct / 100);
-        
-        applyFinancials(vol, CURRENT_SITE.pmc, ppaVol, strikePrice);
-        drawPpaChart(vol, ppaVol);
+        try {
+            // 🚀 ON DÉLÈGUE TOUT AU CORTEX PYTHON (Thin Client)
+            const payload = {
+                site_id: CURRENT_SITE.id,
+                coverage_pct: coveragePct,
+                strike_price: strikePrice
+            };
+
+            const res = await fetch(getApiUrl('/api/v4/simulate/ppa'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+
+            const fin = data.financials;
+            const tech = data.technical;
+
+            // Injection des KPIs renvoyés par l'Ingénierie Financière
+            document.getElementById('kpi-vol').innerText = Math.round(tech.total_vol_mwh).toLocaleString('fr-FR');
+            document.getElementById('kpi-pmc').innerText = Math.round(fin.current_pmc).toLocaleString('fr-FR');
+            
+            const blendedEl = document.getElementById('kpi-blended');
+            blendedEl.innerText = Math.round(fin.blended_price_eur_mwh).toLocaleString('fr-FR');
+            
+            const savingsEl = document.getElementById('kpi-savings');
+            if (fin.ten_year_savings_eur > 0) {
+                savingsEl.innerText = "+ " + Math.round(fin.ten_year_savings_eur).toLocaleString('fr-FR') + " €";
+                savingsEl.className = "text-3xl font-black text-white font-mono drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] my-2";
+                blendedEl.className = "text-4xl font-black text-success font-mono drop-shadow-md";
+            } else {
+                savingsEl.innerText = Math.round(fin.ten_year_savings_eur).toLocaleString('fr-FR') + " €";
+                savingsEl.className = "text-3xl font-black text-alert font-mono drop-shadow-[0_0_15px_rgba(239,68,68,0.8)] my-2";
+                blendedEl.className = "text-4xl font-black text-alert font-mono drop-shadow-md";
+            }
+
+            // Génération du Graphique (Toujours fluide en JS)
+            drawPpaChart(tech.total_vol_mwh, coveragePct);
+
+        } catch(e) {
+            console.error(e);
+            App.toast("CORTEX Engine: Erreur de calcul financier.", "error");
+        }
     }
 
     window.updateActivePpa = function() {
