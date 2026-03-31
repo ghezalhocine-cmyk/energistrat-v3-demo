@@ -399,22 +399,33 @@
         </div>
     </div>
 
-    <!-- LOGIQUE JAVASCRIPT CRM & MULTI-TENANT -->
+   <!-- ============================================================================== -->
+    <!-- LOGIQUE JAVASCRIPT (CORTEX SETTINGS OPS V12.8 - FULL RECOVERY & MATH SHIELDS)  -->
+    <!-- ============================================================================== -->
     <script>
         let TENANTS = [];
-        let SITES = [];
+        let SITES =[];
         let ACTIVE_TENANT = null;
         let CURRENT_ID = null;
         let currentEnergy = 'elec';
-        let ORPHAN_LIST = [];
+        let ORPHAN_LIST =[];
 
-        function showToast(msg) { const t = document.getElementById('toast'); t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`; t.className = "show"; setTimeout(() => t.className = "", 3000); }
+        function showToast(msg) { 
+            const t = document.getElementById('toast'); 
+            t.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>${msg}`; 
+            t.className = "show"; 
+            setTimeout(() => t.className = "", 3000); 
+        }
+
         function toggleImportModal() { 
             if(!ACTIVE_TENANT) return alert("Vous devez sélectionner un client dans le CRM d'abord !");
             document.getElementById('import-target-tenant').innerText = ACTIVE_TENANT.name || ACTIVE_TENANT.siret;
             document.getElementById('import-modal').classList.toggle('hidden'); 
         }
-        function fileSelected(input) { if(input.files && input.files[0]) document.getElementById('csv-label').innerHTML = `<span class="text-cyan">${input.files[0].name}</span>`; }
+
+        function fileSelected(input) { 
+            if(input.files && input.files[0]) document.getElementById('csv-label').innerHTML = `<span class="text-cyan">${input.files[0].name}</span>`; 
+        }
 
         function switchTab(id) {
             document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
@@ -426,14 +437,20 @@
         }
 
         // ========================================
-        // 1. LE MOTEUR CRM
+        // 1. LE MOTEUR CRM (RÉCONCILIÉ AVEC LES SALES)
         // ========================================
         async function loadTenants() {
             try {
-                const res = await fetch('/api/ops/tenants');
+                // On interroge le pipeline SaaS (Les leads créés par les commerciaux)
+                const res = await fetch('/api/crm/pipeline/saas');
                 const data = await res.json();
-                if(data.success) {
-                    TENANTS = data.tenants;
+                if(data.success && data.pipeline) {
+                    TENANTS = data.pipeline.map(d => ({
+                        tenant_id: d.company_id,
+                        siret: d.company_id ? d.company_id.replace("COMP_", "") : "",
+                        name: d.holding_name || d.name,
+                        contact: d.all_contacts && d.all_contacts.length > 0 ? `${d.all_contacts[0].firstname} ${d.all_contacts[0].lastname}` : "Non renseigné"
+                    }));
                     filterTenants();
                 }
             } catch(e) { console.error(e); }
@@ -445,18 +462,20 @@
             list.innerHTML = '';
             
             if(TENANTS.length === 0) {
-                list.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-500">Aucun client enregistré dans la base.</td></tr>';
+                list.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-500">Aucun client enregistré dans le CRM Sales.</td></tr>';
                 return;
             }
 
             TENANTS.filter(t => (t.name || '').toLowerCase().includes(term) || (t.siret || '').includes(term)).forEach(t => {
+                // On utilise JSON.stringify de manière sécurisée en échappant les quotes
+                const safeTenant = JSON.stringify(t).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
                 list.innerHTML += `
                     <tr class="hover:bg-white/5 transition">
-                        <td class="p-4 font-bold text-white"><i class="fa-solid fa-building text-gray-500 mr-2"></i> ${t.name || 'Sans Nom'}</td>
-                        <td class="p-4 font-mono text-cyan">${t.tenant_id || t.siret}</td>
-                        <td class="p-4 text-gray-400 text-xs">${t.contact || '-'}</td>
+                        <td class="p-4 font-bold text-white"><i class="fa-solid fa-building text-cyan mr-2"></i> ${t.name || 'Sans Nom'}</td>
+                        <td class="p-4 font-mono text-gray-400">${t.siret || t.tenant_id}</td>
+                        <td class="p-4 text-gray-500 text-xs font-mono"><i class="fa-solid fa-user-tie mr-1"></i> Équipe Commerciale</td>
                         <td class="p-4 text-right">
-                            <button onclick='activateTenant(${JSON.stringify(t)})' class="bg-cyan/10 text-cyan hover:bg-cyan hover:text-black border border-cyan/30 px-3 py-1 rounded transition text-xs font-bold">Gérer le Parc</button>
+                            <button onclick="activateTenant(JSON.parse('${safeTenant}'))" class="bg-cyan/10 text-cyan hover:bg-cyan hover:text-abysse border border-cyan/30 px-4 py-2 rounded-lg transition text-xs font-black uppercase tracking-widest shadow-md">Gérer le Parc</button>
                         </td>
                     </tr>
                 `;
@@ -490,18 +509,16 @@
                 } else {
                     alert("Erreur de création : " + data.error);
                 }
-            } catch(e) {
-                alert("Erreur réseau");
-            }
+            } catch(e) { alert("Erreur réseau"); }
             btn.innerHTML = 'CRÉER LE LOCATAIRE';
         }
 
         function activateTenant(tenantObj) {
             ACTIVE_TENANT = tenantObj;
             const badge = document.getElementById('active-tenant-badge');
-            badge.className = "bg-cyan/20 border border-cyan/50 text-cyan p-3 rounded-xl text-xs font-bold text-center truncate";
-            badge.innerHTML = `<i class="fa-solid fa-unlock-keyhole mr-2"></i> ${tenantObj.name || tenantObj.tenant_id}`;
-            document.getElementById('parc-subtitle').innerText = `Locataire Actif : ${tenantObj.name || tenantObj.tenant_id}`;
+            badge.className = "bg-cyan/20 border border-cyan/50 text-cyan p-3 rounded-xl text-xs font-bold text-center truncate shadow-[0_0_15px_rgba(0,229,255,0.2)]";
+            badge.innerHTML = `<i class="fa-solid fa-unlock-keyhole mr-2"></i> ${tenantObj.name || tenantObj.siret}`;
+            document.getElementById('parc-subtitle').innerHTML = `Locataire Actif : <span class="text-white">${tenantObj.name}</span>`;
             switchTab('parc');
             resetForm();
             loadSites();
@@ -517,16 +534,22 @@
                 const res = await fetch('/api/dashboard/fleet');
                 const data = await res.json();
                 if(data.fleet) {
+                    // On filtre sur le tenant_id de la compagnie
                     SITES = data.fleet.filter(s => s.tenant_id === ACTIVE_TENANT.tenant_id);
                     const container = document.getElementById('site-list');
                     container.innerHTML = '';
                     
+                    if(SITES.length === 0) {
+                        container.innerHTML = '<div class="text-center text-gray-500 text-xs italic mt-10 border border-dashed border-gray-700 p-4 rounded-xl">Aucun compteur pour ce client.</div>';
+                        return;
+                    }
+
                     SITES.filter(s => s.name.toLowerCase().includes(term) || (s.pdl && s.pdl.includes(term))).forEach(s => {
                         const div = document.createElement('div');
-                        div.className = "p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer mb-2 transition border border-transparent hover:border-cyan/30";
+                        div.className = "p-3 bg-abysse/50 rounded-xl hover:bg-cyan/10 cursor-pointer mb-2 transition border border-white/5 hover:border-cyan/50 shadow-inner";
                         div.onclick = () => loadForm(s.id);
-                        const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire text-red-500 mr-2"></i>' : '<i class="fa-solid fa-bolt text-cyan mr-2"></i>';
-                        div.innerHTML = `<div class="font-bold text-xs text-white truncate flex items-center">${icon} ${s.name}</div><div class="mt-1 text-[9px] text-gray-500 font-mono flex justify-between"><span>${s.pdl || 'N/A'}</span><span class="text-cyan">${s.city || ''}</span></div>`;
+                        const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire text-red-500 mr-2 text-lg"></i>' : '<i class="fa-solid fa-bolt text-cyan mr-2 text-lg"></i>';
+                        div.innerHTML = `<div class="font-bold text-xs text-white truncate flex items-center">${icon} ${s.name}</div><div class="mt-2 text-[10px] text-gray-400 font-mono flex justify-between bg-black/40 p-1.5 rounded"><span class="text-cyan">${s.pdl || 'N/A'}</span><span>${Math.round(s.volume || 0)} MWh</span></div>`;
                         container.appendChild(div);
                     });
                 }
@@ -541,11 +564,11 @@
                 const data = await res.json();
                 
                 document.getElementById('form-title').innerText = "Modifier Site";
-                document.getElementById('form-id').innerText = id;
+                document.getElementById('form-id').innerText = "ID: " + id;
                 
                 const identity = data.identity || {};
                 document.getElementById('id-input').value = identity.siret || identity.id || "";
-                document.getElementById('site-name-input').value = identity.site_name || "";
+                document.getElementById('site-name-input').value = identity.site_name || data.name || "";
                 document.getElementById('naf-input').value = identity.naf || "";
                 
                 const mat = identity.organization_matrix || {};
@@ -554,14 +577,14 @@
                 document.getElementById('mat-cc').value = mat.cost_center || "";
                 
                 const loc = data.location || {};
-                document.getElementById('address-input').value = loc.address || "";
-                document.getElementById('zip-input').value = loc.zip_code || "";
-                document.getElementById('city-input').value = loc.city || "";
-                document.getElementById('surface-input').value = loc.surface || "";
-                document.getElementById('inp-type').value = loc.typologie || "";
+                document.getElementById('address-input').value = loc.address || data.ADRESSE_SITE || "";
+                document.getElementById('zip-input').value = loc.zip_code || data.CP || "";
+                document.getElementById('city-input').value = loc.city || data.VILLE || "";
+                document.getElementById('surface-input').value = loc.surface || data.SURFACE_M2 || "";
+                document.getElementById('inp-type').value = loc.typologie || data.TYPOLOGIE || "";
 
                 const contract = data.contract || {};
-                document.getElementById('ref-input').value = contract.pdl || contract.pce || "";
+                document.getElementById('ref-input').value = contract.pdl || contract.pce || data.pdl || "";
                 document.getElementById('val-input').value = contract.power || "";
                 document.getElementById('segment-display').value = contract.segment || "";
                 document.getElementById('provider-input').value = contract.provider || "";
@@ -569,7 +592,7 @@
                 document.getElementById('date-start').value = contract.start_date || "";
                 document.getElementById('date-end').value = contract.end_date || "";
                 
-                if(data.energy_type === 'gaz') setEnergy('gaz'); else setEnergy('elec');
+                if(data.energy_type === 'gaz' || data.ENERGIE === 'GAZ') setEnergy('gaz'); else setEnergy('elec');
 
                 const pd = contract.power_details || {};
                 document.getElementById('ps-hph').value = pd.hph || pd.ps_hph || contract.ps_hph || "";
@@ -583,14 +606,15 @@
 
                 if(currentEnergy === 'gaz') {
                     document.getElementById('price-gaz-fix').value = p.fix || p.abonnement || "";
-                    document.getElementById('price-gaz-mol').value = p.hph || p.prix_molecule || p.price_kwh || "";
+                    let pxMol = p.price_kwh ? (p.price_kwh*1000).toFixed(2) : (p.hph || p.prix_molecule || "");
+                    document.getElementById('price-gaz-mol').value = pxMol;
                     document.getElementById('price-gaz-tax').value = taxVal;
                 } else {
-                    document.getElementById('price-hph').value = p.hph || p.price_hph || p.prix_hph || "";
+                    document.getElementById('price-hph').value = p.hph || p.price_hph || "";
                     document.getElementById('price-hch').value = p.hch || p.price_hch || "";
                     document.getElementById('price-hpe').value = p.hpe || p.price_hpe || "";
                     document.getElementById('price-hce').value = p.hce || p.price_hce || "";
-                    document.getElementById('price-fix').value = p.fix || p.abonnement || p.price_fix || "";
+                    document.getElementById('price-fix').value = p.fix || p.abonnement || "";
                     document.getElementById('price-tax').value = taxVal;
                 }
                 
@@ -616,8 +640,36 @@
             const inputPdl = document.getElementById('ref-input').value.replace(/\s/g, '');
             if(!inputPdl) return alert("PDL requis.");
 
+            // 🛡️ BOUCLIER 1 : La Taxe (Plafond strict à 100€/MWh pour éviter les 28000€)
             let taxValue = currentEnergy === 'gaz' ? parseFloat(document.getElementById('price-gaz-tax').value) : parseFloat(document.getElementById('price-tax').value);
-            if(isNaN(taxValue) || taxValue > 100) taxValue = 22.5;
+            if(isNaN(taxValue) || taxValue > 100 || taxValue < 0) taxValue = currentEnergy === 'gaz' ? 8.44 : 22.5;
+
+            // 🛡️ BOUCLIER 2 : La Puissance Maximale (Le fix de la Ligne Rouge TURPE)
+            const psHph = parseFloat(document.getElementById('ps-hph').value) || 0;
+            const psHch = parseFloat(document.getElementById('ps-hch').value) || 0;
+            const psHpe = parseFloat(document.getElementById('ps-hpe').value) || 0;
+            const psHce = parseFloat(document.getElementById('ps-hce').value) || 0;
+            const psUnique = parseFloat(document.getElementById('val-input').value) || 0;
+            
+            const maxPowerDetected = Math.max(psHph, psHch, psHpe, psHce);
+            // Si le client a rempli les 4 cadrans, on prend le max. Sinon on prend la puissance unique.
+            const finalPower = maxPowerDetected > 0 ? maxPowerDetected : psUnique;
+
+            // 🛡️ BOUCLIER 3 : Le Prix Moyen Lissé Dynamique (Le fix de la case vide)
+            const pxHph = parseFloat(document.getElementById('price-hph').value) || 0;
+            const pxHch = parseFloat(document.getElementById('price-hch').value) || 0;
+            const pxHpe = parseFloat(document.getElementById('price-hpe').value) || 0;
+            const pxHce = parseFloat(document.getElementById('price-hce').value) || 0;
+            const pxGazMol = parseFloat(document.getElementById('price-gaz-mol').value) || 0;
+
+            // Moyenne pondérée standard (HPH 40%, HCH 30%, HPE 20%, HCE 10%)
+            let avgPriceMwh = 0;
+            if (currentEnergy === 'elec' && pxHph > 0) {
+                avgPriceMwh = (pxHph * 0.4) + (pxHch * 0.3) + (pxHpe * 0.2) + (pxHce * 0.1);
+                if(avgPriceMwh === 0) avgPriceMwh = pxHph; // Fallback si le client n'a rempli qu'une case
+            } else if (currentEnergy === 'gaz') {
+                avgPriceMwh = pxGazMol;
+            }
 
             const payload = {
                 id: CURRENT_ID || inputPdl,
@@ -641,42 +693,45 @@
                     typologie: document.getElementById('inp-type').value
                 },
                 contract: {
-                    pdl: inputPdl,
-                    power: parseFloat(document.getElementById('val-input').value) || 0,
-                    segment: document.getElementById('segment-display').value,
+                    pdl: currentEnergy === 'elec' ? inputPdl : "",
+                    pce: currentEnergy === 'gaz' ? inputPdl : "",
+                    power: finalPower, // <-- Le correctif de puissance est ici !
                     provider: document.getElementById('provider-input').value,
                     fta: document.getElementById('fta-input').value,
                     start_date: document.getElementById('date-start').value,
                     end_date: document.getElementById('date-end').value,
                     energy_type: currentEnergy,
+                    segment: document.getElementById('segment-display').value,
                     power_details: {
-                        hph: parseFloat(document.getElementById('ps-hph').value) || 0,
-                        hch: parseFloat(document.getElementById('ps-hch').value) || 0,
-                        hpe: parseFloat(document.getElementById('ps-hpe').value) || 0,
-                        hce: parseFloat(document.getElementById('ps-hce').value) || 0
+                        hph: psHph, hch: psHch, hpe: psHpe, hce: psHce
                     }
                 },
                 pricing: {
-                    hph: currentEnergy === 'gaz' ? parseFloat(document.getElementById('price-gaz-mol').value) || 0 : parseFloat(document.getElementById('price-hph').value) || 0,
-                    hch: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('price-hch').value) || 0,
-                    hpe: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('price-hpe').value) || 0,
-                    hce: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('price-hce').value) || 0,
+                    price_kwh: avgPriceMwh / 1000.0, // <-- Le correctif du Prix Moyen est ici !
+                    hph: pxHph || pxGazMol,
+                    hch: pxHch,
+                    hpe: pxHpe,
+                    hce: pxHce,
                     fix: currentEnergy === 'gaz' ? parseFloat(document.getElementById('price-gaz-fix').value) || 0 : parseFloat(document.getElementById('price-fix').value) || 0,
-                    tax: taxValue
+                    tax: taxValue // <-- Le correctif Fiscal est ici !
                 }
             };
             
             try {
                 const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
                 const response = await res.json();
-                if(response.success) { showToast("Sauvegardé"); CURRENT_ID = response.id; loadSites(); } 
+                if(response.success) { 
+                    showToast("Patrimoine 3D synchronisé avec succès."); 
+                    CURRENT_ID = response.id; 
+                    loadSites(); 
+                } 
                 else { alert("Erreur: " + response.error); }
             } catch(e) { alert("Erreur réseau"); }
             btn.innerHTML = original;
         }
 
         // ========================================
-        // 3. OUTIL ADOPTION (Rattachement)
+        // 3. OUTIL ADOPTION (Rattachement Orphelins)
         // ========================================
         function openOrphanModal() {
             if(!ACTIVE_TENANT) return alert("Sélectionnez un client dans le CRM d'abord.");
@@ -688,27 +743,33 @@
         async function scanOrphans() {
             const kw = document.getElementById('orphan-search').value;
             const container = document.getElementById('orphan-list');
-            container.innerHTML = '<div class="text-center mt-10"><i class="fa-solid fa-spinner fa-spin text-indigo-500 text-2xl"></i></div>';
+            container.innerHTML = '<div class="text-center mt-10"><i class="fa-solid fa-spinner fa-spin text-indigo-500 text-3xl"></i></div>';
             
             try {
                 const res = await fetch(`/api/ops/orphans?keyword=${encodeURIComponent(kw)}`);
                 const data = await res.json();
-                ORPHAN_LIST = data.orphans || [];
+                ORPHAN_LIST = data.orphans ||[];
                 
                 if(ORPHAN_LIST.length === 0) {
-                    container.innerHTML = '<div class="text-center mt-10 text-gray-500">Aucun site orphelin trouvé.</div>';
+                    container.innerHTML = '<div class="text-center mt-10 text-success font-bold"><i class="fa-solid fa-check-circle text-3xl mb-2 block"></i> Base saine. Aucun compteur orphelin.</div>';
                     return;
                 }
                 
-                let html = `<table class="w-full text-left text-xs text-white"><thead><tr class="text-[10px] text-gray-500 border-b border-white/10"><th class="p-2"><input type="checkbox" onclick="toggleAllOrphans(this)"></th><th class="p-2">Nom du site</th><th class="p-2">PDL</th><th class="p-2">Tenant Actuel</th></tr></thead><tbody>`;
-                ORPHAN_LIST.forEach((s, idx) => {
-                    html += `<tr><td class="p-2 border-b border-white/5"><input type="checkbox" class="orphan-cb accent-indigo-500" value="${s.id}" onchange="updateAdoptBtn()"></td><td class="p-2 font-bold border-b border-white/5">${s.name}</td><td class="p-2 font-mono text-cyan border-b border-white/5">${s.pdl}</td><td class="p-2 text-gray-500 border-b border-white/5">${s.current_tenant}</td></tr>`;
+                let html = `<table class="w-full text-left text-xs text-white"><thead><tr class="text-[10px] text-gray-500 border-b border-white/10 uppercase tracking-widest"><th class="p-3"><input type="checkbox" onclick="toggleAllOrphans(this)"></th><th class="p-3">Nom du site</th><th class="p-3">PDL</th><th class="p-3">Tenant Actuel</th></tr></thead><tbody>`;
+                ORPHAN_LIST.forEach((s) => {
+                    html += `
+                        <tr class="hover:bg-white/5 transition border-b border-white/5">
+                            <td class="p-3"><input type="checkbox" class="orphan-cb accent-indigo-500" value="${s.id}" onchange="updateAdoptBtn()"></td>
+                            <td class="p-3 font-bold">${s.name}</td>
+                            <td class="p-3 font-mono text-cyan">${s.pdl}</td>
+                            <td class="p-3 text-gray-500 font-mono">${s.current_tenant}</td>
+                        </tr>`;
                 });
                 html += `</tbody></table>`;
                 container.innerHTML = html;
                 updateAdoptBtn();
             } catch(e) {
-                container.innerHTML = '<div class="text-center mt-10 text-red-500">Erreur lors du scan.</div>';
+                container.innerHTML = '<div class="text-center mt-10 text-alert font-bold">Erreur de connexion base 3D.</div>';
             }
         }
 
@@ -719,8 +780,10 @@
             document.getElementById('orphan-count').innerText = n;
             if(n > 0) {
                 btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                btn.classList.add('shadow-[0_0_15px_rgba(0,229,255,0.4)]');
             } else {
                 btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed');
+                btn.classList.remove('shadow-[0_0_15px_rgba(0,229,255,0.4)]');
             }
         }
 
@@ -729,7 +792,7 @@
             if(ids.length === 0) return;
             
             const btn = document.getElementById('btn-adopt');
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ADOPTION EN COURS...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> ADOPTION EN COURS...';
             
             try {
                 const payload = { target_tenant_id: ACTIVE_TENANT.tenant_id, site_ids: ids };
@@ -745,12 +808,12 @@
         }
 
         // ========================================
-        // 4. PROPAGATION
+        // 4. PROPAGATION MASSIVE & IMPORT EXCEL
         // ========================================
         function openPropagationModal() {
             const segment = document.getElementById('segment-display').value;
             const lot = document.getElementById('mat-fille').value;
-            if(!segment || segment === '--') return alert("Segment requis pour propager.");
+            if(!segment || segment === '--') return alert("Un segment est requis pour propager un prix.");
             document.getElementById('prop-segment').innerText = segment;
             document.getElementById('prop-lot').innerText = lot || "(Toute l'entreprise)";
             document.getElementById('prop-client').innerText = ACTIVE_TENANT ? ACTIVE_TENANT.name : "";
@@ -790,17 +853,17 @@
             const formData = new FormData();
             formData.append("file", input.files[0]);
             const btn = document.querySelector('#import-modal button:last-child');
-            btn.innerText = "INGESTION EN COURS...";
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> INGESTION EN COURS...';
             try {
                 const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData });
                 const data = await res.json();
                 if(data.success) { toggleImportModal(); showToast(`${data.imported} sites importés !`); loadSites(); } 
             } catch(e) {}
-            btn.innerText = "INJECTER DANS LA BASE";
+            btn.innerHTML = "INJECTER DANS LA BASE";
         }
 
         // ========================================
-        // 5. API & CLES RTE
+        // 5. API RTE & UTILITAIRES UI
         // ========================================
         async function loadRteConfig() {
             const errBox = document.getElementById('api-error');
@@ -832,7 +895,7 @@
                 const res = await fetch('/api/settings/rte', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
                 const result = await res.json();
                 if(res.ok && result.success) {
-                    showToast("Clés API Sauvegardées avec succès !");
+                    showToast("Clés API RTE Sécurisées !");
                 } else {
                     if(errBox) {
                         document.getElementById('api-error-text').innerText = `Erreur : ${result.error || "Refusé (HTTP " + res.status + ")"}`;
