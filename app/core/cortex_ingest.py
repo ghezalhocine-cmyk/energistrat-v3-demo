@@ -1,3 +1,5 @@
+# --- START OF FILE cortex_ingest.py ---
+
 import pandas as pd
 import numpy as np
 import io
@@ -16,16 +18,21 @@ except ImportError:
         db = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V7.2")
+logger = logging.getLogger("CORTEX_INGEST_V12_8")
 
 class CortexIngest:
+    """
+    CORTEX INGEST V12.8 (SMART PARSER & LOAD CURVES)
+    Ingestion massive de matrices Excel/CSV et de Courbes de Charge Enedis/GRDF.
+    Intègre les boucliers anti-notation scientifique et l'auto-détection d'unités (W/kW).
+    """
     def __init__(self):
-        self.version = "7.2 (Anti-Scientific Notation)"
+        self.version = "12.8.0 (Multi-Delimiter & Auto-Unit)"
         self.COLUMN_MAPPING = {
             "pdl":["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
             "site_label":["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM"],
             "entity":["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT", "SOCIETE"],
-            "siret": ["SIRET", "SIRET_SITE", "SIREN"],
+            "siret":["SIRET", "SIRET_SITE", "SIREN"],
             "ref_copro":["REF_COPRO", "IMMATRICULATION", "REGISTRE_COPRO", "MATRICULE"],
             "naf":["NAF", "CODE_NAF", "APE", "CODE_APE"], 
             "insee":["INSEE", "CODE_INSEE", "CODE_COMMUNE"], 
@@ -41,9 +48,9 @@ class CortexIngest:
             "compteur_prod":["COMPTEUR_PRODUCTION", "PRODUCTEUR", "INJECTION", "COMPTEUR_PROD"],
             "puissance":["PUISSANCE", "PS", "P_SOUSCRITE", "KVA", "S MAX (KVA)", "PUISSANCE_SOUSCRITE"],
             "p_max":["POINTE_MAX", "P_MAX", "PUISSANCE_ATTEINTE", "MAX_ATTEINTE"],
-            "fta": ["FTA", "FORMULE_TARIFAIRE", "OPTION"],
+            "fta":["FTA", "FORMULE_TARIFAIRE", "OPTION"],
             "cja":["CJA", "CJA_MWH_J", "CAPACITE_JOURNALIERE"],
-            "profil": ["PROFIL", "PROFIL_GAZ"],
+            "profil":["PROFIL", "PROFIL_GAZ"],
             "tarif_ach":["TARIF_ACHEM", "TARIF_ACHEMINEMENT", "ATRT"],
             "conso":["CAR_MWH", "VOLUME_ANNUEL", "CONSOMMATION", "VOLUME", "CONSO", "ESTIMATION", "VOL. ANNUEL", "CJA"],
             "segment":["SEGMENT", "SEGMENT_GAZ", "TARIF", "CATEGORIE"],
@@ -62,11 +69,10 @@ class CortexIngest:
             "prix_hch":["PRIX_HCH", "HCH"],
             "prix_hpe": ["PRIX_HPE", "HPE"],
             "prix_hce": ["PRIX_HCE", "HCE"],
-            "abonnement": ["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE", "PART_FIXE"],
+            "abonnement":["ABONNEMENT", "ABO", "FIXE", "PRIME_FIXE", "PART_FIXE"],
             "taxes": ["TAXES", "CSPE", "TICGN", "CTA"],
             "stockage":["TERME_STOCK", "STOCKAGE", "TERME_STOCKAGE"]
         }
-        self.NAME_BLACKLIST =["CLIENT", "SITE", "INCONNU", "NAN", "NONE", "NOM_SITE", "0", ".", "COMMUNE", "MAIRIE", "SOCIETE"]
 
     def _clean_header(self, h):
         return str(h).upper().strip().replace('É', 'E').replace('È', 'E').replace(' ', '_').replace('.', '').replace('-', '_')
@@ -96,7 +102,6 @@ class CortexIngest:
         # FIX EXCEL : Désamorçage de la notation scientifique (E+13)
         if 'E+' in s:
             try:
-                # Convertit "3.0E+13" en nombre réel, puis en entier, puis en texte
                 return str(int(float(s)))
             except:
                 pass
@@ -107,6 +112,9 @@ class CortexIngest:
             
         return s
 
+    # =========================================================
+    # 1. ANALYSE DE LA MATRICE EXCEL (36 COLONNES)
+    # =========================================================
     def parse_mass_import_unified(self, file_content):
         sites =[]
         df = None
@@ -116,7 +124,7 @@ class CortexIngest:
             try: buffer.seek(0); df = pd.read_csv(buffer, sep=';', encoding='latin-1', dtype=str, on_bad_lines='skip')
             except:
                 try: buffer.seek(0); df = pd.read_csv(buffer, sep=',', encoding='utf-8', dtype=str, on_bad_lines='skip')
-                except: return []
+                except: return[]
 
         if df is None or df.empty: return[]
 
@@ -125,7 +133,7 @@ class CortexIngest:
         c_siret = self._find_col(cols, "siret")
         
         if not c_pdl and not c_siret: 
-            return []
+            return[]
 
         c_nom = self._find_col(cols, "site_label")
         c_entite = self._find_col(cols, "entity")
@@ -149,7 +157,6 @@ class CortexIngest:
 
         for idx, row in df.iterrows():
             try:
-                # Création d'un ID Absolu (Priorité au PDL, sinon SIRET, sinon ID généré)
                 pdl = self._safe_str_clean(row.get(c_pdl, "")) if c_pdl else ""
                 siret = self._safe_str_clean(row.get(c_siret, "")) if c_siret else ""
                 site_id = pdl if pdl else (siret if siret else f"GEN_{uuid.uuid4().hex[:8]}")
@@ -166,7 +173,7 @@ class CortexIngest:
                 
                 provider_excel = self._safe_str_clean(row.get(c_fourn, "")) if c_fourn else "Inconnu"
 
-                # STRUCTURE PARFAITE V7
+                # STRUCTURE PARFAITE V12.8
                 site = {
                     "identity": { 
                         "id": site_id, 
@@ -194,27 +201,93 @@ class CortexIngest:
                 if db:
                     db.save_site(site_id, site)
                 sites.append(site)
-            except Exception as e: print(f"Erreur Ligne CSV: {e}")
+            except Exception as e: 
+                logger.error(f"Erreur Ligne CSV: {e}")
         return sites
 
+    # =========================================================
+    # 2. ANALYSE DES COURBES DE CHARGE (ENEDIS/GRDF)
+    # =========================================================
     def parse_load_curve(self, file_content, filename):
         try:
             buffer = io.BytesIO(file_content)
-            enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
-            buffer.seek(0)
-            try: df = pd.read_csv(buffer, sep=';', encoding=enc, on_bad_lines='skip')
-            except: 
+            enc = 'utf-8'
+            try:
+                # Détection d'encodage (Souvent UTF-8 ou Latin-1/ISO-8859-1 chez Enedis)
+                enc = chardet.detect(buffer.read(10000))['encoding'] or 'utf-8'
+            except: pass
+
+            df = None
+            # 🛡️ BOUCLIER 1 : MULTI-SÉPARATEURS (Gestion des Tabs \t)
+            for sep in[';', '\t', ',']:
                 buffer.seek(0)
-                df = pd.read_csv(buffer, sep=',', encoding=enc, on_bad_lines='skip')
-            col_date = next((c for c in df.columns if "DATE" in str(c).upper()), None)
-            col_val = next((c for c in df.columns if "PUISSANCE" in str(c).upper() or "VALEUR" in str(c).upper()), None)
-            if not col_date or not col_val: return None, 0, {}
+                try:
+                    temp_df = pd.read_csv(buffer, sep=sep, encoding=enc, on_bad_lines='skip', engine='python')
+                    if len(temp_df.columns) > 2:  # Au moins Date, Valeur et éventuellement Unité
+                        df = temp_df
+                        break
+                except: continue
+
+            if df is None or df.empty:
+                return None, 0, {}
+
+            # 🛡️ BOUCLIER 2 : DÉTECTION SÉCURISÉE DE LA DATE (Priorité "Horodate")
+            col_date = None
+            for c in df.columns:
+                c_up = str(c).upper()
+                if "HORODATE" in c_up:
+                    col_date = c
+                    break
+                    
+            if not col_date:
+                for c in df.columns:
+                    c_up = str(c).upper()
+                    # On exclut "Début" et "Fin" pour éviter le delta 0
+                    if "DATE" in c_up and "DÉBUT" not in c_up and "DEBUT" not in c_up and "FIN" not in c_up:
+                        col_date = c
+                        break
+
+            # Détection de la colonne Valeur
+            col_val = next((c for c in df.columns if "VALEUR" in str(c).upper() or "PUISSANCE" in str(c).upper() or "SOUTIRAGE" in str(c).upper()), None)
+
+            if not col_date or not col_val: 
+                return None, 0, {}
+
+            # 🛡️ BOUCLIER 3 : DÉTECTION DE L'UNITÉ (W vs kW)
+            col_unit = next((c for c in df.columns if "UNIT" in str(c).upper()), None)
+            is_watt = False
+            if col_unit and not df.empty:
+                first_unit = str(df[col_unit].dropna().iloc[0]).upper()
+                if "W" in first_unit and "KW" not in first_unit and "MW" not in first_unit:
+                    is_watt = True
+
+            # 4. Formatage et Nettoyage
             df = df.rename(columns={col_date: 'date', col_val: 'val'})
             df['val'] = df['val'].apply(self._safe_float)
+            
+            # Conversion vitale W -> kW
+            if is_watt:
+                df['val'] = df['val'] / 1000.0
+                
             df['date'] = pd.to_datetime(df['date'], dayfirst=True, errors='coerce')
-            df = df.dropna()
-            delta = (df['date'].iloc[1] - df['date'].iloc[0]).total_seconds() / 60
-            return df, int(delta), {}
-        except: return None, 0, {}
+            df = df.dropna(subset=['date', 'val'])
+            
+            if len(df) < 2:
+                return None, 0, {}
+
+            # Tri temporel obligatoire pour garantir le pas de temps
+            df = df.sort_values(by='date')
+
+            # 5. Calcul du pas de temps (Delta)
+            delta = (df['date'].iloc[1] - df['date'].iloc[0]).total_seconds() / 60.0
+            if delta <= 0:
+                delta = 10.0 # Fallback Enedis Standard (10 minutes)
+            
+            return df, int(abs(delta)), {}
+            
+        except Exception as e:
+            logger.error(f"Erreur critique parse_load_curve: {e}")
+            return None, 0, {}
 
 ingest = CortexIngest()
+# --- END OF FILE cortex_ingest.py ---
