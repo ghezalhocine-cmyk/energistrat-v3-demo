@@ -100,6 +100,9 @@ class MockAcademy:
 class MockPricer:
     def build_quote(self, payload): return {"success": False, "error": "CORTEX Pricer Offline."}
 
+class MockPPA:
+    def simulate_ppa(self, s, c, p): return {"error": "Moteur CORTEX PPA hors ligne."}
+
 def load_module(mod_name, obj_name, mock_instance=None):
     paths =[f"app.core.{mod_name}", f"core.{mod_name}", mod_name]
     for path in paths:
@@ -127,6 +130,7 @@ academy_engine = load_module("cortex_academy", "academy_engine", MockAcademy())
 pricer_engine = load_module("cortex_pricer", "pricer_engine", MockPricer())
 pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 ademe_engine = load_module("cortex_ademe", "ademe_engine", MockAdeme())
+ppa_engine = load_module("cortex_ppa", "ppa_engine", MockPPA())
 
 app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.6-SECURE")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -153,7 +157,10 @@ class CarbonSettingsModel(BaseModel): baseline_year: int = 2010; baseline_kwh_sq
 class VoteRequestModel(BaseModel): site_id: str; vote: bool
 class LegalSignModel(BaseModel): site_id: str; consent: bool
 class SolarRequest(BaseModel): address: str; surface_roof: float; electricity_price: float
-
+class PpaSimulationRequest(BaseModel):
+    site_id: str
+    coverage_pct: float
+    strike_price: float
 class CRMSiteModel(BaseModel): pdl_pce: str; energy_type: str = "elec"; site_name: str; address: str; power_kva: float = 0.0; fta: str = "CU"; profile: str = "PRO1"; car_mwh: float = 0.0; is_active: bool = True; company_id: str
 class CRMContactModel(BaseModel): firstname: str; lastname: str; role: str; email: str; phone: str; company_id: str; site_id: Optional[str] = None
 class CRMCompany3DModel(BaseModel): siren: str; company_name: str; holding_name: Optional[str] = None; naf: str; address: str; city: str; source: str; pipeline: str 
@@ -1095,6 +1102,31 @@ async def api_finance_upload(file: UploadFile = File(...), site_id: str = Form(.
 # ==============================================================================
 # API DÉCISIONS LAB (Orchestration vers les Moteurs CORTEX)
 # ==============================================================================
+
+@app.post("/api/v4/simulate/ppa")
+async def api_simulate_ppa(payload: PpaSimulationRequest, user = Depends(get_current_user)):
+    """API CORTEX V4 : Moteur d'ingénierie financière PPA (Option B)"""
+    try:
+        if not user:
+            return JSONResponse({"error": "Non autorisé"}, status_code=401)
+            
+        site_data = db.get_site(payload.site_id)
+        if not site_data:
+            return JSONResponse({"error": "Actif introuvable dans la base 3D."}, status_code=404)
+            
+        # Sécurité God Mode / Multi-Tenant
+        profile = db.get_user_profile(user.get("uid"))
+        if user.get("role") != "ADMIN" and site_data.get("identity", {}).get("tenant_id") != profile.get("tenant_id"):
+            return JSONResponse({"error": "Accès refusé."}, status_code=403)
+
+        # Délégation totale au moteur CORTEX PPA
+        result = ppa_engine.simulate_ppa(site_data, payload.coverage_pct, payload.strike_price)
+        
+        return JSONResponse(json_compliant(result))
+        
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 @app.post("/api/v4/simulate/ebitda")
 async def api_simulate_ebitda(payload: EbitdaRequest, user = Depends(get_current_user)):
     try:
