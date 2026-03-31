@@ -474,15 +474,18 @@
     <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
+<!-- ============================================================================== -->
+    <!-- LOGIQUE JAVASCRIPT (CORTEX DATA UNITY V12.8 - PATCH ANTI-CRASH)                -->
+    <!-- ============================================================================== -->
     <script>
         const App = {
             toast: function(msg, type='info') {
                 const container = document.getElementById('toast-container');
                 if(!container) return;
-                const colors = { success: 'bg-green-600 border-green-500 text-white', error: 'bg-alert border-alert text-white', info: 'bg-cyan border-cyan text-abysse', sage: 'bg-purple border-purple text-white' };
+                const colors = { success: 'bg-success border-success/50 text-abysse', error: 'bg-alert border-alert/50 text-white', info: 'bg-cyan border-cyan/50 text-abysse', sage: 'bg-purple border-purple/50 text-white' };
                 const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
                 const el = document.createElement('div');
-                el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto`;
+                el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto z-[999]`;
                 el.innerHTML = `<i class="fa-solid ${icon} text-lg"></i> <span>${msg}</span>`;
                 container.appendChild(el);
                 requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
@@ -496,18 +499,15 @@
 
         let SITES =[];
         let CURRENT_SITE_ID = null;
-        let CURRENT_ENERGY_FORM = 'elec';
-        let GLOBAL_TENANT_ID = forceTenant !== 'ALL' ? forceTenant : "TENANT_DEFAULT";
-
-        function goBack() {
-            if(window.history.length > 1) window.history.back();
-            else window.location.href = '/ops_nexus';
-        }
+        let currentEnergy = 'elec';
+        let GLOBAL_TENANT_ID = (forceTenant && forceTenant !== 'ALL') ? forceTenant : "TENANT_DEFAULT";
 
         document.addEventListener('DOMContentLoaded', () => {
             if(forceTenant && forceTenant !== 'ALL') {
-                document.getElementById('god-mode-indicator').classList.remove('hidden');
-                document.getElementById('import-tenant-id').innerText = forceTenant;
+                const ind = document.getElementById('god-mode-indicator');
+                if(ind) ind.classList.remove('hidden');
+                const impId = document.getElementById('import-tenant-id');
+                if(impId) impId.innerText = forceTenant;
             }
             switchView('general'); 
         });
@@ -565,8 +565,6 @@
                         
                         const nom = etab.nom_complet || etab.nom_raison_sociale || "Entité Publique";
                         document.getElementById('partner-name').value = nom;
-                        
-                        // AUTOCOMPLETION NAF
                         document.getElementById('partner-naf').value = etab.activite_principale || "Inconnu";
                         
                         GLOBAL_TENANT_ID = val; 
@@ -597,7 +595,7 @@
                 await fetch('/api/partner/save_config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
                 await fetch('/api/settings/carbon', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ baseline_year: data.baseline_year, baseline_kwh_sqm: 0.0 }) });
                 App.toast("Identité Master Tenant verrouillée.", "success");
-            } catch(e) { App.toast("Erreur sauvegarde.", "error"); }
+            } catch(e) { App.toast("Erreur de sauvegarde.", "error"); }
         }
 
         // ==========================================
@@ -626,16 +624,16 @@
             const avg = Math.round(totalScore / SITES.length);
             const el = document.getElementById('global-health');
             el.innerText = `${avg}%`;
-            el.className = `text-xl font-black font-mono ${avg === 100 ? 'text-success' : (avg > 60 ? 'text-cyan' : 'text-alert')}`;
+            el.className = `text-cyan font-black font-mono text-lg ${avg === 100 ? 'text-success' : (avg > 60 ? 'text-cyan' : 'text-alert')}`;
         }
 
         function calculateHealthScoreInternal(s) {
             let score = 0;
             if(s.pdl || s.id) score += 25;
-            if(s.surface || s.SURFACE_M2) score += 25;
-            if(s.provider || s.FOURNISSEUR) score += 15;
-            if(s.budget > 0 || s.prix_hph || s.price_kwh || s.PRIX_HPH || s.PRIX_MOL_EUR_MWH) score += 20;
-            if(s.end_date || s.FIN_MARCHE_YYYYMMDD) score += 15;
+            if(s.surface || s.SURFACE_M2 || (s.location && s.location.surface)) score += 25;
+            if(s.provider || s.FOURNISSEUR || (s.contract && s.contract.provider)) score += 15;
+            if(s.budget > 0 || s.prix_hph || s.price_kwh || (s.kpis && s.kpis.budget > 0)) score += 20;
+            if(s.end_date || s.FIN_MARCHE_YYYYMMDD || (s.contract && s.contract.end_date)) score += 15;
             return Math.min(score, 100);
         }
 
@@ -706,10 +704,12 @@
                 
                 const identity = data.identity || {};
                 document.getElementById('site-name').value = identity.site_name || data.name || data.NOM_SITE || "";
-                document.getElementById('site-lot').value = identity.ref_copro || identity.lot_name || data.segment || data.LOT_AFFECTATION || "";
+                document.getElementById('site-lot').value = identity.lot_name || identity.ref_copro || data.segment || data.LOT_AFFECTATION || "";
                 
                 const loc = data.location || {};
-                document.getElementById('site-city').value = loc.city || data.city || data.VILLE || "";
+                document.getElementById('address-input').value = loc.address || data.ADRESSE_SITE || "";
+                document.getElementById('zip-input').value = loc.zip_code || data.CP || "";
+                document.getElementById('city-input').value = loc.city || data.city || data.VILLE || "";
                 document.getElementById('site-surface').value = loc.surface || data.surface || data.SURFACE_M2 || "";
                 document.getElementById('site-insee').value = loc.insee || data.insee || data.INSEE || "";
                 document.getElementById('inp-type').value = loc.typologie || data.typologie || data.TYPOLOGIE || "";
@@ -732,7 +732,7 @@
                 // GAZ SPECS
                 document.getElementById('site-profil-gaz').value = contract.profil || data.profil || data.PROFIL || "";
                 document.getElementById('ps-gaz-cja').value = contract.cja || data.cja || data.CJA_MWH_J || "";
-                document.getElementById('ps-gaz-car').value = data.kpis?.car_mwh || data.volume_mwh || data.CAR_MWH || "";
+                document.getElementById('ps-gaz-car').value = data.kpis?.volume_mwh || data.volume_mwh || data.CAR_MWH || "";
 
                 const p = data.pricing || {};
                 let taxVal = parseFloat(p.tax || p.taxes || p.price_tax || data.TAXES || 22.5);
@@ -775,7 +775,7 @@
             document.getElementById('site-health-score').innerText = "0%";
             document.getElementById('site-health-score').className = "text-2xl font-black font-mono text-alert";
             
-            const inputs =['site-name','site-lot','site-surface','site-city','site-insee','site-pdl','site-provider','site-start-date','site-end-date','ps-hph','ps-hch','ps-hpe','ps-hce','ps-unique','px-hph','px-hch','px-hpe','px-hce','px-unique','px-fix','ps-gaz-cja','ps-gaz-car','site-profil-gaz','px-gaz-mol','px-gaz-fix','px-gaz-stock','inp-type'];
+            const inputs =['site-name','site-lot','address-input','site-surface','city-input','zip-input','site-insee','site-pdl','site-provider','site-start-date','site-end-date','ps-hph','ps-hch','ps-hpe','ps-hce','ps-unique','px-hph','px-hch','px-hpe','px-hce','px-unique','px-fix','ps-gaz-cja','ps-gaz-car','site-profil-gaz','px-gaz-mol','px-gaz-fix','px-gaz-stock','inp-type'];
             inputs.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
             document.getElementById('px-tax').value = "22.5";
             document.getElementById('px-gaz-tax').value = "8.44";
@@ -827,84 +827,103 @@
             const btn = document.getElementById('btn-save-site');
             const original = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xl mr-3"></i> Synchronisation...';
-            
-            const inputPdl = document.getElementById('site-pdl').value.replace(/\s/g, '');
-            if(!inputPdl) { App.toast("L'identifiant PDL/PCE est obligatoire.", "error"); btn.innerHTML = original; return; }
+            btn.disabled = true;
 
-            const isAdvanced = document.getElementById('quadrant-toggle').checked;
-
-            const payload = {
-                id: CURRENT_SITE_ID || inputPdl, 
-                identity: {
-                    id: CURRENT_SITE_ID || inputPdl, 
-                    tenant_id: GLOBAL_TENANT_ID,
-                    site_name: document.getElementById('site-name').value,
-                    lot_name: document.getElementById('site-lot').value
-                },
-                location: { 
-                    city: document.getElementById('site-city').value,
-                    zip_code: document.getElementById('zip-input').value,
-                    insee: document.getElementById('site-insee').value,
-                    surface: parseFloat(document.getElementById('site-surface').value) || 0,
-                    typologie: document.getElementById('inp-type').value
-                },
-                contract: {
-                    pdl: currentEnergy === 'elec' ? inputPdl : "",
-                    pce: currentEnergy === 'gaz' ? inputPdl : "",
-                    power: currentEnergy === 'gaz' ? 0 : (isAdvanced ? 0 : parseFloat(document.getElementById('ps-unique').value) || 0),
-                    cja: currentEnergy === 'gaz' ? parseFloat(document.getElementById('ps-gaz-cja').value) || 0 : 0,
-                    profil: currentEnergy === 'gaz' ? document.getElementById('site-profil-gaz').value : "",
-                    provider: document.getElementById('site-provider').value,
-                    start_date: document.getElementById('site-start-date').value,
-                    end_date: document.getElementById('site-end-date').value,
-                    energy_type: currentEnergy,
-                    power_details: {
-                        hph: parseFloat(document.getElementById('ps-hph').value) || 0,
-                        hch: parseFloat(document.getElementById('ps-hch').value) || 0,
-                        hpe: parseFloat(document.getElementById('ps-hpe').value) || 0,
-                        hce: parseFloat(document.getElementById('ps-hce').value) || 0
-                    }
-                },
-                kpis: {
-                    volume_mwh: currentEnergy === 'gaz' ? parseFloat(document.getElementById('ps-gaz-car').value) || 0 : 0
-                },
-                pricing: {
-                    price_kwh: currentEnergy === 'elec' && !isAdvanced ? (parseFloat(document.getElementById('px-unique').value) || 0)/1000 : (currentEnergy === 'gaz' ? (parseFloat(document.getElementById('px-gaz-mol').value)||0)/1000 : 0),
-                    hph: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hph').value) || 0,
-                    hch: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hch').value) || 0,
-                    hpe: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hpe').value) || 0,
-                    hce: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hce').value) || 0,
-                    fix: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-fix').value) || 0 : parseFloat(document.getElementById('px-fix').value) || 0,
-                    stockage: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-stock').value) || 0 : 0,
-                    tax: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-tax').value) || 8.44 : parseFloat(document.getElementById('px-tax').value) || 22.5
-                }
-            };
-            
             try {
-                const res = await fetch('/api/settings/save_client', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                // SÉCURITÉ : La lecture du DOM est protégée ici
+                const inputPdl = document.getElementById('site-pdl').value.replace(/\s/g, '');
+                if(!inputPdl) { 
+                    App.toast("L'identifiant PDL/PCE est obligatoire.", "error"); 
+                    btn.innerHTML = original; btn.disabled = false; 
+                    return; 
+                }
+
+                const isAdvanced = document.getElementById('quadrant-toggle').checked;
+
+                const payload = {
+                    id: CURRENT_SITE_ID || inputPdl, 
+                    identity: {
+                        id: CURRENT_SITE_ID || inputPdl, 
+                        tenant_id: GLOBAL_TENANT_ID,
+                        site_name: document.getElementById('site-name').value,
+                        lot_name: document.getElementById('site-lot').value
+                    },
+                    location: { 
+                        address: document.getElementById('address-input').value, // AJOUTÉ : Adresse du bâtiment
+                        city: document.getElementById('city-input').value,       // CORRIGÉ : Bon ID pour la ville
+                        zip_code: document.getElementById('zip-input').value,
+                        insee: document.getElementById('site-insee').value,
+                        surface: parseFloat(document.getElementById('site-surface').value) || 0,
+                        typologie: document.getElementById('inp-type').value
+                    },
+                    contract: {
+                        pdl: currentEnergy === 'elec' ? inputPdl : "",
+                        pce: currentEnergy === 'gaz' ? inputPdl : "",
+                        power: currentEnergy === 'gaz' ? 0 : (isAdvanced ? 0 : parseFloat(document.getElementById('ps-unique').value) || 0),
+                        cja: currentEnergy === 'gaz' ? parseFloat(document.getElementById('ps-gaz-cja').value) || 0 : 0,
+                        profil: currentEnergy === 'gaz' ? document.getElementById('site-profil-gaz').value : "",
+                        provider: document.getElementById('site-provider').value,
+                        start_date: document.getElementById('site-start-date').value,
+                        end_date: document.getElementById('site-end-date').value,
+                        energy_type: currentEnergy,
+                        power_details: {
+                            hph: parseFloat(document.getElementById('ps-hph').value) || 0,
+                            hch: parseFloat(document.getElementById('ps-hch').value) || 0,
+                            hpe: parseFloat(document.getElementById('ps-hpe').value) || 0,
+                            hce: parseFloat(document.getElementById('ps-hce').value) || 0
+                        }
+                    },
+                    kpis: {
+                        volume_mwh: currentEnergy === 'gaz' ? parseFloat(document.getElementById('ps-gaz-car').value) || 0 : 0
+                    },
+                    pricing: {
+                        price_kwh: currentEnergy === 'elec' && !isAdvanced ? (parseFloat(document.getElementById('px-unique').value) || 0)/1000 : (currentEnergy === 'gaz' ? (parseFloat(document.getElementById('px-gaz-mol').value)||0)/1000 : 0),
+                        hph: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hph').value) || 0,
+                        hch: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hch').value) || 0,
+                        hpe: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hpe').value) || 0,
+                        hce: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hce').value) || 0,
+                        fix: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-fix').value) || 0 : parseFloat(document.getElementById('px-fix').value) || 0,
+                        stockage: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-stock').value) || 0 : 0,
+                        tax: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-tax').value) || 8.44 : parseFloat(document.getElementById('px-tax').value) || 22.5
+                    }
+                };
+
+                const res = await fetch('/api/settings/save_client', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify(payload) 
+                });
                 const response = await res.json();
+                
                 if(response.success) { 
                     App.toast("Actif synchronisé avec la Base 3D CORTEX.", "success"); 
                     CURRENT_SITE_ID = response.id || payload.id; 
                     await loadFleet(); 
                     loadSiteForm(CURRENT_SITE_ID); 
-                } else { App.toast("Erreur serveur : " + response.error, "error"); }
-            } catch(e) { App.toast("Erreur réseau.", "error"); }
-            btn.innerHTML = original;
+                } else { 
+                    App.toast("Erreur serveur : " + response.error, "error"); 
+                }
+            } catch(e) { 
+                App.toast("Le formulaire contient une erreur de syntaxe ou le réseau a coupé.", "error"); 
+                console.error(e);
+            } finally {
+                btn.innerHTML = original;
+                btn.disabled = false;
+            }
         }
 
         // ==========================================
-        // VUE 3 : IMPORT MASSIF EXCEL (SMART TEMPLATE 36 COLONNES)
+        // VUE 3 : IMPORT MASSIF EXCEL (SMART TEMPLATE)
         // ==========================================
         window.downloadTemplate = function() {
-            App.toast("Génération de la matrice V12.6...", "info");
+            App.toast("Génération de la matrice V12.8...", "info");
             const csv = "ENTITE;NOM_SITE;ADRESSE_SITE;CP;VILLE;INSEE;SIRET_SITE;NAF;ENERGIE;PDL_PCE;SEGMENT;PROFIL;FOURNISSEUR;DATE_DEBUT;FIN_MARCHE_YYYYMMDD;VOLUME_ANNUEL;CJA_MWH_J;TYPOLOGIE;PUISSANCE_KVA;PS_HPH;PS_HCH;PS_HPE;PS_HCE;PRIX_MOL_EUR_MWH;PRIX_HPH;PRIX_HCH;PRIX_HPE;PRIX_HCE;ABONNEMENT_EUR;TERME_STOC;TAXES;SURFACE_M2\n" +
                         "Mairie de Grenoble;Hôtel de Ville;11 Boulevard Jean Pain;38000;GRENOBLE;38185;21380185500018;8411Z;ELEC;30001234567890;C4;;EDF;01/01/2025;20261231;250;;Bâtiment;250;60;60;60;60;;150;100;120;80;350;;22.5;15000\n" +
                         "Mairie de Grenoble;Gymnase;2 Rue des Sports;38000;GRENOBLE;38185;21380185500018;8411Z;GAZ;12345678901234;;T2/P12;ENGIE;01/01/2025;20261231;450;0;Sport;;;;;;45.5;;;;;250;0.70;8.44;2500\n";
             setTimeout(() => {
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement("a"); a.href = url; a.download = `Matrice_CORTEX_V12.6.csv`;
+                const a = document.createElement("a"); a.href = url; a.download = `Matrice_CORTEX_V12.8.csv`;
                 document.body.appendChild(a); a.click(); a.remove();
                 App.toast("Matrice téléchargée.", "success");
             }, 800);
@@ -1026,7 +1045,7 @@
                 } catch(e) {}
             }, 300);
         }
-        document.addEventListener('click', function(e) { if (!document.getElementById('address-input').contains(e.target)) document.getElementById('address-suggestions').classList.add('hidden'); });
+        document.addEventListener('click', function(e) { if (document.getElementById('address-input') && !document.getElementById('address-input').contains(e.target)) { const sug = document.getElementById('address-suggestions'); if(sug) sug.classList.add('hidden'); } });
 
     </script>
 </body>
