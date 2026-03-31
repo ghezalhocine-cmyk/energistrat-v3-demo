@@ -660,9 +660,11 @@ async def api_get_sentinel_alerts(): return db.get_sentinel_alerts()
 @app.post("/api/ops/sentinel/run")
 async def api_run_sentinel_scan(user = Depends(get_current_user)): return JSONResponse({"success": True, "message": "Scan SGE déclenché."})
 
+import re # N'oublie pas de vérifier que "import re" est bien tout en haut de ton main.py (avec les autres imports)
+
 @app.post("/api/ingest/upload")
 async def api_ingest_upload(files: List[UploadFile] = File(...), user = Depends(get_current_user)):
-    """Aiguilleur Mass Ingest (SGE/GRDF) vers Cortex Ingest"""
+    """Aiguilleur Smart Ingest (Matrice Globale vs Courbe de Charge ENEDIS/GRDF)"""
     if not user or user.get("role") != "ADMIN":
         return JSONResponse({"error": "Accès refusé. Réservé aux Opérationnels."}, status_code=401)
     
@@ -673,21 +675,65 @@ async def api_ingest_upload(files: List[UploadFile] = File(...), user = Depends(
     for file in files:
         try:
             content = await file.read()
-            # Délégation au moteur CORTEX (qui va lire le fichier et sauvegarder en base 3D)
-            sites_imported = ingest.parse_mass_import_unified(content)
+            filename_upper = file.filename.upper()
             
-            if sites_imported and len(sites_imported) > 0:
-                report.append({
-                    "filename": file.filename,
-                    "status": "INGESTED",
-                    "message": f"{len(sites_imported)} compteurs synchronisés avec succès dans la Base 3D."
-                })
+            # 1. SMART ROUTER : Détection d'une Courbe de Charge (SGE / ADAM)
+            # On cherche un PDL/PCE (14 chiffres consécutifs) dans le nom du fichier
+            pdl_match = re.search(r'(\d{14})', filename_upper)
+            
+            if pdl_match and ("ENEDIS" in filename_upper or "GRDF" in filename_upper or "CDC" in filename_upper):
+                pdl = pdl_match.group(1)
+                
+                # C'est une courbe ! On délègue au moteur Physique
+                df, delta_minutes, meta = ingest.parse_load_curve(content, file.filename)
+                
+                if df is not None and not df.empty:
+                    # Traitement mathématique rapide de la courbe
+                    # Si delta=10 min, on divise par 6 pour avoir des kWh
+                    total_kwh = float(df['val'].sum() * (delta_minutes / 60.0))
+                    pmax_kw = float(df['val'].max())
+                    
+                    # Mise à jour silencieuse dans la Base 3D
+                    site_data = db.get_site(pdl) or {}
+                    if 'identity' not in site_data: site_data['identity'] = {'id': pdl, 'site_name': f"Site {pdl}"}
+                    if 'contract' not in site_data: site_data['contract'] = {'pdl': pdl if "ENEDIS" in filename_upper else "", 'pce': pdl if "GRDF" in filename_upper else ""}
+                    if 'kpis' not in site_data: site_data['kpis'] = {}
+                    
+                    # Injection des vraies données SGE
+                    site_data['kpis']['volume_mwh'] = round(total_kwh / 1000, 2)
+                    site_data['kpis']['pmax_kw'] = round(pmax_kw, 2)
+                    site_data['kpis']['has_load_curve'] = True
+                    
+                    db.save_site(pdl, site_data)
+                    
+                    report.append({
+                        "filename": file.filename,
+                        "status": "INGESTED",
+                        "message": f"Courbe SGE ({pdl}) : {round(total_kwh/1000, 2)} MWh et Pmax {round(pmax_kw)} kW injectés."
+                    })
+                else:
+                    report.append({
+                        "filename": file.filename,
+                        "status": "ERROR",
+                        "message": "Fichier SGE illisible, corrompu ou vide."
+                    })
+            
+            # 2. SMART ROUTER : Détection d'une Matrice Excel/CSV classique
             else:
-                report.append({
-                    "filename": file.filename,
-                    "status": "UNKNOWN_PDL",
-                    "message": "Aucun PDL/PCE détecté ou format de matrice non reconnu."
-                })
+                sites_imported = ingest.parse_mass_import_unified(content)
+                if sites_imported and len(sites_imported) > 0:
+                    report.append({
+                        "filename": file.filename,
+                        "status": "INGESTED",
+                        "message": f"{len(sites_imported)} compteurs synchronisés via la Matrice."
+                    })
+                else:
+                    report.append({
+                        "filename": file.filename,
+                        "status": "UNKNOWN_PDL",
+                        "message": "Aucun PDL détecté ni format de matrice reconnu."
+                    })
+                    
         except Exception as e:
             report.append({
                 "filename": file.filename,
@@ -696,7 +742,6 @@ async def api_ingest_upload(files: List[UploadFile] = File(...), user = Depends(
             })
             
     return JSONResponse({"success": True, "report": report})
-
 @app.get("/api/tools/sniper/market")
 async def api_sniper_market(user = Depends(get_current_user)):
     if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
