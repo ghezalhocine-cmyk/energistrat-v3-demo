@@ -660,6 +660,43 @@ async def api_get_sentinel_alerts(): return db.get_sentinel_alerts()
 @app.post("/api/ops/sentinel/run")
 async def api_run_sentinel_scan(user = Depends(get_current_user)): return JSONResponse({"success": True, "message": "Scan SGE déclenché."})
 
+@app.post("/api/ingest/upload")
+async def api_ingest_upload(files: List[UploadFile] = File(...), user = Depends(get_current_user)):
+    """Aiguilleur Mass Ingest (SGE/GRDF) vers Cortex Ingest"""
+    if not user or user.get("role") != "ADMIN":
+        return JSONResponse({"error": "Accès refusé. Réservé aux Opérationnels."}, status_code=401)
+    
+    if not ingest:
+        return JSONResponse({"error": "Moteur CORTEX INGEST hors ligne."}, status_code=500)
+        
+    report =[]
+    for file in files:
+        try:
+            content = await file.read()
+            # Délégation au moteur CORTEX (qui va lire le fichier et sauvegarder en base 3D)
+            sites_imported = ingest.parse_mass_import_unified(content)
+            
+            if sites_imported and len(sites_imported) > 0:
+                report.append({
+                    "filename": file.filename,
+                    "status": "INGESTED",
+                    "message": f"{len(sites_imported)} compteurs synchronisés avec succès dans la Base 3D."
+                })
+            else:
+                report.append({
+                    "filename": file.filename,
+                    "status": "UNKNOWN_PDL",
+                    "message": "Aucun PDL/PCE détecté ou format de matrice non reconnu."
+                })
+        except Exception as e:
+            report.append({
+                "filename": file.filename,
+                "status": "ERROR",
+                "message": f"Erreur critique: {str(e)}"
+            })
+            
+    return JSONResponse({"success": True, "report": report})
+
 @app.get("/api/tools/sniper/market")
 async def api_sniper_market(user = Depends(get_current_user)):
     if not rte: return JSONResponse({"success": False, "error": "Module RTE hors ligne"})
