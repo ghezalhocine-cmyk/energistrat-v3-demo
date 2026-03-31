@@ -464,7 +464,7 @@
         </div>
     </div>
 <!-- ============================================================================== -->
-    <!-- LOGIQUE JAVASCRIPT (CORTEX SALES V12.8)                                        -->
+    <!-- LOGIQUE JAVASCRIPT (CORTEX SALES V12.8 - FULL RECOVERY)                        -->
     <!-- ============================================================================== -->
     <script>
         const App = {
@@ -504,7 +504,7 @@
             loadAdminCatalogue();
         });
 
-        // --- 1. PIPELINE & KANBAN (AVEC DRAG & DROP FIXÉ) ---
+        // --- 1. PIPELINE & KANBAN ---
         async function switchPipeline(type) {
             currentPipeline = type;
             document.querySelectorAll('.pipe-tab').forEach(t => { t.classList.remove('bg-cyan', 'text-abysse', 'bg-success', 'text-white', 'shadow-[0_0_15px_rgba(0,229,255,0.4)]', 'shadow-[0_0_15px_rgba(0,255,102,0.4)]'); t.classList.add('text-gray-400'); });
@@ -545,7 +545,7 @@
                     renderKanban(columns); renderList();
                     if(document.getElementById('map-container').classList.contains('flex')) { plotWarRoomMap(); }
                 }
-            } catch (err) {}
+            } catch (err) { App.toast("Erreur de chargement du pipeline", "error"); }
         }
 
         function renderKanban(columns) {
@@ -582,7 +582,32 @@
             }
         }
 
-        // --- 2. DRAG & DROP (LA MAGIE RÉPARÉE) ---
+        function renderList() {
+            const tbody = document.getElementById('list-tbody');
+            tbody.innerHTML = '';
+            Object.values(dealsData).forEach(d => {
+                let bColor = d.solvency_score === 'VERT' ? 'bg-success shadow-[0_0_5px_#00FF66]' : (d.solvency_score === 'ORANGE' ? 'bg-warning shadow-[0_0_5px_#FFB800]' : (d.solvency_score === 'ROUGE' ? 'bg-alert' : 'bg-gray-500'));
+                let alertIcon = d.saas_alerts?.length > 0 ? `<i class="ph ph-warning text-alert text-xl ml-2 drop-shadow-md" title="Alerte SaaS"></i>` : '';
+                tbody.insertAdjacentHTML('beforeend', `
+                    <tr class="grid-row border-b border-white/5 transition-colors cursor-pointer hover:bg-white/5" onclick="openDeal('${d.id}')">
+                        <td class="p-5"><p class="font-black text-white text-base">${d.holding_name || d.name || "Client"}</p><p class="text-[10px] text-gray-500 font-mono mt-1">${d.name || ""}</p></td>
+                        <td class="p-5"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full ${bColor}"></div><span class="text-xs text-gray-300 font-mono font-bold">${d.company_id ? d.company_id.replace("COMP_", "") : "---"}</span></div></td>
+                        <td class="p-5"><select onclick="event.stopPropagation()" onchange="quickChangeStage('${d.id}', this.value)" class="bg-abysse border border-cyan/30 text-cyan text-xs font-bold rounded-xl px-4 py-2 outline-none cursor-pointer hover:bg-cyan/10 transition uppercase tracking-widest shadow-inner">${Object.entries(STAGES).map(([k,v]) => `<option value="${k}" ${d.stage === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+                        <td class="p-5 text-sm font-bold text-gray-300 flex items-center gap-2"><i class="ph ph-buildings text-lg text-gray-500"></i> ${d.sites_count || 0} sites ${alertIcon}</td>
+                        <td class="p-5 text-right text-lg font-black text-cyan drop-shadow-md">${new Intl.NumberFormat('fr-FR').format(Math.round(d.commission_est || 0))} €</td>
+                    </tr>`);
+            });
+        }
+
+        function filterList() {
+            const query = document.getElementById('search-list').value.toLowerCase();
+            const rows = document.getElementById('list-tbody').getElementsByTagName('tr');
+            for (let row of rows) {
+                row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+            }
+        }
+
+        // --- 2. DRAG & DROP KANBAN ---
         function dragStart(event, dealId) { event.dataTransfer.setData("deal_id", dealId); }
         function allowDrop(event) { event.preventDefault(); }
         function dragEnter(event, element) { event.preventDefault(); element.classList.add('drag-over'); }
@@ -612,58 +637,98 @@
             }
         }
 
-        function renderList() { /* Inchangé, même logique que renderKanban */ }
-        function filterList() { /* Inchangé */ }
-
-        // --- 3. VUE DÉTAILLÉE DU DEAL (LES 3 COLONNES) ---
+        // --- 3. VUE DÉTAILLÉE DU DEAL (FULLSCREEN) ---
         function openDeal(dealId) {
             try {
                 currentDealId = dealId;
                 const deal = dealsData[dealId];
                 if (!deal) return;
 
-                // Identité
                 document.getElementById('fs-holding-name').innerText = deal.holding_name || deal.name || "Inconnu";
                 document.getElementById('fs-pipeline-badge').innerText = (deal.pipeline || currentPipeline).toUpperCase();
+                
+                const badge = document.getElementById('fs-solvency');
+                if (deal.solvency_score === 'VERT') badge.className = "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border bg-success/20 text-success border-success/50 shadow-[0_0_10px_rgba(0,255,102,0.2)]";
+                else if (deal.solvency_score === 'ORANGE') badge.className = "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border bg-warning/20 text-warning border-warning/50";
+                else if (deal.solvency_score === 'ROUGE') badge.className = "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border bg-alert/20 text-alert border-alert/50 animate-pulse";
+                else badge.className = "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border bg-gray-800 text-gray-300 border-gray-600";
+                badge.innerText = deal.solvency_msg || "Non vérifié";
+
                 document.getElementById('fs-siren').innerText = deal.company_id ? deal.company_id.replace("COMP_", "") : "---";
                 document.getElementById('fs-naf').innerText = deal.naf || "---";
                 document.getElementById('fs-address').innerText = deal.city || "---";
                 document.getElementById('fs-stage-select').value = deal.stage || 'LEAD';
 
-                // Intelligence (Mailto et Icebreaker)
+                const wLink = document.getElementById('fs-website-link');
+                const wSpan = document.getElementById('fs-website');
+                if (deal.website && deal.website !== "") {
+                    wSpan.innerText = deal.website;
+                    wLink.href = deal.website.startsWith('http') ? deal.website : `https://${deal.website}`;
+                    wLink.style.pointerEvents = "auto";
+                } else {
+                    wSpan.innerText = "---"; wLink.removeAttribute('href'); wLink.style.pointerEvents = "none";
+                }
+
+                // INTELLIGENCE & MAILTO
                 if(deal.intelligence) {
                     document.getElementById('fs-icebreaker-box').classList.remove('hidden');
                     document.getElementById('fs-pain-point').innerText = deal.intelligence.pain_points || "N/A";
                     document.getElementById('fs-pitch').innerText = deal.intelligence.pitch || "N/A";
-                    // 🚀 LE BOUTON OUTLOOK MAGIQUE
+                    
                     const mailtoBtn = document.getElementById('fs-mailto-btn');
                     if(deal.intelligence.mailto_link) {
                         mailtoBtn.href = deal.intelligence.mailto_link;
                     } else {
-                        mailtoBtn.href = `mailto:?subject=Audit Energétique&body=${encodeURIComponent(deal.intelligence.pitch)}`;
+                        mailtoBtn.href = `mailto:?subject=Audit Énergétique CORTEX&body=${encodeURIComponent(deal.intelligence.pitch)}`;
                     }
                 } else { 
                     document.getElementById('fs-icebreaker-box').classList.add('hidden'); 
                 }
 
-                // Bifurcation CPQ vs Catalogue
+                // CONTACTS
+                const contactBox = document.getElementById('fs-contacts-list');
+                contactBox.innerHTML = '';
+                if (deal.all_contacts && deal.all_contacts.length > 0) {
+                    deal.all_contacts.forEach(c => {
+                        contactBox.innerHTML += `
+                            <div class="flex items-center justify-between p-4 bg-abysse/50 border border-white/5 rounded-2xl shadow-inner">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-full bg-cyan/20 text-cyan flex items-center justify-center font-black text-sm border border-cyan/30 shadow-[0_0_10px_rgba(0,229,255,0.2)]">${(c.firstname||'?').charAt(0)}${(c.lastname||'?').charAt(0)}</div>
+                                    <div><p class="text-base font-bold text-white leading-tight">${c.firstname||''} ${c.lastname||''}</p><p class="text-[10px] text-gray-500 font-mono mt-1 uppercase tracking-widest">${c.role || 'Contact'}</p></div>
+                                </div>
+                                <div class="text-right text-xs font-mono space-y-1">
+                                    <p class="text-gray-400 hover:text-cyan cursor-pointer transition"><i class="ph ph-envelope-simple mr-1"></i> ${c.email || '---'}</p>
+                                    <p class="text-gray-500 hover:text-cyan cursor-pointer transition"><i class="ph ph-phone mr-1"></i> ${c.phone || '---'}</p>
+                                </div>
+                            </div>`;
+                    });
+                } else { contactBox.innerHTML = `<p class="text-xs text-gray-500 font-mono italic text-center py-4 bg-black/30 rounded-xl">Aucun contact lié.</p>`; }
+
+                // Bifurcation CPQ vs Standard
                 if (currentPipeline === 'fourniture' || deal.pipeline === 'fourniture') {
                     document.getElementById('fs-tools-fourniture').classList.remove('hidden'); document.getElementById('fs-tools-fourniture').classList.add('flex');
-                    // Reset CPQ
-                    document.getElementById('cpq-result').classList.add('hidden');
+                    document.getElementById('fs-tools-standard').classList.add('hidden');
+                    document.getElementById('cpq-result').classList.add('hidden'); // Reset CPQ
+                } else {
+                    document.getElementById('fs-tools-fourniture').classList.add('hidden'); document.getElementById('fs-tools-fourniture').classList.remove('flex');
+                    document.getElementById('fs-tools-standard').classList.remove('hidden');
+                    refreshDealProducts(); 
                 }
 
+                // CHARGEMENT DE LA BASE 3D
                 renderDealSites(deal.company_id);
                 fetchActivities(dealId);
                 switchActionTab('note');
+                
                 document.getElementById('deal-fullscreen').classList.add('open');
             } catch(e) {
-                App.toast("Erreur d'ouverture", "error");
+                console.error(e); App.toast("Erreur d'ouverture du dossier", "error");
             }
         }
 
         function closeDeal() { document.getElementById('deal-fullscreen').classList.remove('open'); currentDealId = null; }
         function changeDealStage(newStage) { if(currentDealId) quickChangeStage(currentDealId, newStage); }
+        
         window.openDataUnity = function() {
             if(currentDealId && dealsData[currentDealId]) {
                 const compId = dealsData[currentDealId].company_id;
@@ -671,14 +736,69 @@
             }
         }
 
-        // --- 4. CORTEX PRICER V12.8 (THICK SERVER) ---
+        // --- 4. DATA 3D SGE (SITES DU CLIENT) ---
         let currentDealSites =[];
+        async function renderDealSites(companyId) {
+            const container = document.getElementById('fs-sites-list');
+            if(!companyId) { container.innerHTML = '<div class="text-[10px] text-gray-400 font-mono text-center py-8 bg-black/40 rounded-2xl border border-white/5 border-dashed">Company ID manquant.</div>'; return; }
 
+            container.innerHTML = '<div class="text-center py-6"><i class="ph ph-spinner animate-spin text-cyan text-3xl mb-2 block"></i><span class="text-xs font-mono text-gray-500">Scan de la Base 3D...</span></div>';
+            try {
+                const res = await fetch('/api/dashboard/fleet');
+                const data = await res.json();
+                const dealSites = data.fleet.filter(s => s.tenant_id === companyId);
+
+                document.getElementById('fs-sites-count').innerText = dealSites.length;
+
+                if (dealSites.length === 0) {
+                    container.innerHTML = '<div class="text-[10px] text-gray-400 font-mono text-center py-8 bg-black/40 rounded-2xl border border-white/5 border-dashed">Aucun site. Ouvrez la Data Unity pour un import de parc.</div>';
+                    populateCpqSites([]); 
+                    return;
+                }
+
+                container.innerHTML = dealSites.map(s => {
+                    const icon = s.energy === 'gaz' ? '<i class="ph ph-fire text-alert"></i>' : '<i class="ph ph-lightning text-cyan"></i>';
+                    const prov = s.provider && s.provider !== 'Inconnu' ? s.provider : '<span class="text-alert opacity-70">Fournisseur ?</span>';
+                    const surf = s.surface ? `${s.surface} m²` : '<span class="text-alert opacity-70">Surface ?</span>';
+                    
+                    let dateHtml = s.end_date || 'N/A';
+                    if (s.end_date && s.end_date !== 'N/A') {
+                        const d = new Date(s.end_date);
+                        if (!isNaN(d.getTime())) {
+                            const diffM = Math.round((d - new Date()) / (1000 * 60 * 60 * 24 * 30));
+                            if (diffM < 0) dateHtml = `<span class="text-alert font-bold animate-pulse">Échu</span>`;
+                            else if (diffM <= 6) dateHtml = `<span class="text-alert font-bold">Urgence (${diffM}m)</span>`;
+                            else dateHtml = `<span class="text-success">${s.end_date}</span>`;
+                        }
+                    }
+
+                    return `
+                    <div class="bg-abysse border border-cyan/10 p-3 rounded-lg hover:border-cyan/40 transition mb-2 shadow-inner">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="font-bold text-white text-xs flex items-center gap-2 truncate">${icon} ${s.name}</div>
+                            <div class="text-[9px] text-cyan font-mono flex-shrink-0">${s.pdl}</div>
+                        </div>
+                        <div class="flex justify-between items-end mt-2 text-[10px] text-gray-400">
+                            <div><span class="block">${prov} <span class="text-gray-500 ml-2">| Fin:</span> ${dateHtml}</span><span class="block mt-0.5">Surface: ${surf}</span></div>
+                            <div class="text-right"><span class="block font-bold text-white">${Math.round(s.volume)} MWh</span></div>
+                        </div>
+                    </div>
+                    `;
+                }).join('');
+
+                populateCpqSites(dealSites);
+
+            } catch (e) {
+                container.innerHTML = '<div class="text-[10px] text-alert font-mono">Erreur de chargement de la base 3D.</div>';
+            }
+        }
+
+        // --- 5. CPQ EXPERT (PRICER V12.8) ---
         function populateCpqSites(sites) {
             currentDealSites = sites;
             const select = document.getElementById('cpq-site-select');
             if(!select) return;
-            select.innerHTML = '<option value="">-- Sélectionnez un compteur 3D --</option>';
+            select.innerHTML = '<option value="">-- Sélectionnez un actif 3D --</option>';
             sites.forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = s.id;
@@ -697,7 +817,7 @@
             if(!siteId) return App.toast("Sélectionnez un site à pricer.", "error");
 
             const site = currentDealSites.find(s => s.id === siteId);
-            if(!site || site.volume <= 0) return App.toast("Le volume du site est nul.", "error");
+            if(!site || site.volume <= 0) return App.toast("Ce site n'a pas de volume MWh en base.", "error");
 
             const btn = document.getElementById('btn-cpq'); 
             const orig = btn.innerHTML; 
@@ -705,7 +825,6 @@
             btn.disabled = true;
 
             try {
-                // 🚀 APPEL DU BACKEND PYTHON (Zéro calcul JS)
                 const payload = {
                     site_id: siteId,
                     volume_mwh: site.volume,
@@ -726,9 +845,8 @@
 
                 if(!data.success) throw new Error(data.error);
 
-                // INJECTION DU COST STACK
                 const stack = data.stack;
-                document.getElementById('cpq-mol').innerText = new Intl.NumberFormat('fr-FR').format(stack.sourcing_eur) + " €";
+                document.getElementById('cpq-mol').innerText = new Intl.NumberFormat('fr-FR').format(stack.molecule_eur) + " €";
                 document.getElementById('cpq-capa').innerText = new Intl.NumberFormat('fr-FR').format(stack.capacite_eur) + " €";
                 document.getElementById('cpq-cee').innerText = new Intl.NumberFormat('fr-FR').format(stack.cee_eur) + " €";
                 document.getElementById('cpq-go').innerText = new Intl.NumberFormat('fr-FR').format(stack.go_eur) + " €";
@@ -738,12 +856,11 @@
                 
                 document.getElementById('cpq-price').innerText = data.kpis.prix_moyen_mwh.toFixed(2);
                 
-                // ORACLE INSIGHT
                 const oracleBox = document.getElementById('cpq-oracle-insight');
                 oracleBox.innerHTML = `Win Prob: <b class="text-white">${data.oracle.win_probability}%</b> <br> ${data.oracle.insight}`;
 
                 document.getElementById('cpq-result').classList.remove('hidden');
-                App.toast("Pricer CORTEX : Cotation générée.", "success");
+                App.toast("Cotation Deal Desk générée par CORTEX.", "success");
 
             } catch (e) {
                 App.toast("Erreur du Pricer : " + e.message, "error");
@@ -752,7 +869,7 @@
             }
         }
 
-        // --- 5. L'ACTION CENTER (AGENDA, NOTES) ---
+        // --- 6. ACTION CENTER (NOTES, AGENDA, TICKETS) ---
         function switchActionTab(tab) {['note', 'agenda', 'ticket'].forEach(t => {
                 const el = document.getElementById(`action-${t}`);
                 if(el) { el.classList.add('hidden'); el.classList.remove('flex'); }
@@ -763,7 +880,6 @@
             if(document.getElementById(`tab-${tab}`)) document.getElementById(`tab-${tab}`).classList.add('active', 'bg-abysse/50');
         }
 
-        // 🚀 LE NOUVEAU GÉNÉRATEUR DOCTOLIB / CALENDAR
         window.generateCalendarEvent = function() {
             const dateVal = document.getElementById('agenda-date').value;
             const titleVal = document.getElementById('agenda-title').value || "Point Énergie Energistrat";
@@ -791,7 +907,7 @@
                 document.getElementById(inputId).value = '';
                 fetchActivities(currentDealId);
                 App.toast("Action logguée.", "success");
-            } catch (e) {}
+            } catch (e) { App.toast("Erreur réseau.", "error"); }
         }
 
         async function fetchActivities(dealId) {
@@ -805,6 +921,7 @@
                         let icon = 'ph-info'; let color = 'text-cyan bg-abysse border-cyan/30';
                         if (act.type === 'TASK') { icon = 'ph-calendar-check'; color = 'text-purple bg-abysse border-purple/30'; }
                         if (act.type === 'TICKET_ACHAT') { icon = 'ph-warning-circle'; color = 'text-white bg-alert border-alert/50 shadow-[0_0_15px_rgba(255,0,85,0.5)]'; }
+                        if (act.type === 'SYSTEM' || act.type === 'STAGE_CHANGE') { icon = 'ph-robot'; color = 'text-gray-400 bg-panel border-gray-600'; }
                         const dateStr = new Date(act.timestamp).toLocaleString('fr-FR', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
                         return `
                             <div class="relative pl-10 md:pl-0">
@@ -815,16 +932,214 @@
                                 </div>
                             </div>`;
                     }).join('');
+                } else {
+                    list.innerHTML = `<div class="text-center bg-black/30 p-8 rounded-3xl border border-white/5 border-dashed"><p class="text-xs text-gray-500 font-mono uppercase tracking-widest">Aucune interaction CRM.</p></div>`;
                 }
             } catch (e) {}
         }
 
-        // Fonction Utilitaires MAP & SITES (Conservées pour la stabilité)
-        async function renderDealSites(companyId) { /* ... Logique SGE existante (non modifiée) ... */ }
-        function openWarRoomMap() { /* ... Logique Leaflet existante ... */ }
-        function closeWarRoomMap() { /* ... Logique Leaflet existante ... */ }
-        function openNewLeadModal() { document.getElementById('new-lead-modal').classList.remove('hidden'); document.getElementById('new-lead-modal').classList.add('flex'); setTimeout(() => document.getElementById('new-lead-modal').classList.remove('opacity-0'), 10); }
-        function closeNewLeadModal() { document.getElementById('new-lead-modal').classList.add('opacity-0'); setTimeout(() => { document.getElementById('new-lead-modal').classList.add('hidden'); document.getElementById('new-lead-modal').classList.remove('flex'); }, 300); }
-    </script>
+        // --- 7. CREATION DE LEAD & API GOUV ---
+        function openNewLeadModal() { document.getElementById('lead-pipeline').value = currentPipeline; openModal('new-lead-modal'); }
+        function closeNewLeadModal() { closeModal('new-lead-modal'); document.getElementById('siren-search-status').innerHTML = ''; }
+        
+        async function searchSirenAPI() {
+            const sirenInput = document.getElementById('lead-siren'); const siren = sirenInput.value.replace(/\s/g, '');
+            const statusBox = document.getElementById('siren-search-status'); const btn = document.getElementById('btn-search-siren');
+            if (siren.length < 9) { statusBox.innerHTML = '<span class="text-alert font-bold"><i class="ph ph-warning-circle"></i> 9 chiffres requis.</span>'; return; }
+            
+            statusBox.innerHTML = '<span class="text-cyan font-bold"><i class="ph ph-spinner animate-spin inline-block"></i> Interrogation Base Nationale...</span>';
+            btn.classList.add('opacity-50', 'pointer-events-none');
+            
+            try {
+                const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${siren}`); 
+                const data = await res.json();
+                if (data.results && data.results.length > 0) {
+                    document.getElementById('lead-company').value = data.results[0].nom_complet || "";
+                    sirenInput.classList.remove('border-warning', 'border-cyan/30'); sirenInput.classList.add('border-success', 'text-success', 'shadow-[0_0_15px_rgba(0,255,102,0.2)]');
+                    statusBox.innerHTML = '<span class="text-success font-bold"><i class="ph ph-check-circle text-lg"></i> Entité certifiée Open Data !</span>';
+                } else {
+                    sirenInput.classList.add('border-warning'); statusBox.innerHTML = '<span class="text-warning font-bold"><i class="ph ph-warning-circle"></i> Introuvable dans l\'Open Data.</span>';
+                }
+            } catch (e) { 
+                statusBox.innerHTML = '<span class="text-alert font-bold">Erreur de connexion API Gouv.</span>'; 
+            } finally { 
+                btn.classList.remove('opacity-50', 'pointer-events-none'); 
+            }
+        }
+
+        async function createLead(event) {
+            event.preventDefault(); 
+            const btn = document.getElementById('btn-create-lead'); 
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin text-xl mr-2"></i> Synchro 3D...'; 
+            btn.disabled = true;
+            
+            const nameParts = document.getElementById('lead-contact').value.split(' ');
+            
+            // Le payload qui match exactement avec ton backend Python /api/crm/lead (CRMCompany3DModel)
+            const payload = {
+                siren: document.getElementById('lead-siren').value, 
+                company_name: document.getElementById('lead-company').value || "Inconnu",
+                holding_name: document.getElementById('lead-company').value, 
+                naf: "DEFAULT", 
+                address: "", 
+                city: "", 
+                source: "CRM 3D",
+                pipeline: document.getElementById('lead-pipeline').value
+            };
+
+            try {
+                const response = await fetch(getApiUrl('/api/crm/lead'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    closeNewLeadModal();
+                    App.toast("Entité 3D créée avec succès.", "success");
+                    
+                    // Création asynchrone du contact lié
+                    if (data.company_id) {
+                        try {
+                            const contactPayload = {
+                                firstname: nameParts[0] || "", lastname: nameParts.slice(1).join(' ') || "Inconnu",
+                                role: document.getElementById('lead-role').value, email: document.getElementById('lead-email').value,
+                                phone: "", company_id: data.company_id
+                            };
+                            await fetch(getApiUrl(`/api/crm/company/${data.company_id}/contact`), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(contactPayload) });
+                        } catch(e) {}
+                    }
+
+                    if (currentPipeline !== payload.pipeline) switchPipeline(payload.pipeline); else fetchDeals(currentPipeline);
+                    setTimeout(() => openDeal(data.deal_id), 800);
+                } else {
+                    App.toast("Erreur de création (Backend).", "error");
+                }
+            } catch (err) { 
+                App.toast("Erreur serveur.", "error"); 
+            } finally { 
+                btn.innerHTML = orig; btn.disabled = false; 
+            }
+        }
+
+        // --- 8. INLINE EDIT (Édition rapide au clic) ---
+        function startInlineEdit(elementId, entityType, field) {
+            if (!currentDealId) return;
+            const deal = dealsData[currentDealId];
+            const entityId = deal.company_id;
+            const span = document.getElementById(elementId);
+            const currentValue = span.innerText;
+            const input = document.createElement('input'); 
+            input.type = 'text'; 
+            input.value = currentValue === "---" || currentValue === "Non renseigné" ? "" : currentValue; 
+            input.className = 'inline-edit-input shadow-[0_0_10px_rgba(0,229,255,0.3)]';
+            span.parentNode.replaceChild(input, span); 
+            input.focus();
+            input.addEventListener('blur', () => saveInlineEdit(input, span, entityType, entityId, field));
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
+        }
+        async function saveInlineEdit(input, span, entityType, entityId, field) {
+            const newValue = input.value.trim(); 
+            span.innerText = newValue || "---"; 
+            input.parentNode.replaceChild(span, input);
+            if (newValue && newValue !== "---") {
+                try { 
+                    await fetch(getApiUrl(`/api/crm/edit/${entityType}/${entityId}`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ field: field, value: newValue }) }); 
+                    fetchDeals(currentPipeline); 
+                } catch (e) {}
+            }
+        }
+
+        // --- 9. MODALS, WAR ROOM MAP, CATALOGUE & AUTRES (Les fondations intactes) ---
+        function openModal(id) { const m = document.getElementById(id); m.classList.remove('hidden'); m.classList.add('flex'); setTimeout(() => { m.classList.remove('opacity-0'); m.querySelector('.bento-card').classList.remove('scale-95'); }, 10); }
+        function closeModal(id) { const m = document.getElementById(id); m.classList.add('opacity-0'); m.querySelector('.bento-card').classList.add('scale-95'); setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); m.querySelector('form').reset(); }, 300); }
+        function openAddContactModal() { if(currentDealId) openModal('add-contact-modal'); }
+        function openAddSiteModal() { if(currentDealId) openModal('add-site-modal'); }
+        
+        async function addContact(e) {
+            e.preventDefault(); if(!currentDealId) return;
+            const deal = dealsData[currentDealId];
+            const payload = { firstname: document.getElementById('new-c-fname').value, lastname: document.getElementById('new-c-lname').value, email: document.getElementById('new-c-email').value, phone: document.getElementById('new-c-phone').value, role: document.getElementById('new-c-role').value, company_id: deal.company_id };
+            try { await fetch(getApiUrl(`/api/crm/company/${deal.company_id}/contact`), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }); closeModal('add-contact-modal'); fetchDeals(currentPipeline); setTimeout(()=>openDeal(currentDealId), 500); App.toast("Contact ajouté.", "success"); } catch(err) { App.toast("Erreur", "error"); }
+        }
+
+        async function addSite(e) {
+            e.preventDefault(); if(!currentDealId) return;
+            const deal = dealsData[currentDealId];
+            const btn = document.getElementById('btn-save-new-site'); const orig = btn.innerHTML; btn.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i>...'; btn.disabled = true;
+            const pdl = document.getElementById('new-s-pdl').value.replace(/\s/g, ''); const energy = document.getElementById('new-s-energy').value;
+            const payload = {
+                id: pdl, forced_tenant_id: deal.company_id, 
+                identity: { id: pdl, tenant_id: deal.company_id, site_name: document.getElementById('new-s-name').value },
+                location: { surface: parseFloat(document.getElementById('new-s-surface').value) || 0 },
+                contract: { energy_type: energy, provider: document.getElementById('new-s-provider').value, end_date: document.getElementById('new-s-enddate').value, power: parseFloat(document.getElementById('new-s-kva').value) || 0 },
+                kpis: { volume_mwh: parseFloat(document.getElementById('new-s-vol').value) || 0 }
+            };
+            if(energy === 'gaz') payload.contract.pce = pdl; else payload.contract.pdl = pdl;
+            try { await fetch(getApiUrl('/api/settings/save_client'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }); closeModal('add-site-modal'); fetchDeals(currentPipeline); renderDealSites(deal.company_id); App.toast("Compteur injecté dans la Base 3D.", "success"); } catch(err) { App.toast("Erreur réseau.", "error"); } finally { btn.innerHTML = orig; btn.disabled = false; }
+        }
+
+        function openWarRoomMap() {
+            document.getElementById('kanban-container').classList.add('hidden'); document.getElementById('list-container').classList.add('hidden');
+            const mapCont = document.getElementById('map-container'); mapCont.classList.remove('hidden'); mapCont.classList.add('flex');
+            if(!mapInstance) { mapInstance = L.map('war-room-map', {zoomControl: false}).setView([46.6, 1.8], 5); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '' }).addTo(mapInstance); L.control.zoom({ position: 'topright' }).addTo(mapInstance); }
+            setTimeout(() => mapInstance.invalidateSize(), 300); plotWarRoomMap();
+        }
+        function closeWarRoomMap() { document.getElementById('map-container').classList.add('hidden'); document.getElementById('map-container').classList.remove('flex'); switchView('kanban'); }
+        function getFuzzyCoordinates(baseStr, center) { let hash = 0; for (let i = 0; i < baseStr.length; i++) hash = baseStr.charCodeAt(i) + ((hash << 5) - hash); const pseudoRandom1 = (Math.abs(hash) % 100) / 10000; const pseudoRandom2 = (Math.abs(hash >> 2) % 100) / 10000; return[center[0] + (pseudoRandom1 - 0.005), center[1] + (pseudoRandom2 - 0.005)]; }
+        
+        async function plotWarRoomMap() {
+            if(!mapInstance) return;
+            mapMarkers.forEach(m => mapInstance.removeLayer(m)); mapMarkers =[];
+            for(const id in dealsData) {
+                const d = dealsData[id]; if(d.sites_count === 0) continue;
+                let colorClass = 'marker-green'; let hex = '#00FF66';
+                if (d.stage === 'LEAD' || d.stage === 'AUDIT') { colorClass = 'marker-blue'; hex = '#00E5FF'; } else if (d.stage === 'NEGOTIATION' || d.stage === 'PROPOSAL') { colorClass = 'marker-orange'; hex = '#FFB800'; }
+                const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-marker ${colorClass} w-4 h-4" style="background-color:${hex}; box-shadow:0 0 10px ${hex}"></div>`, iconSize:[16, 16], iconAnchor:[8, 8] });
+                let coords = getFuzzyCoordinates(d.id,[46.6, 1.8]);
+                const marker = L.marker(coords, {icon: icon}).bindPopup(`<div class="text-center p-2"><b class="text-white font-bold text-sm block mb-1">${d.name}</b><span style="color:${hex};" class="font-black text-sm font-mono">${Math.round(d.commission_est)} €</span><br><button onclick="openDeal('${d.id}')" class="mt-2 bg-abysse border border-white/20 text-white px-4 py-2 rounded-lg font-bold text-xs w-full hover:bg-white hover:text-black transition">Ouvrir</button></div>`).addTo(mapInstance);
+                mapMarkers.push(marker);
+            }
+        }
+
+        async function loadAdminCatalogue() {
+            try {
+                const res = await fetch('/api/crm/products'); const data = await res.json();
+                if(data.success && data.products) {
+                    GLOBAL_CATALOGUE = data.products;
+                    const list = document.getElementById('admin-products-list');
+                    if(list) list.innerHTML = GLOBAL_CATALOGUE.map(p => `<tr class="hover:bg-white/5 border-b border-white/5 transition"><td class="p-4 font-bold text-white text-xs">${p.name}</td><td class="p-4 text-[10px] font-mono text-cyan uppercase tracking-widest">${p.category}</td><td class="p-4 text-right font-mono text-gold font-bold">${parseFloat(p.unit_price).toFixed(2)} €</td><td class="p-4 text-center"><button onclick="deleteAdminProduct('${p.id}')" class="w-8 h-8 rounded-full bg-alert/20 text-alert hover:bg-alert hover:text-white transition"><i class="ph ph-trash"></i></button></td></tr>`).join('');
+                    const select = document.getElementById('catalog-select');
+                    if(select) { select.innerHTML = '<option value="">-- Piocher dans le catalogue --</option>'; GLOBAL_CATALOGUE.forEach(p => { const opt = document.createElement('option'); opt.value = p.id; opt.innerText = `${p.name} - ${parseFloat(p.unit_price).toFixed(2)} €`; select.appendChild(opt); }); }
+                }
+            } catch(e) {}
+        }
+        function openAdminCatalogue() { document.getElementById('admin-catalogue-modal').classList.remove('hidden'); document.getElementById('admin-catalogue-modal').classList.add('flex'); setTimeout(() => document.getElementById('admin-catalogue-modal').style.opacity = "1", 10); loadAdminCatalogue(); }
+        async function saveAdminProduct() { const payload = { name: document.getElementById('cat-name').value, category: document.getElementById('cat-type').value, unit_price: parseFloat(document.getElementById('cat-price').value) || 0, comm_rate: 1.0 }; if(!payload.name) return App.toast("Nom requis", "error"); try { const res = await fetch('/api/crm/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }); if((await res.json()).success) { App.toast("Produit créé", "success"); loadAdminCatalogue(); document.getElementById('cat-name').value = ''; document.getElementById('cat-price').value = ''; } } catch(e) { App.toast("Erreur", "error"); } }
+        async function deleteAdminProduct(id) { try { const res = await fetch(`/api/crm/products/${id}`, { method: 'DELETE' }); if((await res.json()).success) { App.toast("Produit supprimé", "info"); loadAdminCatalogue(); } } catch(e) {} }
+        
+        async function addProductToDeal() {
+            if(!currentDealId) return;
+            const prodId = document.getElementById('catalog-select').value; const qty = parseFloat(document.getElementById('catalog-qty').value) || 1;
+            if(!prodId) return App.toast("Sélectionnez un produit.", "error");
+            const deal = dealsData[currentDealId]; if(!deal) return;
+            const existingItems = deal.products ? deal.products.map(p => ({product_id: p.product_id || p.id, quantity: p.quantity})) :[]; existingItems.push({product_id: prodId, quantity: qty});
+            try { const res = await fetch(getApiUrl(`/api/crm/deal/${currentDealId}/products`), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({items: existingItems}) }); if((await res.json()).success) { App.toast("Devis mis à jour.", "success"); fetchDeals(currentPipeline); setTimeout(() => refreshDealProducts(), 500); } } catch(e) { App.toast("Erreur réseau.", "error"); }
+        }
+        function refreshDealProducts() {
+            if(!currentDealId || !dealsData[currentDealId]) return;
+            const deal = dealsData[currentDealId]; const list = document.getElementById('fs-products-list'); if(!list) return;
+            if(!deal.products || deal.products.length === 0) { list.innerHTML = '<div class="text-[10px] text-gray-500 font-mono text-center py-4 bg-black/30 rounded-xl border border-white/5 border-dashed">Aucun produit dans le devis.</div>'; return; }
+            list.innerHTML = deal.products.map(p => `<div class="flex justify-between items-center bg-abysse/50 p-3 rounded-xl border border-white/5 shadow-inner mb-2"><div><div class="font-bold text-white text-xs">${p.name}</div><div class="text-[9px] text-cyan font-mono mt-0.5 uppercase tracking-widest">${p.category} | Qté: ${p.quantity}</div></div><div class="text-right text-sm font-black text-cyan drop-shadow-md">${new Intl.NumberFormat('fr-FR').format(p.line_comm || (p.unit_price * p.quantity))} €</div></div>`).join('');
+        }
+
+        async function uploadDocument(input) {
+            if(!input.files[0] || !currentDealId) return;
+            App.toast("Envoi dans le coffre-fort...", "info");
+            const formData = new FormData(); formData.append('file', input.files[0]);
+            try {
+                const res = await fetch(getApiUrl(`/api/crm/deal/${currentDealId}/upload`), { method: 'POST', body: formData }); const data = await res.json();
+                if(data.success) { App.toast("Document sauvegardé.", "success"); fetchDeals(currentPipeline); const list = document.getElementById('fs-documents-list'); list.innerHTML += `<div class="flex items-center gap-3 bg-abysse/50 p-3 rounded-xl border border-white/5"><i class="ph ph-file-pdf text-xl text-alert"></i><div class="truncate flex-1"><div class="font-bold text-white text-xs truncate">${data.document.name}</div><div class="text-[9px] text-gray-500 font-mono">${data.document.size}</div></div><i class="ph ph-download-simple text-gray-400 hover:text-white cursor-pointer transition"></i></div>`; }
+            } catch(e) { App.toast("Erreur d'upload.", "error"); }
+        }
+        </script>
 </body>
 </html>
