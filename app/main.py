@@ -250,32 +250,28 @@ def fetch_surface_ademe(address: str, zip_code: str = "") -> float:
     return 0.0
 
 # ==============================================================================
-# TRADUCTEUR UNIVERSEL (SMART MAPPER 3D - ELEC & GAZ)
+# TRADUCTEUR UNIVERSEL (SMART MAPPER 3D - ELEC & GAZ) + BOUCLIERS MATHÉMATIQUES
 # ==============================================================================
 def normalize_full_data(data, tenant_id=None):
-    """Traducteur 3D Blindé (Anti-Crash sur données vérolées ou None)"""
+    """Traducteur 3D Blindé (Anti-Crash) et Moteur de règles (Boucliers FinOps)"""
     
-    # 1. FORCER LES TIROIRS EN DICTIONNAIRES (Le bouclier anti-crash)
-    for key in['identity', 'location', 'contract', 'pricing', 'technical', 'kpis']:
-        if not isinstance(data.get(key), dict):
-            data[key] = {}
-    if not isinstance(data['contract'].get('power_details'), dict):
-        data['contract']['power_details'] = {}
+    for key in ['identity', 'location', 'contract', 'pricing', 'technical', 'kpis']:
+        if not isinstance(data.get(key), dict): data[key] = {}
+    if not isinstance(data['contract'].get('power_details'), dict): data['contract']['power_details'] = {}
 
-    # 2. Identité Primaire
+    # 1. Identité
     existing_id = data['identity'].get('id') or data.get('COMPTEUR_PDL') or data.get('PDL') or data.get('pdl') or data.get('PCE') or data.get('pce') or data.get('id') or f"GEN_{uuid.uuid4().hex[:8]}"
     data['identity']['id'] = str(existing_id).strip()
     data['id'] = data['identity']['id']
 
-    if tenant_id: 
-        data['identity']['tenant_id'] = tenant_id
+    if tenant_id: data['identity']['tenant_id'] = tenant_id
 
     data['identity']['site_name'] = str(data['identity'].get('site_name') or data.get('NOM_SITE') or data.get('name') or "Site Sans Nom")
     data['identity']['siret'] = str(data['identity'].get('siret') or data.get('SIRET_SITE') or data.get('siren') or "")
     data['identity']['naf'] = str(data['identity'].get('naf') or data.get('NAF') or "DEFAULT")
     data['identity']['lot_name'] = str(data['identity'].get('lot_name') or data.get('LOT_AFFECTATION') or "")
     
-    # 3. Localisation
+    # 2. Localisation
     data['location']['address'] = str(data['location'].get('address') or data.get('ADRESSE_SITE') or data.get('ADRESSE_SIT') or "")
     data['location']['zip_code'] = str(data['location'].get('zip_code') or data.get('CP') or "")
     data['location']['city'] = str(data['location'].get('city') or data.get('VILLE') or "")
@@ -285,14 +281,14 @@ def normalize_full_data(data, tenant_id=None):
     try: data['location']['surface'] = float(str(data['location'].get('surface') or data.get('SURFACE_M2') or 0.0).replace(',', '.'))
     except: data['location']['surface'] = 0.0
 
-    # 4. Contrat & Énergie
+    # 3. Contrat
     data['energy_type'] = str(data['contract'].get('energy_type') or data.get('ENERGIE') or data.get('energy_type') or "elec").lower()
     data['contract']['energy_type'] = data['energy_type']
     
     if data['energy_type'] == 'gaz': data['contract']['pce'] = data['identity']['id']
     else: data['contract']['pdl'] = data['identity']['id']
 
-    data['contract']['provider'] = str(data['contract'].get('provider') or data.get('FOURNISSEUR') or data.get('FOURNISSEU') or "")
+    data['contract']['provider'] = str(data['contract'].get('provider') or data.get('FOURNISSEUR') or "")
     data['contract']['segment'] = str(data['contract'].get('segment') or data.get('SEGMENT') or "")
     data['contract']['profil'] = str(data['contract'].get('profil') or data.get('PROFIL') or "")
     data['contract']['fta'] = str(data['contract'].get('fta') or data.get('FTA') or "")
@@ -305,29 +301,44 @@ def normalize_full_data(data, tenant_id=None):
     try: data['contract']['cja'] = float(str(data['contract'].get('cja') or data.get('CJA_MWH_J') or 0).replace(',', '.'))
     except: data['contract']['cja'] = 0.0
 
-    # 5. Puissances 4 Cadrans
+    # 4. Puissances 4 Cadrans & BOUCLIER TURPE
     quad_p = {'hph':'PS_HPH', 'hch':'PS_HCH', 'hpe':'PS_HPE', 'hce':'PS_HCE'}
+    max_p = 0.0
     for t, k in quad_p.items():
         val = data['contract']['power_details'].get(t) or data.get(k) or data.get(k.lower())
-        if val is not None and str(val).strip() not in["", "None", "nan", "NaN"]:
+        if val is not None and str(val).strip() not in ["", "None", "nan", "NaN"]:
             try:
                 clean_val = float(str(val).replace(',', '.'))
                 data['contract']['power_details'][t] = clean_val
                 data['contract'][f"ps_{t}"] = clean_val
+                if clean_val > max_p: max_p = clean_val
             except: pass
+    
+    # 🛡️ BOUCLIER 1 : TURPE (On force la puissance max détectée)
+    if max_p > 0 and max_p > data['contract']['power']:
+        data['contract']['power'] = max_p
 
-    # 6. Pricing 4 Cadrans
+    # 5. Pricing 4 Cadrans & BOUCLIER PMC
     quad_prix = {'hph':'PRIX_HPH', 'hch':'PRIX_HCH', 'hpe':'PRIX_HPE', 'hce':'PRIX_HCE'}
     for t, k in quad_prix.items():
         val = data['pricing'].get(t) or data.get(k) or data.get(k.lower())
-        if val is not None and str(val).strip() not in ["", "None", "nan", "NaN"]:
+        if val is not None and str(val).strip() not in["", "None", "nan", "NaN"]:
             try: 
                 clean_val = float(str(val).replace(',', '.'))
                 if clean_val > 10: clean_val = clean_val / 1000.0
                 data['pricing'][t] = clean_val
             except: pass
-            
-    if not data['pricing'].get('price_kwh'):
+
+    # 🛡️ BOUCLIER 2 : PRIX MOYEN LISSÉ (Moyenne Pondérée)
+    if data['energy_type'] == 'elec' and data['pricing'].get('hph', 0) > 0:
+        p_hph = data['pricing'].get('hph', 0)
+        p_hch = data['pricing'].get('hch', 0)
+        p_hpe = data['pricing'].get('hpe', 0)
+        p_hce = data['pricing'].get('hce', 0)
+        avg_price = (p_hph * 0.4) + (p_hch * 0.3) + (p_hpe * 0.2) + (p_hce * 0.1)
+        if avg_price == 0: avg_price = p_hph
+        data['pricing']['price_kwh'] = avg_price
+    elif not data['pricing'].get('price_kwh'):
         try: 
             p_unique = float(str(data['pricing'].get('price_kwh') or data.get('PRIX_MOLECULE') or data.get('PRIX_MOL_EUR_MWH') or 0).replace(',', '.'))
             if p_unique > 10: p_unique = p_unique / 1000.0
@@ -340,17 +351,21 @@ def normalize_full_data(data, tenant_id=None):
     try: data['pricing']['stockage'] = float(str(data['pricing'].get('stockage') or data.get('TERME_STOC') or 0).replace(',', '.'))
     except: data['pricing']['stockage'] = 0.0
     
-    try: data['pricing']['tax'] = float(str(data['pricing'].get('tax') or data.get('TAXES') or 22.5).replace(',', '.'))
-    except: data['pricing']['tax'] = 22.5
+    # 🛡️ BOUCLIER 3 : TAXES (Anti-Inflation)
+    try: 
+        t_val = float(str(data['pricing'].get('tax') or data.get('TAXES') or -1).replace(',', '.'))
+        if t_val < 0 or t_val > 100:
+            data['pricing']['tax'] = 8.44 if data['energy_type'] == 'gaz' else 22.5
+        else:
+            data['pricing']['tax'] = t_val
+    except: 
+        data['pricing']['tax'] = 8.44 if data['energy_type'] == 'gaz' else 22.5
 
-    # 7. Volumes & KPIs
+    # 6. Volumes
     try: 
         vol = float(str(data['kpis'].get('volume_mwh') or data.get('VOLUME_ANNUEL') or data.get('CAR_MWH') or 0).replace(',', '.'))
         data['kpis']['volume_mwh'] = vol
         data['volume_mwh'] = vol 
-    except: pass
-
-    try: data['kpis']['pmax_kw'] = float(str(data['kpis'].get('pmax_kw') or data.get('PUISSANCE_POINTE_MAX') or 0).replace(',', '.'))
     except: pass
 
     return data
