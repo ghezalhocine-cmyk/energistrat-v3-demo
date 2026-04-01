@@ -2,351 +2,443 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V12.8 | Admin Cockpit (CRM)</title>
+    <title>ENERGISTRAT V12.8 | Admin Cockpit (ERP FinOps)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: { abysse: '#050505', card: '#0F172A', cyan: '#00E5FF', gas: '#EF4444', sat: '#8B5CF6' },
-                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                    colors: { abysse: '#001529', card: '#001D3D', cyan: '#00E5FF', gas: '#EF4444', sat: '#8B5CF6', gold: '#F59E0B', success: '#10B981' },
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
                     borderRadius: { 'bento': '1.5rem' }
                 }
             }
         }
     </script>
     <style>
-        body { background-color: #050505; color: white; }
-        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
-        .nav-item.active { background: rgba(0, 229, 255, 0.1); border-left: 3px solid #00E5FF; color: white; }
-        .input-dark { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; transition: all 0.3s; }
-        .input-dark:focus { border-color: #00E5FF; outline: none; box-shadow: 0 0 15px rgba(0, 229, 255, 0.1); }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
-        #toast { visibility: hidden; min-width: 250px; background-color: #10B981; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 100; right: 30px; bottom: 30px; box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); transform: translateY(100px); transition: all 0.5s; }
-        #toast.show { visibility: visible; transform: translateY(0); }
+        body { background-color: #001529; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 255, 0.1); border-radius: 1.5rem; transition: all 0.3s ease; }
+        .bento-card:hover { border-color: rgba(0, 229, 255, 0.4); box-shadow: 0 10px 30px -10px rgba(0, 229, 255, 0.15); }
+        .nav-item.active { background: rgba(0, 229, 255, 0.1); border-left: 4px solid #00E5FF; color: white; }
+        .input-dark { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,229,255,0.2); color: white; padding: 10px 14px; border-radius: 1rem; width: 100%; outline: none; transition: all 0.3s; font-size: 0.75rem; }
+        .input-dark:focus { border-color: #00E5FF; box-shadow: 0 0 15px rgba(0, 229, 255, 0.2); background: rgba(0,229,255,0.05); }
+        
+        /* Suggestions Autocomplete */
+        .suggestions-list { position: absolute; background: #001D3D; border: 1px solid #00E5FF; width: 100%; z-index: 100; max-height: 200px; overflow-y: auto; border-radius: 1rem; margin-top: 5px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .suggestion-item { padding: 12px 20px; cursor: pointer; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .suggestion-item:hover { background: #00E5FF; color: #001529; font-weight: bold; }
+
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.3); border-radius: 3px; }
+        .tab-content { display: none; } .tab-content.active { display: block; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
-<body class="flex h-screen w-screen overflow-hidden text-sm">
+<body class="flex h-screen w-screen bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] text-sm">
 
-    <!-- TOAST -->
-    <div id="toast"><i class="fa-solid fa-check-circle mr-2"></i>Action effectuée !</div>
+    <!-- TOAST ENGINE -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
     <!-- SIDEBAR -->
-    <aside class="w-64 bg-[#020617] border-r border-white/5 flex flex-col z-50">
-        <div class="p-6 flex items-center gap-3 mb-4 border-b border-white/5 pb-6">
-            <a href="/ops_nexus" class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition"><i class="fa-solid fa-arrow-left"></i></a>
-            <h1 class="font-black text-white italic tracking-tight">CORTEX<span class="text-cyan">.CRM</span></h1>
+    <aside class="w-64 bg-abysse border-r border-cyan/20 flex flex-col z-50 shadow-[10px_0_30px_rgba(0,0,0,0.5)]">
+        <div class="h-24 flex items-center gap-3 px-6 border-b border-cyan/10 bg-abysse/90 sticky top-0 backdrop-blur shrink-0">
+            <a href="/ops_nexus" class="w-10 h-10 rounded-xl bg-card border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:border-white transition shadow-lg"><i class="fa-solid fa-arrow-left"></i></a>
+            <div>
+                <h1 class="font-black text-white tracking-tight text-lg">CORTEX<span class="text-cyan">.OPS</span></h1>
+                <p class="text-[9px] text-cyan font-mono bg-cyan/10 px-2 py-0.5 rounded border border-cyan/30 inline-block mt-1 font-bold">ERP DATA UNITY</p>
+            </div>
         </div>
         
-        <div class="px-4 mb-2">
-            <div class="text-[10px] text-gray-500 uppercase font-bold mb-2">Locataire (Tenant) Actif</div>
-            <div id="active-tenant-badge" class="bg-red-500/20 border border-red-500/50 text-red-400 p-3 rounded-xl text-xs font-bold text-center">
-                <i class="fa-solid fa-lock mr-2"></i> Aucun
+        <div class="px-6 my-6 shrink-0">
+            <div class="text-[10px] text-gray-500 uppercase font-bold mb-2 tracking-widest">Locataire (Tenant) Actif</div>
+            <div id="active-tenant-badge" class="bg-card border border-white/10 text-gray-500 p-3 rounded-xl text-xs font-bold text-center truncate shadow-inner">
+                <i class="fa-solid fa-lock mr-2"></i> Aucun Client
             </div>
         </div>
 
-        <nav class="flex-1 px-4 mt-6 space-y-1">
-            <button onclick="switchTab('crm')" id="nav-crm" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
-                <i class="fa-solid fa-users w-5 text-center"></i> Portefeuille Clients
+        <nav class="flex-1 px-4 space-y-2 overflow-y-auto">
+            <button onclick="switchTab('crm')" id="nav-crm" class="nav-item active w-full text-left px-4 py-3 text-gray-400 font-bold rounded-r-[1.5rem] hover:bg-white/5 transition flex items-center gap-3 uppercase tracking-widest text-[10px]">
+                <i class="fa-solid fa-users w-5 text-center text-lg"></i> Portefeuille Clients
             </button>
-            <button onclick="switchTab('parc')" id="nav-parc" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
-                <i class="fa-solid fa-sitemap w-5 text-center text-cyan"></i> Gérer le Parc
+            <button onclick="switchTab('parc')" id="nav-parc" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold rounded-r-[1.5rem] hover:bg-white/5 transition flex items-center gap-3 uppercase tracking-widest text-[10px]">
+                <i class="fa-solid fa-sitemap w-5 text-center text-cyan text-lg"></i> Gérer le Parc 3D
             </button>
-            <button onclick="switchTab('store')" id="nav-store" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
-                <i class="fa-solid fa-rocket w-5 text-center text-purple-400"></i> App Store (Modules)
+            <button onclick="switchTab('store')" id="nav-store" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold rounded-r-[1.5rem] hover:bg-white/5 transition flex items-center gap-3 uppercase tracking-widest text-[10px]">
+                <i class="fa-solid fa-rocket w-5 text-center text-purple-400 text-lg"></i> Accès Satellites
             </button>
             
-            <div class="mt-8 mb-2 px-4 text-[10px] font-bold text-gray-600 uppercase">Configuration Globale</div>
+            <div class="mt-8 mb-2 px-4 text-[10px] font-bold text-gray-600 uppercase tracking-widest">Configuration Globale</div>
             
-            <button onclick="switchTab('api')" id="nav-api" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-medium rounded-r-lg hover:bg-white/5 transition flex items-center gap-3 border-l-4 border-transparent">
-                <i class="fa-solid fa-key w-5 text-center text-yellow-500"></i> Clés API (RTE / Météo)
+            <button onclick="switchTab('api')" id="nav-api" class="nav-item w-full text-left px-4 py-3 text-gray-400 font-bold rounded-r-[1.5rem] hover:bg-white/5 transition flex items-center gap-3 uppercase tracking-widest text-[10px]">
+                <i class="fa-solid fa-key w-5 text-center text-gold text-lg"></i> Clés API (RTE / Météo)
             </button>
         </nav>
     </aside>
 
-    <main class="flex-1 overflow-y-auto p-10 relative bg-abysse">
+    <main class="flex-1 overflow-y-auto relative bg-transparent">
         
         <!-- ========================================== -->
-        <!-- ONGLET 1 : LE CRM (LISTE DES CLIENTS) -->
+        <!-- ONGLET 1 : LE CRM (RECONCILIATION TOTALE) -->
         <!-- ========================================== -->
-        <div id="tab-crm" class="tab-content max-w-5xl mx-auto space-y-6">
-            <header class="flex justify-between items-end mb-8">
+        <div id="tab-crm" class="tab-content active p-10 max-w-[1400px] mx-auto space-y-6">
+            <header class="flex justify-between items-end mb-8 bg-abysse/80 backdrop-blur p-6 rounded-[2rem] border border-cyan/10 shadow-lg">
                 <div>
-                    <h2 class="text-3xl font-black text-white mb-1">Comptes Entreprises</h2>
-                    <p class="text-gray-400 text-xs">Sélectionnez un Locataire pour piloter son périmètre.</p>
+                    <h2 class="text-3xl font-black text-white mb-2">Comptes Entreprises</h2>
+                    <p class="text-gray-400 text-xs font-mono">Recherche globale (Sales CRM, Back-Office, Base 3D Historique).</p>
                 </div>
-                <div class="flex gap-3">
-                    <div class="relative w-64">
-                        <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                        <input type="text" id="search-tenant" oninput="filterTenants()" placeholder="Rechercher (Nom, SIRET)..." class="w-full input-dark py-2 pl-10 pr-4 rounded-xl text-xs">
+                <div class="flex gap-4">
+                    <div class="relative w-72">
+                        <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-cyan"></i>
+                        <input type="text" id="search-tenant" oninput="filterTenants()" placeholder="Rechercher (Nom, SIRET)..." class="w-full bg-black/50 border border-cyan/30 text-white rounded-xl py-3 pl-12 pr-4 text-xs font-mono outline-none focus:border-cyan shadow-inner">
                     </div>
-                    <button onclick="openCreateTenantModal()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20">
-                        <i class="fa-solid fa-plus mr-2"></i>Nouveau Locataire
+                    <button onclick="openCreateTenantModal()" class="bg-cyan text-abysse px-6 py-3 rounded-xl text-xs font-black hover:bg-white transition shadow-[0_0_15px_rgba(0,229,255,0.4)] uppercase tracking-widest flex items-center gap-2">
+                        <i class="fa-solid fa-plus-circle text-lg"></i> Nouveau Locataire
                     </button>
                 </div>
             </header>
 
-            <div class="bento-card rounded-bento overflow-hidden">
+            <div class="bento-card overflow-hidden shadow-2xl">
                 <table class="w-full text-left">
-                    <thead class="bg-white/5 text-[10px] text-gray-500 uppercase">
-                        <tr><th class="p-4">Raison Sociale</th><th class="p-4">SIRET (Tenant ID)</th><th class="p-4">Origine de la Donnée</th><th class="p-4 text-right">Action</th></tr>
+                    <thead class="bg-black/50 text-[10px] text-gray-500 uppercase tracking-widest border-b border-white/10">
+                        <tr><th class="p-6">Raison Sociale</th><th class="p-6">SIRET (Tenant ID)</th><th class="p-6">Origine (Data)</th><th class="p-6 text-right">Action</th></tr>
                     </thead>
-                    <tbody id="tenant-list" class="divide-y divide-white/5">
-                        <tr><td colspan="4" class="p-8 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Chargement...</td></tr>
+                    <tbody id="tenant-list" class="divide-y divide-white/5 text-gray-300">
+                        <tr><td colspan="4" class="p-10 text-center text-cyan font-mono"><i class="fa-solid fa-spinner fa-spin text-2xl mb-3 block"></i> Fusion des bases en cours...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
         <!-- ========================================== -->
-        <!-- ONGLET 2 : LE PARC DU CLIENT -->
+        <!-- ONGLET 2 : LE PARC DU CLIENT (BASE 3D) -->
         <!-- ========================================== -->
-        <div id="tab-parc" class="tab-content hidden max-w-7xl mx-auto space-y-6">
-            <header class="flex justify-between items-end">
+        <div id="tab-parc" class="tab-content hidden h-full flex flex-col p-8">
+            <header class="flex justify-between items-end mb-6 shrink-0">
                 <div>
-                    <h2 class="text-2xl font-bold text-white mb-1">Architecture & Parc</h2>
-                    <p class="text-cyan text-xs font-bold" id="parc-subtitle">Veuillez sélectionner un client dans le CRM d'abord.</p>
+                    <h2 class="text-2xl font-black text-white tracking-tight">Architecture & Parc 3D</h2>
+                    <p class="text-cyan text-xs font-bold mt-1 bg-cyan/10 px-3 py-1 rounded-lg border border-cyan/20 inline-block" id="parc-subtitle">Veuillez sélectionner un client dans le CRM d'abord.</p>
                 </div>
-                <div class="flex gap-2">
-                    <button onclick="toggleImportModal()" class="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg text-xs font-bold border border-white/10 transition"><i class="fa-solid fa-file-csv mr-2"></i>Forcer Import CSV</button>
-                    <button onclick="saveSite()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg shadow-cyan/20"><i class="fa-solid fa-save mr-2"></i>Sauvegarder Site</button>
+                <div class="flex gap-4">
+                    <button onclick="toggleImportModal()" class="bg-card hover:bg-white/10 text-white px-6 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest border border-white/20 transition shadow-lg flex items-center gap-2"><i class="fa-solid fa-file-excel text-success text-lg"></i> Import CSV</button>
+                    <button onclick="saveSite()" id="btn-save-site" class="bg-cyan text-abysse px-8 py-3 rounded-xl text-[10px] font-black hover:bg-white transition shadow-[0_0_15px_rgba(0,229,255,0.4)] uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-cloud-arrow-up text-lg"></i> Synchroniser Site</button>
                 </div>
             </header>
             
-            <div class="grid grid-cols-12 gap-6 h-[calc(100vh-200px)]">
+            <div class="grid grid-cols-12 gap-8 flex-1 overflow-hidden">
                 
-                <!-- LISTE GAUCHE -->
-                <div class="col-span-3 bento-card p-4 h-full overflow-y-auto flex flex-col relative">
-                    
-                    <!-- LE BOUTON D'ADOPTION DES ORPHELINS -->
-                    <button onclick="openOrphanModal()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-3 rounded-xl mb-4 transition shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-magnifying-glass"></i> Scanner les Orphelins
-                    </button>
-
-                    <div class="flex justify-between items-center mb-4 px-2">
-                        <h3 class="font-bold text-white">Sites du Client</h3>
-                        <button onclick="resetForm()" class="text-xs bg-cyan-900/30 text-cyan-400 px-3 py-1 rounded border border-cyan-500/30 hover:bg-cyan-500 hover:text-black transition"><i class="fa-solid fa-plus"></i></button>
+                <!-- LISTE GAUCHE (ARBRE) -->
+                <div class="col-span-3 bento-card p-0 flex flex-col relative shadow-2xl">
+                    <div class="p-6 border-b border-white/10 bg-card/50">
+                        <button onclick="openOrphanModal()" class="w-full bg-purple-600/20 border border-purple-500/50 hover:bg-purple-500 hover:text-white text-purple-400 text-[10px] font-black uppercase tracking-widest py-3 rounded-xl mb-4 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-link-slash text-lg"></i> Scanner Orphelins
+                        </button>
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-white text-xs uppercase tracking-widest">Sites du Client</h3>
+                            <button onclick="resetForm()" class="w-8 h-8 rounded-lg bg-cyan text-abysse flex items-center justify-center hover:bg-white transition shadow-md"><i class="fa-solid fa-plus font-black"></i></button>
+                        </div>
+                        <div class="relative">
+                            <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                            <input type="text" id="search-site" placeholder="Filtrer (Nom, PDL)..." class="w-full input-dark pl-10" oninput="loadSites()">
+                        </div>
                     </div>
-                    <input type="text" id="search-site" placeholder="Filtrer (Nom, PDL)..." class="input-dark w-full mb-4 p-2 rounded text-xs" oninput="loadSites()">
-                    <div id="site-list" class="flex-1 overflow-y-auto space-y-2 pr-2"></div>
+                    <div id="site-list" class="flex-1 overflow-y-auto p-4 space-y-2 bg-abysse/30"></div>
                 </div>
 
-                <!-- FORMULAIRE (LA ROLLS ROYCE) -->
-                <div class="col-span-9 bento-card p-6 h-full overflow-y-auto relative">
-                    <div id="form-loader" class="absolute inset-0 bg-card/80 backdrop-blur-sm z-50 flex items-center justify-center hidden"><i class="fa-solid fa-spinner fa-spin text-cyan text-4xl"></i></div>
+                <!-- FORMULAIRE CENTRAL (LA ROLLS ROYCE) -->
+                <div class="col-span-9 bento-card p-8 overflow-y-auto relative shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+                    <div id="form-loader" class="absolute inset-0 bg-abysse/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden"><i class="fa-solid fa-spinner fa-spin text-cyan text-5xl mb-4"></i><p class="text-xs text-cyan font-mono tracking-widest uppercase">Chargement de l'actif...</p></div>
                     
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="font-bold text-white flex items-center gap-3"><i class="fa-solid fa-building-user text-gray-500"></i><span id="form-title">Nouveau Site</span></h3>
-                        <div class="text-xs text-gray-500 font-mono" id="form-id">ID: NEW</div>
-                    </div>
-
-                    <!-- MATRICE ORGANISATIONNELLE -->
-                    <div class="bento-card rounded-bento p-6 border-l-4 border-indigo-500 bg-gradient-to-r from-card to-indigo-900/10 mb-6">
-                        <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-sitemap text-indigo-400"></i> MATRICE ORGANISATIONNELLE</h3>
-                        <div class="grid grid-cols-12 gap-4">
-                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Entité Fille / Lot</label><input type="text" id="mat-fille" placeholder="Ex: Mairie Annexe..." class="w-full input-dark p-2 rounded text-xs border border-indigo-500/30 text-white font-bold"></div>
-                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Statut / Type</label><input type="text" id="mat-status" placeholder="Ex: Franchise, Bâtiment Communal..." class="w-full input-dark p-2 rounded text-xs"></div>
-                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Centre de Coût</label><input type="text" id="mat-cc" placeholder="Ex: CC-409, Voirie..." class="w-full input-dark p-2 rounded text-xs font-mono text-indigo-400"></div>
+                    <div class="flex justify-between items-start mb-8 border-b border-white/10 pb-6">
+                        <div>
+                            <h3 class="text-2xl font-black text-white flex items-center gap-3" id="form-title">Nouvelle Entité</h3>
+                            <div class="text-[10px] text-gray-500 font-mono mt-2 tracking-widest uppercase bg-black/50 inline-block px-3 py-1 rounded-lg border border-white/5">PDL / ID : <span id="form-id" class="text-cyan font-bold">NEW</span></div>
                         </div>
                     </div>
 
-                    <!-- 1. IDENTITÉ -->
-                    <div class="bento-card rounded-bento p-6 border-l-4 border-cyan mb-6">
-                        <div class="grid grid-cols-12 gap-4">
-                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">SIRET (Site)</label><input type="text" id="id-input" placeholder="14 chiffres..." class="w-full input-dark p-2 rounded text-xs font-mono"></div>
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Code NAF</label><input type="text" id="naf-input" class="w-full input-dark p-2 rounded text-xs font-mono text-gray-400"></div>
-                            <div class="col-span-7"><label class="text-[10px] text-cyan font-bold uppercase">NOM DU SITE (Affichage Dashboard)</label><input type="text" id="site-name-input" placeholder="Ex: École Jules Ferry..." class="w-full input-dark p-2 rounded text-xs border border-cyan/30 text-white font-bold"></div>
+                    <!-- MATRICE & IDENTITÉ -->
+                    <div class="grid grid-cols-2 gap-6 mb-8">
+                        <div class="bg-abysse/50 p-6 rounded-2xl border border-white/5 space-y-4 shadow-inner">
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 border-b border-white/5 pb-2">Matrice & Identité</h4>
+                            <div><label class="text-[9px] text-cyan font-bold uppercase tracking-widest mb-1 block pl-2">Nom du Bâtiment / Site *</label><input type="text" id="site-name-input" placeholder="Ex: École Primaire Nord" class="input-dark font-bold text-white border-cyan/30 bg-cyan/5"></div>
+                            <div><label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2">SIRET (Établissement spécifique)</label><input type="text" id="id-input" placeholder="14 chiffres..." class="input-dark font-mono text-gray-400"></div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2">Code NAF</label><input type="text" id="naf-input" class="input-dark font-mono text-gray-400"></div>
+                                <div><label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2">Lot (Regroupement)</label><input type="text" id="mat-fille" class="input-dark text-gray-300" placeholder="Ex: Bâtiments Publics"></div>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- 2. LOCALISATION -->
-                    <div class="bento-card rounded-bento p-6 mb-6 bg-white/5 border border-white/5">
-                        <div class="grid grid-cols-12 gap-4">
-                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Usage (Typologie)</label><input type="text" id="inp-type" placeholder="Ex: Industrie, Administratif..." class="w-full input-dark p-2 rounded text-xs"></div>
-                            <div class="col-span-4"><label class="text-[10px] text-gray-500 font-bold uppercase">Adresse (Voie)</label><input type="text" id="address-input" class="w-full input-dark p-2 rounded text-xs"></div>
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Code Postal</label><input type="text" id="zip-input" class="w-full input-dark p-2 rounded text-xs"></div>
-                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Ville</label><input type="text" id="city-input" class="w-full input-dark p-2 rounded text-xs"></div>
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Surface (m²)</label><input type="number" id="surface-input" placeholder="0" class="w-full input-dark p-2 rounded text-xs font-mono text-cyan"></div>
+                        <!-- LOCALISATION (AVEC API GOUV & ADEME) -->
+                        <div class="bg-abysse/50 p-6 rounded-2xl border border-white/5 space-y-4 shadow-inner">
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 border-b border-white/5 pb-2">Localisation & Loi ELAN</h4>
+                            <div class="relative">
+                                <label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2 flex justify-between"><span>Adresse (Voie)</span><span class="text-cyan"><i class="fa-solid fa-magic"></i> Auto-Fill</span></label>
+                                <input type="text" id="address-input" class="input-dark" placeholder="Commencez à taper l'adresse..." oninput="searchAddress()">
+                                <input type="hidden" id="site-insee">
+                                <div id="address-suggestions" class="suggestions-list hidden"></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2">Code Postal</label><input type="text" id="zip-input" class="input-dark font-mono"></div>
+                                <div><label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2">Ville</label><input type="text" id="city-input" class="input-edit font-bold"></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2">Typologie</label><input type="text" id="inp-type" class="input-dark" placeholder="Ex: Bureau, Santé..."></div>
+                                <div><label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2">Surface (m²)</label><input type="number" id="surface-input" placeholder="0" class="input-dark font-mono text-purple-400 border-purple-500/30 bg-purple-500/5"></div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- 3. CONTRAT ET GRILLE TARIFAIRE -->
-                    <div class="bento-card rounded-bento p-6 border-l-4 border-yellow-500 transition-colors" id="card-energy">
-                        <h3 class="text-sm font-bold text-white mb-4 flex items-center justify-between">
-                            <div class="flex items-center gap-2">CONTRAT & PRIX</div>
-                            <div class="flex bg-black/40 rounded-lg p-1">
-                                <button onclick="setEnergy('elec')" id="btn-elec" class="px-3 py-1 text-[10px] font-bold rounded bg-cyan text-black transition">ÉLEC</button>
-                                <button onclick="setEnergy('gaz')" id="btn-gaz" class="px-3 py-1 text-[10px] font-bold rounded text-gray-400 hover:text-white transition">GAZ</button>
+                    <div class="bg-card/80 p-8 rounded-[2rem] border-l-4 border-cyan shadow-lg space-y-6 transition-colors duration-500" id="card-energy">
+                        <div class="flex justify-between items-center border-b border-white/10 pb-4">
+                            <h4 class="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-file-signature text-gray-500"></i> Contrat & Structure Tarifaire</h4>
+                            <div class="flex bg-black/50 p-1 rounded-xl border border-white/5">
+                                <button onclick="setEnergy('elec')" id="btn-elec" class="px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest bg-cyan text-abysse transition shadow-md">ÉLEC</button>
+                                <button onclick="setEnergy('gaz')" id="btn-gaz" class="px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition">GAZ</button>
                             </div>
-                        </h3>
-                        
-                        <div class="grid grid-cols-12 gap-4 mb-4">
-                            <div class="col-span-3"><label id="lbl-ref" class="text-[10px] text-gray-500 font-bold uppercase">PDL / PRM (14) *</label><input type="text" id="ref-input" placeholder="3000..." class="w-full input-dark p-2 rounded text-xs font-mono border-cyan/50 text-white font-bold"></div>
-                            <div class="col-span-2"><label id="lbl-puiss" class="text-[10px] text-gray-500 font-bold uppercase">P. Souscrite</label><input type="number" id="val-input" class="w-full input-dark p-2 rounded text-xs font-mono text-yellow-500 font-bold"></div>
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">FTA (Achem.)</label><input type="text" id="fta-input" class="w-full input-dark p-2 rounded text-xs" placeholder="-"></div>
-                            <div class="col-span-3"><label class="text-[10px] text-gray-500 font-bold uppercase">Fournisseur</label><input type="text" id="provider-input" class="w-full input-dark p-2 rounded text-xs" placeholder="Ex: EDF"></div>
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Segment</label><input type="text" id="segment-display" class="w-full input-dark p-2 rounded text-xs font-bold text-gray-400 bg-white/5" placeholder="C5, T2..."></div>
                         </div>
 
-                        <div class="grid grid-cols-12 gap-4 mb-4">
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Date Début</label><input type="date" id="date-start" class="w-full input-dark p-2 rounded text-xs text-gray-400"></div>
-                            <div class="col-span-2"><label class="text-[10px] text-gray-500 font-bold uppercase">Date Fin</label><input type="date" id="date-end" class="w-full input-dark p-2 rounded text-xs text-gray-400"></div>
+                        <div class="grid grid-cols-12 gap-5">
+                            <div class="col-span-4"><label id="lbl-ref" class="text-[9px] text-cyan font-bold uppercase tracking-widest mb-1 block pl-2">PDL / PRM (14 chiffres) *</label><input type="text" id="ref-input" placeholder="3000..." class="input-dark font-mono text-lg text-cyan border-cyan/30 bg-cyan/5"></div>
+                            <div class="col-span-4"><label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2">Fournisseur Actuel</label><input type="text" id="provider-input" class="input-dark" placeholder="Ex: EDF, Total..."></div>
+                            <div class="col-span-2"><label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2">Début Marché</label><input type="date" id="date-start" class="input-dark text-gray-400 cursor-pointer" style="color-scheme: dark;"></div>
+                            <div class="col-span-2"><label class="text-[9px] text-alert font-bold uppercase tracking-widest mb-1 block pl-2">Fin de marché</label><input type="date" id="date-end" class="input-dark text-white border-alert/50 bg-alert/10 cursor-pointer" style="color-scheme: dark;"></div>
                         </div>
 
-                        <div class="bg-white/5 p-4 rounded-xl border border-white/5">
-                            <div class="text-[10px] font-bold text-gray-400 uppercase mb-3 flex justify-between items-center">
-                                <span>Structure Tarifaire (€ HT)</span>
-                                <button onclick="openPropagationModal()" class="text-cyan cursor-pointer hover:bg-cyan/20 bg-cyan/10 px-3 py-1.5 rounded-lg border border-cyan/30 transition"><i class="fa-solid fa-copy mr-2"></i>Propager au Lot</button>
+                        <!-- GRILLE ÉLECTRICITÉ -->
+                        <div id="grid-elec" class="bg-black/40 p-6 rounded-2xl border border-white/5 mt-4">
+                            <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-2">
+                                <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Grille Tarifaire & Puissances (ÉLEC)</span>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-[9px] text-gray-500 font-bold uppercase">Tarif Base</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="quadrant-toggle" class="sr-only peer" onchange="toggleQuadrants()">
+                                        <div class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan"></div>
+                                    </label>
+                                    <span class="text-[9px] text-cyan font-bold uppercase">4 Cadrans (HPH/HCE)</span>
+                                </div>
                             </div>
                             
-                            <!-- ÉLECTRICITÉ (4 CADRANS) -->
-                            <div id="grid-elec" class="grid grid-cols-6 gap-2">
-                                <div><label class="text-[9px] text-gray-500 uppercase">Abonnement</label><input type="number" id="price-fix" placeholder="0.00" class="w-full input-dark p-2 rounded text-xs text-right text-yellow-500 font-bold"></div>
-                                <div><label class="text-[9px] text-gray-500 uppercase font-bold text-white">HPH (Hiver P)</label><input type="number" step="0.01" id="price-hph" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right font-mono"></div>
-                                <div><label class="text-[9px] text-gray-500 uppercase font-bold text-white">HCH (Hiver C)</label><input type="number" step="0.01" id="price-hch" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right font-mono"></div>
-                                <div><label class="text-[9px] text-gray-500 uppercase font-bold text-cyan">HPE (Été P)</label><input type="number" step="0.01" id="price-hpe" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right border border-cyan/20 font-mono"></div>
-                                <div><label class="text-[9px] text-gray-500 uppercase font-bold text-cyan">HCE (Été C)</label><input type="number" step="0.01" id="price-hce" placeholder="€/MWh" class="w-full input-dark p-2 rounded text-xs text-right font-mono"></div>
-                                <div><label id="lbl-tax" class="text-[9px] text-gray-500 uppercase">CSPE (Taxes)</label><input type="number" step="0.1" id="price-tax" placeholder="22.5" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
+                            <!-- Ligne 1 : Les Puissances -->
+                            <div class="grid grid-cols-5 gap-4 mb-6">
+                                <div class="col-span-5"><span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Puissances Souscrites (kW)</span></div>
+                                <div class="quad-simple col-span-5"><input type="number" id="val-input" placeholder="Puissance Unique (kVA)" class="input-dark font-mono text-cyan w-1/3 text-lg border-cyan/30"></div>
+                                <div class="quad-advanced"><input type="number" id="ps-hph" placeholder="PS - HPH" class="input-dark font-mono text-center"></div>
+                                <div class="quad-advanced"><input type="number" id="ps-hch" placeholder="PS - HCH" class="input-dark font-mono text-center"></div>
+                                <div class="quad-advanced"><input type="number" id="ps-hpe" placeholder="PS - HPE" class="input-dark font-mono text-center border-cyan/30 text-cyan"></div>
+                                <div class="quad-advanced"><input type="number" id="ps-hce" placeholder="PS - HCE" class="input-dark font-mono text-center"></div>
                             </div>
 
-                            <div id="grid-ps" class="grid grid-cols-6 gap-2 mt-4 border-t border-white/5 pt-4">
-                                 <div class="col-span-6 mb-2"><span class="text-[9px] font-bold text-gray-500 uppercase">Puissances Souscrites Détaillées (kW)</span></div>
-                                 <div class="col-start-2"><input type="number" id="ps-hph" placeholder="P1 (HPH)" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
-                                 <div><input type="number" id="ps-hch" placeholder="P2 (HCH)" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
-                                 <div><input type="number" id="ps-hpe" placeholder="P3 (HPE)" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
-                                 <div><input type="number" id="ps-hce" placeholder="P4 (HCE)" class="w-full input-dark p-2 rounded text-xs text-right bg-white/5"></div>
+                            <!-- Ligne 2 : Les Prix -->
+                            <div class="grid grid-cols-5 gap-4">
+                                <div class="col-span-5"><span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Prix de l'Énergie (€/MWh HT)</span></div>
+                                <div class="quad-simple col-span-5"><input type="number" step="0.01" id="px-unique" placeholder="Prix Unique Molécule (€/MWh)" class="input-dark font-mono text-white w-1/3 text-lg border-white/30"></div>
+                                <div class="quad-advanced"><label class="text-[8px] text-white uppercase block mb-1">HPH</label><input type="number" step="0.01" id="price-hph" class="input-dark font-mono text-center text-white border-white/30"></div>
+                                <div class="quad-advanced"><label class="text-[8px] text-gray-400 uppercase block mb-1">HCH</label><input type="number" step="0.01" id="price-hch" class="input-dark font-mono text-center"></div>
+                                <div class="quad-advanced"><label class="text-[8px] text-cyan uppercase block mb-1">HPE</label><input type="number" step="0.01" id="price-hpe" class="input-dark font-mono text-center text-cyan border-cyan/30"></div>
+                                <div class="quad-advanced"><label class="text-[8px] text-gray-400 uppercase block mb-1">HCE</label><input type="number" step="0.01" id="price-hce" class="input-dark font-mono text-center"></div>
+                                
+                                <!-- Fixe & Taxes -->
+                                <div class="col-span-5 mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-4">
+                                    <div><label class="text-[9px] text-gold uppercase font-bold pl-2 mb-1 block">Abonnement Annuel (€)</label><input type="number" step="0.1" id="price-fix" placeholder="0.00" class="input-dark font-mono text-gold border-gold/30 text-lg w-2/3"></div>
+                                    <div><label class="text-[9px] text-gray-400 uppercase font-bold pl-2 mb-1 block">CSPE / TICFE (€/MWh)</label><input type="number" step="0.1" id="price-tax" class="input-dark font-mono text-gray-400 text-lg w-2/3" value="22.5"></div>
+                                </div>
                             </div>
+                        </div>
 
-                            <!-- GAZ NATUREL -->
-                            <div id="grid-gaz" class="grid grid-cols-3 gap-4 hidden">
-                                <div><label class="text-[9px] text-gray-500 uppercase">Abonnement /an</label><input type="number" id="price-gaz-fix" placeholder="0.00" class="w-full input-dark p-2 rounded text-xs text-right text-yellow-500 font-bold"></div>
-                                <div><label class="text-[9px] text-gray-500 uppercase font-bold text-red-500">Prix Molécule (€/MWh)</label><input type="number" step="0.01" id="price-gaz-mol" placeholder="45.00" class="w-full input-dark p-2 rounded text-xs text-right border border-red-500/30 text-white font-mono"></div>
-                                <div><label class="text-[9px] text-gray-500 uppercase">TICGN / Taxes</label><input type="number" step="0.1" id="price-gaz-tax" placeholder="8.44" class="w-full input-dark p-2 rounded text-xs text-right text-gray-400"></div>
+                        <!-- GRILLE GAZ -->
+                        <div id="grid-gaz" class="hidden bg-black/40 p-6 rounded-2xl border border-white/5 mt-4 space-y-6">
+                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest border-b border-white/10 pb-2 block">Paramètres Gaz Naturel</span>
+                            <div class="grid grid-cols-3 gap-6">
+                                <div><label class="text-[9px] text-gas font-bold uppercase pl-2 mb-1 block">Profil (Ex: P12)</label><input type="text" id="site-profil-gaz" class="input-dark font-mono text-gas border-gas/30 bg-gas/5 text-center text-lg uppercase"></div>
+                                <div><label class="text-[9px] text-gray-400 font-bold uppercase pl-2 mb-1 block">CJA (MWh/j)</label><input type="number" step="0.01" id="ps-gaz-cja" class="input-dark font-mono text-center text-lg"></div>
+                                <div><label class="text-[9px] text-white font-bold uppercase pl-2 mb-1 block">Volume CAR (MWh/an)</label><input type="number" id="ps-gaz-car" class="input-dark font-mono text-center text-lg border-white/30 text-white"></div>
                             </div>
-                            
-                            <!-- AJOUT DU VOLUME GAZ -->
-                            <div id="grid-gaz-vol" class="grid grid-cols-3 gap-4 mt-4 hidden border-t border-white/5 pt-4">
-                                <div><label class="text-[9px] text-gray-500 uppercase">Profil (Ex: P12)</label><input type="text" id="site-profil-gaz" class="w-full input-dark p-2 rounded text-xs text-center"></div>
-                                <div><label class="text-[9px] text-gray-500 uppercase">CJA (MWh/j)</label><input type="number" step="0.01" id="ps-gaz-cja" class="w-full input-dark p-2 rounded text-xs text-center"></div>
-                                <div><label class="text-[9px] text-white uppercase font-bold">CAR (MWh/an)</label><input type="number" id="ps-gaz-car" placeholder="Volume Annuel" class="w-full input-dark p-2 rounded text-xs text-center text-white border-white/30"></div>
+                            <div class="grid grid-cols-3 gap-6 pt-4 border-t border-white/5">
+                                <div><label class="text-[9px] text-white font-bold uppercase pl-2 mb-1 block">Prix Molécule (€/MWh)</label><input type="number" step="0.01" id="price-gaz-mol" class="input-dark font-mono text-center text-2xl text-white border-white/50"></div>
+                                <div><label class="text-[9px] text-gold font-bold uppercase pl-2 mb-1 block">Abonnement /an (€)</label><input type="number" step="0.1" id="price-gaz-fix" class="input-dark font-mono text-center text-lg text-gold border-gold/30"></div>
+                                <div><label class="text-[9px] text-gray-400 font-bold uppercase pl-2 mb-1 block">TICGN (€/MWh)</label><input type="number" step="0.1" id="price-gaz-tax" class="input-dark font-mono text-center text-lg" value="8.44"></div>
                             </div>
-
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- ONGLET 3 : APP STORE / ACTIVATION SATELLITES -->
-        <div id="tab-store" class="tab-content hidden max-w-6xl mx-auto space-y-6">
-            <header class="flex justify-between items-end mb-8">
-                <div><h2 class="text-3xl font-black text-white mb-1">Magasin d'Applications (IA)</h2><p class="text-gray-400 text-xs">Activez ou désactivez des modules pour le locataire sélectionné.</p></div>
+        <!-- ONGLET 3 : APP STORE / SATELLITES -->
+        <div id="tab-store" class="tab-content hidden max-w-6xl mx-auto space-y-6 h-full p-10">
+            <header class="flex justify-between items-end mb-8 bg-abysse/80 backdrop-blur p-6 rounded-[2rem] border border-purple/20 shadow-lg">
+                <div>
+                    <h2 class="text-3xl font-black text-white mb-2"><i class="fa-solid fa-rocket text-purple-400 mr-3"></i>Centre d'Activation IA</h2>
+                    <p class="text-gray-400 text-xs font-mono">Activez ou désactivez les Satellites CORTEX pour <span id="store-tenant-name" class="text-white font-bold">le client sélectionné</span>.</p>
+                </div>
+                <button onclick="App.toast('Droits sauvegardés dans le profil Client.', 'success')" class="bg-purple-600 text-white px-8 py-3 rounded-xl text-xs font-black hover:bg-purple-500 transition shadow-[0_0_20px_rgba(168,85,247,0.4)] uppercase tracking-widest flex items-center gap-2">
+                    <i class="fa-solid fa-save text-lg"></i> Enregistrer les accès
+                </button>
             </header>
             
-            <div class="grid grid-cols-3 gap-6">
-                <div class="bento-card p-6 flex flex-col justify-between border-t-2 border-sat">
-                    <div><div class="w-12 h-12 rounded-xl bg-sat/10 text-sat flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-satellite-dish"></i></div><h3 class="font-bold text-white mb-2">Cortex PULSE</h3><p class="text-xs text-gray-400">Alerte jours de pointe PP1 (RTE).</p></div>
-                    <div class="mt-6 flex justify-between items-center border-t border-white/5 pt-4"><button class="bg-sat text-white px-4 py-2 rounded text-xs font-bold transition">Activer</button></div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- SATELLITE 1 -->
+                <div class="bento-card p-6 flex flex-col justify-between border-t-2 border-gold hover:border-gold/50 transition">
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gold/10 text-gold flex items-center justify-center text-2xl"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                            <!-- SWITCH CSS PUR -->
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold"></div>
+                            </label>
+                        </div>
+                        <h3 class="font-bold text-white mb-2 text-lg">Financial Twin</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed font-mono">Audit comptable Factur-X, Trust Score et chasse aux taxes (CSPE/TICFE).</p>
+                    </div>
                 </div>
-                <div class="bento-card p-6 flex flex-col justify-between border-t-2 border-purple-500">
-                    <div><div class="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-city"></i></div><h3 class="font-bold text-white mb-2">Cortex IMMO</h3><p class="text-xs text-gray-400">Prédicteur de DPE et valeur foncière.</p></div>
-                    <div class="mt-6 flex justify-between items-center border-t border-white/5 pt-4"><button class="bg-white/10 text-white px-4 py-2 rounded text-xs font-bold transition">Débloquer</button></div>
+
+                <!-- SATELLITE 2 -->
+                <div class="bento-card p-6 flex flex-col justify-between border-t-2 border-[#F97316] hover:border-[#F97316]/50 transition">
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-[#F97316]/10 text-[#F97316] flex items-center justify-center text-2xl"><i class="fa-solid fa-handshake-simple"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F97316]"></div>
+                            </label>
+                        </div>
+                        <h3 class="font-bold text-white mb-2 text-lg">PPA Builder</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed font-mono">Simulation d'achat direct EnR (Solaire/Éolien) et calcul du prix lissé (Blended) sur 10 ans.</p>
+                    </div>
+                </div>
+
+                <!-- SATELLITE 3 -->
+                <div class="bento-card p-6 flex flex-col justify-between border-t-2 border-success hover:border-success/50 transition">
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-success/10 text-success flex items-center justify-center text-2xl"><i class="fa-solid fa-buildings"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
+                            </label>
+                        </div>
+                        <h3 class="font-bold text-white mb-2 text-lg">Cortex Tertiaire (OPERAT)</h3>
+                        <p class="text-xs text-gray-400 leading-relaxed font-mono">Suivi de la trajectoire de réduction (-40%) et génération de l'export API pour l'État.</p>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- ONGLET 4 : API & CLÉS (RTE) -->
-        <div id="tab-api" class="tab-content hidden max-w-6xl mx-auto space-y-6">
-            <header class="flex justify-between items-end mb-8">
-                <div><h2 class="text-3xl font-black text-white mb-1">Configuration des API</h2><p class="text-gray-400 text-xs">Clés maîtresses globales de l'infrastructure.</p></div>
-                <button onclick="saveRteConfig()" class="bg-cyan text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan/90 transition shadow-lg"><i class="fa-solid fa-save mr-2"></i>Enregistrer Clés</button>
+        <div id="tab-api" class="tab-content hidden max-w-5xl mx-auto space-y-6 p-10">
+            <header class="flex justify-between items-end mb-8 bg-abysse/80 backdrop-blur p-6 rounded-[2rem] border border-gold/20 shadow-lg">
+                <div><h2 class="text-3xl font-black text-white mb-1"><i class="fa-solid fa-key text-gold mr-3"></i>Clés d'Infrastructure</h2><p class="text-gray-400 text-xs font-mono">Configuration des API Data RTE, API Gouv et Météo.</p></div>
+                <button onclick="saveRteConfig()" class="bg-gold text-abysse px-8 py-3 rounded-xl text-xs font-black hover:bg-white transition shadow-[0_0_15px_rgba(245,158,11,0.4)] uppercase tracking-widest"><i class="fa-solid fa-save mr-2 text-lg align-middle"></i> Enregistrer</button>
             </header>
             
-            <div id="api-error" class="hidden bg-red-500/20 border border-red-500/50 text-red-400 p-4 rounded-xl mb-4 font-bold text-sm flex items-center gap-3">
-                <i class="fa-solid fa-triangle-exclamation text-xl"></i> <span id="api-error-text"></span>
-            </div>
-            
-            <div class="bento-card rounded-bento p-8 border-l-4 border-sat bg-gradient-to-r from-card to-sat/10">
-                <h3 class="text-lg font-bold text-white flex items-center gap-3 mb-6"><i class="fa-solid fa-satellite-dish text-sat"></i> Open Data RTE (Marché & Réseau)</h3>
-                <div class="space-y-4 max-w-2xl">
-                    <div><label class="text-[10px] text-gray-500 font-bold uppercase">Client ID</label><input type="text" id="rte-client-id" class="w-full input-dark p-3 rounded-xl font-mono text-sm mt-1"></div>
-                    <div><label class="text-[10px] text-gray-500 font-bold uppercase">Client Secret</label><input type="password" id="rte-client-secret" class="w-full input-dark p-3 rounded-xl font-mono text-sm mt-1"></div>
+            <div class="bento-card rounded-bento p-10 border-l-4 border-sat bg-gradient-to-r from-card to-sat/5 shadow-2xl">
+                <h3 class="text-xl font-black text-white flex items-center gap-3 mb-4"><i class="fa-solid fa-satellite-dish text-sat"></i> Open Data RTE (Marché & Réseau)</h3>
+                <p class="text-xs text-gray-400 mb-8 max-w-2xl font-mono leading-relaxed">Insérez ici vos clés d'API (OAuth2) fournies par le portail <span class="text-white font-bold">data.rte-france.com</span>. Ces clés alimentent le Ticker Boursier (EEX), le radar PP1 (Capacité) et l'alerte EcoWatt.</p>
+                
+                <div class="space-y-6 max-w-2xl">
+                    <div>
+                        <label class="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-2 mb-2 block">Client ID (ID Application)</label>
+                        <input type="text" id="rte-client-id" placeholder="Votre Client ID..." class="w-full input-dark p-4 rounded-xl font-mono text-sm border border-white/10 shadow-inner">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-2 mb-2 block">Client Secret (Clé Secrète)</label>
+                        <input type="password" id="rte-client-secret" placeholder="••••••••••••••••••••••••••••••" class="w-full input-dark p-4 rounded-xl font-mono text-sm border border-white/10 shadow-inner">
+                    </div>
                 </div>
             </div>
         </div>
 
     </main>
 
-    <!-- MODAL CREATE TENANT -->
-    <div id="create-tenant-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bento-card p-8 rounded-bento w-[500px] border border-cyan/30 shadow-2xl shadow-cyan/10">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 rounded-full bg-cyan/20 flex items-center justify-center"><i class="fa-solid fa-building text-cyan"></i></div>
-                <div><h3 class="text-lg font-bold text-white">Nouveau Locataire (Tenant)</h3></div>
+    <!-- MODALS (CREATE TENANT, IMPORT, ORPHANS) -->
+    
+    <!-- MODAL CREATE TENANT AVEC API GOUV -->
+    <div id="create-tenant-modal" class="fixed inset-0 bg-black/90 z-[100] hidden items-center justify-center backdrop-blur-md opacity-0 transition-opacity">
+        <div class="bento-card p-10 rounded-[2rem] w-[600px] border-2 border-cyan/30 shadow-[0_0_50px_rgba(0,229,255,0.2)] transform scale-95 transition-transform" id="modal-tenant-content">
+            <h2 class="text-3xl font-black text-white mb-2 flex items-center gap-3"><i class="fa-solid fa-building text-cyan"></i> Nouveau Locataire (Ops)</h2>
+            <p class="text-xs text-gray-400 font-mono mb-8">Saisissez le SIREN pour pré-remplir l'identité légale.</p>
+            
+            <div class="space-y-6 mb-8">
+                <div class="p-6 bg-abysse/50 border border-cyan/20 rounded-[2rem] shadow-inner">
+                    <label class="text-[10px] text-cyan font-bold font-mono mb-3 block uppercase tracking-widest"><i class="fa-solid fa-magnifying-glass"></i> Recherche Légale (Open Data)</label>
+                    <div class="flex gap-3">
+                        <input type="text" id="new-tenant-siret" placeholder="SIREN (9 chiffres)" class="w-full input-dark p-3 rounded-xl text-lg font-mono tracking-[0.2em] outline-none focus:border-cyan text-white border border-cyan/30 bg-abysse shadow-inner">
+                        <button type="button" onclick="searchTenantSiren()" id="btn-search-siren" class="px-6 bg-cyan/20 text-cyan border border-cyan/50 rounded-xl hover:bg-cyan hover:text-abysse transition-colors font-bold flex items-center gap-2 whitespace-nowrap uppercase tracking-widest text-xs shadow-md">
+                            <i class="fa-solid fa-magic"></i> Auto-Fill
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-500 font-bold uppercase mb-1 block pl-2">Raison Sociale Officielle *</label>
+                    <input type="text" id="new-tenant-name" placeholder="Ex: Mairie de Grenoble..." class="w-full input-dark p-4 rounded-xl text-sm font-bold text-white border border-white/10">
+                </div>
             </div>
-            <div class="space-y-4 mb-8">
-                <div><label class="text-[10px] text-gray-500 font-bold uppercase mb-1 block">SIRET de l'Entité Mère (Tenant ID) *</label><input type="text" id="new-tenant-siret" class="w-full input-dark p-3 rounded-xl text-sm font-mono text-cyan"></div>
-                <div><label class="text-[10px] text-gray-500 font-bold uppercase mb-1 block">Raison Sociale *</label><input type="text" id="new-tenant-name" class="w-full input-dark p-3 rounded-xl text-sm text-white"></div>
-            </div>
-            <div class="flex justify-end gap-3">
-                <button onclick="document.getElementById('create-tenant-modal').classList.add('hidden')" class="text-gray-400 text-xs font-bold px-4 py-3 hover:text-white transition">ANNULER</button>
-                <button onclick="createTenant()" class="bg-cyan text-black text-xs font-bold px-6 py-3 rounded-xl hover:bg-cyan/90 transition shadow-lg">CRÉER LE LOCATAIRE</button>
+            
+            <div class="flex justify-end gap-4 border-t border-white/10 pt-6">
+                <button onclick="closeModal('create-tenant-modal')" class="text-gray-400 text-xs font-bold px-6 py-3 hover:text-white transition uppercase tracking-widest">ANNULER</button>
+                <button onclick="createTenant()" id="btn-create-tenant" class="bg-cyan text-abysse text-sm font-black px-8 py-3 rounded-2xl hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.4)] flex items-center gap-2 uppercase tracking-widest"><i class="fa-solid fa-plus-circle text-lg"></i> CRÉER L'ESPACE</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL ADOPTION ORPHELINS -->
-    <div id="orphan-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bento-card p-8 rounded-bento w-[800px] h-[600px] border border-indigo-500/30 shadow-2xl shadow-indigo-500/10 flex flex-col relative">
-            <button onclick="document.getElementById('orphan-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
-            <div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center"><i class="fa-solid fa-magnifying-glass text-indigo-400"></i></div><div><h3 class="text-xl font-bold text-white">Adoption de Sites (Orphelins)</h3><p class="text-xs text-gray-400">Locataire cible : <span id="orphan-target-client" class="text-cyan font-bold"></span></p></div></div>
-            <div class="flex gap-4 my-6"><input type="text" id="orphan-search" placeholder="Mot clé..." class="w-full input-dark p-3 rounded-xl text-sm"><button onclick="scanOrphans()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 rounded-xl transition">SCANNER</button></div>
-            <div class="flex-1 overflow-y-auto bg-black/20 rounded-xl border border-white/5 p-4" id="orphan-list"></div>
-            <div class="mt-6 pt-4 border-t border-white/10 flex justify-between items-center"><div class="text-xs text-gray-400"><span id="orphan-count" class="text-white font-bold">0</span> sélectionné(s)</div><button onclick="adoptSelectedOrphans()" id="btn-adopt" class="bg-cyan text-black px-6 py-3 rounded-xl text-sm font-bold transition opacity-50 cursor-not-allowed" disabled>ADOPTER</button></div>
+    <div id="orphan-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex-col items-center justify-center p-8 backdrop-blur-md opacity-0 transition-opacity">
+        <div class="bento-card w-full max-w-4xl p-8 relative flex flex-col h-[70vh] border-2 border-indigo-500/30 shadow-[0_0_50px_rgba(99,102,241,0.2)] transform scale-95 transition-transform" id="modal-orphan-content">
+            <button onclick="closeModal('orphan-modal')" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-abysse border border-white/10 text-gray-400 hover:text-white hover:border-white transition flex items-center justify-center text-xl"><i class="fa-solid fa-xmark"></i></button>
+            
+            <h3 class="text-2xl font-black text-white mb-2 flex items-center gap-3"><i class="fa-solid fa-link-slash text-indigo-400"></i> Centre d'Adoption (Sites Orphelins)</h3>
+            <p class="text-sm text-gray-400 mb-6 font-mono">Locataire cible : <span id="orphan-target-client" class="text-cyan font-bold bg-cyan/10 px-2 py-1 rounded border border-cyan/20"></span></p>
+            
+            <div class="flex gap-4 mb-6 bg-black/40 p-4 rounded-2xl border border-white/5 shadow-inner">
+                <input type="text" id="orphan-search" placeholder="Mot clé pour filtrer les orphelins (ex: Mairie, ABAG, PDL)..." class="flex-1 input-dark p-3 rounded-xl text-sm font-mono border-indigo-500/30 focus:border-indigo-500">
+                <button onclick="scanOrphans()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-widest px-8 rounded-xl transition shadow-lg flex items-center gap-2"><i class="fa-solid fa-radar text-lg"></i> SCANNER LA BASE</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto bg-abysse/80 rounded-2xl border border-white/10 p-2 shadow-inner" id="orphan-list">
+                <div class="text-center text-gray-500 mt-20 font-mono text-xs"><i class="fa-solid fa-satellite-dish text-4xl mb-4 block text-indigo-500/50"></i> Appuyez sur Scanner pour chercher les compteurs égarés.</div>
+            </div>
+            
+            <div class="mt-6 pt-4 border-t border-white/10 flex justify-between items-center bg-card/50 p-4 rounded-2xl">
+                <div class="text-xs text-gray-400 font-mono uppercase tracking-widest"><span id="orphan-count" class="text-white font-black text-lg bg-black px-3 py-1 rounded-lg border border-white/10 mr-2">0</span> Sélectionné(s)</div>
+                <button onclick="adoptSelectedOrphans()" id="btn-adopt" class="bg-cyan text-abysse px-8 py-3 rounded-xl text-sm font-black transition opacity-50 cursor-not-allowed uppercase tracking-widest flex items-center gap-2" disabled><i class="fa-solid fa-link text-lg"></i> ADOPTER LA SÉLECTION</button>
+            </div>
         </div>
     </div>
 
     <!-- MODAL IMPORT DE MASSE -->
-    <div id="import-modal" class="fixed inset-0 bg-black/90 z-[99] hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bento-card p-8 rounded-bento w-[600px] relative border border-cyan/30 shadow-[0_0_50px_rgba(0,229,255,0.1)]">
-            <button onclick="toggleImportModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
-            <h3 class="text-xl font-bold text-white mb-1"><i class="fa-solid fa-table-columns text-cyan mr-2"></i>Import Massif (Excel)</h3>
-            <p class="text-xs text-red-400 font-bold mb-6"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Affecté au client <span id="import-target-tenant" class="text-white font-mono bg-red-900/30 px-1 rounded">Aucun</span>.</p>
-            <div class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-white transition cursor-pointer mb-4" onclick="document.getElementById('csv-upload').click()">
-                <i class="fa-solid fa-cloud-arrow-up text-4xl text-gray-500 mb-2"></i><div class="text-sm font-bold text-white" id="csv-label">Glisser le fichier (.XLSX, .CSV)</div><input type="file" id="csv-upload" class="hidden" accept=".csv,.xlsx" onchange="fileSelected(this)">
+    <div id="import-modal" class="fixed inset-0 bg-black/90 z-[100] hidden items-center justify-center backdrop-blur-md opacity-0 transition-opacity">
+        <div class="bento-card p-10 rounded-[2rem] w-[600px] relative border-2 border-success/30 shadow-[0_0_50px_rgba(16,185,129,0.2)] transform scale-95 transition-transform" id="modal-import-content">
+            <button onclick="closeModal('import-modal')" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-abysse border border-white/10 text-gray-400 hover:text-white hover:border-white transition flex items-center justify-center text-xl"><i class="fa-solid fa-xmark"></i></button>
+            <h3 class="text-2xl font-black text-white mb-2 flex items-center gap-3"><i class="fa-solid fa-file-excel text-success"></i> Smart Import (Matrice 3D)</h3>
+            <p class="text-xs text-red-400 font-bold mb-8 bg-red-900/20 p-3 rounded-lg border border-red-500/30"><i class="fa-solid fa-triangle-exclamation mr-2 text-lg align-middle"></i> L'import sera intégralement affecté au locataire : <span id="import-target-tenant" class="text-white font-mono bg-black px-2 py-0.5 rounded ml-1">Aucun</span>.</p>
+            
+            <div class="border-2 border-dashed border-success/50 bg-success/5 rounded-2xl p-10 text-center hover:bg-success/10 transition cursor-pointer mb-6 group shadow-inner" onclick="document.getElementById('csv-upload').click()">
+                <i class="fa-solid fa-cloud-arrow-up text-6xl text-success/70 group-hover:text-success mb-4 transition transform group-hover:scale-110"></i>
+                <div class="text-base font-black text-white uppercase tracking-widest" id="csv-label">Glisser le fichier (.XLSX, .CSV)</div>
+                <p class="text-[10px] text-gray-400 font-mono mt-2">La matrice CORTEX V12.8 est requise pour un parsing parfait.</p>
+                <input type="file" id="csv-upload" class="hidden" accept=".csv,.xlsx" onchange="fileSelected(this)">
             </div>
-            <button class="w-full bg-cyan text-black font-bold py-4 rounded-xl mt-4 hover:bg-white transition" onclick="processImport()">INJECTER EN BASE 3D</button>
+            <button class="w-full bg-success text-abysse font-black py-4 rounded-xl hover:bg-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)] uppercase tracking-widest text-sm flex items-center justify-center gap-2" id="btn-process-import" onclick="processImport()">
+                <i class="fa-solid fa-database text-lg"></i> INJECTER EN BASE 3D
+            </button>
         </div>
     </div>
 
-    <!-- MODAL PROPAGATION -->
-    <div id="propagate-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bento-card p-8 rounded-bento w-[500px] border border-cyan/30 shadow-2xl shadow-cyan/10">
-            <h3 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-network-wired text-cyan mr-2"></i> Propagation Tarifaire</h3>
-            <div class="bg-white/5 p-4 rounded-xl border border-white/5 mb-6">
-                <div class="flex justify-between text-xs mb-2"><span class="text-gray-500">Segment Cible :</span><span class="text-white font-bold" id="prop-segment">--</span></div>
-                <div class="flex justify-between text-xs mb-2"><span class="text-gray-500">Matrice Fille / Lot :</span><span class="text-cyan font-bold" id="prop-lot">--</span></div>
-                <p class="text-[10px] text-gray-400 mt-2"><i class="fa-solid fa-triangle-exclamation text-yellow-500"></i> Seuls les sites de ce segment seront impactés.</p>
-            </div>
-            <div class="mb-6"><label class="text-[10px] text-gray-500 font-bold uppercase mb-1 block">Date d'effet</label><input type="date" id="prop-date" class="w-full input-dark p-3 rounded-xl text-sm"></div>
-            <div class="flex justify-end gap-3"><button onclick="document.getElementById('propagate-modal').classList.add('hidden')" class="text-gray-400 text-xs font-bold px-4 py-3">ANNULER</button><button onclick="confirmPropagation()" class="bg-cyan text-black text-xs font-bold px-6 py-3 rounded-xl">CONFIRMER</button></div>
-        </div>
-    </div>
-  <!-- ============================================================================== -->
-    <!-- LOGIQUE JAVASCRIPT (CORTEX DATA UNITY V12.8 - THIN CLIENT & GHOST DATA)        -->
+    <!-- ============================================================================== -->
+    <!-- LOGIQUE JAVASCRIPT (CORTEX DATA UNITY V12.8 - FULL RECOVERY & SMART APIs)      -->
     <!-- ============================================================================== -->
     <script>
         const App = {
             toast: function(msg, type='info') {
                 const container = document.getElementById('toast-container');
                 if(!container) return;
-                const colors = { success: 'bg-success border-success/50 text-abysse', error: 'bg-alert border-alert/50 text-white', info: 'bg-cyan border-cyan/50 text-abysse', sage: 'bg-purple border-purple/50 text-white' };
+                const colors = { success: 'bg-success border-success/50 text-abysse', error: 'bg-alert border-alert/50 text-white', info: 'bg-cyan border-cyan/50 text-abysse', warning: 'bg-gold border-gold/50 text-abysse' };
                 const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
                 const el = document.createElement('div');
-                el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto z-[999]`;
-                el.innerHTML = `<i class="fa-solid ${icon} text-lg"></i> <span>${msg}</span>`;
+                el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto z-[9999]`;
+                el.innerHTML = `<i class="fa-solid ${icon} text-xl"></i> <span>${msg}</span>`;
                 container.appendChild(el);
                 requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
                 setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
@@ -361,127 +453,172 @@
         let ACTIVE_TENANT = null;
         let CURRENT_ID = null;
         let currentEnergy = 'elec';
-        let GLOBAL_TENANT_ID = (forceTenant && forceTenant !== 'ALL') ? forceTenant : "TENANT_DEFAULT";
+        let ORPHAN_LIST =[];
 
         document.addEventListener('DOMContentLoaded', () => {
-            if(forceTenant && forceTenant !== 'ALL') {
-                const ind = document.getElementById('god-mode-indicator');
-                if(ind) ind.classList.remove('hidden');
-                const impId = document.getElementById('import-tenant-id');
-                if(impId) impId.innerText = forceTenant;
-            }
-            switchView('general'); 
+            switchView('crm'); 
+            loadTenants(); // On charge les clients au démarrage !
         });
 
+        // --- NAVIGATION INTERNE ---
         window.switchView = function(viewId) {
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
             const btn = document.getElementById('nav-' + viewId);
             if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
             
-            const views =['view-general', 'view-perimetre', 'view-import', 'view-rgpd', 'view-support', 'view-equipe'];
-            views.forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('active'); });
+            const views =['tab-crm', 'tab-parc', 'tab-store', 'tab-api'];
+            views.forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('active', 'block'); el.classList.add('hidden'); });
             
-            const target = document.getElementById('view-' + viewId);
-            if(target) target.classList.add('active');
+            const target = document.getElementById('tab-' + viewId);
+            if(target) { target.classList.remove('hidden'); target.classList.add('active', 'block'); }
 
-            if(viewId === 'general') loadPartnerConfig();
-            if(viewId === 'perimetre') { loadFleet(); resetSiteForm(); }
-            if(viewId === 'support') loadSageTimeline();
+            if(viewId === 'parc') { if(ACTIVE_TENANT) loadSites(); resetForm(); }
+            if(viewId === 'api') loadRteConfig();
+            if(viewId === 'store') {
+                if(!ACTIVE_TENANT) { App.toast("Sélectionnez d'abord un client dans le CRM.", "warning"); switchView('crm'); }
+                else { document.getElementById('store-tenant-name').innerText = ACTIVE_TENANT.name; }
+            }
+        }
+
+        // --- GESTION DES MODALES ---
+        function openModal(id) { 
+            const m = document.getElementById(id); m.classList.remove('hidden'); m.classList.add('flex'); 
+            setTimeout(() => { m.classList.remove('opacity-0'); const c = document.getElementById('modal-'+id.replace('-modal', '')+'-content') || m.querySelector('.bento-card'); if(c) c.classList.remove('scale-95'); }, 10); 
+        }
+        function closeModal(id) { 
+            const m = document.getElementById(id); m.classList.add('opacity-0'); const c = document.getElementById('modal-'+id.replace('-modal', '')+'-content') || m.querySelector('.bento-card'); if(c) c.classList.add('scale-95'); 
+            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); const inputs = m.querySelectorAll('input'); inputs.forEach(i=>i.value=''); }, 300); 
         }
 
         // ========================================
-        // 1. LE MOTEUR CRM (RÉCUPÉRATION DES GHOST DATA)
+        // 1. LE MOTEUR CRM (RÉCONCILIATION OPS/SALES/3D)
         // ========================================
         async function loadTenants() {
             try {
                 TENANTS =[];
-                
+                const list = document.getElementById('tenant-list');
+                if(list) list.innerHTML = '<tr><td colspan="4" class="p-10 text-center text-cyan font-mono"><i class="fa-solid fa-spinner fa-spin text-2xl mb-3 block"></i> Fusion des bases en cours...</td></tr>';
+
                 // 1. Charger Ops
                 try {
-                    const resOps = await fetch('/api/ops/tenants');
-                    const dataOps = await resOps.json();
-                    if(dataOps.success && dataOps.tenants) {
-                        dataOps.tenants.forEach(t => {
-                            if(t.tenant_id || t.siret) {
-                                TENANTS.push({ tenant_id: t.tenant_id || t.siret, siret: t.siret || t.tenant_id, name: t.name || "Entité Ops", contact: "Opérationnel", source: "OPS" });
-                            }
-                        });
-                    }
+                    const resOps = await fetch('/api/ops/tenants'); const dataOps = await resOps.json();
+                    if(dataOps.success && dataOps.tenants) { dataOps.tenants.forEach(t => { if(t.tenant_id || t.siret) { TENANTS.push({ tenant_id: t.tenant_id || t.siret, siret: t.siret || t.tenant_id, name: t.name || "Entité Ops", source: "OPS" }); } }); }
                 } catch(e) {}
 
                 // 2. Charger CRM
                 const pipelines =['saas', 'courtage', 'fourniture', 'fournisseurs'];
                 for(const pipe of pipelines) {
                     try {
-                        const resCrm = await fetch(`/api/crm/pipeline/${pipe}`);
-                        const dataCrm = await resCrm.json();
+                        const resCrm = await fetch(`/api/crm/pipeline/${pipe}`); const dataCrm = await resCrm.json();
                         if(dataCrm.success && dataCrm.pipeline) {
                             dataCrm.pipeline.forEach(d => {
-                                if(!TENANTS.find(t => t.tenant_id === d.company_id)) {
-                                    TENANTS.push({ tenant_id: d.company_id, siret: d.company_id ? d.company_id.replace("COMP_", "") : "", name: d.holding_name || d.name || "Client CRM", contact: d.all_contacts && d.all_contacts.length > 0 ? `${d.all_contacts[0].firstname} ${d.all_contacts[0].lastname}` : "Sales", source: "CRM" });
-                                }
+                                if(!TENANTS.find(t => t.tenant_id === d.company_id)) { TENANTS.push({ tenant_id: d.company_id, siret: d.company_id ? d.company_id.replace("COMP_", "") : "", name: d.holding_name || d.name || "Client CRM", source: "CRM" }); }
                             });
                         }
                     } catch(e) {}
                 }
 
-                // 3. 🛡️ SCAN DE LA FLOTTE 3D (RÉCUPÉRATION DES ANCIENS CLIENTS FANTÔMES)
+                // 3. Charger Flotte 3D (Les Fantômes)
                 try {
-                    const resFleet = await fetch('/api/dashboard/fleet');
-                    const dataFleet = await resFleet.json();
+                    const resFleet = await fetch('/api/dashboard/fleet'); const dataFleet = await resFleet.json();
                     if(dataFleet.fleet) {
                         dataFleet.fleet.forEach(s => {
                             const t_id = s.tenant_id;
-                            if(t_id && t_id !== 'ORPHELIN' && !TENANTS.find(t => t.tenant_id === t_id)) {
-                                TENANTS.push({ tenant_id: t_id, siret: t_id, name: "Client Historique (" + t_id + ")", contact: "Base 3D", source: "HISTORIQUE" });
-                            }
+                            if(t_id && t_id !== 'ORPHELIN' && !TENANTS.find(t => t.tenant_id === t_id)) { TENANTS.push({ tenant_id: t_id, siret: t_id, name: "Client Historique (" + t_id + ")", source: "HISTORIQUE" }); }
                         });
                     }
                 } catch(e) {}
                 
                 filterTenants();
+
+                // Auto-Focus si God Mode présent dans l'URL
+                if(forceTenant && forceTenant !== 'ALL') {
+                    const found = TENANTS.find(t => t.tenant_id === forceTenant || t.siret === forceTenant);
+                    if(found) activateTenant(found);
+                    else {
+                        // On le crée à la volée dans la session s'il n'existe pas encore
+                        const fakeTenant = { tenant_id: forceTenant, siret: forceTenant, name: "Entité (Auto-GodMode)", source: "URL" };
+                        TENANTS.push(fakeTenant); activateTenant(fakeTenant);
+                    }
+                }
+
             } catch(e) { console.error(e); }
         }
 
-        function filterTenants() {
-            const term = document.getElementById('search-tenant').value.toLowerCase();
+        window.filterTenants = function() {
+            const term = (document.getElementById('search-tenant')?.value || "").toLowerCase();
             const list = document.getElementById('tenant-list');
+            if(!list) return;
             list.innerHTML = '';
             
-            if(TENANTS.length === 0) {
-                list.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-500">Aucun client dans la base.</td></tr>';
-                return;
-            }
+            if(TENANTS.length === 0) { list.innerHTML = '<tr><td colspan="4" class="p-10 text-center text-gray-500 font-mono">Aucun client dans la base.</td></tr>'; return; }
 
             TENANTS.filter(t => (t.name || '').toLowerCase().includes(term) || (t.siret || '').includes(term)).forEach(t => {
                 const safeTenant = JSON.stringify(t).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
-                let icon = '<i class="fa-solid fa-clock-rotate-left text-gray-400 mr-2" title="Source Historique"></i>';
-                if(t.source === 'CRM') icon = '<i class="fa-solid fa-briefcase text-purple-400 mr-2" title="Source CRM"></i>';
-                if(t.source === 'OPS') icon = '<i class="fa-solid fa-building text-cyan mr-2" title="Source OPS"></i>';
+                let icon = '<i class="fa-solid fa-clock-rotate-left text-gray-500 mr-3 text-lg" title="Historique"></i>';
+                if(t.source === 'CRM') icon = '<i class="fa-solid fa-briefcase text-purple-400 mr-3 text-lg" title="Source CRM"></i>';
+                if(t.source === 'OPS') icon = '<i class="fa-solid fa-building text-cyan mr-3 text-lg" title="Source OPS"></i>';
+                if(t.source === 'URL') icon = '<i class="fa-solid fa-link text-alert mr-3 text-lg" title="Forcé par URL"></i>';
                 
                 list.innerHTML += `
-                    <tr class="hover:bg-white/5 transition">
-                        <td class="p-4 font-bold text-white">${icon} ${t.name || 'Sans Nom'}</td>
-                        <td class="p-4 font-mono text-gray-400">${t.siret || t.tenant_id}</td>
-                        <td class="p-4 text-gray-500 text-xs font-mono"><i class="fa-solid fa-user-tie mr-1"></i> ${t.contact}</td>
-                        <td class="p-4 text-right">
-                            <button onclick="activateTenant(JSON.parse('${safeTenant}'))" class="bg-cyan/10 text-cyan hover:bg-cyan hover:text-abysse border border-cyan/30 px-4 py-2 rounded-lg transition text-xs font-black uppercase tracking-widest shadow-md">Gérer le Parc</button>
+                    <tr class="hover:bg-white/5 transition border-b border-white/5 group">
+                        <td class="p-5 font-black text-white text-base flex items-center">${icon} ${t.name || 'Sans Nom'}</td>
+                        <td class="p-5 font-mono text-cyan text-xs"><span class="bg-black/50 px-2 py-1 rounded border border-white/10 group-hover:border-cyan/30 transition">${t.siret || t.tenant_id}</span></td>
+                        <td class="p-5 text-gray-500 text-[10px] font-bold uppercase tracking-widest">${t.source}</td>
+                        <td class="p-5 text-right">
+                            <button onclick="activateTenant(JSON.parse('${safeTenant}'))" class="bg-cyan/10 text-cyan hover:bg-cyan hover:text-abysse border border-cyan/30 px-6 py-3 rounded-xl transition text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2 ml-auto"><i class="fa-solid fa-folder-open text-sm"></i> Ouvrir le Dossier</button>
                         </td>
                     </tr>
                 `;
             });
         }
 
-        function activateTenant(tenantObj) {
+        window.activateTenant = function(tenantObj) {
             ACTIVE_TENANT = tenantObj;
             const badge = document.getElementById('active-tenant-badge');
-            badge.className = "bg-cyan/20 border border-cyan/50 text-cyan p-3 rounded-xl text-xs font-bold text-center truncate shadow-[0_0_15px_rgba(0,229,255,0.2)]";
-            badge.innerHTML = `<i class="fa-solid fa-unlock-keyhole mr-2"></i> ${tenantObj.name || tenantObj.siret}`;
+            badge.className = "bg-cyan/20 border border-cyan/50 text-cyan p-4 rounded-2xl text-xs font-black text-center truncate shadow-[0_0_20px_rgba(0,229,255,0.3)] uppercase tracking-widest flex items-center justify-center gap-2";
+            badge.innerHTML = `<i class="fa-solid fa-building text-lg"></i> ${tenantObj.name || tenantObj.siret}`;
             document.getElementById('parc-subtitle').innerHTML = `Locataire Actif : <span class="text-white">${tenantObj.name}</span>`;
             GLOBAL_TENANT_ID = tenantObj.tenant_id;
             switchTab('parc');
-            resetForm();
-            loadSites();
+            App.toast(`Dossier ${tenantObj.name} ouvert.`, 'info');
+        }
+
+        // --- API GOUV POUR CREER LE TENANT ---
+        window.openCreateTenantModal = function() { openModal('create-tenant-modal'); }
+        window.searchTenantSiren = async function() {
+            const siret = document.getElementById('new-tenant-siret').value.replace(/\s/g, '');
+            if(siret.length < 9) return App.toast("Saisissez au moins le SIREN (9 chiffres).", "error");
+            
+            const btn = document.getElementById('btn-search-siren');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            try {
+                const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${siret}`);
+                const data = await res.json();
+                if(data.results && data.results.length > 0) {
+                    const etab = data.results[0];
+                    document.getElementById('new-tenant-name').value = etab.nom_complet || etab.nom_raison_sociale;
+                    App.toast("Identité légale récupérée (Open Data).", "success");
+                } else { App.toast("Entreprise introuvable.", "warning"); }
+            } catch(e) { App.toast("Erreur API Gouv.", "error"); }
+            btn.innerHTML = '<i class="fa-solid fa-magic"></i> Auto-Fill';
+        }
+
+        window.createTenant = async function() {
+            const siret = document.getElementById('new-tenant-siret').value.replace(/\s/g, '');
+            const name = document.getElementById('new-tenant-name').value;
+            if(!siret || !name) return App.toast("Le SIRET et le Nom sont obligatoires.", "error");
+            
+            const btn = document.getElementById('btn-create-tenant');
+            const orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> CRÉATION...'; btn.disabled = true;
+            
+            try {
+                const res = await fetch('/api/ops/create_tenant', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({siret: siret, name: name}) });
+                const data = await res.json();
+                if(data.success) { closeModal('create-tenant-modal'); App.toast("Locataire créé avec succès !", "success"); loadTenants(); } 
+                else { App.toast("Erreur : " + data.error, "error"); }
+            } catch(e) { App.toast("Erreur réseau", "error"); }
+            finally { btn.innerHTML = orig; btn.disabled = false; }
         }
 
         // ========================================
@@ -499,31 +636,34 @@
                     container.innerHTML = '';
                     
                     if(SITES.length === 0) {
-                        container.innerHTML = '<div class="text-center text-gray-500 text-xs italic mt-10 border border-dashed border-gray-700 p-4 rounded-xl">Aucun compteur 3D pour ce client.</div>';
+                        container.innerHTML = '<div class="text-center text-gray-500 text-xs italic mt-10 border border-dashed border-cyan/20 p-6 rounded-2xl bg-cyan/5">Aucun compteur 3D pour ce client.</div>';
                         return;
                     }
 
                     SITES.filter(s => s.name.toLowerCase().includes(term) || (s.pdl && s.pdl.includes(term))).forEach(s => {
                         const div = document.createElement('div');
-                        div.className = "p-3 bg-abysse/50 rounded-xl hover:bg-cyan/10 cursor-pointer mb-2 transition border border-white/5 hover:border-cyan/50 shadow-inner";
+                        const isActive = CURRENT_ID === s.id;
+                        div.className = `p-4 rounded-xl cursor-pointer mb-3 transition border shadow-inner ${isActive ? 'bg-cyan/10 border-cyan text-white' : 'bg-black/40 border-white/5 hover:border-cyan/50'}`;
                         div.onclick = () => loadForm(s.id);
-                        const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire text-red-500 mr-2 text-lg"></i>' : '<i class="fa-solid fa-bolt text-cyan mr-2 text-lg"></i>';
-                        div.innerHTML = `<div class="font-bold text-xs text-white truncate flex items-center">${icon} ${s.name}</div><div class="mt-2 text-[10px] text-gray-400 font-mono flex justify-between bg-black/40 p-1.5 rounded"><span class="text-cyan">${s.pdl || 'N/A'}</span><span>${Math.round(s.volume || 0)} MWh</span></div>`;
+                        const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire text-red-500 mr-3 text-2xl"></i>' : '<i class="fa-solid fa-bolt text-cyan mr-3 text-2xl"></i>';
+                        div.innerHTML = `<div class="font-black text-sm text-white truncate flex items-center">${icon} ${s.name}</div><div class="mt-2 text-[10px] text-gray-400 font-mono flex justify-between items-center"><span class="bg-black px-2 py-1 rounded border border-white/10 text-cyan">${s.pdl || 'N/A'}</span><span class="font-bold">${Math.round(s.volume || 0)} MWh</span></div>`;
                         container.appendChild(div);
                     });
                 }
             } catch(e) {}
         }
 
-        async function loadForm(id) {
+        window.loadForm = async function(id) {
             CURRENT_ID = id;
             document.getElementById('form-loader').classList.remove('hidden');
+            loadSites(); // Re-render pour la coloration "active"
+            
             try {
                 const res = await fetch(`/api/dashboard/data/${id}`);
                 const data = await res.json();
                 
-                document.getElementById('form-title').innerText = "Modifier Site";
-                document.getElementById('form-id').innerText = "ID: " + id;
+                document.getElementById('form-title').innerText = "Modification du Compteur";
+                document.getElementById('form-id').innerText = id;
                 
                 const identity = data.identity || {};
                 document.getElementById('id-input').value = identity.siret || identity.id || "";
@@ -538,18 +678,17 @@
                 const loc = data.location || {};
                 document.getElementById('address-input').value = loc.address || data.ADRESSE_SITE || "";
                 document.getElementById('zip-input').value = loc.zip_code || data.CP || "";
-                document.getElementById('city-input').value = loc.city || data.city || data.VILLE || "";
+                document.getElementById('city-input').value = loc.city || data.VILLE || "";
                 document.getElementById('surface-input').value = loc.surface || data.SURFACE_M2 || "";
-                document.getElementById('site-insee').value = loc.insee || data.insee || data.INSEE || "";
-                document.getElementById('inp-type').value = loc.typologie || data.typologie || data.TYPOLOGIE || "";
+                document.getElementById('inp-type').value = loc.typologie || data.TYPOLOGIE || "";
 
                 const contract = data.contract || {};
                 document.getElementById('ref-input').value = contract.pdl || contract.pce || data.pdl || data.pdl_pce || data.PDL || "";
                 document.getElementById('site-provider').value = contract.provider || data.provider || data.FOURNISSEUR || "";
-                document.getElementById('site-start-date').value = contract.start_date || data.start_date || data.DATE_DEBUT || ""; 
-                document.getElementById('site-end-date').value = contract.end_date || data.end_date || data.DATE_FIN || data.FIN_MARCHE_YYYYMMDD || "";
+                document.getElementById('date-start').value = contract.start_date || data.start_date || data.DATE_DEBUT || ""; 
+                document.getElementById('date-end').value = contract.end_date || data.end_date || data.DATE_FIN || data.FIN_MARCHE_YYYYMMDD || "";
                 
-                if(data.energy_type === 'gaz' || data.ENERGIE === 'GAZ') setSiteEnergy('gaz'); else setSiteEnergy('elec');
+                if(data.energy_type === 'gaz' || data.ENERGIE === 'GAZ') setEnergy('gaz'); else setEnergy('elec');
 
                 const pd = contract.power_details || {};
                 document.getElementById('ps-hph').value = pd.hph || pd.ps_hph || contract.ps_hph || data.PS_HPH || "";
@@ -558,7 +697,6 @@
                 document.getElementById('ps-hce').value = pd.hce || pd.ps_hce || contract.ps_hce || data.PS_HCE || "";
                 document.getElementById('val-input').value = contract.power || data.power || data.PUISSANCE_KVA || "";
 
-                // GAZ SPECS
                 document.getElementById('site-profil-gaz').value = contract.profil || data.profil || data.PROFIL || "";
                 document.getElementById('ps-gaz-cja').value = contract.cja || data.cja || data.CJA_MWH_J || "";
                 document.getElementById('ps-gaz-car').value = data.kpis?.volume_mwh || data.volume_mwh || data.CAR_MWH || "";
@@ -569,6 +707,7 @@
                     document.getElementById('price-gaz-fix').value = p.fix || p.abonnement || data.ABONNEMENT_EUR || "";
                     let pxMol = p.price_kwh ? (p.price_kwh*1000).toFixed(2) : (p.hph || p.prix_molecule || data.PRIX_MOL_EUR_MWH || data.PRIX_MOLECULE || "");
                     document.getElementById('price-gaz-mol').value = pxMol;
+                    // L'API Python va sécuriser la taxe
                     document.getElementById('price-gaz-tax').value = p.tax || data.TAXES || 8.44;
                 } else {
                     document.getElementById('price-hph').value = p.hph || p.price_hph || p.prix_hph || data.PRIX_HPH || "";
@@ -588,12 +727,12 @@
             document.getElementById('form-loader').classList.add('hidden');
         }
 
-        function resetForm() {
+        window.resetForm = function() {
             CURRENT_ID = null;
             document.getElementById('form-title').innerText = "Nouvelle Entité";
             document.getElementById('form-id').innerText = "ID: NEW";
             
-            const inputs =['site-name','site-lot','address-input','site-surface','city-input','zip-input','site-insee','ref-input','site-provider','date-start','date-end','ps-hph','ps-hch','ps-hpe','ps-hce','val-input','price-hph','price-hch','price-hpe','price-hce','px-unique','price-fix','ps-gaz-cja','ps-gaz-car','site-profil-gaz','price-gaz-mol','price-gaz-fix','inp-type'];
+            const inputs =['site-name-input','mat-fille','address-input','surface-input','city-input','zip-input','site-insee','ref-input','site-provider','date-start','date-end','ps-hph','ps-hch','ps-hpe','ps-hce','val-input','price-hph','price-hch','price-hpe','price-hce','px-unique','price-fix','ps-gaz-cja','ps-gaz-car','site-profil-gaz','price-gaz-mol','price-gaz-fix','inp-type'];
             inputs.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
             document.getElementById('price-tax').value = "22.5";
             document.getElementById('price-gaz-tax').value = "8.44";
@@ -603,18 +742,105 @@
             toggleQuadrants();
         }
 
-        async function saveSite() {
+        window.setEnergy = function(type) {
+            currentEnergy = type;
+            const btnElec = document.getElementById('btn-elec'); const btnGaz = document.getElementById('btn-gaz');
+            const card = document.getElementById('card-energy');
+            const lblPrimary = document.getElementById('lbl-ref');
+
+            if(type === 'elec') {
+                btnElec.className = "px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest bg-cyan text-abysse transition shadow-md";
+                btnGaz.className = "px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition";
+                card.classList.add('border-cyan'); card.classList.remove('border-red-500', 'border-yellow-500');
+                lblPrimary.innerText = "PDL / PRM (14) *";
+                document.getElementById('grid-elec').classList.remove('hidden'); document.getElementById('grid-ps').classList.remove('hidden'); document.getElementById('grid-gaz').classList.add('hidden');
+                document.getElementById('quadrant-toggle').parentElement.parentElement.classList.remove('hidden');
+            } else {
+                btnGaz.className = "px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest bg-gas text-white transition shadow-md";
+                btnElec.className = "px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition";
+                card.classList.add('border-red-500'); card.classList.remove('border-cyan', 'border-yellow-500');
+                lblPrimary.innerText = "PCE GAZ (14) *";
+                document.getElementById('grid-elec').classList.add('hidden'); document.getElementById('grid-ps').classList.add('hidden'); document.getElementById('grid-gaz').classList.remove('hidden');
+                document.getElementById('quadrant-toggle').parentElement.parentElement.classList.add('hidden');
+            }
+        }
+
+        window.toggleQuadrants = function() {
+            const isAdvanced = document.getElementById('quadrant-toggle').checked;
+            document.querySelectorAll('.quad-advanced').forEach(el => el.style.display = isAdvanced ? 'block' : 'none');
+            document.querySelectorAll('.quad-simple').forEach(el => el.style.display = isAdvanced ? 'none' : 'block');
+        }
+
+        // --- INTELLIGENCE ADEME & API GOUV (LE TRICK MAGIQUE) ---
+        let timeout = null;
+        window.searchAddress = async function() {
+            const query = document.getElementById('address-input').value;
+            const list = document.getElementById('address-suggestions');
+            if(query.length < 5) { list.classList.add('hidden'); return; }
+            clearTimeout(timeout);
+            timeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`);
+                    const data = await res.json();
+                    list.innerHTML = '';
+                    if(data.features && data.features.length > 0) {
+                        list.classList.remove('hidden');
+                        data.features.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item text-gray-300 transition font-mono';
+                            div.innerText = item.properties.label;
+                            div.onclick = () => { 
+                                document.getElementById('address-input').value = item.properties.name; 
+                                document.getElementById('zip-input').value = item.properties.postcode;
+                                document.getElementById('city-input').value = item.properties.city;
+                                document.getElementById('site-insee').value = item.properties.citycode;
+                                list.classList.add('hidden'); 
+                                
+                                // APPEL ADEME (Si la surface est vide)
+                                if(document.getElementById('surface-input').value === "0" || document.getElementById('surface-input').value === "") {
+                                    fetchAdemeSurface(item.properties.name, item.properties.postcode);
+                                }
+                            };
+                            list.appendChild(div);
+                        });
+                    }
+                } catch(e) {}
+            }, 400);
+        }
+        
+        async function fetchAdemeSurface(address, zipcode) {
+            try {
+                App.toast("Interrogation de la base DPE (ADEME)...", "info");
+                const query = encodeURIComponent(`${address} ${zipcode}`);
+                // L'API publique de l'ADEME est ouverte !
+                const res = await fetch(`https://data.ademe.fr/data-fair/api/v1/datasets/dpe-v2-tertiaire-2/lines?q=${query}&size=1&select=surface_utile`);
+                const data = await res.json();
+                if(data && data.results && data.results.length > 0 && data.results[0].surface_utile) {
+                    const surface = data.results[0].surface_utile;
+                    document.getElementById('surface-input').value = Math.round(surface);
+                    document.getElementById('surface-input').classList.add('shadow-[0_0_15px_#A855F7]');
+                    App.toast(`Surface trouvée par l'ADEME : ${Math.round(surface)} m²`, "success");
+                } else {
+                    App.toast("Aucun DPE Tertiaire trouvé à cette adresse.", "warning");
+                }
+            } catch(e) { console.log(e); }
+        }
+
+        document.addEventListener('click', function(e) { if (document.getElementById('address-input') && !document.getElementById('address-input').contains(e.target)) { const sug = document.getElementById('address-suggestions'); if(sug) sug.classList.add('hidden'); } });
+
+        window.saveSite = async function() {
             if(!ACTIVE_TENANT) return alert("Sélectionnez un locataire dans le CRM.");
-            const btn = document.activeElement;
+            const btn = document.getElementById('btn-save-site');
             const original = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2 text-xl"></i> ENVOI...';
             btn.disabled = true;
 
             try {
                 const inputPdl = document.getElementById('ref-input').value.replace(/\s/g, '');
                 if(!inputPdl) { App.toast("L'identifiant PDL/PCE est obligatoire.", "error"); btn.innerHTML = original; btn.disabled = false; return; }
 
-                // ON ENVOIE LES DONNÉES BRUTES : Le Backend Python fait la magie (Thin Client)
+                // Le reste des "Boucliers Mathématiques" se fait dans main.py (normalize_full_data).
+                // On envoie la structure brute que le Python va digérer.
                 const payload = {
                     id: CURRENT_ID || inputPdl,
                     forced_tenant_id: ACTIVE_TENANT.tenant_id, 
@@ -630,7 +856,8 @@
                         zip_code: document.getElementById('zip-input').value,
                         city: document.getElementById('city-input').value,
                         surface: parseFloat(document.getElementById('surface-input').value) || 0,
-                        typologie: document.getElementById('inp-type').value
+                        typologie: document.getElementById('inp-type').value,
+                        insee: document.getElementById('site-insee').value
                     },
                     contract: {
                         pdl: currentEnergy === 'elec' ? inputPdl : "",
@@ -670,12 +897,12 @@
                     App.toast("Actif synchronisé avec la Base 3D CORTEX.", "success"); 
                     CURRENT_ID = response.id || payload.id; 
                     await loadFleet(); 
-                    loadSiteForm(CURRENT_ID); 
+                    loadForm(CURRENT_ID); 
                 } else { 
                     App.toast("Erreur serveur : " + response.error, "error"); 
                 }
             } catch(e) { 
-                App.toast("Le formulaire contient une erreur de syntaxe ou le réseau a coupé.", "error"); 
+                App.toast("Le formulaire contient une erreur ou le réseau a coupé.", "error"); 
             } finally {
                 btn.innerHTML = original;
                 btn.disabled = false;
@@ -683,44 +910,83 @@
         }
 
         // ========================================
-        // 3. UTILS UI
+        // 3. ADOPTION ORPHELINS ET IMPORT
         // ========================================
-        function setSiteEnergy(type) {
-            currentEnergy = type;
-            const btnElec = document.getElementById('btn-elec'); const btnGaz = document.getElementById('btn-gaz');
-            const card = document.getElementById('card-energy');
-            const toggleCont = document.getElementById('toggle-quadrants-container');
-            const lblPrimary = document.getElementById('lbl-ref');
-
-            if(type === 'elec') {
-                btnElec.className = "px-3 py-1 text-[10px] font-bold rounded bg-cyan text-black shadow-lg";
-                btnGaz.className = "px-3 py-1 text-[10px] font-bold rounded text-gray-400";
-                card.style.borderColor = "#00E5FF";
-                lblPrimary.innerText = "PDL / PRM (14) *";
-                document.getElementById('grid-elec').classList.remove('hidden'); document.getElementById('grid-ps').classList.remove('hidden'); document.getElementById('grid-gaz').classList.add('hidden');
-                if(toggleCont) toggleCont.classList.remove('hidden');
-            } else {
-                btnGaz.className = "px-3 py-1 text-[10px] font-bold rounded bg-gas text-white shadow-lg";
-                btnElec.className = "px-3 py-1 text-[10px] font-bold rounded text-gray-400";
-                card.style.borderColor = "#EF4444";
-                lblPrimary.innerText = "PCE GAZ (14) *";
-                document.getElementById('grid-elec').classList.add('hidden'); document.getElementById('grid-ps').classList.add('hidden'); document.getElementById('grid-gaz').classList.remove('hidden');
-                if(toggleCont) toggleCont.classList.add('hidden');
-            }
+        function openOrphanModal() {
+            if(!ACTIVE_TENANT) return alert("Sélectionnez un client dans le CRM d'abord.");
+            document.getElementById('orphan-target-client').innerText = ACTIVE_TENANT.name;
+            openModal('orphan-modal');
+            scanOrphans();
         }
 
-        window.toggleQuadrants = function() {
-            const isAdvanced = document.getElementById('quadrant-toggle').checked;
-            document.querySelectorAll('.quad-advanced').forEach(el => el.style.display = isAdvanced ? 'block' : 'none');
-            document.querySelectorAll('.quad-simple').forEach(el => el.style.display = isAdvanced ? 'none' : 'block');
+        async function scanOrphans() {
+            const kw = document.getElementById('orphan-search').value;
+            const container = document.getElementById('orphan-list');
+            container.innerHTML = '<div class="text-center mt-20"><i class="fa-solid fa-spinner fa-spin text-indigo-500 text-5xl mb-4 block"></i><span class="font-mono text-xs text-indigo-300">Scan des compteurs...</span></div>';
+            try {
+                const res = await fetch(`/api/ops/orphans?keyword=${encodeURIComponent(kw)}`);
+                const data = await res.json();
+                ORPHAN_LIST = data.orphans ||[];
+                if(ORPHAN_LIST.length === 0) { container.innerHTML = '<div class="text-center mt-20 text-success font-black text-xl"><i class="fa-solid fa-check-circle text-5xl mb-4 block drop-shadow-[0_0_15px_#10B981]"></i> Base saine.<br><span class="text-sm font-normal text-gray-400">Aucun compteur égaré.</span></div>'; return; }
+                let html = `<table class="w-full text-left text-xs text-white"><thead><tr class="text-[10px] text-gray-500 border-b border-white/10 uppercase tracking-widest bg-black/50 sticky top-0"><th class="p-4"><input type="checkbox" onclick="toggleAllOrphans(this)" class="accent-indigo-500 w-4 h-4 cursor-pointer"></th><th class="p-4">Nom du site</th><th class="p-4">PDL</th><th class="p-4">Tenant Actuel</th></tr></thead><tbody class="divide-y divide-white/5">`;
+                ORPHAN_LIST.forEach((s) => { html += `<tr class="hover:bg-white/5 transition"><td class="p-4"><input type="checkbox" class="orphan-cb accent-indigo-500 w-4 h-4 cursor-pointer" value="${s.id}" onchange="updateAdoptBtn()"></td><td class="p-4 font-bold text-sm">${s.name}</td><td class="p-4 font-mono text-cyan">${s.pdl}</td><td class="p-4 text-gray-500 font-mono text-[10px]">${s.current_tenant}</td></tr>`; });
+                html += `</tbody></table>`;
+                container.innerHTML = html; updateAdoptBtn();
+            } catch(e) { container.innerHTML = '<div class="text-center mt-10 text-alert font-bold">Erreur de connexion base 3D.</div>'; }
         }
 
-        function openCreateTenantModal() { document.getElementById('create-tenant-modal').classList.remove('hidden'); }
-        async function createTenant() { /* Code existant */ }
+        function toggleAllOrphans(src) { document.querySelectorAll('.orphan-cb').forEach(cb => cb.checked = src.checked); updateAdoptBtn(); }
+        function updateAdoptBtn() {
+            const n = document.querySelectorAll('.orphan-cb:checked').length;
+            const btn = document.getElementById('btn-adopt');
+            document.getElementById('orphan-count').innerText = n;
+            if(n > 0) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); btn.classList.add('shadow-[0_0_20px_rgba(0,229,255,0.5)]'); } 
+            else { btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); btn.classList.remove('shadow-[0_0_20px_rgba(0,229,255,0.5)]'); }
+        }
 
-        // Lancement initial
-        const checkToken = setInterval(() => { if (document.getElementById('nav-crm')) { clearInterval(checkToken); switchTab('crm'); } }, 100);
+        async function adoptSelectedOrphans() {
+            const ids = Array.from(document.querySelectorAll('.orphan-cb:checked')).map(cb => cb.value);
+            if(ids.length === 0) return;
+            const btn = document.getElementById('btn-adopt'); const orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2 text-xl"></i> ADOPTION EN COURS...'; btn.disabled = true;
+            try {
+                const payload = { target_tenant_id: ACTIVE_TENANT.tenant_id, site_ids: ids };
+                const res = await fetch('/api/ops/adopt', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                const data = await res.json();
+                if(data.success) { closeModal('orphan-modal'); App.toast(`${data.updated_count} sites rattachés !`, "success"); loadSites(); }
+            } catch(e) { App.toast("Erreur réseau.", "error"); } finally { btn.innerHTML = orig; btn.disabled = false; }
+        }
 
+        window.toggleImportModal = function() { 
+            if(!ACTIVE_TENANT) return alert("Vous devez sélectionner un client dans le CRM d'abord !");
+            document.getElementById('import-target-tenant').innerText = ACTIVE_TENANT.name || ACTIVE_TENANT.siret;
+            openModal('import-modal'); 
+        }
+
+        window.processImport = async function() {
+            if(!ACTIVE_TENANT) return;
+            const input = document.getElementById('csv-upload');
+            if (!input.files || input.files.length === 0) return App.toast("Glissez un fichier Excel d'abord.", "warning");
+            const formData = new FormData(); formData.append("file", input.files[0]);
+            const btn = document.getElementById('btn-process-import'); const orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2 text-xl"></i> INGESTION EN COURS...'; btn.disabled=true;
+            try {
+                const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData });
+                const data = await res.json();
+                if(data.success) { closeModal('import-modal'); App.toast(`${data.imported} compteurs rattachés au périmètre !`, "success"); loadSites(); } 
+                else { App.toast("Erreur Import : " + (data.error || "Format invalide."), "error"); }
+            } catch(e) { App.toast("Erreur réseau.", "error"); } finally { btn.innerHTML = orig; btn.disabled=false; }
+        }
+
+        // ========================================
+        // 4. CLÉS API RTE
+        // ========================================
+        async function loadRteConfig() {
+            const errBox = document.getElementById('api-error'); if(errBox) errBox.classList.add('hidden');
+            try {
+                const res = await fetch('/api/settings/rte'); const data = await res.json();
+                if(data.client_id) { document.getElementById('rte-client-id').value = data.client_id; document.getElementById('rte-client-secret').value = "••••••••••••••••••••••••••••••"; }
+            } catch(e) {}
+        }
+        
     </script>
 </body>
 </html>
