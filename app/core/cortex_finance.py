@@ -1,3 +1,4 @@
+# --- START OF FILE cortex_finance.py ---
 
 import re
 import io
@@ -16,9 +17,9 @@ except ImportError:
 
 class CortexFinance:
     """
-    ENERGISTRAT - CORTEX FINANCE V12.8 (HEURISTIQUE & FINOPS)
+    ENERGISTRAT - CORTEX FINANCE V12.10 (HEURISTIQUE & FINOPS)
     Analyse générique France pro des factures électricité / gaz.
-    Inclut la protection Cloud Run (Scan limité à 3 pages).
+    Prêt pour Google Cloud Run (Stateless, RAM Protected, Robust Date Parsing).
     """
 
     def __init__(self):
@@ -46,20 +47,20 @@ class CortexFinance:
 
         if filename_l.endswith(".pdf"):
             if not PDF_READY:
-                return {"status": "ERROR", "message": "Module pdfplumber non installé."}
+                return {"status": "ERROR", "message": "Module pdfplumber non installé sur le serveur."}
             return self._parse_pdf_native(file_content, base)
 
         if filename_l.endswith(".xml"):
             return self._parse_facturx_xml(file_content, base)
 
-        return {"status": "ERROR", "message": "Format non supporté. Utiliser PDF ou XML."}
+        return {"status": "ERROR", "message": "Format non supporté. Veuillez utiliser un PDF ou un XML (Factur-X)."}
 
     # =========================================================
     # 2. MOTEUR D'AUDIT FINOPS (BAP & SCORE)
     # =========================================================
     def audit_invoice(self, invoice_wrapper: Dict[str, Any], site_data: Dict[str, Any]) -> Dict[str, Any]:
         if invoice_wrapper.get("status") != "SUCCESS":
-            return {"status": "ERROR", "message": "Données facture invalides."}
+            return {"status": "ERROR", "message": "Les données de la facture n'ont pas pu être extraites proprement."}
 
         inv = invoice_wrapper["data"]
         anomalies: List[Dict[str, Any]] =[]
@@ -154,16 +155,16 @@ class CortexFinance:
 
             with pdfplumber.open(io.BytesIO(content)) as pdf:
                 for i, page in enumerate(pdf.pages):
-                    # 🛡️ PROTECTION ANTI-TIMEOUT: Stop au bout de 3 pages (Evite le crash Cloud Run sur 100 pages)
+                    # 🛡️ PROTECTION ANTI-TIMEOUT: Stop au bout de 3 pages
                     if i >= 3: 
-                        self.logger.warning("Facture longue : Scan PDF tronqué aux 3 premières pages pour préserver la RAM.")
+                        self.logger.warning("Facture longue : Scan PDF tronqué aux 3 premières pages.")
                         break
                         
                     txt = page.extract_text() or ""
                     if txt: text_parts.append(txt)
 
                     try:
-                        tables = page.extract_tables() or []
+                        tables = page.extract_tables() or[]
                         for table in tables:
                             for row in table:
                                 clean_row =[str(c).strip() if c is not None else "" for c in row]
@@ -185,7 +186,7 @@ class CortexFinance:
             data["period_end"] = period_end
 
             data["amount_ttc"] = self._extract_amount_by_keywords(text,["total ttc", "montant ttc", "net à payer ttc", "total à payer ttc"]) or 0.0
-            data["amount_ht"] = self._extract_amount_by_keywords(text, ["total ht", "montant ht", "total hors taxes", "net ht"]) or 0.0
+            data["amount_ht"] = self._extract_amount_by_keywords(text,["total ht", "montant ht", "total hors taxes", "net ht"]) or 0.0
 
             if data["amount_ht"] <= 0 and data["amount_ttc"] > 0:
                 data["amount_ht"] = round(data["amount_ttc"] / 1.2, 2)
@@ -215,7 +216,6 @@ class CortexFinance:
     # 4. MOTEURS DE DÉTECTION (TEXTE/XML/CHIFFRES)
     # =========================================================
     def _parse_facturx_xml(self, content: bytes, data: Dict[str, Any]) -> Dict[str, Any]:
-        # (Version XML allégée et conservée selon l'esprit du code ChatGPT)
         try:
             xml_text = content.decode("utf-8", errors="ignore")
             xml_text = re.sub(r'\sxmlns(:\w+)?="[^"]+"', '', xml_text)
@@ -242,6 +242,7 @@ class CortexFinance:
     def _detect_supplier(self, text_upper: str) -> str:
         for s in self.known_suppliers:
             if s in text_upper or f" {s} " in f" {text_upper} ": return s
+        if "GEG" in text_upper and "GRENOBLE" in text_upper: return "GEG"
         return "INCONNU"
 
     def _detect_energy_type(self, text_upper: str) -> str:
@@ -250,29 +251,44 @@ class CortexFinance:
         return "gas" if s_gas > s_elec else "electricity"
 
     def _extract_pdl(self, text: str) -> Optional[str]:
-        for p in[r"(?:PDL|RÉFÉRENCE ACHEMINEMENT)\s*[:.]?\s*([\d\s]{14,20})", r"\b(\d{14})\b"]:
+        for p in[r"(?:PDL|POINT DE LIVRAISON|RÉFÉRENCE ACHEMINEMENT|REF ACHEMINEMENT|RÉF EXT)\s*[:.]?\s*([\d\s]{14,20})", r"\b(\d{14})\b"]:
             for m in re.finditer(p, text, re.IGNORECASE):
                 cand = re.sub(r"\D", "", m.group(1))
                 if len(cand) >= 14: return cand[:14]
         return None
 
     def _extract_pce(self, text: str) -> Optional[str]:
-        for p in [r"(?:PCE|POINT DE COMPTAGE)\s*[:.]?\s*([\d\s]{14,20})", r"\b(\d{14})\b"]:
+        for p in[r"(?:PCE|POINT DE COMPTAGE)\s*[:.]?\s*([\d\s]{14,20})", r"\b(\d{14})\b"]:
             for m in re.finditer(p, text, re.IGNORECASE):
                 cand = re.sub(r"\D", "", m.group(1))
                 if len(cand) >= 14: return cand[:14]
         return None
 
     def _extract_invoice_number(self, text: str) -> Optional[str]:
-        m = re.search(r"(?:FACTURE|N° DE FACTURE)\s*[:#]?\s*([A-Z0-9\-_\/]+)", text, re.IGNORECASE)
+        m = re.search(r"(?:FACTURE|N° DE FACTURE|INVOICE)\s*[:#]?\s*([A-Z0-9\-_\/]+)", text, re.IGNORECASE)
         return m.group(1).strip() if m else None
 
+    def _parse_fr_date(self, val: str):
+        """Parseur de date robuste (Gère les années sur 2 ou 4 chiffres)"""
+        val = val.strip()
+        for fmt in ("%d/%m/%Y", "%d/%m/%y", "%d-%m-%Y"):
+            try: return datetime.strptime(val, fmt)
+            except: pass
+        return None
+
     def _extract_dates_range(self, text: str) -> Tuple[Optional[str], Optional[str]]:
-        dates =[]
-        for p in[r"du\s+(\d{2}/\d{2}/\d{2,4})\s+au\s+(\d{2}/\d{2}/\d{2,4})"]:
+        dates = []
+        patterns = [
+            r"du\s+(\d{2}[/.-]\d{2}[/.-]\d{2,4})\s+au\s+(\d{2}[/.-]\d{2}[/.-]\d{2,4})", 
+            r"p[ée]riode\s*[:.]?\s*(\d{2}[/.-]\d{2}[/.-]\d{2,4})\s*(?:au|-)\s*(\d{2}[/.-]\d{2}[/.-]\d{2,4})"
+        ]
+        for p in patterns:
             for s, e in re.findall(p, text, re.IGNORECASE):
-                try: dates.append((datetime.strptime(s, "%d/%m/%Y"), datetime.strptime(e, "%d/%m/%Y")))
-                except: pass
+                d_start = self._parse_fr_date(s)
+                d_end = self._parse_fr_date(e)
+                if d_start and d_end:
+                    dates.append((d_start, d_end))
+                    
         if not dates: return None, None
         return min(d[0] for d in dates).strftime("%Y-%m-%d"), max(d[1] for d in dates).strftime("%Y-%m-%d")
 
@@ -306,7 +322,7 @@ class CortexFinance:
         return self._to_float(m.group(1)) if m else 0.0
 
     def _extract_taxes(self, text: str, amount_ht: float, amount_ttc: float) -> float:
-        val = self._extract_amount_by_keywords(text,["total taxes", "taxes", "tva", "cspe"])
+        val = self._extract_amount_by_keywords(text,["total taxes", "taxes", "tva", "cspe", "ticfe"])
         if val and val > 0: return val
         return round(amount_ttc - amount_ht, 2) if amount_ttc > amount_ht else 0.0
 
@@ -323,8 +339,12 @@ class CortexFinance:
         return blocks
 
     def _build_cost_breakdown(self, data: Dict) -> Dict:
-        ht, sub, net, tax, pen = data.get("amount_ht", 0), data.get("subscription_amount", 0), data.get("network_amount", 0), data.get("taxes_amount", 0), data.get("penalties", 0)
-        return { "subscription": sub, "network": net, "energy_variable": max(ht - sub - net - pen, 0), "taxes": tax, "penalties": pen }
+        ht = float(data.get("amount_ht") or 0.0)
+        sub = float(data.get("subscription_amount") or 0.0)
+        net = float(data.get("network_amount") or 0.0)
+        tax = float(data.get("taxes_amount") or 0.0)
+        pen = float(data.get("penalties") or 0.0)
+        return { "subscription": sub, "network": net, "energy_variable": max(ht - sub - net - pen, 0.0), "taxes": tax, "penalties": pen }
 
     def _estimate_sge_volume(self, inv: Dict, site: Dict) -> float:
         return float(inv.get("volume_kwh") or 0) * 0.98
@@ -347,7 +367,7 @@ class CortexFinance:
         except: return None
 
     # =========================================================
-    # 5. RESTAURATION DU SIMULATEUR STRATÉGIQUE M&A
+    # 5. RESTAURATION DES SIMULATEURS HISTORIQUES
     # =========================================================
     def simulate_ebitda(self, ca_k_eur: float, marge_pct: float, gains_eur: float, multiple: float) -> Dict[str, Any]:
         """Moteur vital pour le Dashboard FinOps (Module M&A)"""
@@ -368,5 +388,76 @@ class CortexFinance:
             self.logger.error(f"Erreur simulation EBITDA : {e}")
             return {"error": str(e)}
             
-    def simulate_landing(self, site_data: Dict) -> Dict:
-        return {"year": 2026, "landing_euro": 0, "trajectory":
+    def simulate_landing(self, site_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Projection simple de landing annuel à partir des données site/contrat."""
+        try:
+            year = int(site_data.get("year") or datetime.now().year)
+            kpis = site_data.get("kpis", {}) or {}
+            contract = site_data.get("contract", {}) or {}
+            settings = site_data.get("settings", {}) or {}
+
+            annual_mwh = float(kpis.get("volume_mwh") or 0.0)
+            annual_kwh = float(kpis.get("volume_kwh") or 0.0)
+            if annual_mwh <= 0 and annual_kwh > 0:
+                annual_mwh = annual_kwh / 1000.0
+
+            current_price_eur_mwh = float(
+                contract.get("price_eur_mwh")
+                or contract.get("px_hedged")
+                or contract.get("unit_price_eur_mwh")
+                or 0.0
+            )
+            market_price_eur_mwh = float(
+                settings.get("market_price_eur_mwh")
+                or kpis.get("market_price_eur_mwh")
+                or current_price_eur_mwh
+                or 0.0
+            )
+            subscription_eur = float(contract.get("subscription_eur") or contract.get("fixed_cost_eur") or 0.0)
+            network_eur = float(contract.get("network_eur") or 0.0)
+            taxes_eur = float(contract.get("taxes_eur") or 0.0)
+            savings_target_pct = float(settings.get("savings_target_pct") or 0.0)
+
+            energy_cost_eur = annual_mwh * current_price_eur_mwh
+            baseline_total_eur = energy_cost_eur + subscription_eur + network_eur + taxes_eur
+            market_reference_eur = (annual_mwh * market_price_eur_mwh) + subscription_eur + network_eur + taxes_eur
+            potential_savings_eur = max(baseline_total_eur - market_reference_eur, 0.0)
+            optimized_landing_eur = baseline_total_eur * (1 - savings_target_pct / 100.0)
+
+            monthly_run_rate_eur = baseline_total_eur / 12.0 if baseline_total_eur > 0 else 0.0
+            trajectory =[
+                {
+                    "month": month,
+                    "baseline_eur": round(monthly_run_rate_eur, 2),
+                    "optimized_eur": round(optimized_landing_eur / 12.0, 2) if optimized_landing_eur > 0 else round(monthly_run_rate_eur, 2),
+                }
+                for month in range(1, 13)
+            ]
+
+            return {
+                "status": "SUCCESS",
+                "year": year,
+                "landing_euro": round(baseline_total_eur, 2),
+                "optimized_landing_euro": round(optimized_landing_eur, 2),
+                "market_reference_euro": round(market_reference_eur, 2),
+                "potential_savings_euro": round(potential_savings_eur, 2),
+                "volume_mwh": round(annual_mwh, 3),
+                "unit_price_eur_mwh": round(current_price_eur_mwh, 2),
+                "trajectory": trajectory,
+            }
+        except Exception as e:
+            self.logger.error(f"Erreur simulate_landing : {e}")
+            return {"status": "ERROR", "message": str(e), "year": datetime.now().year, "landing_euro": 0.0, "trajectory": []}
+
+    def healthcheck(self) -> Dict[str, Any]:
+        """Permet de valider rapidement le chargement du moteur dans Cloud Run / FastAPI."""
+        return {
+            "status": "OK",
+            "engine": "CortexFinance",
+            "pdf_ready": PDF_READY,
+            "known_suppliers": len(self.known_suppliers),
+            "version": "V12.10",
+        }
+
+finance = CortexFinance()
+# --- END OF FILE cortex_finance.py ---
