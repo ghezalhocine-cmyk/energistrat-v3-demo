@@ -27,7 +27,7 @@
     
     <style>
         body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
-        .bento-card { background: rgba(0, 29, 61, 0.75); backdrop-filter: blur(20px); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 2.5rem; transition: all 0.3s ease; }
+        .bento-card { background: rgba(0, 29, 61, 0.75); backdrop-filter: blur(20px); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 2rem; transition: all 0.3s ease; }
         .bento-card:hover { border-color: rgba(245, 158, 11, 0.5); transform: translateY(-2px); box-shadow: 0 10px 30px -10px rgba(245, 158, 11, 0.2); }
         
         .drag-active { border-color: #00E5FF !important; background-color: rgba(0, 229, 255, 0.1) !important; transform: scale(1.02); }
@@ -78,7 +78,7 @@
                 </h2>
                 <p class="text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-widest flex items-center gap-2">
                     <span id="god-mode-indicator" class="hidden text-alert animate-pulse font-bold">● GOD MODE</span> 
-                    Audit Comptable & B.A.P
+                    Audit Comptable & Workflow B.A.P
                 </p>
             </div>
             
@@ -99,13 +99,13 @@
 
         <div class="flex-1 p-8 overflow-y-auto pb-20">
             
-            <div class="grid grid-cols-12 gap-8 max-w-[1600px] mx-auto h-full">
+            <div class="max-w-[1600px] mx-auto h-full flex flex-col gap-8">
                 
-                <!-- COLONNE GAUCHE : DROPZONE & KPI -->
-                <div class="col-span-4 flex flex-col gap-6">
+                <!-- HAUT : LA DATA ROOM (GLISSER/DEPOSER + VERIFICATION HUMAINE) -->
+                <div class="grid grid-cols-12 gap-8 shrink-0">
                     
-                    <!-- ZONE DE DROP -->
-                    <div id="drop-zone" class="bento-card p-8 border-2 border-dashed border-gold/30 flex flex-col items-center justify-center hover:bg-gold/5 hover:border-gold cursor-pointer transition group relative overflow-hidden h-64 shrink-0" onclick="document.getElementById('file-input').click()">
+                    <!-- ZONE DE DROP (1/3) -->
+                    <div id="drop-zone" class="col-span-4 bento-card p-8 border-2 border-dashed border-gold/30 flex flex-col items-center justify-center hover:bg-gold/5 hover:border-gold cursor-pointer transition group relative overflow-hidden min-h-[250px]" onclick="document.getElementById('file-input').click()">
                         <i class="fa-solid fa-cloud-arrow-up text-6xl text-gold/50 group-hover:text-gold mb-4 transition transform group-hover:scale-110 pointer-events-none"></i>
                         <h3 class="font-black text-white text-lg pointer-events-none tracking-widest uppercase">Déposer une Facture</h3>
                         <p class="text-[10px] text-gray-400 mt-2 text-center pointer-events-none font-mono">Format PDF ou XML (Factur-X)</p>
@@ -114,79 +114,112 @@
                         <!-- LOADER -->
                         <div id="loading-spinner" class="hidden absolute inset-0 bg-abysse/90 backdrop-blur flex flex-col items-center justify-center z-20">
                             <i class="fa-solid fa-radar fa-spin text-4xl text-gold mb-4"></i>
-                            <p class="text-xs text-gold font-bold font-mono tracking-widest uppercase">Extraction Heuristique...</p>
+                            <p class="text-xs text-gold font-bold font-mono tracking-widest uppercase">Extraction CORTEX...</p>
                         </div>
                     </div>
 
-                    <!-- RESULTAT : TRUST SCORE & BAP -->
-                    <div id="audit-score-card" class="hidden bento-card p-8 border-t-4 border-gray-600 relative overflow-hidden flex-1 flex flex-col justify-center items-center text-center">
-                        <div class="absolute right-[-20px] top-[-20px] opacity-10">
-                            <i class="fa-solid fa-shield-halved text-9xl"></i>
-                        </div>
-                        
-                        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 relative z-10">Trust Score (Fiabilité CORTEX)</h3>
-                        <div class="text-7xl font-black text-white font-mono drop-shadow-lg mb-6 relative z-10" id="res-score">--</div>
-                        
-                        <div id="bap-stamp" class="relative z-10 mb-4 scale-75 md:scale-100">
-                            <!-- Tampon injecté par JS -->
+                    <!-- VERIFICATION DE LA DONNÉE LUE (2/3) - NOUVEAUTÉ MAJEURE -->
+                    <div id="human-verification-card" class="col-span-8 bento-card p-6 flex flex-col opacity-50 pointer-events-none transition-opacity duration-300">
+                        <div class="flex justify-between items-center border-b border-white/10 pb-3 mb-4">
+                            <h3 class="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                <i class="fa-solid fa-eye text-cyan text-lg"></i> Contrôle Visuel (Extraction IA)
+                            </h3>
+                            <div id="facturx-badge" class="hidden inline-flex items-center gap-2 bg-blue-900/40 text-cyan border border-cyan/50 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(0,229,255,0.2)]">
+                                <i class="fa-solid fa-fingerprint"></i> Certifié e-Invoicing
+                            </div>
                         </div>
 
-                        <div id="facturx-badge" class="hidden mt-4 inline-flex items-center gap-2 bg-blue-900/40 text-cyan border border-cyan/50 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(0,229,255,0.2)]">
-                            <i class="fa-solid fa-fingerprint"></i> Certifié e-Invoicing
+                        <!-- Les Champs Lus par l'IA -->
+                        <div class="grid grid-cols-3 gap-6 flex-1">
+                            <div class="bg-black/30 p-4 rounded-xl border border-white/5 shadow-inner">
+                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Fournisseur & PDL</div>
+                                <div class="text-lg font-black text-white truncate" id="read-provider">--</div>
+                                <div class="text-xs font-mono text-cyan mt-1" id="read-pdl">PDL: --</div>
+                            </div>
+                            <div class="bg-black/30 p-4 rounded-xl border border-white/5 shadow-inner">
+                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Période Facturée</div>
+                                <div class="text-sm font-mono text-white mt-1" id="read-period">Du -- au --</div>
+                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mt-2 mb-1">N° de Facture</div>
+                                <div class="text-sm font-mono text-gray-300 truncate" id="read-invoice-num">--</div>
+                            </div>
+                            <div class="bg-black/30 p-4 rounded-xl border border-white/5 shadow-inner border-l-4 border-gold">
+                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Montant & Volume</div>
+                                <div class="text-xl font-black text-white font-mono" id="read-ttc">-- € TTC</div>
+                                <div class="flex justify-between items-center mt-2 text-xs font-mono">
+                                    <span class="text-gray-400" id="read-ht">-- € HT</span>
+                                    <span class="text-cyan font-bold" id="read-vol">-- kWh</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
                 </div>
 
-                <!-- COLONNE DROITE : DATA ROOM & ACTIONS -->
-                <div class="col-span-8 flex flex-col gap-6" id="audit-details-card" style="display: none;">
+                <!-- BAS : LE CENTRE DE DÉCISION (SCORE, GRAPHIQUE, ANOMALIES, WORKFLOW) -->
+                <div id="audit-details-card" class="grid grid-cols-12 gap-8 flex-1 hidden opacity-0 transition-opacity duration-500">
                     
-                    <!-- HAUT : GRAPHIQUE COST BREAKDOWN + ACTIONS -->
-                    <div class="grid grid-cols-2 gap-6">
-                        <!-- CHART -->
-                        <div class="bento-card p-6 h-[300px] flex flex-col relative border border-white/5">
-                            <div class="flex justify-between items-start mb-4 border-b border-white/10 pb-2">
-                                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cost Breakdown (€)</h3>
-                                <div class="text-[10px] text-cyan font-mono font-bold bg-cyan/10 px-2 py-1 rounded border border-cyan/20" id="res-provider">FOURNISSEUR</div>
-                            </div>
-                            <div class="flex-1 relative w-full"><canvas id="invoiceChart"></canvas></div>
+                    <!-- COLONNE DE GAUCHE : TRUST SCORE & COST BREAKDOWN -->
+                    <div class="col-span-5 flex flex-col gap-6">
+                        
+                        <!-- SCORE CARD -->
+                        <div class="bento-card p-6 border-t-4 border-gray-600 relative overflow-hidden flex flex-col justify-center items-center text-center shrink-0" id="card-score">
+                            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 relative z-10">Trust Score CORTEX</h3>
+                            <div class="text-6xl font-black text-white font-mono drop-shadow-lg mb-4 relative z-10" id="res-score">--</div>
+                            <div id="bap-stamp" class="relative z-10 scale-75 md:scale-90"></div>
                         </div>
 
-                        <!-- CENTRE D'ACTIONS (WORKFLOW) -->
-                        <div class="bento-card p-6 border-l-4 border-cyan bg-gradient-to-br from-card to-cyan/5 flex flex-col">
+                        <!-- CHART (BLOQUÉ EN HAUTEUR POUR NE PAS ÉCRASER L'ÉCRAN) -->
+                        <div class="bento-card p-6 flex-1 flex flex-col relative border border-white/5 min-h-[300px] max-h-[350px]">
+                            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 border-b border-white/10 pb-2">Cost Breakdown (€)</h3>
+                            <div class="flex-1 relative w-full h-full"><canvas id="invoiceChart"></canvas></div>
+                        </div>
+                    </div>
+
+                    <!-- COLONNE DE DROITE : ANOMALIES & ACTIONS HUMAINES -->
+                    <div class="col-span-7 flex flex-col gap-6">
+                        
+                        <!-- JOURNAL DES ANOMALIES -->
+                        <div class="bento-card p-0 flex-1 border border-white/5 overflow-hidden flex flex-col shadow-inner">
+                            <div class="flex justify-between items-center p-6 border-b border-white/10 bg-card/50 shrink-0">
+                                <h3 class="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-list-check text-cyan"></i> Journal d'Audit FinOps</h3>
+                                <div class="text-[10px] font-mono text-gray-500 bg-black/40 px-3 py-1 rounded-lg border border-white/5">Détail du Trust Score</div>
+                            </div>
+                            <div class="overflow-y-auto flex-1 p-2">
+                                <table class="w-full text-left">
+                                    <tbody id="anomalies-list" class="text-xs text-gray-300 divide-y divide-white/5 font-mono">
+                                        <!-- Injecté par JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- LE WORKFLOW DE DÉCISION (LE CONTRÔLE HUMAIN) -->
+                        <div class="bento-card p-6 border-t-4 border-cyan bg-gradient-to-br from-card to-cyan/5 shrink-0">
                             <h3 class="text-sm font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <i class="fa-solid fa-bolt text-cyan"></i> Actions Recommandées
+                                <i class="fa-solid fa-gavel text-cyan"></i> Décision Opérationnelle
                             </h3>
-                            <p class="text-[10px] text-gray-400 font-mono mb-4 line-clamp-2">CORTEX a analysé la facture. Voici les leviers d'optimisation ou de contestation disponibles :</p>
+                            <p class="text-[10px] text-gray-400 font-mono mb-6">En tant qu'opérateur, vous gardez le contrôle final. Validez la facture pour l'exporter en comptabilité (FEC) ou ouvrez un litige avec le fournisseur.</p>
                             
-                            <div class="space-y-3 flex-1 flex flex-col justify-center" id="action-center">
-                                <!-- Boutons injectés par JS en fonction de l'audit -->
+                            <div class="grid grid-cols-2 gap-4" id="action-center">
+                                <!-- Bouton Validation (Export) -->
+                                <button onclick="exportAccounting()" id="btn-action-validate" class="bg-success/10 hover:bg-success hover:text-abysse border border-success/40 text-success py-4 rounded-xl text-xs font-black uppercase tracking-widest transition flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                                    <i class="fa-solid fa-check-double text-lg"></i> Bon à Payer (Export FEC)
+                                </button>
+
+                                <!-- Bouton Litige (Mailto) -->
+                                <a href="#" id="btn-action-litige" class="bg-alert/10 hover:bg-alert hover:text-white border border-alert/40 text-alert py-4 rounded-xl text-xs font-black uppercase tracking-widest transition flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+                                    <i class="fa-solid fa-paper-plane text-lg"></i> Litige Fournisseur
+                                </a>
+                            </div>
+                            
+                            <!-- Bouton Optionnel (Douanes) -->
+                            <div id="action-tax-shield" class="hidden mt-4 pt-4 border-t border-white/10">
+                                <button onclick="App.toast('Dossier douanier généré et transmis au Back-Office.', 'success')" class="w-full bg-purple/10 hover:bg-purple hover:text-abysse border border-purple/40 text-purple py-4 rounded-xl text-xs font-black uppercase tracking-widest transition flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+                                    <i class="fa-solid fa-landmark text-lg"></i> Récupérer la Taxe (CSPE)
+                                </button>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- BAS : JOURNAL DES ANOMALIES -->
-                    <div class="bento-card p-6 flex-1 border border-white/5 overflow-hidden flex flex-col">
-                        <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-2 shrink-0">
-                            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Journal d'Audit FinOps</h3>
-                            <div class="text-[10px] font-mono text-gray-500">Détail des pénalités du Trust Score</div>
-                        </div>
-                        <div class="overflow-y-auto flex-1 pr-2">
-                            <table class="w-full text-left">
-                                <thead class="bg-black/40 text-[9px] text-gray-500 uppercase font-black tracking-widest sticky top-0 z-10 backdrop-blur">
-                                    <tr>
-                                        <th class="p-3 rounded-tl-lg">Sévérité</th>
-                                        <th class="p-3">Type d'Anomalie</th>
-                                        <th class="p-3 rounded-tr-lg">Diagnostic de l'IA</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="anomalies-list" class="text-xs text-gray-300 divide-y divide-white/5 font-mono">
-                                    <!-- Injecté par JS -->
-                                </tbody>
-                            </table>
-                        </div>
                     </div>
-
                 </div>
 
             </div>
@@ -195,10 +228,9 @@
 
     <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none w-11/12 md:w-auto max-w-md"></div>
-
 <script>
     // ==========================================
-    // 1. MOTEUR UTILITAIRE & GOD MODE
+    // 1. MOTEUR UTILITAIRE & VUE SUPERVISEUR
     // ==========================================
     function getApiUrl(basePath) {
         const urlParams = new URLSearchParams(window.location.search);
@@ -249,7 +281,10 @@
         const forceTenant = new URLSearchParams(window.location.search).get('force_tenant');
         if(forceTenant && forceTenant !== 'ALL') {
             const ind = document.getElementById('god-mode-indicator');
-            if(ind) ind.classList.remove('hidden');
+            if(ind) {
+                ind.classList.remove('hidden');
+                ind.innerHTML = "● VUE SUPERVISEUR"; // Traduction FR
+            }
         }
 
         try {
@@ -277,14 +312,15 @@
                 document.getElementById('site-selector').innerHTML = '<option value="">Aucun site trouvé.</option>';
             }
         } catch(e) {
-            App.toast("Erreur de connexion CORTEX", "error");
+            App.toast("Erreur de connexion au serveur CORTEX.", "error");
         }
     });
 
     // ==========================================
     // 3. GESTION DU GLISSER-DÉPOSER (DRAG & DROP)
     // ==========================================
-    const dropZone = document.getElementById('drop-zone');['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    const dropZone = document.getElementById('drop-zone');
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, preventDefaults, false);
         document.body.addEventListener(eventName, preventDefaults, false);
     });
@@ -293,17 +329,14 @@
     ['dragenter', 'dragover'].forEach(eventName => dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-active'), false));['dragleave', 'drop'].forEach(eventName => dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-active'), false));
     
     dropZone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files), false);
-    
-    function handleFiles(files) { 
-        if (files.length > 0) uploadInvoice(files[0]); 
-    }
+    function handleFiles(files) { if (files.length > 0) uploadInvoice(files[0]); }
 
     // ==========================================
     // 4. INGESTION ET REQUÊTE VERS L'API PYTHON
     // ==========================================
     async function uploadInvoice(file) {
         const siteId = document.getElementById('site-selector').value;
-        if (!siteId) return App.toast("Veuillez d'abord sélectionner un site cible.", "warning");
+        if (!siteId) return App.toast("Veuillez d'abord sélectionner un compteur cible.", "warning");
 
         document.getElementById('loading-spinner').classList.remove('hidden');
 
@@ -311,49 +344,72 @@
         formData.append('file', file);
         formData.append('site_id', siteId);
 
-        App.toast("CORTEX : Extraction OCR et analyse Heuristique en cours...", "info");
+        App.toast("Lecture et vérification de la facture en cours...", "info");
 
         try {
-            // Appel de l'API de validation (cortex_finance.py)
             const res = await fetch(getApiUrl('/api/finance/upload'), { method: 'POST', body: formData });
             const response = await res.json();
             
             if(response.status === "ERROR" || response.error) {
-                App.toast("Erreur CORTEX : " + (response.message || response.error), "error");
+                App.toast("Rejet : " + (response.message || response.error), "error");
                 document.getElementById('loading-spinner').classList.add('hidden');
                 return;
             }
             
             GLOBAL_DATA = response;
             renderDashboard(response);
-            App.toast("Audit FinOps terminé avec succès.", "success");
+            App.toast("Audit comptable terminé avec succès.", "success");
 
         } catch(e) { 
             console.error(e);
-            App.toast("Erreur réseau ou timeout serveur.", "error"); 
+            App.toast("Erreur réseau ou délai d'attente dépassé.", "error"); 
         } finally { 
             document.getElementById('loading-spinner').classList.add('hidden'); 
         }
     }
 
     // ==========================================
-    // 5. RENDU DU DASHBOARD (THIN CLIENT)
+    // 5. RENDU DU DASHBOARD (INTERFACE D'AUDIT)
     // ==========================================
+    function formatDate(isoString) {
+        if(!isoString) return "--/--/----";
+        const d = new Date(isoString);
+        return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
     function renderDashboard(data) {
-        const scoreCard = document.getElementById('audit-score-card');
         const detailsCard = document.getElementById('audit-details-card');
+        const verifCard = document.getElementById('human-verification-card');
         const badgeFacturx = document.getElementById('facturx-badge');
         
-        scoreCard.classList.remove('hidden');
-        detailsCard.style.display = 'flex'; // Remplace le cache de la zone
+        detailsCard.classList.remove('hidden');
+        detailsCard.style.opacity = '1';
+        verifCard.style.opacity = '1';
+        verifCard.style.pointerEvents = 'auto';
 
-        // 1. TRUST SCORE ET TAMPON (B.A.P)
+        const formatEur = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
+
+        // A. REMPLISSAGE DU CONTRÔLE VISUEL (Les données brutes lues)
+        const tech = data.technical || {};
+        const fin = data.financials || {};
+        
+        document.getElementById('read-provider').innerText = tech.provider || "Inconnu";
+        document.getElementById('read-pdl').innerText = (tech.energy_type === "gas" ? "PCE: " : "PDL: ") + (tech.pdl_detected || tech.pce_detected || "Non détecté");
+        document.getElementById('read-period').innerText = `Du ${formatDate(tech.period_start)} au ${formatDate(tech.period_end)}`;
+        document.getElementById('read-invoice-num').innerText = tech.invoice_number || "Non détecté";
+        
+        document.getElementById('read-ttc').innerText = formatEur.format(fin.amount_ttc);
+        document.getElementById('read-ht').innerText = formatEur.format(fin.amount_ht) + " HT";
+        document.getElementById('read-vol').innerText = new Intl.NumberFormat('fr-FR').format(fin.volume_factured) + " kWh";
+
+        // B. INDICE DE FIABILITÉ ET TAMPON (B.A.P)
         const score = data?.trust_score || 0;
         document.getElementById('res-score').innerText = score + "/100";
-        document.getElementById('res-provider').innerText = data?.technical?.provider || "FOURNISSEUR INCONNU";
         
         const stamp = document.getElementById('bap-stamp');
-        scoreCard.className = "bento-card p-8 border-l-4 relative overflow-hidden flex-1 flex flex-col justify-center items-center text-center";
+        const scoreCard = document.getElementById('card-score');
+        
+        scoreCard.className = "bento-card p-6 border-t-4 relative overflow-hidden flex flex-col justify-center items-center text-center shrink-0";
         
         if(data.bap_status === "APPROVED") {
             scoreCard.classList.add('border-success', 'bg-success/5');
@@ -367,34 +423,35 @@
         }
 
         // Badge e-Invoicing
-        if(data.technical?.source === "FACTUR-X_XML_2026") {
+        if(tech.source === "FACTUR-X_XML_2026") {
             badgeFacturx.classList.remove('hidden');
             document.getElementById('res-score').classList.add('text-cyan');
         } else {
             badgeFacturx.classList.add('hidden');
         }
 
-        // 2. JOURNAL DES ANOMALIES
+        // C. JOURNAL DES ANOMALIES (TRADUCTION FR)
         const tbody = document.getElementById('anomalies-list');
         tbody.innerHTML = '';
         const anomalies = data?.anomalies ||[];
         
         if(anomalies.length > 0) {
             anomalies.forEach(ano => {
-                let colorClass = "text-gray-400"; let bgClass = "bg-gray-500/10 border-gray-500/30";
-                if(ano.severity === "CRITICAL") { colorClass = "text-alert"; bgClass = "bg-alert/10 border-alert/30"; }
-                if(ano.severity === "HIGH") { colorClass = "text-orange-500"; bgClass = "bg-orange-500/10 border-orange-500/30"; }
-                if(ano.severity === "MEDIUM") { colorClass = "text-gold"; bgClass = "bg-gold/10 border-gold/30"; }
+                let colorClass = "text-gray-400"; let bgClass = "bg-gray-500/10 border-gray-500/30"; let severityFr = "MINEURE";
+                
+                if(ano.severity === "CRITICAL") { colorClass = "text-alert"; bgClass = "bg-alert/10 border-alert/30"; severityFr = "CRITIQUE"; }
+                if(ano.severity === "HIGH") { colorClass = "text-orange-500"; bgClass = "bg-orange-500/10 border-orange-500/30"; severityFr = "MAJEURE"; }
+                if(ano.severity === "MEDIUM") { colorClass = "text-gold"; bgClass = "bg-gold/10 border-gold/30"; severityFr = "MINEURE"; }
                 
                 // LE BOUCLIER FISCAL
                 if(ano.severity === "TAX_SHIELD") {
                     colorClass = "text-purple font-black"; bgClass = "bg-purple/20 border-purple/50";
-                    ano.severity = "OPPORTUNITÉ";
+                    severityFr = "OPPORTUNITÉ";
                 }
 
                 tbody.innerHTML += `
                     <tr class="hover:bg-white/5 transition group">
-                        <td class="p-4 border-b border-white/5"><span class="px-2 py-1 rounded text-[9px] font-black border ${bgClass} ${colorClass}">${ano.severity}</span></td>
+                        <td class="p-4 border-b border-white/5"><span class="px-2 py-1 rounded text-[9px] font-black border ${bgClass} ${colorClass}">${severityFr}</span></td>
                         <td class="p-4 border-b border-white/5 font-bold ${colorClass}">${ano.label}</td>
                         <td class="p-4 border-b border-white/5 text-gray-300 leading-relaxed font-sans">${ano.message}</td>
                     </tr>`;
@@ -403,86 +460,49 @@
             tbody.innerHTML = `<tr><td colspan="3" class="p-8 text-center text-success font-black text-lg"><i class="fa-solid fa-shield-check text-4xl mb-4 opacity-50 block"></i>Aucune anomalie détectée.<br><span class="text-sm font-normal text-gray-400">La facture correspond parfaitement aux données réseau.</span></td></tr>`;
         }
 
-        // 3. GENERATION DES BOUTONS D'ACTION (LE WORKFLOW MAGIQUE)
+        // D. GÉNÉRATION DES BOUTONS D'ACTION ET GRAPHIQUE
         generateActionCenter(data);
-
-        // 4. COST BREAKDOWN CHART (DONUT)
         renderChart(data);
     }
 
     // ==========================================
-    // 6. INTELLIGENCE D'ACTION (WORKFLOW GENERATOR)
+    // 6. CIRCUIT DE VALIDATION (WORKFLOW)
     // ==========================================
     function generateActionCenter(data) {
-        const actionCenter = document.getElementById('action-center');
-        actionCenter.innerHTML = '';
+        const btnValider = document.getElementById('btn-action-validate');
+        const btnLitige = document.getElementById('btn-action-litige');
+        const boxDouanes = document.getElementById('action-tax-shield');
         
         const anomalies = data?.anomalies ||[];
-        const provider = data?.technical?.provider || "le fournisseur";
-        const pdl = data?.technical?.pdl_detected || data?.technical?.pce_detected || "[VOTRE_PDL]";
-        const invNum = data?.technical?.invoice_number || "[N_FACTURE]";
+        const provider = data?.technical?.provider || "votre service client";
+        const pdl = data?.technical?.pdl_detected || data?.technical?.pce_detected || "notre point de livraison";
+        const invNum = data?.technical?.invoice_number || "récente";
         
-        let actionsHtml = '';
-
-        // RÈGLE 1 : Si tout est bon (APPROVED) = Bouton d'export Compta
-        if (data.bap_status === "APPROVED") {
-            actionsHtml += `
-                <button onclick="exportAccounting()" class="w-full bg-success/10 hover:bg-success hover:text-abysse border border-success/40 text-success px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-between group shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                    <span class="flex items-center gap-2"><i class="fa-solid fa-file-csv text-lg"></i> Exporter Écritures (FEC)</span>
-                    <i class="fa-solid fa-download opacity-50 group-hover:opacity-100"></i>
-                </button>
-            `;
+        // RÈGLE 1 : VERROUILLAGE SI CRITIQUE
+        if (data.bap_status === "QUARANTINE") {
+            btnValider.classList.add('opacity-30', 'cursor-not-allowed', 'grayscale');
+            btnValider.onclick = (e) => { e.preventDefault(); App.toast("Validation bloquée. Veuillez ouvrir un litige.", "error"); };
+        } else {
+            btnValider.classList.remove('opacity-30', 'cursor-not-allowed', 'grayscale');
+            btnValider.onclick = exportAccounting;
         }
 
-        // RÈGLE 2 : Anomalie Fournisseur (Prix ou Volume SGE)
-        const hasLitige = anomalies.some(a => a.severity === 'CRITICAL' || a.label.includes('Écart volume') || a.label.includes('incohérents'));
-        if (hasLitige) {
-            const subject = encodeURIComponent(`Contestation Facture ${invNum} - PDL ${pdl}`);
-            const body = encodeURIComponent(`Bonjour service facturation ${provider},\n\nNotre intelligence artificielle CORTEX a détecté une anomalie critique sur la facture N°${invNum}.\n\nMerci de suspendre le prélèvement et de nous éditer une facture rectificative ou un avoir dans les plus brefs délais.\n\nCordialement.`);
-            
-            actionsHtml += `
-                <a href="mailto:service-client@${provider.toLowerCase()}.fr?subject=${subject}&body=${body}" class="w-full bg-alert/10 hover:bg-alert hover:text-white border border-alert/40 text-alert px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-between group shadow-[0_0_15px_rgba(239,68,68,0.2)]">
-                    <span class="flex items-center gap-2"><i class="fa-solid fa-gavel text-lg"></i> Ouvrir Litige (Mail Pré-rédigé)</span>
-                    <i class="fa-solid fa-paper-plane opacity-50 group-hover:opacity-100"></i>
-                </a>
-            `;
-        }
+        // RÈGLE 2 : LITIGE FOURNISSEUR (Langage institutionnel)
+        const subject = encodeURIComponent(`Contestation de la facture N°${invNum} - Réf: ${pdl}`);
+        const body = encodeURIComponent(`Madame, Monsieur,\n\nNotre cabinet d'audit énergétique a détecté une anomalie comptable majeure sur votre facture N°${invNum} concernant le point de livraison ${pdl}.\n\nLes volumes facturés diffèrent des données certifiées du gestionnaire de réseau (Enedis/GRDF).\nNous vous mettons en demeure de suspendre le prélèvement lié à cette facturation et d'éditer une facture rectificative dans les plus brefs délais.\n\nDans l'attente de votre retour,\n\nCordialement.`);
+        btnLitige.href = `mailto:service-client@${provider.toLowerCase().replace(' ', '')}.fr?subject=${subject}&body=${body}`;
 
-        // RÈGLE 3 : Optimisation Réseau (TURPE / Pénalités)
-        const hasReseau = anomalies.some(a => a.label.includes('Acheminement') || a.label.includes('Pénalités') || a.label.includes('Part fixe'));
-        if (hasReseau) {
-            const subject = encodeURIComponent(`Demande d'optimisation tarifaire (TURPE) - PDL ${pdl}`);
-            const body = encodeURIComponent(`Bonjour,\n\nSuite à l'audit de notre facture ${invNum}, nous souhaitons procéder à une optimisation de notre Puissance Souscrite ou à l'installation d'une batterie de condensateurs.\n\nMerci de revenir vers nous avec une proposition technique.\n\nCordialement.`);
-            
-            actionsHtml += `
-                <a href="mailto:?subject=${subject}&body=${body}" class="w-full bg-gold/10 hover:bg-gold hover:text-abysse border border-gold/40 text-gold px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-between group shadow-[0_0_15px_rgba(245,158,11,0.2)]">
-                    <span class="flex items-center gap-2"><i class="fa-solid fa-bolt text-lg"></i> Optimisation Réseau (TURPE)</span>
-                    <i class="fa-solid fa-arrow-trend-down opacity-50 group-hover:opacity-100"></i>
-                </a>
-            `;
-        }
-
-        // RÈGLE 4 : Bouclier Fiscal (CSPE)
-        const hasTaxShield = anomalies.some(a => a.severity === 'OPPORTUNITÉ');
+        // RÈGLE 3 : OPPORTUNITÉ DOUANIÈRE (CSPE)
+        const hasTaxShield = anomalies.some(a => a.severity === 'OPPORTUNITÉ' || a.severity === 'TAX_SHIELD');
         if (hasTaxShield) {
-            actionsHtml += `
-                <button onclick="App.toast('Le dossier de récupération douanière a été généré et envoyé aux experts.', 'success')" class="w-full bg-purple/10 hover:bg-purple hover:text-abysse border border-purple/40 text-purple px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-between group shadow-[0_0_15px_rgba(168,85,247,0.2)]">
-                    <span class="flex items-center gap-2"><i class="fa-solid fa-landmark text-lg"></i> Lancer Récupération (Douanes)</span>
-                    <i class="fa-solid fa-file-invoice-dollar opacity-50 group-hover:opacity-100"></i>
-                </button>
-            `;
+            boxDouanes.classList.remove('hidden');
+        } else {
+            boxDouanes.classList.add('hidden');
         }
-
-        // Fallback s'il n'y a pas d'action claire
-        if (actionsHtml === '') {
-            actionsHtml = `<div class="text-center text-[10px] text-gray-500 font-mono mt-4">Aucune action requise. Facture standard.</div>`;
-        }
-
-        actionCenter.innerHTML = actionsHtml;
     }
 
     // ==========================================
-    // 7. GÉNÉRATION DU GRAPHIQUE (COST BREAKDOWN)
+    // 7. GÉNÉRATION DU GRAPHIQUE (DÉCOMPOSITION DES COÛTS)
     // ==========================================
     function renderChart(data) {
         const ctx = document.getElementById('invoiceChart').getContext('2d');
@@ -490,7 +510,6 @@
 
         const cb = data?.financials?.cost_breakdown || {};
         
-        // Sécurisation des données pour le chart
         const energy = parseFloat(cb.energy_variable) || 0;
         const network = parseFloat(cb.network) || 0;
         const sub = parseFloat(cb.subscription) || 0;
@@ -500,7 +519,7 @@
         invoiceChartInstance = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels:['Énergie (Molécule)', 'Acheminement (TURPE)', 'Abonnement', 'Taxes', 'Pénalités'],
+                labels:['Fourniture (Molécule)', 'Acheminement (Réseau)', 'Abonnement Fixe', 'Taxes & Contributions', 'Pénalités (Dépassements)'],
                 datasets:[{
                     data: [energy, network, sub, taxes, penalties],
                     backgroundColor:['#00E5FF', '#F59E0B', '#94A3B8', '#A855F7', '#EF4444'],
@@ -527,25 +546,25 @@
     }
 
     // ==========================================
-    // 8. EXPORT COMPTABLE (FEC)
+    // 8. EXPORT COMPTABLE (FORMAT FEC)
     // ==========================================
     window.exportAccounting = function() {
         if(!GLOBAL_DATA) return;
         const pdl = GLOBAL_DATA.technical?.pdl_detected || GLOBAL_DATA.technical?.pce_detected || "INCONNU";
         const ttc = GLOBAL_DATA.financials?.amount_ttc || 0;
-        const num = GLOBAL_DATA.technical?.invoice_number || "X";
+        const num = GLOBAL_DATA.technical?.invoice_number || "A-CLASSER";
         
-        const csv = `Journal;Date;Compte;Libelle;Debit;Credit\nACH;${new Date().toLocaleDateString('fr-FR')};606120;Facture Energie N°${num} (PDL:${pdl});${ttc};0\n`;
+        const csv = `Journal;Date;Compte;Libelle;Debit;Credit\nACH;${new Date().toLocaleDateString('fr-FR')};606120;Facture Energie N°${num} (Réf:${pdl});${ttc};0\n`;
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a"); 
         a.href = url; 
-        a.download = `Export_Compta_FEC_${pdl}.csv`;
+        a.download = `Ecriture_Comptable_FEC_${pdl}.csv`;
         document.body.appendChild(a); a.click(); a.remove();
         
-        App.toast("Ligne comptable FEC exportée.", "success");
+        App.toast("Ligne comptable approuvée et exportée en format FEC.", "success");
+        document.getElementById('bap-stamp').innerHTML = '<div class="stamp stamp-approved">COMPTABILISÉ</div>';
     }
-</script>    
-    
+</script>
 </body>
 </html>
