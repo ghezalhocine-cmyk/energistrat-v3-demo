@@ -7,6 +7,9 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Ajout du Plugin DataLabels pour les étiquettes dans le Camembert -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -77,7 +80,7 @@
                     <i class="fa-solid fa-satellite text-gold glow-text"></i> FINANCIAL<span class="text-gold">.TWIN</span>
                 </h2>
                 <p class="text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-widest flex items-center gap-2">
-                    <span id="god-mode-indicator" class="hidden text-alert animate-pulse font-bold">● GOD MODE</span> 
+                    <span id="god-mode-indicator" class="hidden text-alert animate-pulse font-bold">● VUE SUPERVISEUR</span> 
                     Audit Comptable & Workflow B.A.P
                 </p>
             </div>
@@ -105,10 +108,10 @@
                 <div class="grid grid-cols-12 gap-8 shrink-0">
                     
                     <!-- ZONE DE DROP (1/3) -->
-                    <div id="drop-zone" class="col-span-4 bento-card p-8 border-2 border-dashed border-gold/30 flex flex-col items-center justify-center hover:bg-gold/5 hover:border-gold cursor-pointer transition group relative overflow-hidden min-h-[250px]" onclick="document.getElementById('file-input').click()">
-                        <i class="fa-solid fa-cloud-arrow-up text-6xl text-gold/50 group-hover:text-gold mb-4 transition transform group-hover:scale-110 pointer-events-none"></i>
-                        <h3 class="font-black text-white text-lg pointer-events-none tracking-widest uppercase">Déposer une Facture</h3>
-                        <p class="text-[10px] text-gray-400 mt-2 text-center pointer-events-none font-mono">Format PDF ou XML (Factur-X)</p>
+                    <div id="drop-zone" class="col-span-3 bento-card p-6 border-2 border-dashed border-gold/30 flex flex-col items-center justify-center hover:bg-gold/5 hover:border-gold cursor-pointer transition group relative overflow-hidden min-h-[220px]" onclick="document.getElementById('file-input').click()">
+                        <i class="fa-solid fa-cloud-arrow-up text-5xl text-gold/50 group-hover:text-gold mb-4 transition transform group-hover:scale-110 pointer-events-none"></i>
+                        <h3 class="font-black text-white text-base pointer-events-none tracking-widest uppercase">Déposer Facture</h3>
+                        <p class="text-[9px] text-gray-400 mt-2 text-center pointer-events-none font-mono">Format PDF ou XML (Factur-X)</p>
                         <input type="file" id="file-input" class="hidden" accept=".pdf,.xml" onchange="handleFiles(this.files)">
                         
                         <!-- LOADER -->
@@ -118,8 +121,8 @@
                         </div>
                     </div>
 
-                    <!-- VERIFICATION DE LA DONNÉE LUE (2/3) - NOUVEAUTÉ MAJEURE -->
-                    <div id="human-verification-card" class="col-span-8 bento-card p-6 flex flex-col opacity-50 pointer-events-none transition-opacity duration-300">
+                    <!-- VERIFICATION DE LA DONNÉE LUE (2/3) - MOTEUR 4 COLONNES -->
+                    <div id="human-verification-card" class="col-span-9 bento-card p-6 flex flex-col opacity-50 pointer-events-none transition-opacity duration-300">
                         <div class="flex justify-between items-center border-b border-white/10 pb-3 mb-4">
                             <h3 class="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
                                 <i class="fa-solid fa-eye text-cyan text-lg"></i> Contrôle Visuel (Extraction IA)
@@ -129,26 +132,42 @@
                             </div>
                         </div>
 
-                        <!-- Les Champs Lus par l'IA -->
-                        <div class="grid grid-cols-3 gap-6 flex-1">
+                        <!-- Les 4 Colonnes de l'IA (Incluant la comparaison SGE) -->
+                        <div class="grid grid-cols-4 gap-4 flex-1">
                             <div class="bg-black/30 p-4 rounded-xl border border-white/5 shadow-inner">
-                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Fournisseur & PDL</div>
-                                <div class="text-lg font-black text-white truncate" id="read-provider">--</div>
-                                <div class="text-xs font-mono text-cyan mt-1" id="read-pdl">PDL: --</div>
+                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Fournisseur & ID</div>
+                                <div class="text-lg font-black text-white truncate mb-1" id="read-provider">--</div>
+                                <div class="text-[11px] font-mono text-cyan" id="read-pdl">PDL: --</div>
                             </div>
+                            
                             <div class="bg-black/30 p-4 rounded-xl border border-white/5 shadow-inner">
-                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Période Facturée</div>
-                                <div class="text-sm font-mono text-white mt-1" id="read-period">Du -- au --</div>
-                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mt-2 mb-1">N° de Facture</div>
+                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Période & N°</div>
+                                <div class="text-[11px] font-mono text-white mb-2" id="read-period">Du -- au --</div>
+                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Facture N°</div>
                                 <div class="text-sm font-mono text-gray-300 truncate" id="read-invoice-num">--</div>
                             </div>
+                            
                             <div class="bg-black/30 p-4 rounded-xl border border-white/5 shadow-inner border-l-4 border-gold">
-                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Montant & Volume</div>
-                                <div class="text-xl font-black text-white font-mono" id="read-ttc">-- € TTC</div>
-                                <div class="flex justify-between items-center mt-2 text-xs font-mono">
-                                    <span class="text-gray-400" id="read-ht">-- € HT</span>
-                                    <span class="text-cyan font-bold" id="read-vol">-- kWh</span>
+                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Montant Exigé</div>
+                                <div class="text-xl font-black text-white font-mono mb-2" id="read-ttc">-- € TTC</div>
+                                <div class="text-xs font-mono text-gray-400" id="read-ht">-- € HT</div>
+                            </div>
+
+                            <!-- LA KILLER FEATURE : COMPARAISON ENEDIS / SGE -->
+                            <div class="bg-black/30 p-4 rounded-xl border border-white/5 shadow-inner border-l-4 border-gray-600 transition-colors duration-500" id="vol-card">
+                                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Concordance Enedis (SGE)</div>
+                                <div class="flex justify-between items-end mt-1 text-xs font-mono">
+                                    <span class="text-gray-400">Facturé :</span>
+                                    <span class="text-white font-bold" id="read-vol-fact">-- kWh</span>
                                 </div>
+                                <div class="flex justify-between items-end mt-2 text-xs font-mono">
+                                    <span class="text-gray-400">Base 3D (Réseau) :</span>
+                                    <span class="text-cyan font-bold" id="read-vol-sge">-- kWh</span>
+                                </div>
+                                <div class="w-full bg-gray-700 h-1.5 mt-3 rounded-full overflow-hidden">
+                                    <div id="vol-bar" class="bg-gray-500 h-full transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                                <div class="text-[9px] font-bold uppercase tracking-widest mt-2 text-right text-gray-500" id="vol-status">En attente</div>
                             </div>
                         </div>
                     </div>
@@ -169,7 +188,7 @@
 
                         <!-- CHART (BLOQUÉ EN HAUTEUR POUR NE PAS ÉCRASER L'ÉCRAN) -->
                         <div class="bento-card p-6 flex-1 flex flex-col relative border border-white/5 min-h-[300px] max-h-[350px]">
-                            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 border-b border-white/10 pb-2">Cost Breakdown (€)</h3>
+                            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 border-b border-white/10 pb-2">Décomposition des coûts (Cost Breakdown)</h3>
                             <div class="flex-1 relative w-full h-full"><canvas id="invoiceChart"></canvas></div>
                         </div>
                     </div>
@@ -181,7 +200,7 @@
                         <div class="bento-card p-0 flex-1 border border-white/5 overflow-hidden flex flex-col shadow-inner">
                             <div class="flex justify-between items-center p-6 border-b border-white/10 bg-card/50 shrink-0">
                                 <h3 class="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-list-check text-cyan"></i> Journal d'Audit FinOps</h3>
-                                <div class="text-[10px] font-mono text-gray-500 bg-black/40 px-3 py-1 rounded-lg border border-white/5">Détail du Trust Score</div>
+                                <div class="text-[10px] font-mono text-gray-500 bg-black/40 px-3 py-1 rounded-lg border border-white/5">Détail des pénalités du Trust Score</div>
                             </div>
                             <div class="overflow-y-auto flex-1 p-2">
                                 <table class="w-full text-left">
@@ -213,8 +232,8 @@
                             
                             <!-- Bouton Optionnel (Douanes) -->
                             <div id="action-tax-shield" class="hidden mt-4 pt-4 border-t border-white/10">
-                                <button onclick="App.toast('Dossier douanier généré et transmis au Back-Office.', 'success')" class="w-full bg-purple/10 hover:bg-purple hover:text-abysse border border-purple/40 text-purple py-4 rounded-xl text-xs font-black uppercase tracking-widest transition flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
-                                    <i class="fa-solid fa-landmark text-lg"></i> Récupérer la Taxe (CSPE)
+                                <button onclick="App.toast('Dossier douanier généré et transmis aux experts fiscalistes.', 'success')" class="w-full bg-purple/10 hover:bg-purple hover:text-abysse border border-purple/40 text-purple py-4 rounded-xl text-xs font-black uppercase tracking-widest transition flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+                                    <i class="fa-solid fa-landmark text-lg"></i> Récupérer la Taxe Douanière (CSPE)
                                 </button>
                             </div>
                         </div>
@@ -252,7 +271,7 @@
             const icons = { success: 'fa-check', error: 'fa-triangle-exclamation', warning: 'fa-bolt', info: 'fa-info' };
             
             const el = document.createElement('div');
-            el.className = `${colors[type] || colors.info} px-6 py-4 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-xs font-black tracking-wide border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto backdrop-blur-md`;
+            el.className = `${colors[type] || colors.info} px-6 py-4 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-xs font-black tracking-wide border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto backdrop-blur-md z-[999]`;
             el.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} text-lg"></i> <span>${msg}</span>`;
             container.appendChild(el);
             
@@ -283,8 +302,13 @@
             const ind = document.getElementById('god-mode-indicator');
             if(ind) {
                 ind.classList.remove('hidden');
-                ind.innerHTML = "● VUE SUPERVISEUR"; // Traduction FR
+                ind.innerHTML = "● VUE SUPERVISEUR";
             }
+        }
+
+        // Activation du Plugin DataLabels pour le graphique
+        if (typeof ChartDataLabels !== 'undefined') {
+            Chart.register(ChartDataLabels);
         }
 
         try {
@@ -309,7 +333,7 @@
                 else if(FLEET_DATA.length === 1) sel.value = FLEET_DATA[0].id;
                 
             } else {
-                document.getElementById('site-selector').innerHTML = '<option value="">Aucun site trouvé.</option>';
+                document.getElementById('site-selector').innerHTML = '<option value="">Aucun site trouvé dans la base.</option>';
             }
         } catch(e) {
             App.toast("Erreur de connexion au serveur CORTEX.", "error");
@@ -344,7 +368,7 @@
         formData.append('file', file);
         formData.append('site_id', siteId);
 
-        App.toast("Lecture et vérification de la facture en cours...", "info");
+        App.toast("Lecture de la facture et analyse comparative en cours...", "info");
 
         try {
             const res = await fetch(getApiUrl('/api/finance/upload'), { method: 'POST', body: formData });
@@ -389,7 +413,7 @@
 
         const formatEur = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
 
-        // A. REMPLISSAGE DU CONTRÔLE VISUEL (Les données brutes lues)
+        // A. REMPLISSAGE DU CONTRÔLE VISUEL
         const tech = data.technical || {};
         const fin = data.financials || {};
         
@@ -400,9 +424,39 @@
         
         document.getElementById('read-ttc').innerText = formatEur.format(fin.amount_ttc);
         document.getElementById('read-ht').innerText = formatEur.format(fin.amount_ht) + " HT";
-        document.getElementById('read-vol').innerText = new Intl.NumberFormat('fr-FR').format(fin.volume_factured) + " kWh";
+        
+        // B. LE COMPARATEUR ENEDIS/SGE INTELLIGENT
+        const volFactured = fin.volume_factured || 0;
+        const volSge = tech.volume_sge || 0;
+        
+        document.getElementById('read-vol-fact').innerText = new Intl.NumberFormat('fr-FR').format(volFactured) + " kWh";
+        document.getElementById('read-vol-sge').innerText = new Intl.NumberFormat('fr-FR').format(volSge) + " kWh";
+        
+        const volCard = document.getElementById('vol-card');
+        const volBar = document.getElementById('vol-bar');
+        const volStatus = document.getElementById('vol-status');
 
-        // B. INDICE DE FIABILITÉ ET TAMPON (B.A.P)
+        if(volFactured > 0 && volSge > 0) {
+            const diffPct = Math.abs((volFactured - volSge) / volFactured) * 100;
+            // On calcule un ratio pour la barre de progression (limité à 100%)
+            const ratio = Math.min((volSge / volFactured) * 100, 100);
+            volBar.style.width = ratio + '%';
+
+            if(diffPct > 5) {
+                volCard.className = "bg-alert/10 p-4 rounded-xl border border-alert/50 shadow-[0_0_15px_rgba(239,68,68,0.2)] border-l-4 transition-colors duration-500";
+                volBar.className = "bg-alert h-full transition-all duration-500 shadow-[0_0_10px_#EF4444]";
+                volStatus.innerHTML = `<span class="text-alert"><i class="fa-solid fa-triangle-exclamation"></i> Écart de ${diffPct.toFixed(1)}%</span>`;
+            } else {
+                volCard.className = "bg-success/10 p-4 rounded-xl border border-success/50 shadow-inner border-l-4 transition-colors duration-500";
+                volBar.className = "bg-success h-full transition-all duration-500 shadow-[0_0_10px_#10B981]";
+                volStatus.innerHTML = `<span class="text-success"><i class="fa-solid fa-check"></i> Cohérent</span>`;
+            }
+        } else {
+            volBar.style.width = '0%';
+            volStatus.innerText = "Données réseau indisponibles";
+        }
+
+        // C. INDICE DE FIABILITÉ ET TAMPON (B.A.P)
         const score = data?.trust_score || 0;
         document.getElementById('res-score').innerText = score + "/100";
         
@@ -422,7 +476,6 @@
             stamp.innerHTML = '<div class="stamp stamp-rejected">LITIGE / BLOQUÉ</div>';
         }
 
-        // Badge e-Invoicing
         if(tech.source === "FACTUR-X_XML_2026") {
             badgeFacturx.classList.remove('hidden');
             document.getElementById('res-score').classList.add('text-cyan');
@@ -430,7 +483,7 @@
             badgeFacturx.classList.add('hidden');
         }
 
-        // C. JOURNAL DES ANOMALIES (TRADUCTION FR)
+        // D. JOURNAL DES ANOMALIES (TRADUCTION FR)
         const tbody = document.getElementById('anomalies-list');
         tbody.innerHTML = '';
         const anomalies = data?.anomalies ||[];
@@ -443,7 +496,6 @@
                 if(ano.severity === "HIGH") { colorClass = "text-orange-500"; bgClass = "bg-orange-500/10 border-orange-500/30"; severityFr = "MAJEURE"; }
                 if(ano.severity === "MEDIUM") { colorClass = "text-gold"; bgClass = "bg-gold/10 border-gold/30"; severityFr = "MINEURE"; }
                 
-                // LE BOUCLIER FISCAL
                 if(ano.severity === "TAX_SHIELD") {
                     colorClass = "text-purple font-black"; bgClass = "bg-purple/20 border-purple/50";
                     severityFr = "OPPORTUNITÉ";
@@ -460,7 +512,6 @@
             tbody.innerHTML = `<tr><td colspan="3" class="p-8 text-center text-success font-black text-lg"><i class="fa-solid fa-shield-check text-4xl mb-4 opacity-50 block"></i>Aucune anomalie détectée.<br><span class="text-sm font-normal text-gray-400">La facture correspond parfaitement aux données réseau.</span></td></tr>`;
         }
 
-        // D. GÉNÉRATION DES BOUTONS D'ACTION ET GRAPHIQUE
         generateActionCenter(data);
         renderChart(data);
     }
@@ -478,31 +529,28 @@
         const pdl = data?.technical?.pdl_detected || data?.technical?.pce_detected || "notre point de livraison";
         const invNum = data?.technical?.invoice_number || "récente";
         
-        // RÈGLE 1 : VERROUILLAGE SI CRITIQUE
+        // Verrouillage du Bon à Payer si Quarantaine
         if (data.bap_status === "QUARANTINE") {
             btnValider.classList.add('opacity-30', 'cursor-not-allowed', 'grayscale');
-            btnValider.onclick = (e) => { e.preventDefault(); App.toast("Validation bloquée. Veuillez ouvrir un litige.", "error"); };
+            btnValider.onclick = (e) => { e.preventDefault(); App.toast("Validation comptable bloquée par l'IA. Veuillez ouvrir un litige.", "error"); };
         } else {
             btnValider.classList.remove('opacity-30', 'cursor-not-allowed', 'grayscale');
             btnValider.onclick = exportAccounting;
         }
 
-        // RÈGLE 2 : LITIGE FOURNISSEUR (Langage institutionnel)
+        // Email de Litige Formel
         const subject = encodeURIComponent(`Contestation de la facture N°${invNum} - Réf: ${pdl}`);
-        const body = encodeURIComponent(`Madame, Monsieur,\n\nNotre cabinet d'audit énergétique a détecté une anomalie comptable majeure sur votre facture N°${invNum} concernant le point de livraison ${pdl}.\n\nLes volumes facturés diffèrent des données certifiées du gestionnaire de réseau (Enedis/GRDF).\nNous vous mettons en demeure de suspendre le prélèvement lié à cette facturation et d'éditer une facture rectificative dans les plus brefs délais.\n\nDans l'attente de votre retour,\n\nCordialement.`);
+        const body = encodeURIComponent(`Madame, Monsieur,\n\nNotre cabinet d'audit énergétique a détecté une anomalie comptable majeure sur votre facture N°${invNum} concernant le point de livraison ${pdl}.\n\nLes volumes facturés diffèrent des données certifiées du gestionnaire de réseau (Enedis/GRDF), ou une anomalie tarifaire a été repérée.\nNous vous mettons en demeure de suspendre le prélèvement lié à cette facturation et d'éditer une facture rectificative dans les plus brefs délais.\n\nDans l'attente de votre retour,\n\nCordialement.`);
         btnLitige.href = `mailto:service-client@${provider.toLowerCase().replace(' ', '')}.fr?subject=${subject}&body=${body}`;
 
-        // RÈGLE 3 : OPPORTUNITÉ DOUANIÈRE (CSPE)
+        // Bouclier Fiscal Douanier
         const hasTaxShield = anomalies.some(a => a.severity === 'OPPORTUNITÉ' || a.severity === 'TAX_SHIELD');
-        if (hasTaxShield) {
-            boxDouanes.classList.remove('hidden');
-        } else {
-            boxDouanes.classList.add('hidden');
-        }
+        if (hasTaxShield) boxDouanes.classList.remove('hidden');
+        else boxDouanes.classList.add('hidden');
     }
 
     // ==========================================
-    // 7. GÉNÉRATION DU GRAPHIQUE (DÉCOMPOSITION DES COÛTS)
+    // 7. GÉNÉRATION DU GRAPHIQUE (DONUT AVEC LABELS)
     // ==========================================
     function renderChart(data) {
         const ctx = document.getElementById('invoiceChart').getContext('2d');
@@ -520,7 +568,7 @@
             type: 'doughnut',
             data: {
                 labels:['Fourniture (Molécule)', 'Acheminement (Réseau)', 'Abonnement Fixe', 'Taxes & Contributions', 'Pénalités (Dépassements)'],
-                datasets:[{
+                datasets: [{
                     data: [energy, network, sub, taxes, penalties],
                     backgroundColor:['#00E5FF', '#F59E0B', '#94A3B8', '#A855F7', '#EF4444'],
                     borderWidth: 2,
@@ -531,14 +579,30 @@
             options: {
                 responsive: true, 
                 maintainAspectRatio: false, 
-                cutout: '65%',
+                cutout: '55%', // Légèrement plus épais pour mieux voir les pourcentages
+                layout: { padding: 20 },
                 plugins: { 
-                    legend: { position: 'right', labels: { color: '#94A3B8', font: { family: 'JetBrains Mono', size: 10 } } },
+                    legend: { display: false }, // On cache la légende pour laisser la place au graphique
                     tooltip: {
                         backgroundColor: 'rgba(0,29,61,0.9)',
                         titleColor: '#00E5FF',
                         bodyFont: { family: 'JetBrains Mono' },
                         callbacks: { label: (ctx) => ` ${ctx.label}: ${new Intl.NumberFormat('fr-FR', {style:'currency', currency:'EUR'}).format(ctx.raw)}` }
+                    },
+                    // Intégration Magique des Pourcentages
+                    datalabels: {
+                        color: '#ffffff',
+                        font: { weight: 'bold', family: 'JetBrains Mono', size: 12 },
+                        formatter: (value, ctx) => {
+                            let sum = 0;
+                            let dataArr = ctx.chart.data.datasets[0].data;
+                            dataArr.map(data => { sum += data; });
+                            let percentage = (value * 100 / sum).toFixed(0) + "%";
+                            // On n'affiche pas le label si la tranche est trop petite (0%)
+                            return value > 0 ? percentage : null;
+                        },
+                        textShadowBlur: 6,
+                        textShadowColor: '#000000'
                     }
                 }
             }
