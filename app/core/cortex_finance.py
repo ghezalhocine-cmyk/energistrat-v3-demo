@@ -28,7 +28,7 @@ class CortexFinance:
         os.makedirs(self.DATA_DIR, exist_ok=True)
 
         self.known_suppliers =[
-            "EDF", "ENGIE", "TOTALENERGIES", "TOTAL", "ENI", 
+            "EDF", "ENGIE", "TOTALENERGIES", "ENI", 
             "VATTENFALL", "GEG", "ALPIQ", "OHM", "DYNEFF", 
             "PRIMAGAZ", "ANTARGAZ", "GAZ DE BORDEAUX", "EKWATEUR", "IBERDROLA"
         ]
