@@ -77,6 +77,9 @@ class MockCortex:
     def simulate_budget_from_bpu(self, b, s): return {}
     def analyze_load_curve(self, f, n): return {}
 
+class MockTertiaire:
+    def generate_operat_declaration(self, s, a, r): return {"error": "Cortex Tertiaire hors ligne."}
+
 class MockAdeme:
     def analyze_immo(self, s): return {"error": "Moteur CORTEX ADEME hors ligne."}
 
@@ -131,6 +134,7 @@ pricer_engine = load_module("cortex_pricer", "pricer_engine", MockPricer())
 pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 ademe_engine = load_module("cortex_ademe", "ademe_engine", MockAdeme())
 ppa_engine = load_module("cortex_ppa", "ppa_engine", MockPPA())
+tertiaire_engine = load_module("cortex_tertiaire", "tertiaire_engine", MockTertiaire())
 
 app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.6-SECURE")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -601,6 +605,31 @@ async def api_upload_deal_file(deal_id: str, file: UploadFile = File(...), user 
     else: db.save_deal(deal_id, deal)
     db.save_activity(f"ACT_{uuid.uuid4().hex[:12]}", {"deal_id": deal_id, "type": "DOCUMENT", "title": "Document ajouté", "description": file.filename, "timestamp": datetime.now().isoformat(), "owner_id": user.get("uid")})
     return JSONResponse({"success": True, "document": file_meta})
+
+@app.get("/api/v4/tertiaire/operat/{client_id}")
+async def api_tertiaire_operat(client_id: str, user = Depends(get_current_user)):
+    """API CORTEX TERTIAIRE : Génération de l'export OPERAT et trajectoire Loi ELAN"""
+    if not user: return JSONResponse({"error": "Non autorisé"}, status_code=401)
+    
+    site_data = db.get_site(client_id)
+    if not site_data: return JSONResponse({"error": "Actif foncier introuvable."}, status_code=404)
+    
+    profile = db.get_user_profile(user.get("uid"))
+    tenant_id = profile.get("tenant_id", "ORPHELIN")
+    if user.get("role") != "ADMIN" and site_data.get("identity", {}).get("tenant_id") != tenant_id:
+        return JSONResponse({"error": "Accès refusé."}, status_code=403)
+
+    # On a besoin des données de l'ADEME (Baseline) calculées par cortex_ademe
+    ademe_data = ademe_engine.analyze_immo(site_data)
+    
+    # On récupère l'année de référence choisie par le client dans ses settings
+    carbon_settings = db.get_setting(f"CARBON_{site_data.get('identity', {}).get('tenant_id')}") or {}
+    ref_year = int(carbon_settings.get("baseline_year", 2010))
+
+    # CORTEX TERTIAIRE FAIT LE TRAVAIL
+    result = tertiaire_engine.generate_operat_declaration(site_data, ademe_data, ref_year)
+    
+    return JSONResponse(result)
 
 @app.get("/api/v1/academy/modules")
 async def api_get_academy_modules(user = Depends(get_current_user)):
