@@ -214,6 +214,9 @@
     <!-- TOAST ENGINE -->
     <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none w-11/12 md:w-auto max-w-md"></div>
 
+<!-- ============================================================================== -->
+<!-- LOGIQUE JAVASCRIPT (CORTEX TERTIAIRE V12.8 - THIN CLIENT & API V4)             -->
+<!-- ============================================================================== -->
 <script>
     // ==========================================
     // 1. MOTEUR UTILITAIRE & GOD MODE
@@ -232,7 +235,7 @@
             const colors = { success: 'bg-success border-success/50 text-abysse', error: 'bg-alert border-alert/50 text-white', warning: 'bg-gold border-gold/50 text-abysse', info: 'bg-operat border-operat/50 text-abysse' };
             const icons = { success: 'fa-check', error: 'fa-triangle-exclamation', warning: 'fa-bolt', info: 'fa-info' };
             const el = document.createElement('div');
-            el.className = `${colors[type] || colors.info} px-6 py-4 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-xs font-black tracking-wide border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto backdrop-blur-md z-[999]`;
+            el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto backdrop-blur-md z-[999]`;
             el.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} text-lg"></i> <span>${msg}</span>`;
             container.appendChild(el);
             requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
@@ -250,12 +253,11 @@
     // 2. ÉTAT GLOBAL
     // ==========================================
     let operatChartInstance = null;
-    let CURRENT_SITE = null;
     let FLEET_DATA =[];
-    let OPERAT_PAYLOAD = {}; // Les données qui seront exportées en JSON
+    let OPERAT_PAYLOAD = null; // Les données validées qui seront exportées en JSON
 
     // ==========================================
-    // 3. INGESTION DE LA FLOTTE
+    // 3. INGESTION DE LA FLOTTE (GOD MODE)
     // ==========================================
     document.addEventListener('DOMContentLoaded', async () => {
         const forceTenant = new URLSearchParams(window.location.search).get('force_tenant');
@@ -281,7 +283,10 @@
                 });
 
                 const urlSite = new URLSearchParams(window.location.search).get('cluster');
-                if (urlSite) { sel.value = urlSite; runOperatAnalysis(); }
+                if (urlSite) { 
+                    sel.value = urlSite; 
+                    if(sel.value) runOperatAnalysis(); 
+                }
             } else {
                 document.getElementById('site-selector').innerHTML = '<option value="">Aucun bâtiment trouvé.</option>';
             }
@@ -289,7 +294,7 @@
     });
 
     // ==========================================
-    // 4. MOTEUR D'AUDIT TERTIAIRE (OPERAT)
+    // 4. MOTEUR D'AUDIT TERTIAIRE (API V4 PYTHON)
     // ==========================================
     window.runOperatAnalysis = async function() {
         const id = document.getElementById('site-selector').value;
@@ -300,143 +305,99 @@
         dashboard.classList.remove('hidden');
         dashboard.classList.add('flex', 'animate-[slideUp_0.4s_ease-out]');
 
-        App.toast("CORTEX : Requête auprès de l'algorithme ADEME...", "info");
+        App.toast("CORTEX : Délégation au moteur légal Python...", "info");
 
         // Reset UI Checks
         const iconSiret = document.getElementById('check-siret');
         const iconSurface = document.getElementById('check-surface');
-        const iconConso = document.getElementById('check-conso');
-        [iconSiret, iconSurface, iconConso].forEach(i => i.className = "fa-solid fa-circle-notch fa-spin text-gray-500");
-        document.getElementById('btn-export-operat').disabled = true;
-        document.getElementById('btn-export-operat').classList.add('opacity-50', 'cursor-not-allowed');
+        const iconConso = document.getElementById('check-conso');[iconSiret, iconSurface, iconConso].forEach(i => i.className = "fa-solid fa-circle-notch fa-spin text-gray-500");
+        
+        const btnExport = document.getElementById('btn-export-operat');
+        btnExport.disabled = true;
+        btnExport.classList.add('opacity-50', 'cursor-not-allowed');
+        btnExport.classList.remove('hover:bg-operat', 'hover:text-abysse');
 
         try {
-            // APPEL MULTIPLE : Data 3D + Cortex IMMO (ADEME) + Settings Carbone
-            const[resData, resImmo, resCarbon] = await Promise.all([
-                fetch(getApiUrl(`/api/dashboard/data/${id}`)),
-                fetch(getApiUrl(`/api/tools/immo/${id}`)),
-                fetch(getApiUrl('/api/settings/carbon')) // Pour l'année de référence globale
-            ]);
+            // 🚀 LE THIN CLIENT APPELLE LE BACKEND PYTHON
+            const res = await fetch(getApiUrl(`/api/v4/tertiaire/operat/${id}`));
+            
+            // Protection 404 (Si le routeur n'a pas la route)
+            if (res.status === 404) throw new Error("API_NOT_DEPLOYED");
+            
+            const data = await res.json();
+            if(!data.success || data.error) throw new Error(data.error || "Erreur interne CORTEX Tertiaire.");
 
-            const siteData = await resData.json();
-            const immoData = await resImmo.json();
-            const carbonData = resCarbon.ok ? await resCarbon.json() : { baseline_year: 2010 };
-
-            if(siteData.error) throw new Error(siteData.error);
-            CURRENT_SITE = siteData;
-
-            // 1. EXTRACTION DES DONNÉES CLÉS
-            const surface = parseFloat(siteData.location?.surface) || 0;
-            const siret = siteData.identity?.siret || "";
-            const intensityReelle = immoData?.energy?.intensity_kwh_m2 || 0; // kWh/m2 actuel
-            const intensityRef = immoData?.energy?.baseline_kwh_m2 || 250; // kWh/m2 (Valeur Absolue de la catégorie NAF)
-            const refYear = carbonData.baseline_year || 2010;
-
-            // 2. AUDIT DE COMPLÉTUDE (OPERAT STRICT)
-            let isReady = true;
-
-            // Check SIRET
-            if(siret && siret.length >= 9) {
-                iconSiret.className = "fa-solid fa-check-circle text-operat text-lg shadow-[0_0_10px_#10B981] rounded-full";
-            } else {
-                iconSiret.className = "fa-solid fa-xmark-circle text-alert text-lg";
-                isReady = false;
-            }
-
-            // Check Surface (> 1000 m2)
-            if(surface >= 1000) {
-                iconSurface.className = "fa-solid fa-check-circle text-operat text-lg shadow-[0_0_10px_#10B981] rounded-full";
-            } else {
-                iconSurface.className = "fa-solid fa-triangle-exclamation text-gold text-lg";
-                // On ne bloque pas l'export si < 1000, mais on prévient
-            }
-
-            // Check Conso
-            if(intensityReelle > 0) {
-                iconConso.className = "fa-solid fa-check-circle text-operat text-lg shadow-[0_0_10px_#10B981] rounded-full";
-            } else {
-                iconConso.className = "fa-solid fa-xmark-circle text-alert text-lg";
-                isReady = false;
-            }
-
-            // 3. CALCULS DES CIBLES DÉCENNALES (Valeur Relative)
-            const target2030 = intensityRef * 0.60; // -40%
-            const target2040 = intensityRef * 0.50; // -50%
-            const target2050 = intensityRef * 0.40; // -60%
-
-            // Calcul de la progression actuelle par rapport à la cible 2030
-            // Objectif : Passer de intensityRef à target2030. Où en sommes-nous ?
-            let progressPct = 0;
-            if(intensityRef > target2030) {
-                const totalDropNeeded = intensityRef - target2030;
-                const currentDrop = intensityRef - intensityReelle;
-                progressPct = (currentDrop / totalDropNeeded) * 100;
-            }
-
-            // 4. INJECTION DANS L'UI
-            document.getElementById('kpi-ref-vol').innerText = Math.round(intensityRef);
+            // 1. INJECTION DES KPIs (Calculés par Python)
+            const metrics = data.metrics;
+            const refYear = data.operat_payload?.annee_reference || 2010;
+            
+            document.getElementById('kpi-ref-vol').innerText = metrics.intensity_ref;
             document.getElementById('kpi-ref-year').innerText = refYear;
+            document.getElementById('kpi-current-vol').innerText = metrics.intensity_reelle;
+            document.getElementById('kpi-target-2030').innerText = metrics.target_2030;
             
-            document.getElementById('kpi-current-vol').innerText = Math.round(intensityReelle);
-            document.getElementById('kpi-target-2030').innerText = Math.round(target2030);
-            
+            // 2. INJECTION DU STATUT DE TRAJECTOIRE
             const badgeProgress = document.getElementById('kpi-progress');
             const badgeStatus = document.getElementById('kpi-badge-status');
             const statusCard = document.getElementById('kpi-status-card');
+            const progressPct = metrics.progress_pct;
 
-            badgeProgress.innerText = Math.round(progressPct) + "%";
+            badgeProgress.innerText = progressPct.toFixed(1) + " %";
 
             if (progressPct >= 100) {
-                // Objectif 2030 déjà atteint
+                // Objectif 2030 atteint
                 badgeProgress.className = "text-4xl font-black text-operat font-mono drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] my-2";
                 badgeStatus.className = "status-badge status-ready mt-1";
                 badgeStatus.innerHTML = '<i class="fa-solid fa-trophy"></i> OBJECTIF 2030 ATTEINT';
                 statusCard.className = "bento-card p-6 border-t-4 border-operat relative flex flex-col justify-center items-center text-center bg-card shadow-[0_0_30px_rgba(16,185,129,0.2)]";
             } else if (progressPct >= 50) {
+                // En bonne voie
                 badgeProgress.className = "text-4xl font-black text-white font-mono drop-shadow-md my-2";
                 badgeStatus.className = "status-badge status-warning mt-1";
                 badgeStatus.innerHTML = '<i class="fa-solid fa-arrow-trend-down"></i> EN BONNE VOIE';
                 statusCard.className = "bento-card p-6 border-t-4 border-gold relative flex flex-col justify-center items-center text-center bg-card";
             } else {
+                // En retard
                 badgeProgress.className = "text-4xl font-black text-alert font-mono drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] my-2";
                 badgeStatus.className = "status-badge status-error mt-1";
                 badgeStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> RETARD CRITIQUE';
                 statusCard.className = "bento-card p-6 border-t-4 border-alert relative flex flex-col justify-center items-center text-center bg-card shadow-[0_0_30px_rgba(239,68,68,0.2)]";
             }
 
-            // 5. PRÉPARATION DU PAYLOAD JSON POUR L'EXPORT
-            OPERAT_PAYLOAD = {
-                "identifiant_siret": siret,
-                "nom_etablissement": siteData.identity?.site_name,
-                "adresse": siteData.location?.address,
-                "code_postal": siteData.location?.zip_code,
-                "ville": siteData.location?.city,
-                "categorie_activite_naf": siteData.identity?.naf,
-                "surface_assujettie_m2": surface,
-                "annee_reference": refYear,
-                "consommation_reference_kwh_m2": Math.round(intensityRef),
-                "consommation_actuelle_kwh_m2": Math.round(intensityReelle),
-                "objectif_2030_kwh_m2": Math.round(target2030),
-                "objectif_2040_kwh_m2": Math.round(target2040),
-                "objectif_2050_kwh_m2": Math.round(target2050)
-            };
+            // 3. MISE À JOUR DE L'AUDIT DE COMPLÉTUDE
+            const audit = data.audit;
+            
+            if(audit.siret_valid) iconSiret.className = "fa-solid fa-check-circle text-operat text-lg shadow-[0_0_10px_#10B981] rounded-full";
+            else iconSiret.className = "fa-solid fa-xmark-circle text-alert text-lg";
 
-            // Activer le bouton si l'audit est OK
-            if(isReady) {
-                const btn = document.getElementById('btn-export-operat');
-                btn.disabled = false;
-                btn.classList.remove('opacity-50', 'cursor-not-allowed');
-                App.toast("Conformité validée. Export OPERAT disponible.", "success");
+            if(audit.surface_valid) iconSurface.className = "fa-solid fa-check-circle text-operat text-lg shadow-[0_0_10px_#10B981] rounded-full";
+            else iconSurface.className = "fa-solid fa-triangle-exclamation text-gold text-lg"; // Non bloquant, juste un warning (<1000m2)
+
+            if(audit.conso_valid) iconConso.className = "fa-solid fa-check-circle text-operat text-lg shadow-[0_0_10px_#10B981] rounded-full";
+            else iconConso.className = "fa-solid fa-xmark-circle text-alert text-lg";
+
+            // 4. VERROUILLAGE/DÉVERROUILLAGE DE L'EXPORT
+            OPERAT_PAYLOAD = data.operat_payload;
+            
+            if(data.is_export_ready && OPERAT_PAYLOAD) {
+                btnExport.disabled = false;
+                btnExport.classList.remove('opacity-50', 'cursor-not-allowed');
+                btnExport.classList.add('hover:bg-operat', 'hover:text-abysse');
+                App.toast("Conformité validée par l'IA. Export OPERAT autorisé.", "success");
             } else {
-                App.toast("Audit échoué. Corrigez le SIRET ou les Consommations dans la Base 3D.", "error");
+                App.toast("Audit échoué. Le SIRET ou les consommations sont manquants dans la Base 3D.", "error");
             }
 
-            // 6. GÉNÉRATION DE L'ESCALIER LÉGISLATIF
-            drawOperatChart(refYear, intensityRef, intensityReelle, target2030, target2040, target2050);
+            // 5. GÉNÉRATION DU GRAPHIQUE
+            drawOperatChart(refYear, metrics.intensity_ref, metrics.intensity_reelle, metrics.target_2030, metrics.target_2040, metrics.target_2050);
 
         } catch(e) {
             console.error(e);
-            App.toast("Erreur d'analyse CORTEX Tertiaire.", "error");
+            if(e.message === "API_NOT_DEPLOYED") {
+                App.toast("L'API Cortex Tertiaire n'est pas encore déployée sur le serveur.", "warning");
+            } else {
+                App.toast("Erreur critique lors de l'audit Loi ELAN.", "error");
+            }
         }
     }
 
@@ -447,16 +408,13 @@
         const ctx = document.getElementById('operatChart').getContext('2d');
         if(operatChartInstance) operatChartInstance.destroy();
 
-        // Axe des X (Temporel)
         const currentYear = new Date().getFullYear();
         const labels =[refYear.toString(), currentYear.toString(), "2030", "2040", "2050"];
         
         // Trajectoire Réelle / Projetée (Cyan)
-        // La ligne va de la Réf -> Actuel. (Les futures années sont laissées vides pour ne pas "deviner")
-        const dataReelle =[intRef, intReelle, null, null, null];
+        const dataReelle = [intRef, intReelle, null, null, null];
 
         // L'Escalier Légal (Vert Operat)
-        // La marche descend aux échéances clés.
         const dataLegale =[intRef, intRef, t2030, t2040, t2050];
 
         operatChartInstance = new Chart(ctx, {
@@ -467,7 +425,7 @@
                     {
                         label: 'Trajectoire Réelle (kWh/m²)',
                         data: dataReelle,
-                        borderColor: '#00E5FF', // Cyan
+                        borderColor: '#00E5FF', 
                         borderWidth: 3,
                         pointBackgroundColor: '#001D3D',
                         pointBorderColor: '#00E5FF',
@@ -478,11 +436,11 @@
                     {
                         label: 'Plafond Légal (Décret Tertiaire)',
                         data: dataLegale,
-                        borderColor: '#10B981', // Vert Operat
+                        borderColor: '#10B981',
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',
                         borderWidth: 3,
-                        borderDash: [5, 5],
-                        stepped: 'after', // LE SECRET DE L'ESCALIER EST ICI
+                        borderDash:[5, 5],
+                        stepped: 'after', // Crée l'effet "Escalier"
                         fill: true,
                         pointRadius: 0
                     }
@@ -502,15 +460,8 @@
                     }
                 },
                 scales: {
-                    x: { 
-                        grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
-                        ticks: { color: '#94A3B8', font: { family: 'JetBrains Mono', weight: 'bold' } }
-                    },
-                    y: { 
-                        beginAtZero: true,
-                        grid: { color: 'rgba(16,185,129,0.1)', drawBorder: false },
-                        ticks: { color: '#94A3B8', font: { family: 'JetBrains Mono' } }
-                    }
+                    x: { grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, ticks: { color: '#94A3B8', font: { family: 'JetBrains Mono', weight: 'bold' } } },
+                    y: { beginAtZero: true, grid: { color: 'rgba(16,185,129,0.1)', drawBorder: false }, ticks: { color: '#94A3B8', font: { family: 'JetBrains Mono' } } }
                 }
             }
         });
@@ -524,7 +475,7 @@
 
         App.toast("Génération du fichier JSON réglementaire...", "info");
 
-        // Formatage pour l'API
+        // Formatage exact pour l'API de l'État
         const jsonString = JSON.stringify(OPERAT_PAYLOAD, null, 4);
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -536,7 +487,7 @@
         a.click();
         a.remove();
 
-        // Effet UX sur le bouton
+        // Effet UX de validation sur le bouton
         const btn = document.getElementById('btn-export-operat');
         btn.innerHTML = '<i class="fa-solid fa-check-double text-xl"></i> Export Réussi';
         btn.classList.add('bg-operat', 'text-abysse');
@@ -546,7 +497,7 @@
             btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down text-xl"></i> Générer Export (JSON)';
             btn.classList.remove('bg-operat', 'text-abysse');
             btn.classList.add('text-operat', 'bg-operat/10');
-        }, 3000);
+        }, 4000);
     }
 </script>
 </body>
