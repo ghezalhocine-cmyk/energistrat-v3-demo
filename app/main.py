@@ -1093,27 +1093,61 @@ async def get_partner_config(user = Depends(get_current_user)):
 async def get_fleet_data(response: Response, user = Depends(get_current_user)):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     if not user: return JSONResponse({"error": "Non autorisé"}, 401)
-    profile = db.get_user_profile(user.get("uid")); tenant_id = profile.get("tenant_id", "ORPHELIN")
+    
+    profile = db.get_user_profile(user.get("uid"))
+    tenant_id = profile.get("tenant_id", "ORPHELIN")
     is_admin = user.get("role") == "ADMIN"
     raw_sites = db.get_all_sites()
-    filtered_sites =[s for s in raw_sites if "CLI_" not in str(s.get('identity', {}).get('id', '')) and (is_admin or s.get("identity", {}).get("tenant_id") == tenant_id)]
     
+    # BOUCLIER ANTI-CRASH (NoneType Safety)
+    filtered_sites =[]
+    for s in raw_sites:
+        ident = s.get('identity') or {}
+        sid = str(ident.get('id', ''))
+        if "CLI_" not in sid and (is_admin or ident.get("tenant_id") == tenant_id):
+            filtered_sites.append(s)
+            
     fleet_list =[]
     for s in filtered_sites:
-        s = normalize_full_data(s, s.get("identity", {}).get("tenant_id"))
+        ident = s.get('identity') or {}
+        s = normalize_full_data(s, ident.get("tenant_id"))
         if cortex: s['computed_financials'] = cortex.enrich_site_financials(s)
-        fin = s.get('computed_financials', {}); contract = s.get('contract', {}); kpis = s.get('kpis', {}); loc = s.get('location', {}); identity = s.get('identity', {})
-        city = fin.get('meta', {}).get('city') or loc.get('city') or 'Inconnue'
+        
+        fin = s.get('computed_financials') or {}
+        contract = s.get('contract') or {}
+        kpis = s.get('kpis') or {}
+        loc = s.get('location') or {}
+        identity = s.get('identity') or {}
+        
+        city = (fin.get('meta') or {}).get('city') or loc.get('city') or 'Inconnue'
         prov = contract.get('provider') or 'Inconnu'
-        vol_engine = float(fin.get('volume_mwh', 0)); vol_router = float(kpis.get('volume_mwh', 0))
+        vol_engine = float(fin.get('volume_mwh') or 0)
+        vol_router = float(kpis.get('volume_mwh') or 0)
         final_vol = vol_engine if vol_engine > 0 else vol_router
-        final_budget = float(fin.get('budget_annual', 0) or kpis.get('budget', 0))
+        final_budget = float(fin.get('budget_annual') or kpis.get('budget') or 0)
+        
         if final_budget == 0 and final_vol > 0:
-            p_data = s.get('pricing', {}); avg_price = float(p_data.get('price_kwh') or p_data.get('hph') or 0.20)
+            p_data = s.get('pricing') or {}
+            avg_price = float(p_data.get('price_kwh') or p_data.get('hph') or 0.20)
             if avg_price > 2.0: avg_price = avg_price / 1000.0
-            tax = float(p_data.get('tax') or 22.5); sub_cost = float(p_data.get('fix') or 0)
+            tax = float(p_data.get('tax') or 22.5)
+            sub_cost = float(p_data.get('fix') or 0)
             final_budget = sub_cost + (final_vol * 1000 * avg_price) + (final_vol * tax)
-        fleet_list.append({ "id": get_safe_id(identity.get('id', '')), "name": fin.get('meta', {}).get('site_label') or identity.get('site_name') or 'Inconnu', "city": city, "zip": loc.get('zip_code', ''), "volume": final_vol, "energy": "gaz" if contract.get('energy_type') == 'gaz' else "elec", "segment": contract.get('segment') or identity.get('lot_name') or '-', "provider": prov, "budget": final_budget, "ghost_savings": float(kpis.get('ghost_savings', 0)), "power": contract.get('power', 0), "pdl": contract.get('pdl') or contract.get('pce', '-'), "surface": loc.get('surface', 0), "tenant_id": identity.get('tenant_id', 'Orphelin'), "naf": identity.get('naf', 'DEFAULT') })
+            
+        fleet_list.append({
+            "id": get_safe_id(identity.get('id', '')),
+            "name": (fin.get('meta') or {}).get('site_label') or identity.get('site_name') or 'Inconnu',
+            "city": city, "zip": loc.get('zip_code', ''), "volume": final_vol,
+            "energy": "gaz" if contract.get('energy_type') == 'gaz' else "elec",
+            "segment": contract.get('segment') or identity.get('lot_name') or '-',
+            "provider": prov, "budget": final_budget,
+            "ghost_savings": float(kpis.get('ghost_savings') or 0),
+            "power": contract.get('power', 0),
+            "pdl": contract.get('pdl') or contract.get('pce', '-'),
+            "surface": loc.get('surface', 0),
+            "tenant_id": identity.get('tenant_id', 'Orphelin'),
+            "naf": identity.get('naf', 'DEFAULT')
+        })
     return JSONResponse(json_compliant({"fleet": fleet_list, "count": len(fleet_list)}))
 
 @app.get("/api/dashboard/data/{client_id}")
