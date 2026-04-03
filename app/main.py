@@ -1285,7 +1285,7 @@ async def api_simulate_subventions(payload: SubventionRequest, user = Depends(ge
         return JSONResponse(json_compliant({"success": True, "results": res}))
     except Exception as e: return JSONResponse({"success": False, "error": str(e)}, 500)
 
-VALID_VIEWS =["settings", "settings_pme", "settings_light", "settings_partner", "settings_ops", "ops_nexus", "ops_ingest", "ops_aggregator", "ops_market", "pme", "industry", "retail", "mairie", "sde", "oph", "syndic", "sante", "supplier", "citoyen", "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance", "dashboard_finance", "sales_workspace", "sales_playbook", "sales_outreach", "sales_academy", "sales_cpq", "vision", "decisions_lab", "decisions_lab_mairie", "forecast", "flex", "subventions", "ppa", "performance", "reverse", "immo","cortex_store"]
+VALID_VIEWS =["settings", "settings_pme", "settings_light", "settings_partner", "settings_ops", "ops_nexus", "ops_ingest", "ops_aggregator", "ops_market", "pme", "industry", "retail", "mairie", "sde", "oph", "syndic", "sante", "supplier", "citoyen", "pulse", "carbon", "gridmap", "solar", "optimization", "trading", "thermic", "deal_desk", "finance", "dashboard_finance", "sales_workspace", "sales_playbook", "sales_outreach", "sales_academy", "sales_cpq", "vision", "decisions_lab", "decisions_lab_mairie", "forecast", "flex", "subventions", "ppa", "performance", "reverse", "immo","cortex_store","operat"]
 PUBLIC_PAGES =["index.html", "onboarding.html", "processing.html", "login.html", "solutions.html", "cortex.html", "vitality.html", "connectivite.html", "audit_premium.html", "store.html", "ethique.html", "fournisseurs.html", "etudes-de-cas.html", "modele_economique.html"]
 
 @app.get("/{page_name}")
