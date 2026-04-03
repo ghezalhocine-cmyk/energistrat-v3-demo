@@ -450,7 +450,8 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
     all_comps = {c.get("id"): c for c in db.get_all_companies()}
     all_conts = {c.get("id"): c for c in db.get_all_contacts()}
     real_sites = db.get_all_sites()
-
+    
+    # ... (La récupération des old_leads reste identique) ...
     try:
         old_leads = db.get_all_leads()
         for old in old_leads:
@@ -465,9 +466,12 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
         if not deal.get("legacy"):
             comp = all_comps.get(deal.get("company_id"), {})
             deal_contacts =[c for c in all_conts.values() if c.get("company_id") == comp.get("id")]
-            company_sites =[s for s in real_sites if s.get("identity", {}).get("tenant_id") == comp.get("id")]
-            total_vol = sum([float(s.get("kpis", {}).get("volume_mwh", 0)) for s in company_sites])
-            saas_alerts =[f"⚠️ Dépassement détecté sur {s.get('identity', {}).get('site_name', 'Site')}" for s in company_sites if s.get("kpis", {}).get("is_alert")]
+            
+            # BOUCLIER ANTI-CRASH
+            company_sites =[s for s in real_sites if (s.get("identity") or {}).get("tenant_id") == comp.get("id")]
+            total_vol = sum([float((s.get("kpis") or {}).get("volume_mwh") or 0) for s in company_sites])
+            saas_alerts =[f"⚠️ Dépassement détecté sur {(s.get('identity') or {}).get('site_name', 'Site')}" for s in company_sites if (s.get("kpis") or {}).get("is_alert")]
+            
             vol = float(deal.get("volume_est") or total_vol)
             naf = comp.get("naf", "DEFAULT")
             formatted_deals.append({
@@ -484,7 +488,7 @@ async def api_get_crm_pipeline(pipe_type: str, user = Depends(get_current_user))
             fake_contact = {"id": old.get("id"), "firstname": str(old.get("contact_firstname", "")).strip(), "lastname": str(old.get("contact_lastname", "")).strip(), "role": old.get("contact_role", "Contact"), "phone": old.get("contact_phone", ""), "email": old.get("contact_email", ""), "linkedin": old.get("linkedin", "")}
             formatted_deals.append({
                 "id": old.get("id"), "company_id": old.get("id"), "holding_name": old.get("company_name", "Ancien Client"),
-                "name": deal.get("name", "Ancien Deal"), "city": old.get("city", ""), "website": old.get("website", ""), "solvency_score": "INCONNU", "solvency_msg": "Legacy (Créé avant API)",
+                "name": deal.get("name", "Ancien Deal"), "city": old.get("city", ""), "website": old.get("website", ""), "solvency_score": "INCONNU", "solvency_msg": "Legacy",
                 "naf": naf, "volume": vol, "stage": old.get("stage", "LEAD"), "all_contacts":[fake_contact], "sites_count": 0, "saas_alerts":[],
                 "intelligence": crm_engine.generate_icebreaker(naf, pipe_type), "commission_est": float(deal.get("commission_est") or crm_engine.calculate_commission(vol, pipe_type, saas_mrr=299)), "products": deal.get("products",[]), "documents": deal.get("documents",[])
             })
