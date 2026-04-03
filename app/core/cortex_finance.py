@@ -536,7 +536,11 @@ class CortexFinance:
 
     def healthcheck(self) -> dict:
         return dict(status="OK", engine="CortexFinance", pdf_ready=PDF_READY, known_suppliers=len(self.known_suppliers), version=self.VERSION)
-
+        
+    def _anomaly(self, severity: str, label: str, message: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        payload = {"severity": severity, "label": label, "message": message}
+        if metadata: payload["metadata"] = metadata
+        return payload
 finance = CortexFinance()
 
 # --- END OF FILE cortex_finance.py ---    
