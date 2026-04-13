@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENERGISTRAT V12.6 | Data Unity (Settings & Conformité)</title>
+    <title>ENERGISTRAT V13 | Mon Espace (ERP FinOps)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js pour la Salle de Marchés -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script>
         tailwind.config = {
@@ -16,9 +18,11 @@
                     colors: { 
                         abysse: '#001529', card: '#001D3D', sidebar: '#001529', 
                         cyan: '#00E5FF', success: '#10B981', alert: '#EF4444', 
-                        gold: '#F59E0B', purple: '#A855F7', gas: '#F97316'
+                        gold: '#F59E0B', purple: '#A855F7', gas: '#F97316',
+                        water: '#3B82F6', biomass: '#84CC16'
                     },
-                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] }
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
+                    borderRadius: { 'bento': '3rem' }
                 }
             }
         }
@@ -26,93 +30,108 @@
     <style>
         body { background-color: #001529; color: #e2e8f0; overflow: hidden; font-family: 'Inter', sans-serif; }
         
+        /* Design System V13 - Bento Dark Cyber */
         .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 255, 0.1); border-radius: 3rem; transition: all 0.3s ease; }
-        .bento-card:hover { border-color: rgba(0, 229, 255, 0.4); box-shadow: 0 10px 30px -10px rgba(0, 229, 255, 0.2); }
+        .bento-card:hover { border-color: rgba(0, 229, 255, 0.3); box-shadow: 0 10px 40px -10px rgba(0, 229, 255, 0.15); }
         
         .nav-item.active { background: rgba(0, 229, 255, 0.1); border-right: 4px solid #00E5FF; color: white; }
         
-        .input-edit { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,229,255,0.2); color: white; padding: 14px 20px; border-radius: 2rem; width: 100%; font-family: 'Inter', sans-serif; outline: none; transition: all 0.3s; font-size: 0.875rem; }
-        .input-edit:focus { border-color: #00E5FF; box-shadow: 0 0 15px rgba(0,229,255,0.3); background: rgba(0,229,255,0.05); }
+        .input-edit { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,229,255,0.2); color: white; padding: 14px 24px; border-radius: 9999px; width: 100%; font-family: 'Inter', sans-serif; outline: none; transition: all 0.3s; font-size: 0.875rem; }
+        .input-edit:focus { border-color: #00E5FF; box-shadow: 0 0 20px rgba(0,229,255,0.2); background: rgba(0,229,255,0.05); }
         .input-mono { font-family: 'JetBrains Mono', monospace; font-weight: bold; color: #00E5FF; }
 
+        /* Custom Toggle Switch */
         .toggle-checkbox:checked { right: 0; border-color: #00E5FF; }
-        .toggle-checkbox:checked + .toggle-label { background-color: #00E5FF; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #00E5FF; box-shadow: 0 0 15px rgba(0,229,255,0.5); }
         .toggle-checkbox { right: 0; z-index: 1; border-color: #e2e8f0; transition: all 0.3s; }
-        .toggle-label { background-color: #334155; transition: all 0.3s; }
+        .toggle-label { background-color: #334155; transition: all 0.3s; border-radius: 9999px; }
 
-        .suggestions-list { position: absolute; background: #001D3D; border: 1px solid #00E5FF; width: 100%; z-index: 100; max-height: 200px; overflow-y: auto; border-radius: 1rem; margin-top: 5px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .suggestion-item { padding: 12px 20px; cursor: pointer; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        /* Lock Overlay (Cortex Store) */
+        .premium-lock { position: absolute; inset: 0; backdrop-filter: blur(8px); background: rgba(0,21,41,0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 3rem; z-index: 10; opacity: 0; transition: opacity 0.3s; cursor: pointer; }
+        .premium-card:hover .premium-lock { opacity: 1; }
+
+        .suggestions-list { position: absolute; background: #001D3D; border: 1px solid #00E5FF; width: 100%; z-index: 100; max-height: 200px; overflow-y: auto; border-radius: 1.5rem; margin-top: 5px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+        .suggestion-item { padding: 12px 24px; cursor: pointer; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .suggestion-item:hover { background: #00E5FF; color: #001529; font-weight: bold; }
 
-        .view-section { display: none; } .view-section.active { display: block; animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .view-section { display: none; } .view-section.active { display: block; animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); filter: blur(2px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
         
         ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #00E5FF; border-radius: 3px; }
+        
+        /* Loading Skeletons */
+        .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 9999px; }
+        @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     </style>
 </head>
 <body class="flex h-screen w-screen font-sans bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
 
-    <!-- SIDEBAR -->
-    <aside class="w-64 bg-abysse border-r border-cyan/10 flex flex-col flex-shrink-0 z-50 shadow-2xl h-screen">
-        <div class="h-24 flex items-center px-6 border-b border-cyan/10 bg-card/50">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan to-blue-800 flex items-center justify-center text-abysse font-black shadow-[0_0_15px_rgba(0,229,255,0.5)] text-xl mr-3">
-                <i class="fa-solid fa-database text-abysse"></i>
+    <!-- TOAST ENGINE V13 -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- SIDEBAR ERP -->
+    <aside class="w-72 bg-abysse border-r border-cyan/10 flex flex-col flex-shrink-0 z-50 shadow-[10px_0_30px_rgba(0,0,0,0.5)] h-screen">
+        <div class="h-24 flex items-center px-8 border-b border-cyan/10 bg-abysse/90 backdrop-blur">
+            <div class="w-12 h-12 rounded-[1rem] bg-gradient-to-br from-cyan to-blue-900 flex items-center justify-center text-abysse font-black shadow-[0_0_20px_rgba(0,229,255,0.4)] text-2xl mr-4">
+                <i class="fa-solid fa-layer-group"></i>
             </div>
             <div>
-                <div class="font-black tracking-tight text-white leading-none text-lg">DATA <span class="text-cyan">UNITY</span></div>
-                <div id="god-mode-indicator" class="text-[9px] text-alert font-mono mt-1 hidden animate-pulse font-bold bg-alert/20 px-2 py-0.5 rounded border border-alert/50 inline-block">● GOD MODE ACTIF</div>
-                <div class="text-[9px] text-gray-500 font-mono mt-1 tracking-widest uppercase">Settings V12.6</div>
+                <div class="font-black tracking-tight text-white leading-none text-xl">CORTEX<span class="text-cyan">.ERP</span></div>
+                <div class="text-[9px] text-gray-500 font-mono mt-1 tracking-widest uppercase border border-gray-700 bg-black/50 px-2 py-0.5 rounded-full inline-block">CLIENT SPACE V13</div>
             </div>
         </div>
         
-        <nav class="flex-1 overflow-y-auto py-6 space-y-1">
-            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-widest mb-2 px-6">Identité & Parc</div>
-            <button onclick="switchView('general')" id="nav-general" class="nav-item active w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-building w-5 text-center"></i> Master Tenant
+        <nav class="flex-1 overflow-y-auto py-8 space-y-2">
+            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-widest mb-3 px-8">Fondations</div>
+            <button onclick="switchView('gouvernance')" id="nav-gouvernance" class="nav-item active w-full text-left px-8 py-4 rounded-l-[3rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-4">
+                <i class="fa-solid fa-landmark w-5 text-center text-lg"></i> Gouvernance
             </button>
-            <button onclick="switchView('perimetre')" id="nav-perimetre" class="nav-item w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-sitemap w-5 text-center text-cyan"></i> Base 3D & Contrats
+            <button onclick="switchView('parc')" id="nav-parc" class="nav-item w-full text-left px-8 py-4 rounded-l-[3rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-4">
+                <i class="fa-solid fa-network-wired w-5 text-center text-cyan text-lg"></i> Arbre de Parc 3D
             </button>
-            <button onclick="switchView('import')" id="nav-import" class="nav-item w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-file-excel w-5 text-center text-success"></i> Smart Importer Excel
+            <button onclick="switchView('jumeau')" id="nav-jumeau" class="nav-item w-full text-left px-8 py-4 rounded-l-[3rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-4">
+                <i class="fa-solid fa-microchip w-5 text-center text-success text-lg"></i> Jumeau Physique
             </button>
 
-            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-widest mb-2 mt-6 px-6">Conformité & Ops</div>
-            <button onclick="switchView('rgpd')" id="nav-rgpd" class="nav-item w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-shield-halved w-5 text-center text-gold"></i> Mandats (API SGE)
+            <div class="text-[10px] uppercase text-gray-500 font-bold tracking-widest mb-3 mt-8 px-8">Opérations & FinOps</div>
+            <button onclick="switchView('marches')" id="nav-marches" class="nav-item w-full text-left px-8 py-4 rounded-l-[3rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-4">
+                <i class="fa-solid fa-chart-candlestick w-5 text-center text-gold text-lg"></i> Salle de Marchés
             </button>
-            <button onclick="switchView('support')" id="nav-support" class="nav-item w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-headset w-5 text-center text-purple"></i> Guichet Support Ops
+            <button onclick="switchView('dataroom')" id="nav-dataroom" class="nav-item w-full text-left px-8 py-4 rounded-l-[3rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-4">
+                <i class="fa-solid fa-server w-5 text-center text-purple text-lg"></i> Data Room & Hub
             </button>
-            <button onclick="switchView('equipe')" id="nav-equipe" class="nav-item w-full text-left px-6 py-4 rounded-l-[2rem] text-sm font-bold text-gray-400 hover:text-white transition flex items-center gap-3">
-                <i class="fa-solid fa-users w-5 text-center text-gray-300"></i> Rôles & Sécurité
+
+            <div class="text-[10px] uppercase text-gold font-bold tracking-widest mb-3 mt-8 px-8"><i class="fa-solid fa-star mr-1"></i> Écosystème</div>
+            <button onclick="switchView('store')" id="nav-store" class="nav-item w-full text-left px-8 py-4 rounded-l-[3rem] text-sm font-black text-gold hover:text-white hover:bg-gold/10 transition flex items-center gap-4">
+                <i class="fa-solid fa-store w-5 text-center text-lg"></i> Cortex Store
             </button>
         </nav>
         
-        <div class="p-4 border-t border-cyan/10 bg-card/30">
-            <button onclick="history.back()" class="flex items-center justify-center w-full gap-2 text-gray-400 hover:text-white transition text-xs font-bold bg-abysse border border-white/10 hover:border-cyan/50 rounded-[2rem] py-3 shadow-lg">
-                <i class="fa-solid fa-arrow-left"></i> Quitter les Paramètres
+        <div class="p-6 border-t border-cyan/10 bg-abysse">
+            <button onclick="window.location.href='/dashboard'" class="flex items-center justify-center w-full gap-3 text-gray-400 hover:text-abysse hover:bg-cyan transition text-xs font-black border border-white/10 rounded-full py-4 uppercase tracking-widest">
+                <i class="fa-solid fa-arrow-left"></i> Retour Dashboard
             </button>
         </div>
     </aside>
 
     <main class="flex-1 flex flex-col relative bg-transparent overflow-hidden">
         
-        <!-- HEADER GLOBAL & HEALTH SCORE -->
-        <header class="h-24 border-b border-cyan/10 flex items-center justify-between px-10 bg-abysse/90 backdrop-blur sticky top-0 z-40 flex-shrink-0 shadow-lg">
+        <!-- HEADER DYNAMIQUE -->
+        <header class="h-24 border-b border-cyan/10 flex items-center justify-between px-12 bg-abysse/90 backdrop-blur sticky top-0 z-40 flex-shrink-0 shadow-lg">
             <div>
-                <h2 id="page-title" class="text-3xl font-black text-white italic tracking-tight drop-shadow-lg">Mon Entreprise</h2>
-                <p class="text-xs text-gray-400 font-mono mt-1" id="header-subtitle">Identité juridique et Master Tenant</p>
+                <h2 id="page-title" class="text-3xl font-black text-white tracking-tight">Gouvernance</h2>
+                <p class="text-xs text-gray-400 font-mono mt-1" id="header-subtitle">Portefeuille et Maisons Mères</p>
             </div>
             
             <div class="flex items-center gap-6">
-                <div class="bg-card/50 border border-white/10 px-6 py-3 rounded-[2rem] flex items-center gap-4 shadow-inner">
+                <!-- DATA HEALTH SCORE -->
+                <div class="bg-card border border-white/10 px-6 py-2 rounded-full flex items-center gap-4 shadow-inner cursor-help" title="Niveau de complétion de votre Base 3D">
                     <div class="text-right">
-                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Data Health Score</div>
-                        <div class="text-xs font-bold text-white">Qualité de la base</div>
+                        <div class="text-[9px] text-cyan uppercase font-bold tracking-widest mb-0.5">Health Score</div>
+                        <div class="text-xs font-bold text-white">Qualité Data</div>
                     </div>
-                    <div class="relative w-16 h-16 flex items-center justify-center bg-abysse rounded-full border-4 border-cyan/20 shadow-[0_0_15px_rgba(0,229,255,0.2)]">
-                        <span class="text-cyan font-black font-mono text-lg" id="global-health">0%</span>
+                    <div class="w-12 h-12 flex items-center justify-center bg-abysse rounded-full border-2 border-cyan/30 shadow-[0_0_10px_rgba(0,229,255,0.2)] text-cyan font-black font-mono text-sm" id="global-health">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
                     </div>
                 </div>
             </div>
@@ -120,933 +139,1098 @@
 
         <div class="flex-1 overflow-y-auto p-10 pb-32">
 
-            <!-- VUE 1 : MON ENTREPRISE (IDENTITÉ 3D) -->
-            <div id="view-general" class="view-section active max-w-[1200px] mx-auto space-y-8">
+            <!-- ========================================================= -->
+            <!-- ONGLET 1 : GOUVERNANCE & IDENTITÉ                         -->
+            <!-- ========================================================= -->
+            <div id="view-gouvernance" class="view-section active max-w-[1200px] mx-auto space-y-8">
                 <div class="flex justify-between items-end mb-6">
                     <div>
-                        <h3 class="text-2xl font-black text-white">Master Tenant (Niveau 1)</h3>
-                        <p class="text-sm text-gray-400 mt-2 font-mono">C'est la racine de votre base 3D. Tous vos sites y seront rattachés.</p>
+                        <h3 class="text-2xl font-black text-white">Portefeuille & Entités Légales</h3>
+                        <p class="text-sm text-gray-400 mt-2 font-mono">Gérez votre Maison Mère et ses filiales (Multi-SIRET).</p>
                     </div>
-                    <button onclick="savePartnerConfig()" class="bg-cyan text-abysse font-black px-8 py-4 rounded-[2rem] hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.4)] uppercase tracking-widest text-xs flex items-center gap-2">
-                        <i class="fa-solid fa-save text-lg"></i> Verrouiller l'Identité
+                    <button onclick="saveGouvernance()" class="bg-cyan text-abysse font-black px-8 py-4 rounded-full hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.4)] uppercase tracking-widest text-xs flex items-center gap-2">
+                        <i class="fa-solid fa-save text-lg"></i> Sauvegarder
                     </button>
                 </div>
 
-                <div class="bento-card p-10 border-t-4 border-cyan shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- IDENTITÉ MAGIC FILL (SIRET) -->
+                <div class="bento-card p-10 border-t-4 border-cyan shadow-2xl">
+                    <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-3 border-b border-white/10 pb-4"><i class="fa-solid fa-sitemap text-cyan text-xl"></i> Maison Mère (Portefeuille)</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                         <div>
-                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block"><i class="fa-solid fa-magnifying-glass text-cyan mr-1"></i> SIREN / SIRET (Recherche API Gouv)</label>
+                            <label class="text-[10px] text-cyan uppercase font-bold tracking-widest pl-4 mb-2 block"><i class="fa-solid fa-magic mr-1"></i> SIRET Maître (14 chiffres)</label>
                             <div class="relative">
-                                <input type="text" id="partner-siret" placeholder="Saisir 9 à 14 chiffres..." class="input-edit input-mono text-lg" onblur="checkPartnerIdentity()">
-                                <div id="partner-status" class="absolute right-6 top-1/2 -translate-y-1/2 text-xl"></div>
+                                <input type="text" id="gov-siret" placeholder="Saisir 14 chiffres..." autocomplete="off" class="input-edit input-mono text-lg text-cyan bg-cyan/5 border-cyan/30" onblur="triggerMagicFill()">
+                                <div id="magic-status" class="absolute right-6 top-1/2 -translate-y-1/2 text-xl text-gray-500"><i class="fa-solid fa-search"></i></div>
                             </div>
                         </div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Raison Sociale Officielle</label><input type="text" id="partner-name" class="input-edit font-bold text-white bg-white/5 border-dashed" readonly></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Code NAF (Benchmarking Sectoriel)</label><input type="text" id="partner-naf" class="input-edit input-mono text-gray-400 bg-white/5" readonly></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">TVA Intracommunautaire (Auto)</label><input type="text" id="partner-tva" class="input-edit input-mono text-gray-400 bg-white/5" readonly></div>
-                        <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Adresse du Siège</label><input type="text" id="partner-address" class="input-edit text-gray-300"></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Code Postal</label><input type="text" id="partner-zip" class="input-edit input-mono text-gray-300"></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Ville</label><input type="text" id="partner-city" class="input-edit text-gray-300 font-bold"></div>
+                        <div>
+                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Nom du Portefeuille / Groupe</label>
+                            <input type="text" id="holding-name" placeholder="Chargement..." class="input-edit font-bold text-white text-lg bg-abysse" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Raison Sociale Officielle</label><input type="text" id="gov-name" class="input-edit font-bold text-white bg-white/5 border-dashed" placeholder="Auto-complété..." readonly></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Code NAF</label><input type="text" id="gov-naf" class="input-edit input-mono text-gray-400 bg-white/5" placeholder="Auto-complété..." readonly></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">TVA Intracommunautaire</label><input type="text" id="gov-tva" class="input-edit input-mono text-gray-400 bg-white/5" placeholder="Calcul automatique..." readonly></div>
+                        <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Adresse de l'établissement (Auto ADEME)</label><input type="text" id="gov-address" class="input-edit text-gray-300" placeholder="Auto-complété..."></div>
                     </div>
                 </div>
 
-                <div class="bento-card p-10 border border-white/5 bg-gradient-to-r from-card to-abysse text-center">
-                    <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-4"><i class="fa-solid fa-leaf text-success mr-2"></i> Année de Référence Carbone (Loi ELAN)</h4>
-                    <p class="text-xs text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">Paramètre légal central pour générer les trajectoires de sobriété (-40% en 2030) sur vos tableaux de bord CORTEX Climate.</p>
-                    <select id="partner-baseline-year" class="bg-abysse border border-success/30 text-success font-bold font-mono text-lg rounded-[2rem] px-10 py-4 outline-none cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                        <option value="2010">Année 2010 (Référence Légale par défaut)</option>
-                        <option value="2018">Année 2018</option>
-                        <option value="2019">Année 2019</option>
-                        <option value="2022">Année 2022</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- VUE 2 : MON PÉRIMÈTRE (L'ARBRE 3D ET LA DÉGRADATION GRACIEUSE) -->
-            <div id="view-perimetre" class="view-section max-w-[1600px] mx-auto space-y-6 h-full">
-                <div class="flex justify-between items-end mb-6">
-                    <div>
-                        <h3 class="text-3xl font-black text-white italic tracking-tight">Base 3D : Patrimoine & Contrats</h3>
-                        <p class="text-sm text-gray-400 mt-2 font-mono">Consolidation Ville > Entité > Site > Compteur</p>
-                    </div>
-                    <button onclick="resetSiteForm()" class="bg-white/10 text-white font-bold px-8 py-4 rounded-[2rem] hover:bg-white/20 transition text-xs flex items-center gap-3 border border-white/20 uppercase tracking-widest shadow-lg">
-                        <i class="fa-solid fa-plus text-cyan text-lg"></i> Ajouter un Compteur
-                    </button>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[750px]">
-                    <!-- COL 1 : ARBRE DES SITES -->
-                    <div class="col-span-4 bento-card p-0 flex flex-col overflow-hidden shadow-2xl">
-                        <div class="p-6 border-b border-white/10 bg-card/50">
-                            <div class="relative w-full">
-                                <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
-                                <input type="text" id="search-site" oninput="renderSiteTree()" placeholder="Rechercher un PDL, un site..." class="w-full bg-abysse border border-white/10 rounded-[2rem] py-3 pl-12 pr-4 text-xs text-white focus:border-cyan outline-none transition font-mono">
-                            </div>
-                        </div>
-                        <div class="flex-1 overflow-y-auto p-6 space-y-4 bg-abysse/30" id="site-tree-container">
-                            <div class="text-center py-10 text-gray-500 font-mono text-xs"><i class="fa-solid fa-spinner fa-spin text-cyan mb-4 text-3xl block"></i> Construction de l'arborescence 3D...</div>
-                        </div>
+                <div class="grid grid-cols-2 gap-8">
+                    <!-- LOI ELAN -->
+                    <div class="bento-card p-10 border border-white/5 bg-gradient-to-br from-card to-success/5 shadow-xl text-center flex flex-col justify-center">
+                        <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-4 flex items-center justify-center gap-2"><i class="fa-solid fa-leaf text-success text-xl"></i> Année de Référence Carbone</h4>
+                        <p class="text-xs text-gray-400 mb-6 leading-relaxed">Figez l'année de référence (Décret Tertiaire / OPERAT) pour calculer la trajectoire des -40% d'économies.</p>
+                        <select id="gov-baseline-year" class="bg-abysse border border-success/30 text-success font-bold font-mono text-lg rounded-full px-8 py-4 outline-none cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.2)] text-center appearance-none">
+                            <option value="2010">Année 2010 (Défaut Légal)</option>
+                            <option value="2018">Année 2018</option>
+                            <option value="2019">Année 2019</option>
+                            <option value="2022">Année 2022</option>
+                        </select>
                     </div>
 
-                    <!-- COL 2 : L'ÉDITEUR INTELLIGENT (ELEC vs GAZ) -->
-                    <div class="col-span-8 bento-card p-0 flex flex-col overflow-hidden relative shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-cyan/30">
-                        <div id="site-editor-overlay" class="absolute inset-0 bg-abysse/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center rounded-[3rem]">
-                            <i class="fa-solid fa-sitemap text-8xl text-gray-600 mb-6 opacity-30"></i>
-                            <h3 class="text-3xl font-black text-white mb-2">Éditeur de Patrimoine</h3>
-                            <p class="text-sm text-gray-400 mt-2 max-w-sm">Sélectionnez un site dans l'arborescence à gauche pour enrichir ses données administratives et contractuelles.</p>
-                        </div>
-
-                        <div class="flex-1 overflow-y-auto p-10 space-y-8 relative">
-                            <div class="flex justify-between items-start border-b border-white/10 pb-6">
-                                <div>
-                                    <h3 class="text-3xl font-black text-white flex items-center gap-3" id="site-editor-title">Nouvelle Entité</h3>
-                                    <div class="text-[10px] text-gray-500 font-mono mt-3 tracking-widest uppercase bg-white/5 inline-block px-3 py-1 rounded-full border border-white/10">PDL / ID : <span id="site-editor-id" class="text-cyan font-bold">NEW</span></div>
-                                </div>
-                                <div class="bg-black/40 px-6 py-3 rounded-2xl border border-white/5 text-center shadow-inner cursor-help" title="Le score augmente quand vous renseignez la Surface, le Prix, le PDL...">
-                                    <div class="text-[9px] text-gray-400 uppercase font-bold tracking-widest mb-1 flex items-center gap-2"><i class="fa-solid fa-heart-pulse text-alert"></i> Score Donnée</div>
-                                    <div class="text-2xl font-black font-mono text-cyan" id="site-health-score">0%</div>
-                                </div>
-                            </div>
-
-                            <!-- BLOC 1 : IDENTITÉ & LOCALISATION -->
-                            <div class="bg-abysse/50 p-8 rounded-[2rem] border border-white/5 space-y-6">
-                                <h4 class="text-sm font-bold text-white uppercase tracking-widest border-b border-white/10 pb-3 flex items-center gap-2"><i class="fa-solid fa-location-dot text-cyan"></i> Identité & Bâtiment</h4>
-                                <div class="grid grid-cols-2 gap-6 relative">
-                                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block text-cyan">Nom du Site / Bâtiment *</label><input type="text" id="site-name" class="input-edit font-bold text-white border-cyan/50 bg-cyan/5 shadow-inner" placeholder="Ex: Mairie Centrale"></div>
-                                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Lot / Entité de regroupement</label><input type="text" id="site-lot" class="input-edit" placeholder="Ex: Lot 1 - Bâtiments > 36kVA"></div>
-                                    
-                                    <!-- AUTOCOMPLÉTION ADRESSE AVEC INSEE CACHÉ -->
-                                    <div class="col-span-2 relative">
-                                        <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Adresse (Voie)</label>
-                                        <input type="text" id="address-input" class="input-edit w-full" placeholder="Commencez à taper l'adresse..." oninput="searchAddress()">
-                                        <input type="hidden" id="site-insee">
-                                        <div id="address-suggestions" class="suggestions-list hidden"></div>
-                                    </div>
-                                    
-                                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Code Postal</label><input type="text" id="zip-input" class="input-edit font-mono"></div>
-                                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Ville</label><input type="text" id="city-input" class="input-edit font-bold"></div>
-
-                                    <div>
-                                        <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block flex justify-between"><span>Surface (m²)</span> <span class="text-tertiaire text-[9px]"><i class="fa-solid fa-leaf mr-1"></i>Décret Tertiaire</span></label>
-                                        <input type="number" id="site-surface" class="input-edit input-mono text-tertiaire border-tertiaire/30 bg-tertiaire/5" placeholder="0">
-                                    </div>
-                                    <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Typologie (Usage)</label><input type="text" id="inp-type" class="input-edit" placeholder="Ex: Ecole, Sport, EP..."></div>
-                                </div>
-                            </div>
-
-                            <!-- BLOC 2 : CONTRAT ET HEUROSAISONNALITÉ -->
-                            <div class="bg-card/80 p-8 rounded-[2rem] border-l-4 border-gold shadow-lg space-y-6 transition-colors duration-500" id="contract-block">
-                                <div class="flex justify-between items-center border-b border-white/10 pb-4">
-                                    <h4 class="text-sm font-bold text-white uppercase tracking-widest"><i class="fa-solid fa-file-signature text-gold mr-2"></i> Contrat & Structure Tarifaire</h4>
-                                    <div class="flex bg-black/50 p-1 rounded-[2rem] border border-white/5">
-                                        <button onclick="setSiteEnergy('elec')" id="btn-site-elec" class="px-6 py-2 rounded-[2rem] text-xs font-bold bg-cyan text-abysse transition shadow-md">ÉLEC</button>
-                                        <button onclick="setSiteEnergy('gaz')" id="btn-site-gaz" class="px-6 py-2 rounded-[2rem] text-xs font-bold text-gray-400 hover:text-white transition">GAZ</button>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-12 gap-6">
-                                    <div class="col-span-4"><label id="lbl-primary" class="text-[10px] text-cyan uppercase font-bold tracking-widest pl-4 mb-2 block">PDL / PRM (14) *</label><input type="text" id="site-pdl" class="input-edit input-mono text-lg text-cyan border-cyan/30 bg-cyan/5" placeholder="3000..."></div>
-                                    <div class="col-span-4"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Fournisseur Actuel</label><input type="text" id="site-provider" class="input-edit" placeholder="Ex: EDF, Total..."></div>
-                                    <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Début Marché</label><input type="date" id="site-start-date" class="input-edit text-gray-400 cursor-pointer" style="color-scheme: dark;"></div>
-                                    <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block text-alert">Fin de marché</label><input type="date" id="site-end-date" class="input-edit text-gray-300 cursor-pointer" style="color-scheme: dark;"></div>
-                                </div>
-
-                                <!-- LE MOTEUR DE PRIX (4 QUADRANTS) -->
-                                <div class="bg-abysse p-8 rounded-3xl border border-white/5 relative mt-6 shadow-inner">
-                                    <div class="flex justify-between items-center mb-8">
-                                        <span class="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-euro-sign text-cyan"></i> Grille Tarifaire (€/MWh HT)</span>
-                                        <div class="flex items-center gap-4 bg-white/5 px-4 py-2 rounded-full border border-white/10" id="toggle-quadrants-container">
-                                            <span class="text-[9px] text-gray-400 uppercase font-bold tracking-widest">Tarif Unique (C5)</span>
-                                            <div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
-                                                <input type="checkbox" id="quadrant-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" onchange="toggleQuadrants()"/>
-                                                <label for="quadrant-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-600 cursor-pointer"></label>
-                                            </div>
-                                            <span class="text-[9px] text-cyan uppercase font-bold tracking-widest">Heurosaisonnier (C4/C3)</span>
-                                        </div>
-                                    </div>
-
-                                    <!-- GRILLE ÉLEC (4 Cadrans) -->
-                                    <div id="pricing-elec-grid" class="grid grid-cols-4 gap-6">
-                                        <!-- PUISSANCES -->
-                                        <div class="col-span-4 border-b border-white/10 pb-2 mb-2"><span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Puissances Souscrites (kW)</span></div>
-                                        <div class="quad-advanced"><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block">PS - HPH</label><input type="number" id="ps-hph" class="input-edit input-mono text-center text-lg"></div>
-                                        <div class="quad-advanced"><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block">PS - HCH</label><input type="number" id="ps-hch" class="input-edit input-mono text-center text-lg"></div>
-                                        <div class="quad-advanced"><label class="text-[10px] text-cyan uppercase font-bold pl-2 mb-2 block">PS - HPE</label><input type="number" id="ps-hpe" class="input-edit input-mono text-center border-cyan/30 text-cyan text-lg"></div>
-                                        <div class="quad-advanced"><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block">PS - HCE</label><input type="number" id="ps-hce" class="input-edit input-mono text-center text-lg"></div>
-                                        <div class="quad-simple col-span-4"><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block text-cyan">Puissance Unique (kVA)</label><input type="number" id="ps-unique" class="input-edit input-mono text-cyan w-1/3 text-lg"></div>
-
-                                        <!-- PRIX MOLECULE -->
-                                        <div class="col-span-4 border-b border-white/10 pb-2 mb-2 mt-4"><span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Prix de l'Énergie (€/MWh HT)</span></div>
-                                        <div class="quad-advanced"><label class="text-[10px] text-white uppercase font-bold pl-2 mb-2 block">Prix HPH</label><input type="number" step="0.01" id="px-hph" class="input-edit input-mono text-center border-white/30 text-white text-lg"></div>
-                                        <div class="quad-advanced"><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block">Prix HCH</label><input type="number" step="0.01" id="px-hch" class="input-edit input-mono text-center text-lg"></div>
-                                        <div class="quad-advanced"><label class="text-[10px] text-cyan uppercase font-bold pl-2 mb-2 block">Prix HPE</label><input type="number" step="0.01" id="px-hpe" class="input-edit input-mono text-center border-cyan/30 text-cyan text-lg"></div>
-                                        <div class="quad-advanced"><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block">Prix HCE</label><input type="number" step="0.01" id="px-hce" class="input-edit input-mono text-center text-lg"></div>
-                                        <div class="quad-simple col-span-4"><label class="text-[10px] text-cyan uppercase font-bold pl-2 mb-2 block">Prix Unique Base (€/MWh)</label><input type="number" step="0.01" id="px-unique" class="input-edit input-mono text-cyan border-cyan/50 bg-cyan/5 w-1/3 text-2xl"></div>
-
-                                        <!-- FIXE & TAXES -->
-                                        <div class="col-span-4 border-b border-white/10 pb-2 mb-2 mt-4"><span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Abonnement & Taxes Réglementaires</span></div>
-                                        <div class="col-span-2"><label class="text-[10px] text-gold uppercase font-bold pl-4 mb-2 block">Abonnement Annuel (€)</label><input type="number" step="0.1" id="px-fix" class="input-edit input-mono text-gold border-gold/30 text-center text-lg"></div>
-                                        <div class="col-span-2"><label class="text-[10px] text-gray-400 uppercase font-bold pl-4 mb-2 block">CSPE / TICFE (€/MWh)</label><input type="number" step="0.1" id="px-tax" class="input-edit input-mono text-gray-400 text-center text-lg" value="22.5"></div>
-                                    </div>
-
-                                    <!-- GRILLE GAZ -->
-                                    <div id="pricing-gaz-grid" class="hidden grid-cols-3 gap-8">
-                                        <div><label class="text-[10px] text-gas uppercase font-bold pl-4 mb-2 block">Profil (Ex: P12)</label><input type="text" id="site-profil-gaz" class="input-edit input-mono text-gas border-gas/30 bg-gas/5 text-center text-lg uppercase"></div>
-                                        <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-4 mb-2 block">CJA (MWh/j)</label><input type="number" step="0.01" id="ps-gaz-cja" class="input-edit input-mono text-center text-lg"></div>
-                                        <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-4 mb-2 block">CAR (MWh/an)</label><input type="number" id="ps-gaz-car" class="input-edit input-mono text-center text-lg"></div>
-                                        
-                                        <div class="col-span-3 border-b border-white/10 pb-2 mb-2 mt-4"><span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Pricing & Taxes</span></div>
-                                        <div><label class="text-[10px] text-white uppercase font-bold pl-4 mb-2 block">Prix Molécule (€/MWh)</label><input type="number" step="0.01" id="px-gaz-mol" class="input-edit input-mono text-white text-center text-2xl bg-white/5 border-white/30"></div>
-                                        <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-4 mb-2 block">Abonnement Annuel (€)</label><input type="number" step="0.1" id="px-gaz-fix" class="input-edit input-mono text-center text-lg"></div>
-                                        <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-4 mb-2 block">Terme de Stockage (€/MWh)</label><input type="number" step="0.01" id="px-gaz-stock" class="input-edit input-mono text-center text-lg"></div>
-                                        <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-4 mb-2 block">TICGN (€/MWh)</label><input type="number" step="0.1" id="px-gaz-tax" class="input-edit input-mono text-center text-lg" value="8.44"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- BARRE D'ACTION ÉDITEUR -->
-                        <div class="p-8 bg-abysse border-t border-cyan/20 flex justify-end gap-6 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-10">
-                            <button onclick="closeSiteEditor()" class="px-8 py-4 rounded-[2rem] text-gray-400 hover:text-white font-bold text-sm transition uppercase tracking-widest">Fermer</button>
-                            <button onclick="saveSiteData()" id="btn-save-site" class="bg-cyan text-abysse px-12 py-4 rounded-[2rem] text-base font-black hover:bg-white transition shadow-[0_0_30px_rgba(0,229,255,0.4)] uppercase tracking-widest flex items-center gap-3">
-                                <i class="fa-solid fa-cloud-arrow-up"></i> Synchroniser Base 3D
-                            </button>
+                    <!-- WORKFLOW DELEGATION -->
+                    <div class="bento-card p-10 border border-white/5 shadow-xl">
+                        <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-white/10 pb-4"><i class="fa-solid fa-link text-purple text-xl"></i> Délégation de Saisie</h4>
+                        <p class="text-xs text-gray-400 mb-6 leading-relaxed">Générez un lien magique sécurisé (sans mot de passe) pour demander à un technicien local de remplir les caractéristiques de son bâtiment.</p>
+                        <div class="flex gap-4">
+                            <input type="email" id="gov-delegate-email" placeholder="Email du technicien..." class="input-edit flex-1">
+                            <button onclick="sendMagicLink()" class="bg-purple/20 text-purple border border-purple/50 px-6 rounded-full font-black uppercase tracking-widest text-xs hover:bg-purple hover:text-white transition shadow-lg whitespace-nowrap">Envoyer Lien</button>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- VUE 3 : IMPORT MASSIF EXCEL (SMART TEMPLATE 36 COLONNES) -->
-            <div id="view-import" class="view-section max-w-[1200px] mx-auto space-y-8 mt-10">
-                <div class="text-center mb-16">
-                    <h2 class="text-5xl font-black text-white italic tracking-tight mb-6">IMPORT <span class="text-success">MASSIF</span></h2>
-                    <p class="text-base text-gray-400 font-mono leading-relaxed max-w-3xl mx-auto">Peuplez votre War Room en un clic. Téléchargez la matrice V12.6, remplissez vos compteurs Élec & Gaz, et glissez le fichier ci-dessous. L'IA CORTEX classera chaque donnée dans le bon tiroir 3D.</p>
-                </div>
-
-                <div class="grid grid-cols-2 gap-10">
-                    <div class="bento-card p-12 border-t-4 border-cyan text-center shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col justify-center items-center">
-                        <i class="fa-solid fa-file-excel text-7xl text-cyan mb-8 drop-shadow-lg"></i>
-                        <h3 class="text-2xl font-black text-white mb-4">1. Télécharger la Matrice</h3>
-                        <p class="text-sm text-gray-400 mb-10 leading-relaxed">Fichier normé (36 colonnes) adapté aux marchés publics et industriels. Gère l'heurosaisonnalité, le Gaz, le code INSEE et la loi ELAN.</p>
-                        <button onclick="downloadTemplate()" class="w-full bg-abysse border-2 border-cyan/50 text-cyan font-black py-5 rounded-[2rem] hover:bg-cyan hover:text-abysse transition shadow-[0_0_20px_rgba(0,229,255,0.2)] text-sm uppercase tracking-widest flex justify-center items-center gap-3">
-                            <i class="fa-solid fa-download text-lg"></i> Matrice V12.6 (.CSV)
-                        </button>
+                <!-- RBAC -->
+                <div class="bento-card overflow-hidden shadow-2xl border border-white/5">
+                    <div class="p-8 border-b border-white/10 flex justify-between items-center bg-black/20">
+                        <h4 class="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-users-gear text-gray-400 text-xl"></i> Gestion des Rôles (RBAC)</h4>
+                        <button onclick="App.toast('Module en cours d\'activation', 'info')" class="bg-white/10 text-white px-6 py-2 rounded-full text-xs font-bold uppercase hover:bg-white/20 transition"><i class="fa-solid fa-plus mr-2"></i> Ajouter Utilisateur</button>
                     </div>
-
-                    <div class="bento-card p-12 border-t-4 border-success text-center shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col justify-center items-center group hover:border-success/80 transition duration-500">
-                        <i class="fa-solid fa-cloud-arrow-up text-7xl text-gray-600 group-hover:text-success mb-8 transition duration-500"></i>
-                        <h3 class="text-2xl font-black text-white mb-4">2. Ingestion CORTEX</h3>
-                        <p class="text-sm text-gray-400 mb-10 leading-relaxed">Glissez votre fichier complété. L'IA rattachera tous les compteurs à votre SIRET maître (<span class="text-success font-bold" id="import-tenant-id">--</span>).</p>
-                        <label class="w-full block bg-success text-abysse font-black py-5 rounded-[2rem] cursor-pointer hover:bg-white transition shadow-[0_0_30px_rgba(16,185,129,0.4)] text-sm uppercase tracking-widest">
-                            <i class="fa-solid fa-upload mr-2 text-lg"></i> Injecter les Données
-                            <input type="file" id="csv-upload" class="hidden" accept=".csv,.xlsx" onchange="processImport(this)">
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- VUE 4 : RGPD & CONFORMITÉ LÉGALE -->
-            <div id="view-rgpd" class="view-section max-w-[1200px] mx-auto space-y-8">
-                <div class="flex justify-between items-end mb-10">
-                    <div>
-                        <h2 class="text-4xl font-black text-white italic tracking-tight">Tiers de <span class="text-gold">Confiance</span></h2>
-                        <p class="text-sm text-gray-400 mt-2 font-mono">Contrôle des flux API (SGE) et registre RGPD.</p>
-                    </div>
-                    <div class="bg-card/50 border border-white/10 px-8 py-4 rounded-[2rem] flex items-center gap-4 shadow-lg">
-                        <span class="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Rétention Légale</span>
-                        <span class="text-base font-black text-white bg-abysse px-4 py-2 rounded-full border border-white/20">5 Ans</span>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-10">
-                    <div class="bento-card p-10 border-l-4 border-gold shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
-                        <h3 class="text-xl font-black text-white mb-8 flex items-center gap-3"><i class="fa-solid fa-plug-circle-check text-gold text-2xl"></i> Monitoring API Distributeurs</h3>
-                        <div class="space-y-6">
-                            <div class="bg-abysse/50 p-6 rounded-[2rem] border border-white/5 flex justify-between items-center shadow-inner">
-                                <div class="flex items-center gap-6">
-                                    <div class="w-14 h-14 rounded-full bg-cyan/10 flex items-center justify-center border border-cyan/30 text-cyan text-2xl shadow-lg"><i class="fa-solid fa-bolt"></i></div>
-                                    <div><div class="font-bold text-white text-lg">Passerelle ENEDIS</div><div class="text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-widest">Synchro : Aujourd'hui, 06h12</div></div>
-                                </div>
-                                <div class="bg-success/20 text-success border border-success/30 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-success animate-pulse"></div> Actif</div>
-                            </div>
-                            <div class="bg-abysse/50 p-6 rounded-[2rem] border border-white/5 flex justify-between items-center opacity-50">
-                                <div class="flex items-center gap-6">
-                                    <div class="w-14 h-14 rounded-full bg-gas/10 flex items-center justify-center border border-gas/30 text-gas text-2xl"><i class="fa-solid fa-fire"></i></div>
-                                    <div><div class="font-bold text-white text-lg">Passerelle GRDF</div><div class="text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-widest">Aucun compteur gaz détecté</div></div>
-                                </div>
-                                <div class="bg-gray-800 text-gray-400 border border-gray-600 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest">En veille</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bento-card p-10 border-l-4 border-cyan shadow-[0_20px_50px_rgba(0,0,0,0.3)] text-center flex flex-col justify-center relative overflow-hidden">
-                        <i class="fa-solid fa-file-signature absolute -right-4 -bottom-4 text-[150px] text-cyan opacity-5"></i>
-                        <h3 class="text-2xl font-black text-white mb-4 relative z-10">Mandat Unique de Collecte</h3>
-                        <p class="text-sm text-gray-400 mb-10 leading-relaxed max-w-md mx-auto relative z-10">
-                            Pour permettre à CORTEX de collecter et d'analyser vos courbes de charge en continu, vous devez approuver le mandat de délégation SGE. Un certificat PDF sera horodaté dans la blockchain interne.
-                        </p>
-                        <div class="flex items-center justify-center gap-4 mb-10 relative z-10 bg-abysse/50 p-4 rounded-[2rem] border border-white/5 w-max mx-auto">
-                            <input type="checkbox" id="legal-check" class="w-6 h-6 accent-cyan cursor-pointer shadow-[0_0_10px_#00E5FF]">
-                            <label for="legal-check" class="text-sm font-bold text-white cursor-pointer select-none">J'agis en qualité de représentant légal et j'approuve.</label>
-                        </div>
-                        <button onclick="approveMandate()" id="btn-mandate" class="w-full bg-cyan text-abysse font-black py-5 rounded-[2rem] shadow-[0_0_30px_rgba(0,229,255,0.4)] hover:bg-white transition flex justify-center items-center gap-3 uppercase tracking-widest text-sm relative z-10">
-                            <i class="fa-solid fa-stamp text-xl"></i> Signer le Mandat Électronique
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- VUE 5 : GUICHET OPS & SAGE TIMELINE -->
-            <div id="view-support" class="view-section max-w-[1600px] mx-auto space-y-8 h-full">
-                <div class="flex justify-between items-end mb-6">
-                    <div>
-                        <h3 class="text-4xl font-black text-white italic tracking-tight">GUICHET <span class="text-purple">OPS</span></h3>
-                        <p class="text-sm text-gray-400 mt-2 font-mono">Service Desk & Timeline d'Expertise (SAGE)</p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 h-[700px]">
-                    <!-- NOUVELLE REQUÊTE (PONT CRM) -->
-                    <div class="col-span-5 bento-card p-10 border-t-4 border-cyan flex flex-col shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
-                        <h4 class="text-lg font-black text-white uppercase tracking-widest mb-4 flex items-center gap-3"><i class="fa-solid fa-paper-plane text-cyan text-2xl"></i> Ouvrir un Ticket Support</h4>
-                        <p class="text-sm text-gray-400 mb-8 leading-relaxed">Votre demande sera poussée directement dans la War Room de nos experts opérationnels.</p>
-                        
-                        <div class="space-y-6 flex-1">
-                            <select id="ticket-type" class="input-edit appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_20px_center] bg-[length:12px_auto] cursor-pointer font-bold text-base py-5">
-                                <option value="ACHAT">Demande de cotation (Nouveau Bâtiment)</option>
-                                <option value="FACTURE">Contestation d'une facture</option>
-                                <option value="TECH">Problème sur un PDL SGE</option>
-                                <option value="RSE">Question Décret Tertiaire / CEE</option>
-                            </select>
-                            <textarea id="ticket-desc" class="input-edit h-64 resize-none font-sans text-sm p-6" placeholder="Détaillez votre besoin ici..."></textarea>
-                        </div>
-                        <button onclick="sendOpsTicket()" class="w-full bg-cyan text-abysse font-black py-5 rounded-[2rem] hover:bg-white transition shadow-[0_0_30px_rgba(0,229,255,0.4)] mt-6 uppercase tracking-widest text-sm flex items-center justify-center gap-3">
-                            <i class="fa-solid fa-paper-plane"></i> Envoyer la requête
-                        </button>
-                    </div>
-
-                    <!-- TIMELINE SAGE (PREUVE DE TRAVAIL) -->
-                    <div class="col-span-7 bento-card p-0 flex flex-col border-t-4 border-purple overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
-                        <div class="p-8 border-b border-white/5 bg-card/50">
-                            <h4 class="text-lg font-black text-white uppercase tracking-widest flex items-center gap-3"><i class="fa-solid fa-user-tie text-purple text-2xl"></i> Journal d'Expertise (SAGE)</h4>
-                            <p class="text-xs text-gray-400 mt-2 font-mono">Retrouvez ici toutes les recommandations rédigées par nos experts ou l'Économe de flux de votre syndicat.</p>
-                        </div>
-                        <div class="flex-1 overflow-y-auto p-10 space-y-8 bg-abysse/30 relative" id="sage-timeline-container">
-                            <div class="absolute left-14 top-0 bottom-0 w-px bg-white/10 z-0"></div>
-                            <div class="text-center py-20 text-gray-500 font-mono text-sm relative z-10"><i class="fa-solid fa-spinner fa-spin text-purple mb-4 text-4xl block"></i> Analyse de la base 3D...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- VUE 6 : ÉQUIPE & ACCÈS -->
-            <div id="view-equipe" class="view-section max-w-[1200px] mx-auto space-y-8">
-                <div class="flex justify-between items-end mb-10">
-                    <div>
-                        <h2 class="text-4xl font-black text-white italic tracking-tight">Rôle & <span class="text-gray-400">Sécurité</span></h2>
-                        <p class="text-sm text-gray-400 mt-2 font-mono">Gestion des accès à l'Hyperviseur.</p>
-                    </div>
-                    <button onclick="App.toast('Invitation envoyée !', 'success')" class="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-8 py-4 rounded-[2rem] text-sm font-black transition flex items-center gap-3 uppercase tracking-widest shadow-lg">
-                        <i class="fa-solid fa-user-plus text-cyan"></i> Inviter un collaborateur
-                    </button>
-                </div>
-                
-                <div class="bento-card overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/5">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-abysse text-[10px] text-gray-500 uppercase tracking-widest border-b border-white/10">
-                            <tr><th class="p-8">Utilisateur</th><th class="p-8">Rôle (RBAC)</th><th class="p-8 text-center">Statut</th><th class="p-8 text-right">Action</th></tr>
+                            <tr><th class="p-6">Utilisateur</th><th class="p-6">Périmètre</th><th class="p-6">Rôle</th><th class="p-6 text-right">Action</th></tr>
                         </thead>
-                        <tbody class="divide-y divide-white/5 bg-card/30">
+                        <tbody id="rbac-list" class="divide-y divide-white/5 bg-card/30">
                             <tr class="hover:bg-white/5 transition">
-                                <td class="p-8 font-bold text-white flex items-center gap-4 text-base"><div class="w-12 h-12 rounded-full bg-cyan/20 text-cyan flex items-center justify-center text-xl shadow-inner"><i class="fa-solid fa-user"></i></div> Vous (Admin)</td>
-                                <td class="p-8 text-cyan font-mono text-sm font-bold">Propriétaire</td>
-                                <td class="p-8 text-center"><span class="bg-success/20 border border-success/30 text-success px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest shadow-[0_0_10px_rgba(16,185,129,0.2)]">Actif</span></td>
-                                <td class="p-8 text-right text-gray-600">-</td>
+                                <td class="p-6 font-bold text-white flex items-center gap-4 text-sm"><div class="w-8 h-8 rounded-full bg-cyan/20 text-cyan flex items-center justify-center text-xs shadow-inner"><i class="fa-solid fa-user"></i></div> Vous (Admin)</td>
+                                <td class="p-6 text-gray-400 font-mono text-xs">Portefeuille Global</td>
+                                <td class="p-6"><span class="bg-success/20 border border-success/30 text-success px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-[0_0_10px_rgba(16,185,129,0.2)]">Propriétaire</span></td>
+                                <td class="p-6 text-right text-gray-600">-</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
+            <!-- ========================================================= -->
+            <!-- ONGLET 2 : L'ARBRE DE PARC 3D (ASSET MANAGEMENT)          -->
+            <!-- ========================================================= -->
+            <div id="view-parc" class="view-section max-w-[1600px] mx-auto space-y-6 h-full">
+                <div class="flex justify-between items-end mb-6">
+                    <div>
+                        <h3 class="text-3xl font-black text-white tracking-tight">Arbre de Parc 3D</h3>
+                        <p class="text-sm text-gray-400 mt-2 font-mono">Portefeuille > Entité Légale > Bâtiment > Compteur</p>
+                    </div>
+                    <button onclick="resetSiteForm()" class="bg-white/10 text-white font-bold px-8 py-4 rounded-full hover:bg-white/20 transition text-xs flex items-center gap-3 border border-white/20 uppercase tracking-widest shadow-lg">
+                        <i class="fa-solid fa-plus text-cyan text-lg"></i> Nouvel Actif
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[750px]">
+                    <!-- ARBRE GAUCHE -->
+                    <div class="col-span-4 bento-card p-0 flex flex-col overflow-hidden shadow-2xl">
+                        <div class="p-6 border-b border-white/10 bg-card/50 rounded-t-[3rem]">
+                            <div class="relative w-full">
+                                <i class="fa-solid fa-search absolute left-5 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
+                                <input type="text" id="search-tree" oninput="renderAssetTree()" placeholder="Rechercher (Tag, Site, PDL)..." autocomplete="off" class="w-full bg-abysse border border-white/10 rounded-full py-4 pl-12 pr-4 text-xs text-white focus:border-cyan outline-none transition font-mono shadow-inner">
+                            </div>
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-6 space-y-4 bg-abysse/30 rounded-b-[3rem]" id="asset-tree-container">
+                            <div class="text-center py-10 text-gray-500 font-mono text-xs"><i class="fa-solid fa-spinner fa-spin text-cyan mb-4 text-3xl block"></i> Génération de la grappe...</div>
+                        </div>
+                    </div>
+
+                    <!-- ÉDITEUR DROITE -->
+                    <div class="col-span-8 bento-card p-10 flex flex-col relative shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-cyan/20">
+                        <!-- OVERLAY VIDE -->
+                        <div id="site-editor-overlay" class="absolute inset-0 bg-abysse/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center rounded-[3rem]">
+                            <i class="fa-solid fa-sitemap text-8xl text-gray-600 mb-6 opacity-30"></i>
+                            <h3 class="text-3xl font-black text-white mb-2">Gestion des Actifs</h3>
+                            <p class="text-sm text-gray-400 mt-2 max-w-sm">Sélectionnez un élément dans l'arbre pour modifier ses caractéristiques.</p>
+                        </div>
+
+                        <div class="flex justify-between items-start border-b border-white/10 pb-6 mb-8">
+                            <div>
+                                <h3 class="text-3xl font-black text-white flex items-center gap-3" id="asset-title">Détails de l'Actif</h3>
+                                <div class="text-[10px] text-gray-500 font-mono mt-3 tracking-widest uppercase bg-white/5 inline-block px-3 py-1 rounded-full border border-white/10">Identifiant : <span class="text-cyan font-bold" id="asset-id">--</span></div>
+                            </div>
+                            <button onclick="App.toast('Compteur archivé (Soft Delete)', 'success')" class="bg-alert/10 text-alert border border-alert/30 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-alert hover:text-white transition">
+                                <i class="fa-solid fa-box-archive mr-2"></i> Soft Delete
+                            </button>
+                        </div>
+
+                        <div class="space-y-8 flex-1 overflow-y-auto pr-4">
+                            <!-- Multi Fluides -->
+                            <div>
+                                <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-4 block border-b border-white/5 pb-2">Vecteur Énergétique</label>
+                                <div class="flex flex-wrap gap-4">
+                                    <button onclick="setSiteEnergy('elec')" id="btn-site-elec" class="px-6 py-3 rounded-full border-2 border-cyan bg-cyan/10 text-cyan font-black text-xs flex items-center gap-2 uppercase tracking-widest shadow-[0_0_15px_rgba(0,229,255,0.3)]"><i class="fa-solid fa-bolt"></i> Électricité</button>
+                                    <button onclick="setSiteEnergy('gaz')" id="btn-site-gaz" class="px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest hover:border-gas hover:text-gas transition"><i class="fa-solid fa-fire"></i> Gaz</button>
+                                    <button class="px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest opacity-50 cursor-not-allowed"><i class="fa-solid fa-droplet"></i> Eau</button>
+                                    <button class="px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest opacity-50 cursor-not-allowed"><i class="fa-solid fa-temperature-arrow-up"></i> RCU (Chaleur)</button>
+                                    <button class="px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest opacity-50 cursor-not-allowed"><i class="fa-solid fa-leaf"></i> Biomasse</button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-6">
+                                <div><label id="lbl-primary" class="text-[10px] text-cyan uppercase font-bold tracking-widest pl-4 mb-2 block">Identifiant Unique (PDL/PCE) *</label><input type="text" id="site-pdl" class="input-edit input-mono text-cyan bg-cyan/5 border-cyan/30" placeholder="Ex: 3000..."></div>
+                                <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Entité Parente (Lot)</label><input type="text" id="site-lot" class="input-edit text-gray-300" placeholder="Ex: Zone Nord"></div>
+                                <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Nom du Bâtiment / Site</label><input type="text" id="site-name" class="input-edit text-white font-bold" placeholder="Ex: Gymnase Municipal"></div>
+                            </div>
+
+                            <!-- Inputs cachés pour sauvegarde via Jumeau/Marché -->
+                            <input type="hidden" id="address-input"><input type="hidden" id="city-input"><input type="hidden" id="zip-input"><input type="hidden" id="site-insee"><input type="hidden" id="site-surface"><input type="hidden" id="inp-type">
+                            <input type="hidden" id="site-provider"><input type="hidden" id="site-start-date"><input type="hidden" id="site-end-date">
+                            <input type="hidden" id="ps-hph"><input type="hidden" id="ps-hch"><input type="hidden" id="ps-hpe"><input type="hidden" id="ps-hce"><input type="hidden" id="ps-unique">
+                            <input type="hidden" id="px-hph"><input type="hidden" id="px-hch"><input type="hidden" id="px-hpe"><input type="hidden" id="px-hce"><input type="hidden" id="px-unique"><input type="hidden" id="px-fix"><input type="hidden" id="px-tax" value="22.5">
+                            <input type="hidden" id="site-profil-gaz"><input type="hidden" id="ps-gaz-cja"><input type="hidden" id="ps-gaz-car"><input type="hidden" id="px-gaz-mol"><input type="hidden" id="px-gaz-fix"><input type="hidden" id="px-gaz-stock"><input type="hidden" id="px-gaz-tax" value="8.44">
+                            <input type="checkbox" id="quadrant-toggle" class="hidden">
+
+                            <!-- Custom Tags -->
+                            <div class="bg-abysse/50 p-6 rounded-[2rem] border border-white/5 shadow-inner">
+                                <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-4 block"><i class="fa-solid fa-tags text-purple mr-2"></i> Custom Tags Analytiques (Reportings)</label>
+                                <input type="text" class="input-edit font-mono text-purple mb-4" placeholder="Ajouter un tag (ex: #Zone_Nord) et Entrée...">
+                                <div class="flex gap-2 flex-wrap" id="custom-tags-container">
+                                    <span class="bg-purple/20 text-purple border border-purple/30 px-4 py-2 rounded-full text-xs font-mono font-bold cursor-pointer hover:bg-alert hover:text-white hover:border-alert transition">#Relamping_2025 <i class="fa-solid fa-xmark ml-2"></i></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-6 border-t border-white/10 text-right">
+                            <button onclick="saveSiteData()" id="btn-save-site" class="bg-cyan text-abysse font-black px-10 py-4 rounded-full hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.4)] text-xs uppercase tracking-widest flex items-center gap-2 ml-auto">
+                                <i class="fa-solid fa-cloud-arrow-up text-lg"></i> Sauvegarder Actif
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- ONGLET 3 : LE JUMEAU PHYSIQUE (ADEME & TECH)              -->
+            <!-- ========================================================= -->
+            <div id="view-jumeau" class="view-section max-w-[1200px] mx-auto space-y-8">
+                <div class="text-center mb-10">
+                    <h2 class="text-4xl font-black text-white italic tracking-tight">Le Jumeau <span class="text-success">Physique</span></h2>
+                    <p class="text-sm text-gray-400 mt-2 font-mono max-w-2xl mx-auto">Nourrissez l'IA CORTEX avec les caractéristiques de vos bâtiments pour débloquer les analyses solaires et thermiques.</p>
+                </div>
+
+                <div class="bento-card p-10 border-t-4 border-success shadow-2xl">
+                    <div class="flex justify-between items-center mb-8 border-b border-white/10 pb-6">
+                        <h4 class="text-lg font-black text-white uppercase tracking-widest flex items-center gap-3"><i class="fa-solid fa-radar text-success text-2xl"></i> Auto-Scan ADEME (DPE / Surface)</h4>
+                        <button onclick="scanAdeme()" class="bg-success text-abysse font-black px-6 py-3 rounded-full hover:bg-white transition shadow-[0_0_15px_rgba(16,185,129,0.4)] text-xs uppercase tracking-widest flex items-center gap-2">
+                            <i class="fa-solid fa-satellite-dish"></i> Lancer le Scan
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                        <div class="col-span-2 relative">
+                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Adresse du Bâtiment (Relié au SIRET local)</label>
+                            <input type="text" id="jum-address" class="input-edit text-lg" placeholder="Saisir l'adresse exacte pour la base DPE..." autocomplete="off">
+                        </div>
+                        <div><label class="text-[10px] text-success uppercase font-bold tracking-widest pl-4 mb-2 block">Surface Récupérée (m²)</label><input type="number" id="jum-surface" class="input-edit input-mono text-success text-2xl bg-success/5 border-success/30 text-center" placeholder="0"></div>
+                        <div><label class="text-[10px] text-success uppercase font-bold tracking-widest pl-4 mb-2 block">Étiquette DPE (Estimée)</label><input type="text" id="jum-dpe" class="input-edit input-mono text-success text-2xl bg-success/5 border-success/30 text-center" placeholder="--"></div>
+                    </div>
+                </div>
+
+                <div class="bento-card p-10 border border-white/5 shadow-2xl bg-abysse/50">
+                    <div class="flex justify-between items-center mb-8 border-b border-white/10 pb-4">
+                        <h4 class="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-3"><i class="fa-solid fa-microchip text-cyan text-xl"></i> Attributs Techniques (CORTEX Engine)</h4>
+                        <button onclick="sendMagicLink()" class="bg-purple/20 text-purple border border-purple/50 px-6 py-2 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-purple hover:text-white transition flex items-center gap-2"><i class="fa-solid fa-link"></i> Envoyer lien au technicien</button>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-8">
+                        <div class="bg-card p-6 rounded-[2rem] border border-white/5 text-center flex flex-col items-center justify-center shadow-inner">
+                            <i class="fa-solid fa-temperature-arrow-up text-3xl text-gas mb-4"></i>
+                            <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4">Système de Chauffage</div>
+                            <select id="inp-heating" class="w-full bg-abysse border border-white/10 text-white text-xs font-bold rounded-full px-4 py-3 outline-none cursor-pointer text-center appearance-none">
+                                <option value="">Non Renseigné</option><option value="gaz">Gaz Naturel</option><option value="elec">Électrique (PAC)</option><option value="rcu">Réseau de Chaleur</option><option value="fioul">Fioul</option>
+                            </select>
+                        </div>
+                        <div class="bg-card p-6 rounded-[2rem] border border-white/5 text-center flex flex-col items-center justify-center shadow-inner">
+                            <i class="fa-solid fa-network-wired text-3xl text-cyan mb-4"></i>
+                            <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4">Pilotage Centralisé (GTB)</div>
+                            <div class="flex gap-2 w-full">
+                                <button class="flex-1 bg-abysse text-gray-400 border border-white/10 font-bold py-2 rounded-full text-xs hover:text-white transition">OUI</button>
+                                <button class="flex-1 bg-cyan text-abysse font-black py-2 rounded-full text-xs transition shadow-[0_0_10px_rgba(0,229,255,0.3)]">NON</button>
+                            </div>
+                        </div>
+                        <div class="bg-card p-6 rounded-[2rem] border border-white/5 text-center flex flex-col items-center justify-center relative overflow-hidden group hover:border-gold/50 transition shadow-inner">
+                            <i class="fa-solid fa-solar-panel text-3xl text-gold mb-4 relative z-10"></i>
+                            <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4 relative z-10">Potentiel Solar Studio</div>
+                            <select id="inp-roof" class="w-full bg-abysse border border-gold/30 text-gold text-xs font-bold rounded-full px-4 py-3 outline-none cursor-pointer text-center appearance-none relative z-10">
+                                <option value="">Non Renseigné</option><option value="incline">Toiture Inclinée</option><option value="plat">Toiture Terrasse (Plate)</option><option value="parking">Ombrières Parking</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- ONGLET 4 : LA SALLE DE MARCHÉS (CONDOR TRADING)           -->
+            <!-- ========================================================= -->
+            <div id="view-marches" class="view-section max-w-[1600px] mx-auto space-y-8">
+                <div class="flex justify-between items-end mb-6">
+                    <div>
+                        <h3 class="text-3xl font-black text-white italic tracking-tight">Salle de <span class="text-gold">Marchés</span></h3>
+                        <p class="text-sm text-gray-400 mt-2 font-mono">Couverture (Hedging), Tranches et Structuration d'Acheminement (TURPE/ATRD).</p>
+                    </div>
+                </div>
+
+                <div class="bento-card p-8 border-t-4 border-cyan shadow-xl">
+                    <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-white/10 pb-4"><i class="fa-solid fa-tower-cell text-cyan text-xl"></i> Structuration d'Acheminement (Réseau)</h4>
+                    <div class="grid grid-cols-12 gap-8">
+                        <div class="col-span-3">
+                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Segment Technique</label>
+                            <select id="network-segment" class="input-edit text-center font-bold text-cyan border-cyan/30 appearance-none bg-abysse cursor-pointer">
+                                <option value="">-- Sélectionner --</option>
+                                <optgroup label="Électricité"><option value="C1">C1 (HTB)</option><option value="C2">C2 (HTA)</option><option value="C3">C3 (HTA)</option><option value="C4">C4 (BT > 36)</option><option value="C5">C5 (BT < 36)</option></optgroup>
+                                <optgroup label="Gaz Naturel"><option value="T1">T1 (Base)</option><option value="T2">T2 (B2S)</option><option value="T3">T3 (B2M)</option><option value="T4">T4 (Industrie)</option></optgroup>
+                            </select>
+                        </div>
+                        <div class="col-span-3">
+                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Plage d'Utilisation (FTA)</label>
+                            <select id="network-fta" class="input-edit text-center font-bold appearance-none cursor-pointer">
+                                <option value="">--</option><option value="CU">CU (Courte)</option><option value="MU">MU (Moyenne)</option><option value="LU">LU (Longue)</option>
+                            </select>
+                        </div>
+                        <!-- Cadrans intégrés dans le Jumeau / SaveSiteData -->
+                        <div class="col-span-6 flex items-center justify-center border border-dashed border-white/10 rounded-[2rem] bg-black/20">
+                            <span class="text-xs text-gray-500 font-mono">Puissances synchronisées via Base 3D</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LE DASHBOARD CONDOR (HEDGING & TRANCHES) -->
+                <div class="bento-card overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.4)] border-t-4 border-gold">
+                    <div class="p-8 bg-abysse/90 border-b border-white/5 flex justify-between items-center">
+                        <h4 class="text-xl font-black text-white uppercase tracking-widest"><i class="fa-solid fa-layer-group text-gold mr-3 text-2xl"></i> Couverture de Tranches (Hedging)</h4>
+                        <div class="flex gap-2">
+                            <span class="bg-gray-800 text-gray-400 border border-gray-600 px-4 py-2 rounded-full text-[10px] font-mono font-bold">Base</span>
+                            <span class="bg-gold/20 text-gold border border-gold/40 px-4 py-2 rounded-full text-[10px] font-mono font-bold">Pointe</span>
+                        </div>
+                    </div>
+
+                    <!-- KPIs HEDGING -->
+                    <div class="grid grid-cols-4 gap-px bg-white/5 border-b border-white/5">
+                        <div class="bg-card/80 p-6 text-center shadow-inner">
+                            <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 flex items-center justify-center gap-2"><div class="w-2 h-2 rounded-full bg-success"></div> Couverture Moy.</div>
+                            <div class="text-3xl font-black font-mono text-white">72%</div>
+                        </div>
+                        <div class="bg-card/80 p-6 text-center shadow-inner">
+                            <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 flex items-center justify-center gap-2"><div class="w-2 h-2 rounded-full bg-cyan animate-pulse"></div> Prix Moyen Pondéré</div>
+                            <div class="text-3xl font-black font-mono text-cyan">95.63 €</div>
+                        </div>
+                        <div class="bg-card/80 p-6 text-center shadow-inner">
+                            <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 flex items-center justify-center gap-2"><div class="w-2 h-2 rounded-full bg-water"></div> Positions Ouvertes</div>
+                            <div class="text-3xl font-black font-mono text-white">14</div>
+                        </div>
+                        <div class="bg-card/80 p-6 text-center shadow-inner">
+                            <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 flex items-center justify-center gap-2"><div class="w-2 h-2 rounded-full bg-gas"></div> Volume PPA</div>
+                            <div class="text-3xl font-black font-mono text-white">1,240 MWh</div>
+                        </div>
+                    </div>
+
+                    <!-- GRAPHIQUE & NÉGOCIATION -->
+                    <div class="grid grid-cols-12 gap-0 bg-abysse/50">
+                        <div class="col-span-8 p-8 border-r border-white/5 relative">
+                            <div class="text-xs text-gray-500 font-bold uppercase tracking-widest mb-6">Prévision de puissance & couverture</div>
+                            <div class="h-[300px] w-full flex items-center justify-center">
+                                <canvas id="hedgingChart" style="width:100%; height:100%;"></canvas>
+                            </div>
+                            <div class="flex gap-4 justify-center mt-6">
+                                <span class="text-[9px] text-gray-400 font-mono flex items-center gap-2"><div class="w-3 h-3 bg-gray-700 rounded-sm"></div> Prévision (Spot)</span>
+                                <span class="text-[9px] text-gray-400 font-mono flex items-center gap-2"><div class="w-3 h-3 bg-water rounded-sm"></div> ARENH</span>
+                                <span class="text-[9px] text-gray-400 font-mono flex items-center gap-2"><div class="w-3 h-3 bg-[#F97316] rounded-sm"></div> PPA Solaire</span>
+                                <span class="text-[9px] text-gray-400 font-mono flex items-center gap-2"><div class="w-3 h-3 bg-purple rounded-sm"></div> CAL 2026</span>
+                            </div>
+                        </div>
+
+                        <div class="col-span-4 p-8 bg-card/50 flex flex-col justify-between">
+                            <div>
+                                <div class="text-xs text-gold font-black uppercase tracking-widest mb-6 border-b border-gold/20 pb-2"><i class="fa-solid fa-bolt mr-2"></i> Exécution Tranche</div>
+                                <label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block">Produit Boursier</label>
+                                <select class="input-edit mb-6 appearance-none bg-abysse border-white/10 text-center font-bold text-white cursor-pointer shadow-inner"><option>CAL 2026 (Base)</option><option>CAL 2027 (Base)</option><option>Q1 2026 (Pointe)</option></select>
+                                
+                                <div class="grid grid-cols-2 gap-4 mb-6">
+                                    <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block">Volume (%)</label><input type="number" class="input-edit text-center shadow-inner" placeholder="10"></div>
+                                    <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block">Cible (€/MWh)</label><input type="number" class="input-edit text-center shadow-inner" placeholder="Spot"></div>
+                                </div>
+
+                                <div class="bg-black/40 border border-white/5 rounded-[2rem] p-4 mb-6 text-center shadow-inner">
+                                    <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-1">Impact sur le prix moyen lissé</div>
+                                    <div class="text-lg font-black font-mono text-success drop-shadow-[0_0_8px_#10B981]">- 5.20 €/MWh</div>
+                                </div>
+                            </div>
+                            <button onclick="App.toast('Ordre de marché transmis au desk CORTEX.', 'success')" class="w-full bg-gold text-abysse font-black py-4 rounded-full hover:bg-white transition shadow-[0_0_20px_rgba(245,158,11,0.4)] text-sm uppercase tracking-widest flex items-center justify-center gap-3">
+                                Négocier <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- ONGLET 5 : DATA ROOM & CONNECTIVITÉ (LE HUB)              -->
+            <!-- ========================================================= -->
+            <div id="view-dataroom" class="view-section max-w-[1400px] mx-auto space-y-8">
+                <div class="flex justify-between items-end mb-10">
+                    <div>
+                        <h2 class="text-4xl font-black text-white italic tracking-tight">Le Hub <span class="text-purple">Data Room</span></h2>
+                        <p class="text-sm text-gray-400 mt-2 font-mono">Connectivité SGE, Email Catching et API Keys.</p>
+                    </div>
+                </div>
+
+                <div class="bento-card p-10 border-t-4 border-purple shadow-[0_20px_50px_rgba(0,0,0,0.4)] flex items-center justify-between bg-gradient-to-r from-card to-purple/10">
+                    <div class="max-w-2xl">
+                        <h3 class="text-2xl font-black text-white mb-4 flex items-center gap-3"><i class="fa-solid fa-envelope-open-text text-purple"></i> Email Catching (La Pieuvre IA)</h3>
+                        <p class="text-sm text-gray-300 leading-relaxed font-mono mb-6">Donnez cette adresse unique à vos fournisseurs. L'IA CORTEX aspirera, lira et classera automatiquement les factures PDF dans votre coffre-fort, sans aucune action de votre part.</p>
+                        <div class="flex items-center gap-4 bg-abysse border border-purple/50 p-2 rounded-full w-max shadow-inner">
+                            <span class="text-cyan font-mono font-bold pl-6 pr-4 tracking-widest text-sm" id="catch-email">factures-xxxxx@inbox.energistrat.com</span>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('catch-email').innerText); App.toast('Email copié !', 'success')" class="bg-purple text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-white hover:text-purple transition shadow-lg"><i class="fa-regular fa-copy"></i></button>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-robot text-9xl text-purple opacity-20 drop-shadow-[0_0_30px_rgba(168,85,247,0.5)]"></i>
+                </div>
+
+                <div class="grid grid-cols-2 gap-8">
+                    <div class="bento-card p-10 border border-white/5 shadow-xl">
+                        <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-white/10 pb-4"><i class="fa-solid fa-file-contract text-cyan text-xl"></i> Registre des Mandats (SGE)</h4>
+                        <div class="space-y-4" id="mandates-list">
+                            <div class="text-center py-6 text-gray-500 font-mono text-xs"><i class="fa-solid fa-spinner fa-spin text-cyan mb-2 text-xl block"></i> Vérification des autorisations Enedis/GRDF...</div>
+                        </div>
+                    </div>
+
+                    <div class="bento-card p-10 border border-white/5 shadow-xl bg-abysse/50">
+                        <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-white/10 pb-4"><i class="fa-solid fa-code text-gold text-xl"></i> Webhooks & API (ERP / GTB)</h4>
+                        <p class="text-xs text-gray-400 mb-8 leading-relaxed">Générez un Token pour connecter ENERGISTRAT à votre ERP (SAP, Sage) ou à vos automates de bâtiment (Siemens, Schneider) en bi-directionnel.</p>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="text-[10px] text-gold uppercase font-bold tracking-widest pl-4 mb-2 block">Bearer Token (Lecture/Écriture)</label>
+                                <div class="flex gap-2">
+                                    <input type="password" value="sk-live-1234567890abcdef" class="input-edit input-mono text-gold bg-gold/5 border-gold/30 rounded-r-none" readonly>
+                                    <button onclick="App.toast('Nouveau Token généré.', 'info')" class="bg-gold text-abysse font-black px-6 rounded-r-full hover:bg-white transition text-xs"><i class="fa-solid fa-rotate-right"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- ONGLET 6 : L'APP STORE (UPSALE GAMIFIÉ)                   -->
+            <!-- ========================================================= -->
+            <div id="view-store" class="view-section max-w-[1600px] mx-auto space-y-10">
+                <div class="text-center mb-16">
+                    <h2 class="text-5xl font-black text-white italic tracking-tight mb-4">Cortex <span class="text-gold">Store</span></h2>
+                    <p class="text-base text-gray-400 font-mono">Débloquez la pleine puissance de l'Intelligence Artificielle pour votre portefeuille.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- MODULE PPA (Locked) -->
+                    <div class="bento-card p-0 relative overflow-hidden premium-card group h-80 flex flex-col border-white/5">
+                        <div class="p-8 flex-1">
+                            <i class="fa-solid fa-solar-panel text-4xl text-[#F97316] mb-6"></i>
+                            <h3 class="text-2xl font-black text-white mb-3">PPA Builder</h3>
+                            <p class="text-sm text-gray-400 leading-relaxed font-mono">Simulation d'achat direct EnR (Ferme Solaire) et calcul du prix lissé sur 10 ans.</p>
+                        </div>
+                        <div class="p-6 bg-black/40 border-t border-white/5 flex justify-between items-center"><span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Add-on Premium</span><i class="fa-solid fa-lock text-gray-600"></i></div>
+                        <div class="premium-lock p-8 text-center opacity-0 group-hover:opacity-100 transition-opacity duration-300" onclick="openUpsellModal('PPA Builder', 'Décarbonez vos achats et fixez votre prix sur 10 ans avec notre IA de dimensionnement PPA.')">
+                            <i class="fa-solid fa-lock text-5xl text-gold mb-6 drop-shadow-[0_0_20px_#F59E0B]"></i>
+                            <h4 class="text-xl font-black text-white mb-2">Module Verrouillé</h4>
+                            <p class="text-xs text-gray-300 font-mono mb-6">Découvrez le potentiel caché.</p>
+                            <button class="bg-gold text-abysse font-black px-8 py-3 rounded-full text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(245,158,11,0.5)]">En savoir plus</button>
+                        </div>
+                    </div>
+
+                    <!-- MODULE TERTIAIRE (Locked) -->
+                    <div class="bento-card p-0 relative overflow-hidden premium-card group h-80 flex flex-col border-white/5">
+                        <div class="p-8 flex-1">
+                            <i class="fa-solid fa-buildings text-4xl text-success mb-6"></i>
+                            <h3 class="text-2xl font-black text-white mb-3">Cortex Tertiaire</h3>
+                            <p class="text-sm text-gray-400 leading-relaxed font-mono">Trajectoire de réduction (-40%) et génération de l'export API OPERAT.</p>
+                        </div>
+                        <div class="p-6 bg-black/40 border-t border-white/5 flex justify-between items-center"><span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Add-on Premium</span><i class="fa-solid fa-lock text-gray-600"></i></div>
+                        <div class="premium-lock p-8 text-center opacity-0 group-hover:opacity-100 transition-opacity duration-300" onclick="openUpsellModal('Cortex Tertiaire', 'Automatisez votre déclaration OPERAT et évitez les sanctions légales grâce à notre moteur de conformité ELAN.')">
+                            <i class="fa-solid fa-lock text-5xl text-gold mb-6 drop-shadow-[0_0_20px_#F59E0B]"></i>
+                            <h4 class="text-xl font-black text-white mb-2">Module Verrouillé</h4>
+                            <p class="text-xs text-gray-300 font-mono mb-6">Évitez les sanctions légales.</p>
+                            <button class="bg-gold text-abysse font-black px-8 py-3 rounded-full text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(245,158,11,0.5)]">En savoir plus</button>
+                        </div>
+                    </div>
+
+                    <!-- MODULE FINANCIAL TWIN (Unlocked) -->
+                    <div class="bento-card p-0 relative overflow-hidden h-80 flex flex-col border-cyan/50 shadow-[0_0_30px_rgba(0,229,255,0.1)]">
+                        <div class="absolute -right-10 -top-10 text-[150px] text-cyan opacity-5"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                        <div class="p-8 flex-1 relative z-10">
+                            <i class="fa-solid fa-file-invoice-dollar text-4xl text-cyan mb-6"></i>
+                            <h3 class="text-2xl font-black text-white mb-3">Financial Twin</h3>
+                            <p class="text-sm text-gray-400 leading-relaxed font-mono">Audit comptable Factur-X, Trust Score et chasse aux taxes. Vérification au centime près.</p>
+                        </div>
+                        <div class="p-6 bg-cyan/10 border-t border-cyan/20 flex justify-between items-center relative z-10">
+                            <span class="text-xs font-black text-cyan uppercase tracking-widest flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-cyan animate-pulse"></div> Actif</span>
+                            <button onclick="window.location.href='/finance'" class="text-xs font-bold text-white hover:text-cyan transition">Accéder <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 
-    <!-- TOAST ENGINE -->
-    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none"></div>
+    <!-- MODALE : UPSELL GAMIFIÉ -->
+    <div id="upsell-modal" class="fixed inset-0 bg-black/90 z-[100] hidden items-center justify-center backdrop-blur-md opacity-0 transition-opacity">
+        <div class="bento-card p-0 rounded-[3rem] w-[700px] border-2 border-gold/30 shadow-[0_0_80px_rgba(245,158,11,0.3)] transform scale-95 transition-transform overflow-hidden" id="modal-upsell-content">
+            <div class="h-48 bg-[url('https://www.energistrat.fr/wp-content/uploads/2023/10/Dashboard-flou.jpg')] bg-cover bg-center relative flex flex-col items-center justify-center border-b border-white/10" style="background-image: linear-gradient(rgba(0,21,41,0.8), rgba(0,21,41,0.9)), url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHBhdGggZD0iTTIwIDBMNDAgMjBMMjAgNDBMMCAyMHoiIGZpbGw9IiMwMEU1RkYiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==');">
+                <i class="fa-solid fa-lock text-5xl text-gold drop-shadow-[0_0_20px_#F59E0B] mb-4"></i>
+                <h3 class="text-3xl font-black text-white italic tracking-tight drop-shadow-lg" id="upsell-title">Nom du Module</h3>
+            </div>
+            
+            <div class="p-10 text-center">
+                <p class="text-sm text-gray-300 leading-relaxed font-mono mb-8" id="upsell-desc">Description du module premium.</p>
+                <div class="bg-gold/10 border border-gold/30 p-6 rounded-[2rem] mb-10 text-left flex items-start gap-4">
+                    <i class="fa-solid fa-robot text-3xl text-gold mt-1"></i>
+                    <div>
+                        <h4 class="text-xs font-black text-gold uppercase tracking-widest mb-1">Diagnostic CORTEX IA</h4>
+                        <p class="text-sm text-white font-bold">L'IA a détecté un potentiel d'optimisation non exploité sur votre périmètre actuel. L'activation de ce module est fortement recommandée.</p>
+                    </div>
+                </div>
+                <div class="flex justify-center gap-6">
+                    <button onclick="closeModal('upsell-modal')" class="text-gray-400 text-xs font-bold px-8 py-4 hover:text-white uppercase tracking-widest transition">Peut-être plus tard</button>
+                    <button onclick="requestActivation()" id="btn-request-activation" class="bg-gold text-abysse text-sm font-black px-10 py-4 rounded-full hover:bg-white transition shadow-[0_0_30px_rgba(245,158,11,0.5)] flex items-center gap-3 uppercase tracking-widest">
+                        <i class="fa-solid fa-bolt"></i> Demander l'Activation
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<!-- ============================================================================== -->
-    <!-- LOGIQUE JAVASCRIPT (CORTEX DATA UNITY V12.8 - PATCH ANTI-CRASH)                -->
+    <!-- ============================================================================== -->
+    <!-- CORTEX ERP CLIENT V13 - MOTEUR JAVASCRIPT (DATA UNITY)                         -->
+    <!-- Protocole NEXUS, API Gouv (SIRET), API ADEME, Chart.js (Hedging Condor)        -->
     <!-- ============================================================================== -->
     <script>
-        const App = {
-            toast: function(msg, type='info') {
-                const container = document.getElementById('toast-container');
-                if(!container) return;
-                const colors = { success: 'bg-success border-success/50 text-abysse', error: 'bg-alert border-alert/50 text-white', info: 'bg-cyan border-cyan/50 text-abysse', sage: 'bg-purple border-purple/50 text-white' };
-                const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
-                const el = document.createElement('div');
-                el.className = `${colors[type] || colors.info} px-6 py-4 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto z-[999]`;
-                el.innerHTML = `<i class="fa-solid ${icon} text-lg"></i> <span>${msg}</span>`;
-                container.appendChild(el);
-                requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
-                setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
+    const App = {
+        toast: function(msg, type='info') {
+            const container = document.getElementById('toast-container');
+            if(!container) return;
+            const colors = { success: 'bg-success border-success/50 text-abysse', error: 'bg-alert border-alert/50 text-white', info: 'bg-cyan border-cyan/50 text-abysse', warning: 'bg-gold border-gold/50 text-abysse' };
+            const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
+            const el = document.createElement('div');
+            el.className = `${colors[type] || colors.info} px-8 py-4 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto z-[9999]`;
+            el.innerHTML = `<i class="fa-solid ${icon} text-xl"></i> <span>${msg}</span>`;
+            container.appendChild(el);
+            requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
+            setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
+        }
+    };
+
+    const Nexus = {
+        get forceTenant() { return new URLSearchParams(window.location.search).get('force_tenant') || localStorage.getItem('cortex_god_mode_tenant') || null; },
+        getApiUrl(path) {
+            if (!this.forceTenant) return path;
+            const separator = path.includes('?') ? '&' : '?';
+            return `${path}${separator}force_tenant=${encodeURIComponent(this.forceTenant)}`;
+        },
+        async fetch(path, options = {}) {
+            try {
+                const response = await fetch(this.getApiUrl(path), options);
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData?.error || errData?.detail || `Erreur HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                if(data?.success === false) throw new Error(data?.error || "Erreur API interne");
+                return data;
+            } catch (error) {
+                App.toast(error.message, 'error');
+                console.error(`[NEXUS ERROR] ${path}:`, error);
+                return null;
+            }
+        }
+    };
+
+    let GLOBAL_TENANT_ID = Nexus.forceTenant || "ORPHELIN";
+    let SITES =[];
+    let CURRENT_SITE_ID = null;
+    let currentEnergy = 'elec';
+    let hedgingChartInstance = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        switchView('gouvernance');
+        const emailEl = document.getElementById('catch-email');
+        if(emailEl) emailEl.innerText = `factures-${Math.random().toString(36).substring(2, 8)}@inbox.energistrat.com`;
+        await loadGouvernance();
+        await loadFleet();
+    });
+
+    window.switchView = function(viewId) {
+        document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
+        const btn = document.getElementById('nav-' + viewId);
+        if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
+        
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        const target = document.getElementById('view-' + viewId);
+        if(target) target.classList.add('active');
+        
+        const titles = { 'gouvernance': 'Gouvernance', 'parc': 'Asset Management', 'jumeau': 'Jumeau Physique', 'marches': 'Salle de Marchés', 'dataroom': 'Data Room & Hub', 'store': 'Cortex Store' };
+        const subtitles = { 'gouvernance': 'Portefeuille et Maisons Mères', 'parc': 'Arbre de Parc 3D (Multi-SIRET)', 'jumeau': 'Auto-Scan ADEME & Attributs techniques', 'marches': 'Couverture, Tranches & Acheminement', 'dataroom': 'Connectivité SGE, API & Email Catching', 'store': 'Catalogue des modules IA' };
+        
+        const pageTitle = document.getElementById('page-title');
+        const pageSub = document.getElementById('header-subtitle');
+        if(pageTitle) pageTitle.innerText = titles[viewId] || 'Mon Espace';
+        if(pageSub) pageSub.innerText = subtitles[viewId] || '';
+
+        if(viewId === 'marches') setTimeout(initHedgingChart, 300);
+        if(viewId === 'dataroom') generateMandatesList();
+    }
+
+    async function loadGouvernance() {
+        const data = await Nexus.fetch('/api/partner/get_config');
+        if(data?.data) {
+            const conf = data.data;
+            GLOBAL_TENANT_ID = conf.siret || conf.tenant_id || GLOBAL_TENANT_ID;
+            
+            const elSiret = document.getElementById('gov-siret');
+            const elName = document.getElementById('gov-name');
+            const elNaf = document.getElementById('gov-naf');
+            const elAddr = document.getElementById('gov-address');
+            const elHold = document.getElementById('holding-name');
+            const elBase = document.getElementById('gov-baseline-year');
+            
+            if(elSiret) elSiret.value = conf.siret || "";
+            if(elName) elName.value = conf.name || "";
+            if(elNaf) elNaf.value = conf.naf || "";
+            if(elAddr) elAddr.value = conf.address || "";
+            if(elHold) elHold.value = conf.name || "Portefeuille Global";
+            if(elBase && conf.baseline_year) elBase.value = conf.baseline_year;
+
+            if(conf.siret && String(conf.siret).length >= 9) {
+                const siren = String(conf.siret).substring(0, 9);
+                const cle = (12 + 3 * (parseInt(siren) % 97)) % 97;
+                const elTva = document.getElementById('gov-tva');
+                if(elTva) elTva.value = `FR${cle < 10 ? '0'+cle : cle}${siren}`;
+            }
+        }
+    }
+
+    window.triggerMagicFill = async function() {
+        const siret = document.getElementById('gov-siret')?.value?.replace(/\s/g, '');
+        if(!siret || siret.length < 14) return;
+        
+        const status = document.getElementById('magic-status');
+        if(status) status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i>';
+        
+        try {
+            const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${siret}`);
+            const data = await res.json();
+            
+            if(data?.results?.length > 0) {
+                const etab = data.results[0];
+                const nom = etab.nom_complet || etab.nom_raison_sociale;
+                const naf = etab.activite_principale;
+                
+                document.getElementById('gov-name').value = nom || "";
+                document.getElementById('gov-naf').value = naf || "";
+                const holdingName = document.getElementById('holding-name');
+                if(holdingName) holdingName.value = nom || "";
+                
+                const baseSiren = siret.substring(0, 9);
+                const cle = (12 + 3 * (parseInt(baseSiren) % 97)) % 97;
+                const tvaEl = document.getElementById('gov-tva');
+                if(tvaEl) tvaEl.value = `FR${cle < 10 ? '0'+cle : cle}${baseSiren}`;
+
+                let adresseExacte = "";
+                if(etab.matching_etablissements && etab.matching_etablissements.length > 0) {
+                    const matchEtab = etab.matching_etablissements[0];
+                    adresseExacte = `${matchEtab.adresse || ""}, ${matchEtab.code_postal || ""} ${matchEtab.libelle_commune || ""}`;
+                } else if(etab.siege?.adresse) {
+                    adresseExacte = `${etab.siege.adresse}, ${etab.siege.code_postal} ${etab.siege.libelle_commune}`;
+                }
+                
+                document.getElementById('gov-address').value = adresseExacte.trim();
+
+                if(status) status.innerHTML = '<i class="fa-solid fa-check-circle text-success drop-shadow-[0_0_10px_#10B981]"></i>';
+                App.toast("Identité locale (SIRET) récupérée avec précision.", "success");
+                GLOBAL_TENANT_ID = siret;
+            } else {
+                if(status) status.innerHTML = '<i class="fa-solid fa-xmark text-alert"></i>';
+                App.toast("SIRET introuvable dans la base de l'État.", "warning");
+            }
+        } catch(e) {
+            if(status) status.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-alert"></i>';
+            App.toast("Erreur de connexion API Gouv.", "error");
+        }
+    }
+
+    window.saveGouvernance = async function() {
+        const payload = {
+            siret: document.getElementById('gov-siret')?.value,
+            name: document.getElementById('gov-name')?.value,
+            naf: document.getElementById('gov-naf')?.value,
+            address: document.getElementById('gov-address')?.value,
+            baseline_year: parseInt(document.getElementById('gov-baseline-year')?.value) || 2010
+        };
+        
+        const res1 = await Nexus.fetch('/api/partner/save_config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        const res2 = await Nexus.fetch('/api/settings/carbon', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ baseline_year: payload.baseline_year, baseline_kwh_sqm: 0.0 }) });
+        
+        if(res1?.success) App.toast("Paramètres du portefeuille sauvegardés.", "success");
+    }
+
+    window.sendMagicLink = function() {
+        const email = document.getElementById('gov-delegate-email')?.value;
+        if(!email) return App.toast("Veuillez saisir l'email du technicien.", "error");
+        App.toast(`Lien sécurisé de délégation envoyé à ${email}`, "success");
+        document.getElementById('gov-delegate-email').value = "";
+    }
+
+    async function loadFleet() {
+        const data = await Nexus.fetch('/api/dashboard/fleet');
+        if(data?.fleet) {
+            SITES = data.fleet;
+            renderAssetTree();
+            updateGlobalHealthScore();
+        }
+    }
+
+    function updateGlobalHealthScore() {
+        const el = document.getElementById('global-health');
+        if(!el) return;
+        if(SITES.length === 0) { el.innerText = "0%"; return; }
+        
+        let totalScore = 0;
+        SITES.forEach(s => {
+            let score = 0;
+            if(s.pdl || s.id) score += 25;
+            if(s.surface || s.SURFACE_M2 || s.location?.surface) score += 25;
+            if(s.provider || s.FOURNISSEUR || s.contract?.provider) score += 15;
+            if(s.budget > 0 || s.prix_hph || s.price_kwh || s.pricing?.price_kwh) score += 20;
+            if(s.end_date || s.contract?.end_date) score += 15;
+            totalScore += Math.min(score, 100);
+        });
+        
+        const avg = Math.round(totalScore / SITES.length);
+        el.innerText = `${avg}%`;
+        el.className = `w-12 h-12 flex items-center justify-center rounded-full border-2 font-black font-mono text-sm shadow-lg ${avg === 100 ? 'text-success border-success/50 bg-success/10 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : (avg > 60 ? 'text-cyan border-cyan/50 bg-cyan/10 shadow-[0_0_15px_rgba(0,229,255,0.3)]' : 'text-alert border-alert/50 bg-alert/10 shadow-[0_0_15px_rgba(239,68,68,0.3)]')}`;
+    }
+
+    window.renderAssetTree = function() {
+        const term = String(document.getElementById('search-tree')?.value || "").toLowerCase();
+        const container = document.getElementById('asset-tree-container');
+        if(!container) return;
+        container.innerHTML = '';
+        
+        let filtered = SITES.filter(s => String(s?.name || '').toLowerCase().includes(term) || String(s?.pdl || s?.id || '').includes(term));
+        if(filtered.length === 0) { container.innerHTML = '<div class="text-gray-500 text-sm font-mono text-center py-10">Aucun actif trouvé dans le périmètre.</div>'; return; }
+
+        const grouped = {};
+        filtered.forEach(s => {
+            const lot = s.segment && s.segment !== '-' ? s.segment : (s.city || "Patrimoine Global");
+            if(!grouped[lot]) grouped[lot] = [];
+            grouped[lot].push(s);
+        });
+
+        for (const lot in grouped) {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = "mb-6";
+            groupDiv.innerHTML = `<div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-3"><i class="fa-solid fa-folder-open text-cyan"></i> ${lot} <span class="bg-black/40 px-2 py-0.5 rounded-full border border-white/5">${grouped[lot].length}</span></div>`;
+            
+            const list = document.createElement('div');
+            list.className = "pl-3 border-l border-white/10 space-y-2 ml-2";
+
+            grouped[lot].forEach(s => {
+                const div = document.createElement('div');
+                const isActive = CURRENT_SITE_ID === s.id;
+                div.className = `p-3 rounded-2xl cursor-pointer transition flex items-center justify-between border ${isActive ? 'bg-cyan/10 border-cyan text-white shadow-[0_0_15px_rgba(0,229,255,0.2)]' : 'bg-card/30 border-white/5 text-gray-400 hover:bg-white/10 hover:text-white'}`;
+                div.onclick = () => loadSiteForm(s.id);
+                
+                const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire text-gas"></i>' : '<i class="fa-solid fa-bolt text-cyan"></i>';
+                div.innerHTML = `<div class="flex items-center gap-3 truncate">${icon}<div class="truncate"><div class="font-bold text-xs truncate text-white">${s.name || 'Site sans nom'}</div><div class="text-[9px] font-mono mt-0.5 opacity-70 uppercase tracking-widest">${s.pdl || s.id}</div></div></div>`;
+                list.appendChild(div);
+            });
+            groupDiv.appendChild(list);
+            container.appendChild(groupDiv);
+        }
+    }
+
+    window.loadSiteForm = async function(id) {
+        CURRENT_SITE_ID = id;
+        renderAssetTree();
+        
+        const overlay = document.getElementById('site-editor-overlay');
+        if(overlay) overlay.classList.add('hidden');
+        
+        document.getElementById('asset-title').innerText = "Chargement...";
+        const data = await Nexus.fetch(`/api/dashboard/data/${id}`);
+        
+        if(data) {
+            document.getElementById('asset-title').innerText = data?.identity?.site_name || data?.name || "Actif Sans Nom";
+            document.getElementById('asset-id').innerText = id;
+            
+            document.getElementById('site-name').value = data?.identity?.site_name || data?.name || "";
+            document.getElementById('site-lot').value = data?.identity?.lot_name || data?.segment || "";
+            document.getElementById('address-input').value = data?.location?.address || "";
+            document.getElementById('zip-input').value = data?.location?.zip_code || "";
+            document.getElementById('city-input').value = data?.location?.city || "";
+            document.getElementById('site-surface').value = data?.location?.surface || "";
+            document.getElementById('site-insee').value = data?.location?.insee || "";
+            document.getElementById('inp-type').value = data?.location?.typologie || "";
+            document.getElementById('site-pdl').value = data?.contract?.pdl || data?.contract?.pce || "";
+            
+            document.getElementById('jum-address').value = data?.location?.address || "";
+            document.getElementById('jum-surface').value = data?.location?.surface || "0";
+            
+            document.getElementById('site-provider').value = data?.contract?.provider || "";
+            document.getElementById('site-start-date').value = data?.contract?.start_date || ""; 
+            document.getElementById('site-end-date').value = data?.contract?.end_date || "";
+            
+            if(data?.energy_type === 'gaz' || data?.contract?.energy_type === 'gaz') setSiteEnergy('gaz'); else setSiteEnergy('elec');
+
+            const pd = data?.contract?.power_details || {};
+            document.getElementById('ps-hph').value = pd?.hph || data?.contract?.ps_hph || "";
+            document.getElementById('ps-hch').value = pd?.hch || data?.contract?.ps_hch || "";
+            document.getElementById('ps-hpe').value = pd?.hpe || data?.contract?.ps_hpe || "";
+            document.getElementById('ps-hce').value = pd?.hce || data?.contract?.ps_hce || "";
+            document.getElementById('ps-unique').value = data?.contract?.power || "";
+
+            document.getElementById('site-profil-gaz').value = data?.contract?.profil || "";
+            document.getElementById('ps-gaz-cja').value = data?.contract?.cja || "";
+            document.getElementById('ps-gaz-car').value = data?.kpis?.volume_mwh || "";
+
+            const p = data?.pricing || {};
+            if(currentEnergy === 'gaz') {
+                document.getElementById('px-gaz-fix').value = p?.fix || "";
+                document.getElementById('px-gaz-mol').value = p?.price_kwh ? (p.price_kwh*1000).toFixed(2) : (p?.hph || "");
+                document.getElementById('px-gaz-stock').value = p?.stockage || "";
+                document.getElementById('px-gaz-tax').value = p?.tax || 8.44;
+            } else {
+                document.getElementById('px-hph').value = p?.hph || "";
+                document.getElementById('px-hch').value = p?.hch || "";
+                document.getElementById('px-hpe').value = p?.hpe || "";
+                document.getElementById('px-hce').value = p?.hce || "";
+                document.getElementById('px-unique').value = p?.price_kwh ? (p.price_kwh*1000).toFixed(2) : "";
+                document.getElementById('px-fix').value = p?.fix || "";
+                document.getElementById('px-tax').value = p?.tax || 22.5;
+            }
+
+            const isAdvanced = (document.getElementById('ps-hph').value !== "" || document.getElementById('px-hph').value !== "");
+            const quadToggle = document.getElementById('quadrant-toggle');
+            if(quadToggle) { quadToggle.checked = isAdvanced; toggleQuadrants(); }
+            
+            if(document.getElementById('view-marches').classList.contains('active')) {
+                initHedgingChart();
+            }
+        }
+    }
+
+    window.resetSiteForm = function() {
+        CURRENT_SITE_ID = null;
+        renderAssetTree();
+        const overlay = document.getElementById('site-editor-overlay');
+        if(overlay) overlay.classList.add('hidden');
+        
+        document.getElementById('asset-title').innerText = "Nouvelle Entité";
+        document.getElementById('asset-id').innerText = "NEW";
+        
+        const inputs =['site-name','site-lot','address-input','site-surface','city-input','zip-input','site-insee','site-pdl','site-provider','site-start-date','site-end-date','ps-hph','ps-hch','ps-hpe','ps-hce','ps-unique','px-hph','px-hch','px-hpe','px-hce','px-unique','px-fix','ps-gaz-cja','ps-gaz-car','site-profil-gaz','px-gaz-mol','px-gaz-fix','px-gaz-stock','inp-type', 'jum-address', 'jum-surface', 'jum-dpe'];
+        inputs.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+        
+        document.getElementById('px-tax').value = "22.5";
+        document.getElementById('px-gaz-tax').value = "8.44";
+        
+        setSiteEnergy('elec');
+        const quadToggle = document.getElementById('quadrant-toggle');
+        if(quadToggle) { quadToggle.checked = false; toggleQuadrants(); }
+    }
+
+    window.setSiteEnergy = function(type) {
+        currentEnergy = type;
+        const btnElec = document.getElementById('btn-site-elec'); 
+        const btnGaz = document.getElementById('btn-site-gaz');
+        const lblPrimary = document.getElementById('lbl-primary');
+
+        if(type === 'elec') {
+            if(btnElec) btnElec.className = "px-6 py-3 rounded-full border-2 border-cyan bg-cyan/10 text-cyan font-black text-xs flex items-center gap-2 uppercase tracking-widest shadow-[0_0_15px_rgba(0,229,255,0.3)]";
+            if(btnGaz) btnGaz.className = "px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest hover:border-gas hover:text-gas transition";
+            if(lblPrimary) lblPrimary.innerText = "PDL / PRM (14) *";
+            document.getElementById('pricing-elec-grid')?.classList.remove('hidden');
+            document.getElementById('pricing-gaz-grid')?.classList.add('hidden');
+            document.getElementById('toggle-quadrants-container')?.classList.remove('hidden');
+        } else {
+            if(btnGaz) btnGaz.className = "px-6 py-3 rounded-full border-2 border-gas bg-gas/10 text-gas font-black text-xs flex items-center gap-2 uppercase tracking-widest shadow-[0_0_15px_rgba(249,115,22,0.3)]";
+            if(btnElec) btnElec.className = "px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest hover:border-cyan hover:text-cyan transition";
+            if(lblPrimary) lblPrimary.innerText = "PCE GAZ (14) *";
+            document.getElementById('pricing-elec-grid')?.classList.add('hidden');
+            document.getElementById('pricing-gaz-grid')?.classList.remove('hidden');
+            document.getElementById('toggle-quadrants-container')?.classList.add('hidden');
+        }
+    }
+
+    window.toggleQuadrants = function() {
+        const isAdvanced = document.getElementById('quadrant-toggle')?.checked;
+        document.querySelectorAll('.quad-advanced').forEach(el => el.style.display = isAdvanced ? 'block' : 'none');
+        document.querySelectorAll('.quad-simple').forEach(el => el.style.display = isAdvanced ? 'none' : 'block');
+    }
+
+    window.saveSiteData = async function() {
+        const inputPdl = document.getElementById('site-pdl')?.value?.replace(/\s/g, '');
+        if(!inputPdl) { App.toast("L'identifiant PDL/PCE est obligatoire.", "error"); return; }
+
+        App.toast("Synchronisation avec la Base 3D en cours...", "info");
+        const isAdvanced = document.getElementById('quadrant-toggle')?.checked;
+
+        const payload = {
+            id: CURRENT_SITE_ID || inputPdl, 
+            forced_tenant_id: GLOBAL_TENANT_ID,
+            identity: {
+                id: CURRENT_SITE_ID || inputPdl, 
+                tenant_id: GLOBAL_TENANT_ID,
+                site_name: document.getElementById('site-name')?.value || "",
+                lot_name: document.getElementById('site-lot')?.value || ""
+            },
+            location: { 
+                address: document.getElementById('address-input')?.value || "", 
+                city: document.getElementById('city-input')?.value || "",       
+                zip_code: document.getElementById('zip-input')?.value || "",
+                insee: document.getElementById('site-insee')?.value || "",
+                surface: parseFloat(document.getElementById('site-surface')?.value) || 0,
+                typologie: document.getElementById('inp-type')?.value || ""
+            },
+            contract: {
+                pdl: currentEnergy === 'elec' ? inputPdl : "",
+                pce: currentEnergy === 'gaz' ? inputPdl : "",
+                power: currentEnergy === 'gaz' ? 0 : (isAdvanced ? 0 : parseFloat(document.getElementById('ps-unique')?.value) || 0),
+                cja: currentEnergy === 'gaz' ? parseFloat(document.getElementById('ps-gaz-cja')?.value) || 0 : 0,
+                profil: currentEnergy === 'gaz' ? document.getElementById('site-profil-gaz')?.value : "",
+                provider: document.getElementById('site-provider')?.value || "",
+                start_date: document.getElementById('site-start-date')?.value || "",
+                end_date: document.getElementById('site-end-date')?.value || "",
+                energy_type: currentEnergy,
+                power_details: {
+                    hph: parseFloat(document.getElementById('ps-hph')?.value) || 0,
+                    hch: parseFloat(document.getElementById('ps-hch')?.value) || 0,
+                    hpe: parseFloat(document.getElementById('ps-hpe')?.value) || 0,
+                    hce: parseFloat(document.getElementById('ps-hce')?.value) || 0
+                }
+            },
+            kpis: {
+                volume_mwh: currentEnergy === 'gaz' ? parseFloat(document.getElementById('ps-gaz-car')?.value) || 0 : 0
+            },
+            pricing: {
+                price_kwh: currentEnergy === 'elec' && !isAdvanced ? (parseFloat(document.getElementById('px-unique')?.value) || 0)/1000 : (currentEnergy === 'gaz' ? (parseFloat(document.getElementById('px-gaz-mol')?.value)||0)/1000 : 0),
+                hph: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hph')?.value) || 0,
+                hch: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hch')?.value) || 0,
+                hpe: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hpe')?.value) || 0,
+                hce: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hce')?.value) || 0,
+                fix: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-fix')?.value) || 0 : parseFloat(document.getElementById('px-fix')?.value) || 0,
+                stockage: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-stock')?.value) || 0 : 0,
+                tax: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-tax')?.value) || 8.44 : parseFloat(document.getElementById('px-tax')?.value) || 22.5
             }
         };
 
-        // --- MOTEUR GOD MODE ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const forceTenant = urlParams.get('force_tenant') || localStorage.getItem('cortex_god_mode_tenant');
-
-        let SITES =[];
-        let CURRENT_SITE_ID = null;
-        let currentEnergy = 'elec';
-        let GLOBAL_TENANT_ID = (forceTenant && forceTenant !== 'ALL') ? forceTenant : "TENANT_DEFAULT";
-
-        document.addEventListener('DOMContentLoaded', () => {
-            if(forceTenant && forceTenant !== 'ALL') {
-                const ind = document.getElementById('god-mode-indicator');
-                if(ind) ind.classList.remove('hidden');
-                const impId = document.getElementById('import-tenant-id');
-                if(impId) impId.innerText = forceTenant;
-            }
-            switchView('general'); 
+        const data = await Nexus.fetch('/api/settings/save_client', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(payload) 
         });
-
-        window.switchView = function(viewId) {
-            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active', 'text-white'); el.classList.add('text-gray-400'); });
-            const btn = document.getElementById('nav-' + viewId);
-            if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-gray-400'); }
-            
-            const views =['view-general', 'view-perimetre', 'view-import', 'view-rgpd', 'view-support', 'view-equipe'];
-            views.forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('active'); });
-            
-            const target = document.getElementById('view-' + viewId);
-            if(target) target.classList.add('active');
-
-            if(viewId === 'general') loadPartnerConfig();
-            if(viewId === 'perimetre') { loadFleet(); resetSiteForm(); }
-            if(viewId === 'support') loadSageTimeline();
+        
+        if(data?.success) { 
+            App.toast("Actif sauvegardé et consolidé.", "success"); 
+            CURRENT_SITE_ID = data.id || payload.id; 
+            await loadFleet(); 
+            loadSiteForm(CURRENT_SITE_ID); 
         }
+    }
 
-        // ==========================================
-        // VUE 1 : MON ENTREPRISE (MASTER TENANT)
-        // ==========================================
-        async function loadPartnerConfig() {
+    let addressSearchTimeout = null;
+    window.searchAddress = async function() {
+        const query = document.getElementById('address-input').value;
+        const list = document.getElementById('address-suggestions');
+        if(!list) return;
+        
+        if(query.length < 4) { list.classList.add('hidden'); return; }
+        
+        clearTimeout(addressSearchTimeout);
+        addressSearchTimeout = setTimeout(async () => {
             try {
-                const res = await fetch('/api/partner/get_config');
-                const j = await res.json();
-                if(j.success && j.data) {
-                    if (forceTenant && forceTenant !== 'ALL') {
-                        document.getElementById('partner-siret').value = forceTenant;
-                        checkPartnerIdentity(); 
-                    } else {
-                        document.getElementById('partner-siret').value = j.data.siret || "";
-                        document.getElementById('partner-name').value = j.data.name || "";
-                        document.getElementById('partner-address').value = j.data.address || "";
-                        document.getElementById('partner-zip').value = j.data.zip || "";
-                        document.getElementById('partner-city').value = j.data.city || "";
-                        document.getElementById('partner-naf').value = j.data.naf || "";
-                    }
+                const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`);
+                const data = await res.json();
+                list.innerHTML = '';
+                if(data.features && data.features.length > 0) {
+                    list.classList.remove('hidden');
+                    data.features.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'suggestion-item text-gray-300 transition font-mono';
+                        div.innerText = item.properties.label;
+                        div.onclick = () => { 
+                            document.getElementById('address-input').value = item.properties.name || ""; 
+                            document.getElementById('zip-input').value = item.properties.postcode || "";
+                            document.getElementById('city-input').value = item.properties.city || "";
+                            document.getElementById('site-insee').value = item.properties.citycode || "";
+                            list.classList.add('hidden'); 
+                        };
+                        list.appendChild(div);
+                    });
                 }
             } catch(e) {}
-        }
+        }, 300);
+    }
+    document.addEventListener('click', function(e) { if (document.getElementById('address-input') && !document.getElementById('address-input').contains(e.target)) { const sug = document.getElementById('address-suggestions'); if(sug) sug.classList.add('hidden'); } });
 
-        async function checkPartnerIdentity() {
-            const val = document.getElementById('partner-siret').value.replace(/\s/g, '');
-            const status = document.getElementById('partner-status');
-            if(val.length >= 9) {
-                status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i>';
-                try {
-                    const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${val}`);
-                    const data = await res.json();
-                    if(data.results && data.results.length > 0) {
-                        const etab = data.results[0];
-                        status.innerHTML = '<i class="fa-solid fa-check-circle text-success shadow-[0_0_10px_#10B981] rounded-full"></i>';
-                        
-                        const nom = etab.nom_complet || etab.nom_raison_sociale || "Entité Publique";
-                        document.getElementById('partner-name').value = nom;
-                        document.getElementById('partner-naf').value = etab.activite_principale || "Inconnu";
-                        
-                        GLOBAL_TENANT_ID = val; 
-                        
-                        try { document.getElementById('partner-tva').value = "FR" + (12 + 3 * (parseInt(val.substring(0,9)) % 97)) % 97 + val.substring(0, 9); } catch(e) {}
-                        
-                        if(etab.siege && etab.siege.adresse) {
-                            document.getElementById('partner-address').value = etab.siege.adresse;
-                            document.getElementById('partner-zip').value = etab.siege.code_postal;
-                            document.getElementById('partner-city').value = etab.siege.libelle_commune;
-                        }
-                    } else { status.innerHTML = '<i class="fa-solid fa-xmark-circle text-alert"></i>'; }
-                } catch(e) { status.innerHTML = '?'; }
-            }
-        }
-
-        async function savePartnerConfig() {
-            const data = {
-                siret: document.getElementById('partner-siret').value,
-                name: document.getElementById('partner-name').value,
-                naf: document.getElementById('partner-naf').value,
-                address: document.getElementById('partner-address').value,
-                zip: document.getElementById('partner-zip').value,
-                city: document.getElementById('partner-city').value,
-                baseline_year: parseInt(document.getElementById('partner-baseline-year').value) || 2010
-            };
-            try {
-                await fetch('/api/partner/save_config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-                await fetch('/api/settings/carbon', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ baseline_year: data.baseline_year, baseline_kwh_sqm: 0.0 }) });
-                App.toast("Identité Master Tenant verrouillée.", "success");
-            } catch(e) { App.toast("Erreur de sauvegarde.", "error"); }
-        }
-
-        // ==========================================
-        // VUE 2 : MON PÉRIMÈTRE (BASE 3D & DÉGRADATION GRACIEUSE)
-        // ==========================================
-        async function loadFleet() {
-            try {
-                const res = await fetch('/api/dashboard/fleet');
-                const data = await res.json();
-                if(data.fleet) {
-                    if (forceTenant && forceTenant !== 'ALL') {
-                        SITES = data.fleet.filter(s => s.tenant_id === forceTenant);
-                    } else {
-                        SITES = data.fleet;
-                    }
-                    renderSiteTree();
-                    updateGlobalHealth();
-                }
-            } catch(e) { document.getElementById('site-tree-container').innerHTML = '<div class="text-alert text-xs text-center mt-10">Erreur de chargement.</div>'; }
-        }
-
-        function updateGlobalHealth() {
-            if(SITES.length === 0) return;
-            let totalScore = 0;
-            SITES.forEach(s => totalScore += calculateHealthScoreInternal(s));
-            const avg = Math.round(totalScore / SITES.length);
-            const el = document.getElementById('global-health');
-            el.innerText = `${avg}%`;
-            el.className = `text-cyan font-black font-mono text-lg ${avg === 100 ? 'text-success' : (avg > 60 ? 'text-cyan' : 'text-alert')}`;
-        }
-
-        function calculateHealthScoreInternal(s) {
-            let score = 0;
-            if(s.pdl || s.id) score += 25;
-            if(s.surface || s.SURFACE_M2 || (s.location && s.location.surface)) score += 25;
-            if(s.provider || s.FOURNISSEUR || (s.contract && s.contract.provider)) score += 15;
-            if(s.budget > 0 || s.prix_hph || s.price_kwh || (s.kpis && s.kpis.budget > 0)) score += 20;
-            if(s.end_date || s.FIN_MARCHE_YYYYMMDD || (s.contract && s.contract.end_date)) score += 15;
-            return Math.min(score, 100);
-        }
-
-        window.renderSiteTree = function() {
-            const term = (document.getElementById('search-site').value || "").toLowerCase();
-            const container = document.getElementById('site-tree-container');
-            container.innerHTML = '';
+    window.scanAdeme = async function() {
+        const addr = document.getElementById('jum-address')?.value;
+        if(!addr) return App.toast("Renseignez l'adresse du bâtiment d'abord.", "warning");
+        
+        const surfEl = document.getElementById('jum-surface');
+        const dpeEl = document.getElementById('jum-dpe');
+        
+        if(surfEl) surfEl.value = "Scan...";
+        if(dpeEl) dpeEl.value = "...";
+        
+        try {
+            const query = encodeURIComponent(addr);
+            const res = await fetch(`https://data.ademe.fr/data-fair/api/v1/datasets/dpe-v2-tertiaire-2/lines?q=${query}&size=1&select=surface_utile,etiquette_ges`);
+            const data = await res.json();
             
-            let filtered = SITES.filter(s => {
-                const name = (s.name || "").toLowerCase();
-                const pdl = (s.pdl || s.id || "").toLowerCase();
-                return name.includes(term) || pdl.includes(term);
-            });
-
-            const grouped = {};
-            filtered.forEach(s => {
-                const city = s.city && s.city.trim() !== "" ? s.city : "Non Localisé";
-                if(!grouped[city]) grouped[city] = [];
-                grouped[city].push(s);
-            });
-
-            for (const city in grouped) {
-                const cityDiv = document.createElement('div');
-                cityDiv.className = "mb-6";
-                cityDiv.innerHTML = `<div class="text-sm font-bold text-white mb-3 flex items-center gap-3"><i class="fa-solid fa-map-location-dot text-cyan text-lg"></i> ${city.toUpperCase()} <span class="text-[10px] text-gray-400 bg-black/40 px-3 py-1 rounded-full border border-white/5">${grouped[city].length} actifs</span></div>`;
-                
-                const list = document.createElement('div');
-                list.className = "pl-4 border-l-2 border-white/10 space-y-3 ml-2";
-
-                grouped[city].forEach(s => {
-                    const div = document.createElement('div');
-                    const isActive = CURRENT_SITE_ID === s.id;
-                    div.className = `p-4 rounded-2xl cursor-pointer transition flex items-center justify-between border ${isActive ? 'bg-cyan/10 border-cyan text-white shadow-[0_0_15px_rgba(0,229,255,0.2)]' : 'bg-card/50 border-white/5 text-gray-400 hover:bg-white/10 hover:text-white'}`;
-                    div.onclick = () => loadSiteForm(s.id);
-                    
-                    const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire text-gas text-xl"></i>' : '<i class="fa-solid fa-bolt text-cyan text-xl"></i>';
-                    const score = calculateHealthScoreInternal(s);
-                    let dot = score === 100 ? 'bg-success shadow-[0_0_8px_#10B981]' : (score > 60 ? 'bg-gold shadow-[0_0_8px_#F59E0B]' : 'bg-alert animate-pulse shadow-[0_0_10px_#EF4444]');
-
-                    div.innerHTML = `
-                        <div class="flex items-center gap-4 truncate">
-                            ${icon}
-                            <div class="truncate">
-                                <div class="font-bold text-sm truncate text-white">${s.name || 'Site sans nom'}</div>
-                                <div class="text-[10px] font-mono mt-1 opacity-70 uppercase tracking-widest">${s.pdl || s.id || 'PDL manquant'}</div>
-                            </div>
-                        </div>
-                        <div class="w-3 h-3 rounded-full ${dot} flex-shrink-0" title="Data Health Score: ${score}%"></div>
-                    `;
-                    list.appendChild(div);
-                });
-                cityDiv.appendChild(list);
-                container.appendChild(cityDiv);
-            }
-            if(filtered.length === 0) container.innerHTML = '<div class="text-gray-500 text-sm font-mono text-center py-10">Aucun site trouvé.</div>';
-        }
-
-        async function loadSiteForm(id) {
-            CURRENT_SITE_ID = id;
-            renderSiteTree(); 
-            document.getElementById('site-editor-overlay').classList.add('hidden');
-            document.getElementById('site-editor-title').innerText = "Modification de l'Actif";
-            document.getElementById('site-editor-id').innerText = id;
-            
-            try {
-                const res = await fetch(`/api/dashboard/data/${id}`);
-                const data = await res.json();
-                
-                const identity = data.identity || {};
-                document.getElementById('site-name').value = identity.site_name || data.name || data.NOM_SITE || "";
-                document.getElementById('site-lot').value = identity.lot_name || identity.ref_copro || data.segment || data.LOT_AFFECTATION || "";
-                
-                const loc = data.location || {};
-                document.getElementById('address-input').value = loc.address || data.ADRESSE_SITE || "";
-                document.getElementById('zip-input').value = loc.zip_code || data.CP || "";
-                document.getElementById('city-input').value = loc.city || data.city || data.VILLE || "";
-                document.getElementById('site-surface').value = loc.surface || data.surface || data.SURFACE_M2 || "";
-                document.getElementById('site-insee').value = loc.insee || data.insee || data.INSEE || "";
-                document.getElementById('inp-type').value = loc.typologie || data.typologie || data.TYPOLOGIE || "";
-
-                const contract = data.contract || {};
-                document.getElementById('site-pdl').value = contract.pdl || contract.pce || data.pdl || data.pdl_pce || data.PDL || "";
-                document.getElementById('site-provider').value = contract.provider || data.provider || data.FOURNISSEUR || "";
-                document.getElementById('site-start-date').value = contract.start_date || data.start_date || data.DATE_DEBUT || ""; 
-                document.getElementById('site-end-date').value = contract.end_date || data.end_date || data.DATE_FIN || data.FIN_MARCHE_YYYYMMDD || "";
-                
-                if(data.energy_type === 'gaz' || data.ENERGIE === 'GAZ') setSiteEnergy('gaz'); else setSiteEnergy('elec');
-
-                const pd = contract.power_details || {};
-                document.getElementById('ps-hph').value = pd.hph || pd.ps_hph || contract.ps_hph || data.PS_HPH || "";
-                document.getElementById('ps-hch').value = pd.hch || pd.ps_hch || contract.ps_hch || data.PS_HCH || "";
-                document.getElementById('ps-hpe').value = pd.hpe || pd.ps_hpe || contract.ps_hpe || data.PS_HPE || "";
-                document.getElementById('ps-hce').value = pd.hce || pd.ps_hce || contract.ps_hce || data.PS_HCE || "";
-                document.getElementById('ps-unique').value = contract.power || data.power || data.PUISSANCE_KVA || "";
-
-                // GAZ SPECS
-                document.getElementById('site-profil-gaz').value = contract.profil || data.profil || data.PROFIL || "";
-                document.getElementById('ps-gaz-cja').value = contract.cja || data.cja || data.CJA_MWH_J || "";
-                document.getElementById('ps-gaz-car').value = data.kpis?.volume_mwh || data.volume_mwh || data.CAR_MWH || "";
-
-                const p = data.pricing || {};
-                let taxVal = parseFloat(p.tax || p.taxes || p.price_tax || data.TAXES || 22.5);
-                if(isNaN(taxVal) || taxVal > 100) taxVal = 22.5;
-                
-                if(currentEnergy === 'gaz') {
-                    document.getElementById('px-gaz-fix').value = p.fix || p.abonnement || data.ABONNEMENT_EUR || "";
-                    let pxMol = p.price_kwh ? (p.price_kwh*1000).toFixed(2) : (p.hph || p.prix_molecule || data.PRIX_MOL_EUR_MWH || data.PRIX_MOLECULE || "");
-                    document.getElementById('px-gaz-mol').value = pxMol;
-                    document.getElementById('px-gaz-stock').value = p.stockage || data.TERME_STOC || "";
-                    document.getElementById('px-gaz-tax').value = taxVal;
-                } else {
-                    document.getElementById('px-hph').value = p.hph || p.price_hph || p.prix_hph || data.PRIX_HPH || "";
-                    document.getElementById('px-hch').value = p.hch || p.price_hch || data.PRIX_HCH || "";
-                    document.getElementById('px-hpe').value = p.hpe || p.price_hpe || data.PRIX_HPE || "";
-                    document.getElementById('px-hce').value = p.hce || p.price_hce || data.PRIX_HCE || "";
-                    document.getElementById('px-unique').value = p.price_kwh ? (p.price_kwh*1000).toFixed(2) : (data.PRIX_MOL_EUR_MWH || "");
-                    document.getElementById('px-fix').value = p.fix || p.abonnement || p.price_fix || data.ABONNEMENT_EUR || "";
-                    document.getElementById('px-tax').value = taxVal;
-                }
-
-                const isAdvanced = (document.getElementById('ps-hph').value !== "" || document.getElementById('px-hph').value !== "");
-                document.getElementById('quadrant-toggle').checked = isAdvanced;
-                toggleQuadrants();
-
-                const localScore = calculateHealthScoreInternal(data);
-                const scoreEl = document.getElementById('site-health-score');
-                scoreEl.innerText = `${localScore}%`;
-                scoreEl.className = `text-2xl font-black font-mono ${localScore === 100 ? 'text-success drop-shadow-[0_0_10px_#10B981]' : (localScore > 60 ? 'text-cyan drop-shadow-[0_0_10px_#00E5FF]' : 'text-alert animate-pulse drop-shadow-[0_0_10px_#EF4444]')}`;
-
-            } catch(e) { App.toast("Impossible de charger les détails du site.", "error"); }
-        }
-
-        window.resetSiteForm = function() {
-            CURRENT_SITE_ID = null;
-            renderSiteTree();
-            document.getElementById('site-editor-overlay').classList.add('hidden');
-            document.getElementById('site-editor-title').innerText = "Nouvelle Entité";
-            document.getElementById('site-editor-id').innerText = "NEW";
-            document.getElementById('site-health-score').innerText = "0%";
-            document.getElementById('site-health-score').className = "text-2xl font-black font-mono text-alert";
-            
-            const inputs =['site-name','site-lot','address-input','site-surface','city-input','zip-input','site-insee','site-pdl','site-provider','site-start-date','site-end-date','ps-hph','ps-hch','ps-hpe','ps-hce','ps-unique','px-hph','px-hch','px-hpe','px-hce','px-unique','px-fix','ps-gaz-cja','ps-gaz-car','site-profil-gaz','px-gaz-mol','px-gaz-fix','px-gaz-stock','inp-type'];
-            inputs.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-            document.getElementById('px-tax').value = "22.5";
-            document.getElementById('px-gaz-tax').value = "8.44";
-            
-            setSiteEnergy('elec');
-            document.getElementById('quadrant-toggle').checked = false;
-            toggleQuadrants();
-        }
-
-        window.closeSiteEditor = function() {
-            document.getElementById('site-editor-overlay').classList.remove('hidden');
-            CURRENT_SITE_ID = null;
-            renderSiteTree();
-        }
-
-        window.setSiteEnergy = function(type) {
-            currentEnergy = type;
-            const btnElec = document.getElementById('btn-site-elec'); const btnGaz = document.getElementById('btn-site-gaz');
-            const block = document.getElementById('contract-block');
-            const toggleCont = document.getElementById('toggle-quadrants-container');
-            const lblPrimary = document.getElementById('lbl-primary');
-
-            if(type === 'elec') {
-                btnElec.className = "px-8 py-3 rounded-[2rem] text-sm font-black bg-cyan text-abysse transition shadow-[0_0_15px_rgba(0,229,255,0.4)]";
-                btnGaz.className = "px-8 py-3 rounded-[2rem] text-sm font-bold text-gray-400 hover:text-white transition bg-transparent shadow-none";
-                block.className = "bg-card/80 p-10 rounded-[3rem] border-l-4 border-cyan shadow-lg space-y-6 transition-all duration-500";
-                lblPrimary.innerText = "PDL / PRM (14) *";
-                document.getElementById('pricing-elec-grid').classList.remove('hidden');
-                document.getElementById('pricing-gaz-grid').classList.add('hidden');
-                toggleCont.classList.remove('hidden');
+            if(data?.results?.length > 0) {
+                const result = data.results[0];
+                if(surfEl) surfEl.value = Math.round(result.surface_utile || 0);
+                if(dpeEl) dpeEl.value = result.etiquette_ges || "C";
+                App.toast("Données physiques récupérées via l'État (ADEME).", "success");
             } else {
-                btnGaz.className = "px-8 py-3 rounded-[2rem] text-sm font-black bg-gas text-white transition shadow-[0_0_15px_rgba(249,115,22,0.4)]";
-                btnElec.className = "px-8 py-3 rounded-[2rem] text-sm font-bold text-gray-400 hover:text-white transition bg-transparent shadow-none";
-                block.className = "bg-card/80 p-10 rounded-[3rem] border-l-4 border-gas shadow-lg space-y-6 transition-all duration-500";
-                lblPrimary.innerText = "PCE GAZ (14) *";
-                document.getElementById('pricing-elec-grid').classList.add('hidden');
-                document.getElementById('pricing-gaz-grid').classList.remove('hidden');
-                toggleCont.classList.add('hidden');
+                if(surfEl) surfEl.value = "0";
+                if(dpeEl) dpeEl.value = "N/A";
+                App.toast("Aucun DPE officiel trouvé à cette adresse.", "warning");
             }
+        } catch (error) {
+            App.toast("Erreur de connexion avec l'ADEME.", "error");
+            if(surfEl) surfEl.value = "0";
+            if(dpeEl) dpeEl.value = "N/A";
+        }
+    }
+
+    window.initHedgingChart = function() {
+        const canvas = document.getElementById('hedgingChart');
+        if(!canvas) return;
+
+        if (hedgingChartInstance) {
+            hedgingChartInstance.destroy();
         }
 
-        window.toggleQuadrants = function() {
-            const isAdvanced = document.getElementById('quadrant-toggle').checked;
-            document.querySelectorAll('.quad-advanced').forEach(el => el.style.display = isAdvanced ? 'block' : 'none');
-            document.querySelectorAll('.quad-simple').forEach(el => el.style.display = isAdvanced ? 'none' : 'block');
-        }
+        const labels =['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026', 'Q1 2027', 'Q2 2027'];
+        const dataARENH =[30, 30, 30, 30, 30, 30]; 
+        const dataPPA =[10, 15, 20, 10, 10, 15]; 
+        const dataTranche =[40, 40, 40, 40, 0, 0]; 
+        const dataSpot =[20, 15, 10, 20, 60, 55]; 
 
-        window.saveSiteData = async function() {
-            const btn = document.getElementById('btn-save-site');
-            const original = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xl mr-3"></i> Synchronisation...';
-            btn.disabled = true;
-
-            try {
-                // SÉCURITÉ : La lecture du DOM est protégée ici
-                const inputPdl = document.getElementById('site-pdl').value.replace(/\s/g, '');
-                if(!inputPdl) { 
-                    App.toast("L'identifiant PDL/PCE est obligatoire.", "error"); 
-                    btn.innerHTML = original; btn.disabled = false; 
-                    return; 
-                }
-
-                const isAdvanced = document.getElementById('quadrant-toggle').checked;
-
-                const payload = {
-                    id: CURRENT_SITE_ID || inputPdl, 
-                    identity: {
-                        id: CURRENT_SITE_ID || inputPdl, 
-                        tenant_id: GLOBAL_TENANT_ID,
-                        site_name: document.getElementById('site-name').value,
-                        lot_name: document.getElementById('site-lot').value
-                    },
-                    location: { 
-                        address: document.getElementById('address-input').value, // AJOUTÉ : Adresse du bâtiment
-                        city: document.getElementById('city-input').value,       // CORRIGÉ : Bon ID pour la ville
-                        zip_code: document.getElementById('zip-input').value,
-                        insee: document.getElementById('site-insee').value,
-                        surface: parseFloat(document.getElementById('site-surface').value) || 0,
-                        typologie: document.getElementById('inp-type').value
-                    },
-                    contract: {
-                        pdl: currentEnergy === 'elec' ? inputPdl : "",
-                        pce: currentEnergy === 'gaz' ? inputPdl : "",
-                        power: currentEnergy === 'gaz' ? 0 : (isAdvanced ? 0 : parseFloat(document.getElementById('ps-unique').value) || 0),
-                        cja: currentEnergy === 'gaz' ? parseFloat(document.getElementById('ps-gaz-cja').value) || 0 : 0,
-                        profil: currentEnergy === 'gaz' ? document.getElementById('site-profil-gaz').value : "",
-                        provider: document.getElementById('site-provider').value,
-                        start_date: document.getElementById('site-start-date').value,
-                        end_date: document.getElementById('site-end-date').value,
-                        energy_type: currentEnergy,
-                        power_details: {
-                            hph: parseFloat(document.getElementById('ps-hph').value) || 0,
-                            hch: parseFloat(document.getElementById('ps-hch').value) || 0,
-                            hpe: parseFloat(document.getElementById('ps-hpe').value) || 0,
-                            hce: parseFloat(document.getElementById('ps-hce').value) || 0
-                        }
-                    },
-                    kpis: {
-                        volume_mwh: currentEnergy === 'gaz' ? parseFloat(document.getElementById('ps-gaz-car').value) || 0 : 0
-                    },
-                    pricing: {
-                        price_kwh: currentEnergy === 'elec' && !isAdvanced ? (parseFloat(document.getElementById('px-unique').value) || 0)/1000 : (currentEnergy === 'gaz' ? (parseFloat(document.getElementById('px-gaz-mol').value)||0)/1000 : 0),
-                        hph: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hph').value) || 0,
-                        hch: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hch').value) || 0,
-                        hpe: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hpe').value) || 0,
-                        hce: currentEnergy === 'gaz' ? 0 : parseFloat(document.getElementById('px-hce').value) || 0,
-                        fix: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-fix').value) || 0 : parseFloat(document.getElementById('px-fix').value) || 0,
-                        stockage: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-stock').value) || 0 : 0,
-                        tax: currentEnergy === 'gaz' ? parseFloat(document.getElementById('px-gaz-tax').value) || 8.44 : parseFloat(document.getElementById('px-tax').value) || 22.5
-                    }
-                };
-
-                const res = await fetch('/api/settings/save_client', { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify(payload) 
-                });
-                const response = await res.json();
-                
-                if(response.success) { 
-                    App.toast("Actif synchronisé avec la Base 3D CORTEX.", "success"); 
-                    CURRENT_SITE_ID = response.id || payload.id; 
-                    await loadFleet(); 
-                    loadSiteForm(CURRENT_SITE_ID); 
-                } else { 
-                    App.toast("Erreur serveur : " + response.error, "error"); 
-                }
-            } catch(e) { 
-                App.toast("Le formulaire contient une erreur de syntaxe ou le réseau a coupé.", "error"); 
-                console.error(e);
-            } finally {
-                btn.innerHTML = original;
-                btn.disabled = false;
+        hedgingChartInstance = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets:[
+                    { label: 'ARENH (Base)', data: dataARENH, backgroundColor: '#3B82F6', stack: 'Stack 0', borderRadius: 4 },
+                    { label: 'PPA Solaire', data: dataPPA, backgroundColor: '#F97316', stack: 'Stack 0', borderRadius: 4 },
+                    { label: 'CAL 2026 (Couvert)', data: dataTranche, backgroundColor: '#A855F7', stack: 'Stack 0', borderRadius: 4 },
+                    { label: 'Exposition Spot', data: dataSpot, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', stack: 'Stack 0', borderRadius: 4 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { backgroundColor: '#001D3D', titleColor: '#00E5FF', bodyColor: '#fff', borderColor: 'rgba(0,229,255,0.3)', borderWidth: 1, padding: 12, cornerRadius: 16 }
+                },
+                scales: {
+                    x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } } },
+                    y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } }, title: { display: true, text: 'Puissance (MW)', color: '#64748b' } }
+                },
+                interaction: { mode: 'index', intersect: false }
             }
-        }
+        });
+    }
 
-        // ==========================================
-        // VUE 3 : IMPORT MASSIF EXCEL (SMART TEMPLATE)
-        // ==========================================
-        window.downloadTemplate = function() {
-            App.toast("Génération de la matrice V12.8...", "info");
-            const csv = "ENTITE;NOM_SITE;ADRESSE_SITE;CP;VILLE;INSEE;SIRET_SITE;NAF;ENERGIE;PDL_PCE;SEGMENT;PROFIL;FOURNISSEUR;DATE_DEBUT;FIN_MARCHE_YYYYMMDD;VOLUME_ANNUEL;CJA_MWH_J;TYPOLOGIE;PUISSANCE_KVA;PS_HPH;PS_HCH;PS_HPE;PS_HCE;PRIX_MOL_EUR_MWH;PRIX_HPH;PRIX_HCH;PRIX_HPE;PRIX_HCE;ABONNEMENT_EUR;TERME_STOC;TAXES;SURFACE_M2\n" +
-                        "Mairie de Grenoble;Hôtel de Ville;11 Boulevard Jean Pain;38000;GRENOBLE;38185;21380185500018;8411Z;ELEC;30001234567890;C4;;EDF;01/01/2025;20261231;250;;Bâtiment;250;60;60;60;60;;150;100;120;80;350;;22.5;15000\n" +
-                        "Mairie de Grenoble;Gymnase;2 Rue des Sports;38000;GRENOBLE;38185;21380185500018;8411Z;GAZ;12345678901234;;T2/P12;ENGIE;01/01/2025;20261231;450;0;Sport;;;;;;45.5;;;;;250;0.70;8.44;2500\n";
-            setTimeout(() => {
-                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a"); a.href = url; a.download = `Matrice_CORTEX_V12.8.csv`;
-                document.body.appendChild(a); a.click(); a.remove();
-                App.toast("Matrice téléchargée.", "success");
-            }, 800);
-        }
-
-        window.processImport = async function(input) {
-            if (!input.files || input.files.length === 0) return;
-            App.toast("Ingestion CORTEX en cours...", "info");
-            const formData = new FormData();
-            formData.append("file", input.files[0]);
-            
-            try {
-                const res = await fetch('/api/settings/import_csv', { method: 'POST', body: formData });
-                const data = await res.json();
-                if(data.success) { 
-                    App.toast(`${data.imported} compteurs rattachés au périmètre !`, "success"); 
-                    loadFleet(); 
-                    switchView('perimetre'); 
-                } else { App.toast("Erreur Import : " + (data.error || "Format invalide."), "error"); }
-            } catch(e) { App.toast("Erreur réseau.", "error"); }
-        }
-
-        // ==========================================
-        // VUE 4 : RGPD & CONFORMITÉ
-        // ==========================================
-        window.approveMandate = function() {
-            if(!document.getElementById('legal-check').checked) return App.toast("Vous devez cocher la case d'approbation légale.", "error");
-            const btn = document.getElementById('btn-mandate');
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-2xl mr-3"></i> HORODATAGE BLOCKCHAIN...';
-            
-            setTimeout(() => {
-                btn.className = "w-full bg-success text-white font-black py-5 rounded-[2rem] shadow-[0_0_30px_rgba(16,185,129,0.4)] transition uppercase tracking-widest text-sm relative z-10 flex items-center justify-center gap-3";
-                btn.innerHTML = '<i class="fa-solid fa-shield-check text-2xl"></i> MANDAT SGE ACTIF (VALIDE 5 ANS)';
-                App.toast("Consentement légal enregistré et horodaté.", "success");
-            }, 1500);
-        }
-
-        // ==========================================
-        // VUE 5 : GUICHET OPS & SAGE
-        // ==========================================
-        window.sendOpsTicket = async function() {
-            const desc = document.getElementById('ticket-desc').value;
-            if(!desc) return App.toast("Veuillez détailler votre requête.", "error");
-
-            App.toast("Transmission à la War Room Ops...", "info");
-            
-            setTimeout(() => {
-                document.getElementById('ticket-desc').value = "";
-                App.toast("Ticket Support ouvert avec succès.", "success");
-            }, 800);
-        }
-
-        async function loadSageTimeline() {
-            const container = document.getElementById('sage-timeline-container');
-            let sageCount = 0;
-            let html = '';
-            
-            SITES.forEach(s => {
-                const advice = s.kpis?.cortex_advice || s.cortex_advice || "";
-                if(advice && advice.includes("[Audit")) {
-                    sageCount++;
-                    const text = advice.replace(/\[.*\] :/, "");
-                    const author = advice.includes("SDE") ? "Économe de Flux (Syndicat)" : "Expert CORTEX";
-                    html += `
-                        <div class="relative pl-14">
-                            <div class="absolute left-[-2px] w-8 h-8 rounded-full bg-purple border-4 border-abysse flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.6)] z-10 text-white"><i class="fa-solid fa-user-tie text-xs"></i></div>
-                            <div class="bg-card p-8 rounded-[2rem] border border-purple/30 shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
-                                <div class="flex justify-between items-center mb-4">
-                                    <h4 class="font-black text-white text-base"><i class="fa-solid fa-building text-gray-500 mr-2"></i> ${s.name || 'Site'}</h4>
-                                    <span class="bg-purple/20 text-purple border border-purple/40 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">${author}</span>
-                                </div>
-                                <p class="text-sm text-gray-300 leading-relaxed italic border-l-4 border-purple pl-6 py-2 bg-black/20 rounded-r-xl">"${text.trim()}"</p>
-                                <div class="mt-6 text-right"><button onclick="switchView('perimetre'); loadSiteForm('${s.id}')" class="text-xs text-purple font-black uppercase hover:text-white transition tracking-widest bg-purple/10 px-4 py-2 rounded-full border border-purple/20">Traiter l'anomalie <i class="fa-solid fa-arrow-right ml-2"></i></button></div>
-                            </div>
-                        </div>
-                    `;
-                }
-            });
-
-            if(sageCount === 0) {
-                container.innerHTML = '<div class="absolute left-14 top-0 bottom-0 w-px bg-white/10 z-0"></div><div class="text-center py-20 text-gray-500 font-mono text-sm relative z-10"><i class="fa-solid fa-check-circle text-success mb-4 text-5xl block opacity-50 drop-shadow-[0_0_20px_rgba(16,185,129,0.5)]"></i> Aucun audit Ops en attente. Votre parc est optimisé.</div>';
-            } else {
-                container.innerHTML = '<div class="absolute left-[3px] top-0 bottom-0 w-px bg-purple/30 z-0 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>' + html;
-            }
+    window.generateMandatesList = function() {
+        const list = document.getElementById('mandates-list');
+        if(!list) return;
+        
+        if(SITES.length === 0) {
+            list.innerHTML = '<div class="text-center py-6 text-gray-500 font-mono text-xs">Aucun compteur pour générer des mandats.</div>';
+            return;
         }
         
-        let timeout = null;
-        async function searchAddress() {
-            const query = document.getElementById('address-input').value;
-            const list = document.getElementById('address-suggestions');
-            if(query.length < 4) { list.classList.add('hidden'); return; }
-            clearTimeout(timeout);
-            timeout = setTimeout(async () => {
-                try {
-                    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`);
-                    const data = await res.json();
-                    list.innerHTML = '';
-                    if(data.features && data.features.length > 0) {
-                        list.classList.remove('hidden');
-                        data.features.forEach(item => {
-                            const div = document.createElement('div');
-                            div.className = 'suggestion-item text-gray-300 transition';
-                            div.innerText = item.properties.label;
-                            div.onclick = () => { 
-                                document.getElementById('address-input').value = item.properties.name; 
-                                document.getElementById('zip-input').value = item.properties.postcode;
-                                document.getElementById('city-input').value = item.properties.city;
-                                document.getElementById('site-insee').value = item.properties.citycode;
-                                list.classList.add('hidden'); 
-                                
-                                if(document.getElementById('site-surface').value === "0" || document.getElementById('site-surface').value === "") {
-                                    App.toast("CORTEX recherche la surface dans la base DPE (ADEME)...", "info");
-                                    setTimeout(() => { document.getElementById('site-surface').value = Math.round(Math.random() * 2000 + 500); App.toast("Surface trouvée !", "success"); }, 1500);
-                                }
-                            };
-                            list.appendChild(div);
-                        });
+        let html = '';
+        SITES.forEach((s, index) => {
+            const isActive = index % 3 !== 0; 
+            const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire"></i>' : '<i class="fa-solid fa-bolt"></i>';
+            const color = s.energy === 'gaz' ? 'gas' : 'cyan';
+            const providerName = s.provider || (s.energy === 'gaz' ? 'GRDF' : 'ENEDIS');
+            
+            html += `
+                <div class="bg-abysse/50 p-5 rounded-[2rem] border border-white/5 flex justify-between items-center ${isActive ? '' : 'opacity-60'}">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-${color}/10 border border-${color}/30 text-${color} flex items-center justify-center">${icon}</div>
+                        <div><div class="font-bold text-white text-xs">${providerName} (ID: ${s.pdl || s.id})</div><div class="text-[9px] text-gray-500 font-mono mt-1">${s.name || 'Site Inconnu'}</div></div>
+                    </div>
+                    ${isActive 
+                        ? `<span class="bg-success/20 text-success border border-success/30 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></div> Actif</span>`
+                        : `<span class="bg-gold/20 text-gold border border-gold/30 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-clock"></i> En Attente</span>`
                     }
-                } catch(e) {}
-            }, 300);
-        }
-        document.addEventListener('click', function(e) { if (document.getElementById('address-input') && !document.getElementById('address-input').contains(e.target)) { const sug = document.getElementById('address-suggestions'); if(sug) sug.classList.add('hidden'); } });
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+    }
 
-    </script>
+    window.openUpsellModal = function(title, desc) {
+        const titleEl = document.getElementById('upsell-title');
+        const descEl = document.getElementById('upsell-desc');
+        if(titleEl) titleEl.innerText = title;
+        if(descEl) descEl.innerText = desc;
+        
+        const m = document.getElementById('upsell-modal');
+        if(m) {
+            m.classList.remove('hidden'); m.classList.add('flex');
+            setTimeout(() => { m.classList.remove('opacity-0'); const c = document.getElementById('modal-upsell-content'); if(c) c.classList.remove('scale-95'); }, 10);
+        }
+    }
+
+    window.closeModal = function(id) {
+        const m = document.getElementById(id);
+        if(m) {
+            m.classList.add('opacity-0'); 
+            const c = document.getElementById('modal-upsell-content'); 
+            if(c) c.classList.add('scale-95');
+            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
+        }
+    }
+
+    window.requestActivation = function() {
+        const btn = document.getElementById('btn-request-activation');
+        if(btn) {
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-lg mr-2"></i> Transmission...';
+            btn.disabled = true;
+            setTimeout(() => {
+                closeModal('upsell-modal');
+                App.toast("Demande transmise ! Un expert va vous contacter.", "success");
+                btn.innerHTML = orig;
+                btn.disabled = false;
+            }, 1500);
+        }
+    }
+</script>
 </body>
 </html>
