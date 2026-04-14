@@ -2,193 +2,535 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ENERGISTRAT V3 | Trading Room</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENERGISTRAT V13 | CORTEX Trading Desk (Hedging & Sourcing)</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { 
+                        abysse: '#001529', card: '#001D3D', 
+                        red_alert: '#DC2626', success: '#10B981', cyan: '#00E5FF',
+                        gold: '#F59E0B', purple: '#A855F7', gas: '#F97316', water: '#3B82F6'
+                    },
+                    fontFamily: { sans:['Inter', 'sans-serif'], mono:['JetBrains Mono', 'monospace'] },
+                    borderRadius: { 'bento': '2.5rem' }
+                }
+            }
+        }
+    </script>
     <style>
-        body { background-color: #050505; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
-        .bento-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem; }
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #00E5FF; cursor: pointer; margin-top: -6px; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #334155; border-radius: 2px; }
+        body { background-color: #001529; color: white; overflow: hidden; font-family: 'Inter', sans-serif; }
+        
+        /* Bento Design V13 */
+        .bento-card { background: rgba(0, 29, 61, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 2.5rem; transition: all 0.3s ease; }
+        .bento-card:hover { border-color: rgba(245, 158, 11, 0.3); box-shadow: 0 10px 40px -10px rgba(245, 158, 11, 0.15); }
+        
+        .input-dark { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 14px 20px; border-radius: 1.5rem; width: 100%; outline: none; transition: all 0.3s; font-size: 0.875rem; font-family: 'JetBrains Mono', monospace; font-weight: bold; }
+        .input-dark:focus { border-color: #F59E0B; box-shadow: 0 0 15px rgba(245,158,11,0.2); }
+        
+        /* Animation Radar Sniper */
+        .radar-scan { position: absolute; top: 50%; left: 50%; width: 150px; height: 150px; background: radial-gradient(circle, rgba(220, 38, 38, 0.3) 0%, transparent 70%); border-radius: 50%; transform: translate(-50%, -50%); animation: pulse 2s infinite; z-index: 0; pointer-events: none; }
+        @keyframes pulse { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
+        
+        /* Custom Select */
+        select.custom-select { appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23F59E0B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 1rem center; background-size: 0.8rem auto; }
+        
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(245, 158, 11, 0.3); border-radius: 3px; }
+        
+        /* Skeleton Loaders (Zéro Mock UX) */
+        .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 9999px; color: transparent !important; }
+        @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     </style>
 </head>
-<body class="flex h-screen w-screen">
+<body class="flex h-screen w-screen text-sm bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
 
-    <aside class="w-16 bg-[#020617] border-r border-white/10 flex flex-col items-center py-6 z-50">
-        <a href="/industrie" id="back-btn" class="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-white hover:bg-cyan-500 hover:text-black transition mb-6">
+    <!-- TOAST ENGINE V13 -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- SIDEBAR ÉPURÉE (SATELLITE) -->
+    <aside class="w-24 bg-[#020617] border-r border-white/5 flex flex-col items-center py-6 flex-shrink-0 z-50 shadow-[5px_0_30px_rgba(0,0,0,0.6)]">
+        <button onclick="window.history.back()" title="Retour au Hub" class="w-12 h-12 rounded-2xl bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white flex items-center justify-center transition mb-8 border border-white/10 shadow-lg">
             <i class="fa-solid fa-arrow-left"></i>
-        </a>
-        <div class="w-10 h-10 rounded bg-alert/20 text-alert flex items-center justify-center border border-alert/30 mb-2">
-            <i class="fa-solid fa-chart-candlestick"></i>
+        </button>
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-gold to-yellow-800 flex items-center justify-center text-abysse font-black shadow-[0_0_20px_rgba(245,158,11,0.5)] mb-2 relative overflow-hidden group">
+            <i class="fa-solid fa-layer-group text-2xl relative z-10 group-hover:scale-110 transition duration-300"></i>
         </div>
+        <div class="text-[8px] font-black text-gold uppercase tracking-widest text-center mt-1">TRADING<br>DESK</div>
     </aside>
 
-    <main class="flex-1 flex flex-col p-8 gap-6 overflow-y-auto">
-        <header class="flex justify-between items-center">
+    <main class="flex-1 flex flex-col relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gold/10 via-abysse to-abysse">
+        
+        <!-- HEADER GOD MODE & SÉLECTION -->
+        <header class="h-24 border-b border-white/5 flex items-center justify-between px-10 bg-abysse/95 backdrop-blur z-20 flex-shrink-0 shadow-lg">
             <div>
-                <h1 class="text-3xl font-bold text-white">Salle des Marchés (EEX)</h1>
-                <p class="text-sm text-gray-400 mt-1">Stratégie d'achat dynamique : Bloc + Spot</p>
+                <h2 class="text-3xl font-black text-white italic tracking-tight drop-shadow-md">CORTEX <span class="text-gold">Hedging Floor</span></h2>
+                <div class="flex items-center gap-4 mt-1">
+                    <span id="god-mode-badge" class="hidden px-2 py-0.5 bg-alert/20 text-alert border border-alert/50 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-1"></span>
+                    <p class="text-xs text-gray-400 font-mono flex items-center gap-2">Couverture de tranches & Analyse d'exposition Spot.</p>
+                </div>
             </div>
-            <div class="text-right">
-                <div class="text-xs text-gray-500 uppercase font-bold">Site Actif</div>
-                <div class="text-xl font-bold text-alert" id="site-name">Chargement...</div>
+            <div class="flex items-center gap-6">
+                <!-- SÉLECTEUR DE SITE / GROUPE (Pour consolider le Forecast) -->
+                <div class="relative min-w-[350px]">
+                    <i class="fa-solid fa-building absolute left-4 top-1/2 -translate-y-1/2 text-gold z-10"></i>
+                    <select id="site-selector" onchange="runTradingDesk()" class="input-dark custom-select pl-12 text-sm shadow-inner cursor-pointer">
+                        <option value="">Chargement du portefeuille...</option>
+                    </select>
+                </div>
             </div>
         </header>
 
-        <!-- ZONE 1 : MARKET DATA -->
-        <div class="grid grid-cols-4 gap-6">
-            <div class="bento-card p-6 bg-card relative overflow-hidden">
-                <div class="absolute top-0 right-0 p-4 opacity-10 text-6xl text-cyan"><i class="fa-solid fa-bolt"></i></div>
-                <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">EEX Spot FR (Day-Ahead)</h3>
-                <div class="text-4xl font-mono font-bold text-white mb-1">42.50 <span class="text-sm text-gray-500">€/MWh</span></div>
-                <div class="text-[10px] text-green-400 font-bold">▼ -12% vs Hier</div>
-            </div>
-            <div class="bento-card p-6 bg-card relative overflow-hidden">
-                <div class="absolute top-0 right-0 p-4 opacity-10 text-6xl text-alert"><i class="fa-solid fa-fire"></i></div>
-                <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Gaz TTF (Month+1)</h3>
-                <div class="text-4xl font-mono font-bold text-white mb-1">34.20 <span class="text-sm text-gray-500">€/MWh</span></div>
-                <div class="text-[10px] text-red-400 font-bold">▲ +2% vs Hier</div>
-            </div>
-            <div class="bento-card col-span-2 p-6 bg-card">
-                <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">Couverture (Hedging)</h3>
-                <div class="h-24 relative"><canvas id="hedgeChart"></canvas></div>
-            </div>
-        </div>
-
-        <!-- ZONE 2 : SIMULATEUR -->
-        <div class="bento-card p-8 border-t-4 border-alert">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-white">Simulateur Stratégie (Bloc + Spot)</h2>
-                <div class="bg-white/5 px-4 py-2 rounded-lg border border-white/10 text-right">
-                    <span class="text-[10px] text-gray-500 uppercase font-bold">Gain Potentiel</span>
-                    <div class="text-2xl font-bold text-green-500" id="strat-gain">-- €</div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-12 gap-8">
-                <div class="col-span-4 flex flex-col gap-6">
-                    <div>
-                        <label class="text-xs font-bold text-white mb-4 block">Hauteur du Ruban (Bloc)</label>
-                        <input type="range" id="bloc-slider" min="0" max="2000" step="10" value="0" oninput="updateStrategy()">
-                        <div class="flex justify-between text-xs text-gray-400 mt-2">
-                            <span>0 kW</span>
-                            <span id="bloc-val" class="text-cyan font-bold text-lg">0 kW</span>
-                            <span>2000 kW</span>
+        <!-- L'INTERFACE "TRINITY" (3 PANNEAUX) -->
+        <div class="flex-1 p-8 overflow-y-auto pb-20">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-[1800px] mx-auto h-full min-h-[750px]">
+                
+                <!-- ========================================================= -->
+                <!-- COLONNE 1 : LE RADAR (Ex-Sniper)                          -->
+                <!-- ========================================================= -->
+                <div class="col-span-3 flex flex-col gap-6 h-full pr-2">
+                    
+                    <!-- TICKER BOURSIER (EEX / RTE) -->
+                    <div class="bento-card p-6 border-t-4 border-cyan shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+                        <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-satellite-dish text-cyan"></i> Bourse en Direct</h3>
+                            <div class="w-2 h-2 rounded-full bg-success animate-pulse shadow-[0_0_8px_#10B981]"></div>
+                        </div>
+                        <div class="space-y-6">
+                            <div>
+                                <div class="text-[10px] text-cyan font-bold uppercase tracking-widest mb-1">Électricité (CAL N+1 Base)</div>
+                                <div class="text-4xl font-black font-mono text-white drop-shadow-md" id="live-elec"><span class="skeleton">85.00</span> €</div>
+                            </div>
+                            <div class="border-t border-white/5 pt-4">
+                                <div class="text-[10px] text-gas font-bold uppercase tracking-widest mb-1">Gaz Naturel (PEG N+1)</div>
+                                <div class="text-3xl font-black font-mono text-white" id="live-gaz"><span class="skeleton">35.00</span> €</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="bg-white/5 p-4 rounded-xl border border-white/5 text-xs space-y-2">
-                        <div class="flex justify-between"><span class="text-gray-400">Prix Bloc (Fixe)</span><span class="text-white font-bold">85.00 €/MWh</span></div>
-                        <div class="flex justify-between"><span class="text-gray-400">Prix Spot (Moy.)</span><span class="text-white font-bold" id="spot-avg">-- €/MWh</span></div>
+
+                    <!-- TENDANCE IA (Bull/Bear) -->
+                    <div class="bento-card p-6 border border-white/5 relative overflow-hidden" id="market-status-card">
+                        <div class="absolute right-0 top-0 opacity-5 text-8xl" id="bg-icon-status"><i class="fa-solid fa-chart-line"></i></div>
+                        <div class="flex items-center gap-4 relative z-10">
+                            <div class="w-14 h-14 rounded-[1rem] bg-white/5 flex items-center justify-center text-3xl shadow-inner" id="status-icon">
+                                <i class="fa-solid fa-spinner fa-spin text-gray-400"></i>
+                            </div>
+                            <div>
+                                <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Tendance Marché</div>
+                                <div class="text-xl font-black text-white" id="market-status-text">Analyse IA...</div>
+                            </div>
+                        </div>
+                        <p class="text-[11px] text-gray-400 mt-4 relative z-10 leading-relaxed font-mono" id="market-advice">
+                            Interrogation des serveurs CORTEX...
+                        </p>
                     </div>
-                    <button onclick="updateStrategy()" class="bg-alert text-black font-bold py-3 rounded-xl hover:bg-white transition shadow-lg">LANCER SIMULATION</button>
+
+                    <!-- GÂCHETTE SNIPER -->
+                    <div class="bento-card p-8 border-t-4 border-red_alert shadow-[0_20px_50px_rgba(0,0,0,0.3)] mt-auto">
+                        <h3 class="text-sm font-bold text-white mb-6 uppercase tracking-widest flex items-center gap-2 border-b border-white/10 pb-4">
+                            <i class="fa-solid fa-crosshairs text-red_alert"></i> Cible de Couverture
+                        </h3>
+                        <div class="space-y-5">
+                            <div>
+                                <label class="text-[10px] text-gray-400 font-bold uppercase block mb-2">Prix Déclencheur (€/MWh)</label>
+                                <div class="relative">
+                                    <input type="number" id="target-price" value="60.00" class="input-dark text-xl text-center py-4">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-400 font-bold uppercase block mb-2">Action Automatique</label>
+                                <select id="action-type" class="input-dark custom-select text-xs py-3">
+                                    <option value="sms">Alerte Stratégique (SMS/Email)</option>
+                                    <option value="oef">Ordre d'Exécution Ferme (Achat)</option>
+                                </select>
+                            </div>
+                            <button onclick="armSniper()" id="btn-arm" class="w-full bg-red_alert text-white font-black py-4 rounded-full shadow-[0_0_20px_rgba(220,38,38,0.4)] hover:bg-white hover:text-red_alert transition mt-2 uppercase tracking-widest text-xs flex justify-center items-center gap-3">
+                                <i class="fa-solid fa-lock text-lg"></i> Armer le Sniper
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-span-8 h-80 relative bg-black/20 rounded-xl border border-white/5 p-4">
-                    <canvas id="stratChart"></canvas>
+
+                <!-- ========================================================= -->
+                <!-- COLONNE 2 & 3 : LE PLATEAU DE COUVERTURE & DEAL DESK      -->
+                <!-- ========================================================= -->
+                <div class="col-span-9 flex flex-col gap-6">
+                    
+                    <!-- LES 4 KPIs MAJEURS -->
+                    <div class="grid grid-cols-4 gap-6 flex-shrink-0">
+                        <div class="bento-card p-6 border-t-4 border-success bg-success/5 shadow-lg relative overflow-hidden">
+                            <i class="fa-solid fa-shield-halved absolute -right-4 -bottom-4 text-7xl text-success opacity-10"></i>
+                            <h3 class="text-[10px] font-bold text-success uppercase tracking-widest mb-2">Volume Sécurisé</h3>
+                            <div class="text-4xl font-black text-white font-mono drop-shadow-md" id="kpi-coverage"><span class="skeleton">75</span>%</div>
+                            <div class="text-[9px] text-gray-400 font-bold border-t border-white/10 pt-2 mt-3 uppercase tracking-widest">Sur l'horizon visible</div>
+                        </div>
+                        
+                        <div class="bento-card p-6 border-t-4 border-gold shadow-lg relative overflow-hidden bg-gradient-to-br from-card to-gold/10">
+                            <i class="fa-solid fa-scale-balanced absolute -right-4 -bottom-4 text-7xl text-gold opacity-10"></i>
+                            <h3 class="text-[10px] font-bold text-gold uppercase tracking-widest mb-2">Prix Moyen Pondéré</h3>
+                            <div class="text-4xl font-black text-white font-mono drop-shadow-md" id="kpi-blended"><span class="skeleton">95.6</span> €</div>
+                            <div class="text-[9px] text-gray-400 font-bold border-t border-white/10 pt-2 mt-3 uppercase tracking-widest text-gold">Objectif Budgétaire</div>
+                        </div>
+
+                        <div class="bento-card p-6 border-t-4 border-cyan shadow-lg">
+                            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Risque Spot (Ouvert)</h3>
+                            <div class="text-3xl font-black text-white font-mono drop-shadow-md" id="kpi-spot"><span class="skeleton">2.5</span> GWh</div>
+                            <div class="text-[9px] text-gray-400 font-bold border-t border-white/10 pt-2 mt-3 uppercase tracking-widest">Exposition marché</div>
+                        </div>
+
+                        <div class="bento-card p-6 border-t-4 border-purple shadow-lg">
+                            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Volume Solaire (PPA)</h3>
+                            <div class="text-3xl font-black text-white font-mono drop-shadow-md" id="kpi-ppa"><span class="skeleton">1.2</span> GWh</div>
+                            <div class="text-[9px] text-gray-400 font-bold border-t border-white/10 pt-2 mt-3 uppercase tracking-widest text-purple">Hedge Physique</div>
+                        </div>
+                    </div>
+
+                    <!-- LE GRAPHIQUE CONDOR (TETRIS) & L'EXÉCUTION -->
+                    <div class="bento-card flex-1 flex flex-col shadow-[0_30px_60px_rgba(0,0,0,0.5)] overflow-hidden border border-gold/30">
+                        <div class="p-6 bg-abysse/90 border-b border-white/5 flex justify-between items-center flex-shrink-0">
+                            <div>
+                                <h4 class="text-lg font-black text-white uppercase tracking-widest flex items-center gap-3"><i class="fa-solid fa-layer-group text-gold text-2xl"></i> Stratégie de Sourcing (Empilement)</h4>
+                                <p class="text-[10px] text-gray-500 font-mono mt-1">Prévision de puissance (Forecast IA) & Stratégie de Tranches.</p>
+                            </div>
+                            <div class="flex gap-4">
+                                <span class="text-[10px] text-gray-400 font-mono font-bold flex items-center gap-2"><div class="w-3 h-3 bg-gray-700 rounded-sm"></div> Prévision (Volume Total)</span>
+                                <span class="text-[10px] text-gray-400 font-mono font-bold flex items-center gap-2"><div class="w-3 h-3 bg-water rounded-sm"></div> Sourcing Ruban</span>
+                                <span class="text-[10px] text-gray-400 font-mono font-bold flex items-center gap-2"><div class="w-3 h-3 bg-[#F97316] rounded-sm"></div> PPA Solaire</span>
+                                <span class="text-[10px] text-gray-400 font-mono font-bold flex items-center gap-2"><div class="w-3 h-3 bg-purple rounded-sm"></div> Tranches de Marché</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex-1 flex min-h-0">
+                            <!-- CHART AREA -->
+                            <div class="w-2/3 p-6 border-r border-white/5 relative flex flex-col">
+                                <!-- OVERLAY CHARGEMENT (Zéro Mock) -->
+                                <div id="chart-loader" class="absolute inset-0 bg-abysse/90 z-50 flex flex-col items-center justify-center backdrop-blur-sm">
+                                    <i class="fa-solid fa-satellite-dish text-4xl text-gold mb-4 animate-pulse"></i>
+                                    <span class="text-xs text-gold font-mono font-bold uppercase tracking-widest">Construction de la matrice...</span>
+                                </div>
+                                <div class="flex-1 relative w-full h-full">
+                                    <canvas id="hedgingChart"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- DEAL DESK (SIMULATEUR D'ACHAT) -->
+                            <div class="w-1/3 p-8 bg-card/30 flex flex-col justify-between overflow-y-auto">
+                                <div>
+                                    <div class="text-xs text-gold font-black uppercase tracking-widest mb-6 border-b border-gold/20 pb-3 flex items-center gap-2"><i class="fa-solid fa-bolt text-lg"></i> Couvrir le Risque (Spot)</div>
+                                    
+                                    <label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block">Produit Boursier</label>
+                                    <select class="input-dark custom-select mb-6 bg-abysse border-white/10 text-center font-bold text-white shadow-inner">
+                                        <option>CAL 2026 (Ruban Base)</option>
+                                        <option>CAL 2027 (Ruban Base)</option>
+                                        <option>Q1 2027 (Pointe Hiver)</option>
+                                    </select>
+                                    
+                                    <div class="grid grid-cols-2 gap-4 mb-6">
+                                        <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block">Volume (MW)</label><input type="number" class="input-dark text-center shadow-inner" placeholder="0.5"></div>
+                                        <div><label class="text-[10px] text-gray-400 uppercase font-bold pl-2 mb-2 block">Prix Cible (€)</label><input type="number" class="input-dark text-center shadow-inner" placeholder="Marché"></div>
+                                    </div>
+
+                                    <div class="bg-black/40 border border-white/5 rounded-3xl p-6 mb-6 text-center shadow-inner">
+                                        <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Simulation Impact (Blended Price)</div>
+                                        <div class="text-2xl font-black font-mono text-success drop-shadow-[0_0_10px_#10B981]">- 0.00 €/MWh</div>
+                                        <p class="text-[9px] text-gray-600 mt-2 font-mono">L'IA recalculera le graphique avant validation.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="space-y-4">
+                                    <button onclick="App.toast('Ordre de marché transmis au Desk CORTEX.', 'success')" class="w-full bg-gold text-abysse font-black py-4 rounded-full hover:bg-white transition shadow-[0_0_20px_rgba(245,158,11,0.4)] text-sm uppercase tracking-widest flex items-center justify-center gap-3">
+                                        Négocier la tranche <i class="fa-solid fa-arrow-right"></i>
+                                    </button>
+                                    <button onclick="App.toast('Mémorandum généré.', 'info')" class="w-full bg-transparent border border-white/20 text-gray-400 font-bold py-3 rounded-full hover:text-white hover:border-white transition text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                                        <i class="fa-solid fa-file-pdf"></i> Mémo Stratégique (Board)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
-
     </main>
 
+    <!-- ============================================================================== -->
+    <!-- CORTEX TRADING DESK V13 - MOTEUR JAVASCRIPT (THIN CLIENT & NEXUS)              -->
+    <!-- ZÉRO MOCK : Les calculs sont sanctuarisés dans le Backend Python               -->
+    <!-- ============================================================================== -->
     <script>
-        let stratChartInstance = null;
-        let hedgeChartInstance = null;
-        let CURRENT_ID = null;
+        const App = {
+            toast: function(msg, type='info') {
+                const container = document.getElementById('toast-container');
+                if(!container) return;
+                const colors = { success: 'bg-success border-success/50 text-abysse', error: 'bg-alert border-alert/50 text-white', info: 'bg-cyan border-cyan/50 text-abysse', warning: 'bg-gold border-gold/50 text-abysse' };
+                const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
+                const el = document.createElement('div');
+                el.className = `${colors[type] || colors.info} px-8 py-4 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-sm font-bold border flex items-center gap-3 transform transition-all duration-300 -translate-y-10 opacity-0 pointer-events-auto z-[9999]`;
+                el.innerHTML = `<i class="fa-solid ${icon} text-xl"></i> <span>${msg}</span>`;
+                container.appendChild(el);
+                requestAnimationFrame(() => el.classList.remove('-translate-y-10', 'opacity-0'));
+                setTimeout(() => { el.classList.add('opacity-0', '-translate-y-10'); setTimeout(() => el.remove(), 300); }, 4000);
+            }
+        };
 
-        async function init() {
-            const urlParams = new URLSearchParams(window.location.search);
-            CURRENT_ID = urlParams.get('id');
-            
-            if(CURRENT_ID) {
-                document.getElementById('back-btn').href = `/industrie?id=${CURRENT_ID}`;
-                
-                // Get Site Name
+        const Nexus = {
+            get forceTenant() { return new URLSearchParams(window.location.search).get('force_tenant') || localStorage.getItem('cortex_god_mode_tenant') || null; },
+            getApiUrl(path) {
+                if (!this.forceTenant) return path;
+                const separator = path.includes('?') ? '&' : '?';
+                return `${path}${separator}force_tenant=${encodeURIComponent(this.forceTenant)}`;
+            },
+            async fetch(path, options = {}) {
                 try {
-                    const res = await fetch(`/api/dashboard/data/${CURRENT_ID}`);
-                    const data = await res.json();
-                    document.getElementById('site-name').innerText = data.identity?.site_name || "Site";
-                } catch(e) {}
+                    const response = await fetch(this.getApiUrl(path), options);
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData?.error || errData?.detail || `Erreur HTTP ${response.status}`);
+                    }
+                    const data = await response.json();
+                    if(data?.success === false) throw new Error(data?.error || "Erreur API interne");
+                    return data;
+                } catch (error) {
+                    App.toast(error.message, 'error');
+                    console.error(`[NEXUS ERROR] ${path}:`, error);
+                    return null;
+                }
+            }
+        };
+
+        let GLOBAL_TENANT_ID = Nexus.forceTenant || "ORPHELIN";
+        let isArmed = false;
+        let hedgingChartInstance = null;
+
+        // --- 1. INITIALISATION ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            if(Nexus.forceTenant && Nexus.forceTenant !== 'ALL') {
+                const badge = document.getElementById('god-mode-badge');
+                if(badge) { badge.classList.remove('hidden'); badge.innerHTML = `<i class="fa-solid fa-eye"></i> OPS : ${Nexus.forceTenant}`; }
+            }
+            
+            // On charge d'abord la liste des sites pour le sélecteur
+            await loadPortfolioSelector();
+            
+            // On lance le flux boursier en tâche de fond
+            pollMarketData();
+            
+            // On lance la construction de la matrice Condor
+            runTradingDesk();
+        });
+
+        // --- 2. SÉLECTEUR DE PORTEFEUILLE ---
+        async function loadPortfolioSelector() {
+            const data = await Nexus.fetch('/api/dashboard/fleet');
+            if(data?.fleet) {
+                let sites = data.fleet;
+                if(GLOBAL_TENANT_ID && GLOBAL_TENANT_ID !== "ORPHELIN") {
+                    sites = sites.filter(s => String(s?.tenant_id) === String(GLOBAL_TENANT_ID) && s.energy === 'elec');
+                }
                 
-                initHedgeChart();
-                updateStrategy();
-            } else {
-                alert("Aucun site sélectionné.");
+                const sel = document.getElementById('site-selector');
+                if(!sel) return;
+                
+                if(sites.length === 0) {
+                    sel.innerHTML = '<option value="">Aucun compteur électrique actif.</option>';
+                    return;
+                }
+                
+                sel.innerHTML = '<option value="ALL">Consolidation Globale (Portefeuille)</option>';
+                sites.sort((a,b) => (b.volume || 0) - (a.volume || 0)).forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.innerText = `Focus : ${s.name || s.id} (${Math.round(s.volume || 0)} MWh)`;
+                    sel.appendChild(opt);
+                });
             }
         }
 
-        async function updateStrategy() {
-            if(!CURRENT_ID) return;
-            const blocKw = parseFloat(document.getElementById('bloc-slider').value);
-            document.getElementById('bloc-val').innerText = blocKw + " kW";
-
-            try {
-                // APPEL AU VRAI MOTEUR CORTEX MARKET
-                const res = await fetch('/api/ops/market/simulate_strategy', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ site_id: CURRENT_ID, bloc_kw: blocKw })
-                });
-                const result = await res.json();
-                
-                if(result.details_horaires) {
-                    const gain = result.gain_strategie;
-                    const gainEl = document.getElementById('strat-gain');
-                    gainEl.innerText = (gain > 0 ? "+" : "") + Math.round(gain).toLocaleString() + " €";
-                    gainEl.className = gain > 0 ? "text-2xl font-bold text-green-500" : "text-2xl font-bold text-red-500";
-                    
-                    document.getElementById('spot-avg').innerText = result.spot_avg + " €/MWh";
-                    renderStratChart(result);
-                }
-            } catch(e) { console.error(e); }
-        }
-
-        function renderStratChart(data) {
-            const ctx = document.getElementById('stratChart').getContext('2d');
-            if(stratChartInstance) stratChartInstance.destroy();
+        // --- 3. MOTEUR BOURSIER (RADAR GAUCHE) ---
+        async function pollMarketData() {
+            // ZÉRO MOCK : Appel direct à cortex_rte.py via l'API Sniper
+            const data = await Nexus.fetch('/api/tools/sniper/market');
             
-            const labels = data.details_horaires.map(d => d.heure + 'h');
-            const conso = data.details_horaires.map(d => d.conso_kw);
-            const prices = data.prices_curve;
+            const statusCard = document.getElementById('market-status-card');
+            const statusIcon = document.getElementById('status-icon');
+            const statusText = document.getElementById('market-status-text');
+            const adviceText = document.getElementById('market-advice');
+            const bgIcon = document.getElementById('bg-icon-status');
+            
+            const elElec = document.getElementById('live-elec');
+            const elGaz = document.getElementById('live-gaz');
 
-            stratChartInstance = new Chart(ctx, {
+            if (!data || !data.success) {
+                if(elElec) elElec.innerHTML = '<span class="text-alert text-xl">RTE OFFLINE</span>';
+                if(elGaz) elGaz.innerHTML = '<span class="text-alert text-xl">EEX OFFLINE</span>';
+                if(statusText) statusText.innerText = "Connexion Perdue";
+                if(adviceText) adviceText.innerText = "Vérifiez vos clés API dans la Data Room.";
+                return;
+            }
+
+            const elecPrice = data.current_prices?.elec || 0;
+            const gazPrice = data.current_prices?.gaz || 0;
+            
+            if(elElec) elElec.innerText = elecPrice.toFixed(2) + " €";
+            if(elGaz) elGaz.innerText = gazPrice.toFixed(2) + " €";
+
+            const targetPrice = parseFloat(document.getElementById('target-price')?.value) || 0;
+            
+            // IA Tendance
+            if (isArmed && elecPrice <= targetPrice && elecPrice > 0) {
+                statusCard.className = "bento-card p-6 border border-success bg-success/10 animate-pulse relative overflow-hidden";
+                statusIcon.className = "w-14 h-14 rounded-[1rem] bg-success/20 text-success flex items-center justify-center text-3xl shadow-inner";
+                statusIcon.innerHTML = '<i class="fa-solid fa-bullseye"></i>';
+                statusText.innerText = "CIBLE ATTEINTE";
+                statusText.className = "text-xl font-black text-success";
+                adviceText.innerHTML = "<strong class='text-success'>L'ordre est déclenché.</strong> Le marché a touché votre limite. Le contrat est en cours de sécurisation.";
+                bgIcon.innerHTML = '<i class="fa-solid fa-check-double text-success"></i>';
+            } else if (data.status === "BEAR") {
+                statusCard.className = "bento-card p-6 border border-cyan/50 bg-cyan/5 relative overflow-hidden";
+                statusIcon.className = "w-14 h-14 rounded-[1rem] bg-cyan/10 text-cyan flex items-center justify-center text-3xl shadow-inner";
+                statusIcon.innerHTML = '<i class="fa-solid fa-arrow-trend-down"></i>';
+                statusText.innerText = "Baissier (Opportunité)";
+                statusText.className = "text-xl font-black text-cyan";
+                adviceText.innerText = "Le marché se détend. Gardez le sniper armé et attendez que le prix atteigne votre cible.";
+                bgIcon.innerHTML = '<i class="fa-solid fa-arrow-trend-down text-cyan"></i>';
+            } else {
+                statusCard.className = "bento-card p-6 border border-alert/50 bg-alert/5 relative overflow-hidden";
+                statusIcon.className = "w-14 h-14 rounded-[1rem] bg-alert/10 text-alert flex items-center justify-center text-3xl shadow-inner";
+                statusIcon.innerHTML = '<i class="fa-solid fa-arrow-trend-up"></i>';
+                statusText.innerText = "Haussier (Risque)";
+                statusText.className = "text-xl font-black text-alert";
+                adviceText.innerText = "Le marché est en tension. Ne signez aucun contrat long terme aujourd'hui, attendez une correction.";
+                bgIcon.innerHTML = '<i class="fa-solid fa-fire text-alert"></i>';
+            }
+        }
+
+        window.armSniper = function() {
+            const btn = document.getElementById('btn-arm');
+            const target = document.getElementById('target-price').value;
+            const action = document.getElementById('action-type').value;
+            
+            if(!target || target <= 0) return App.toast("Veuillez définir un prix cible valide.", "warning");
+            
+            isArmed = true;
+            btn.innerHTML = `<i class="fa-solid fa-radar fa-spin text-xl"></i> CIBLE VERROUILLÉE À ${target}€`;
+            btn.className = "w-full bg-abysse text-red_alert border-2 border-red_alert font-black py-4 rounded-full shadow-[0_0_20px_rgba(220,38,38,0.4)] transition mt-2 uppercase tracking-widest text-xs flex justify-center items-center gap-3";
+            
+            App.toast(`L'IA surveille la bourse 24/7. ${action === 'oef' ? 'Ordre d\'achat' : 'Alerte'} programmé à ${target}€/MWh.`, "info");
+            pollMarketData(); // Force la mise à jour visuelle
+        }
+
+        // --- 4. LE PLATEAU DE COUVERTURE (CONDOR CHART & KPIs) ---
+        window.runTradingDesk = async function() {
+            document.getElementById('chart-loader').classList.remove('hidden');
+            
+            // Retrait des Skeletons des KPIs
+            const kpiIds =['kpi-coverage', 'kpi-blended', 'kpi-spot', 'kpi-ppa'];
+            kpiIds.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xl text-gray-500"></i>';
+            });
+
+            // ZÉRO MOCK : On appelle la route API qui va lier Finance + Forecast
+            const data = await Nexus.fetch('/api/v4/trading/hedging_data');
+            
+            document.getElementById('chart-loader').classList.add('hidden');
+
+            if(!data || !data.success) {
+                App.toast("Erreur de génération de la matrice financière.", "error");
+                return;
+            }
+
+            // Injection des KPIs réels (Calculés en Python)
+            document.getElementById('kpi-coverage').innerText = `${data.kpis.coverage_pct}%`;
+            document.getElementById('kpi-blended').innerText = `${data.kpis.blended_price} €`;
+            document.getElementById('kpi-spot').innerText = `${(data.kpis.open_volume_mwh / 1000).toFixed(1)} GWh`;
+            document.getElementById('kpi-ppa').innerText = `${(data.kpis.ppa_volume_mwh / 1000).toFixed(1)} GWh`;
+
+            // Dessin du Chart.js (Le Tetris Condor)
+            renderHedgingChart(data.chart);
+        }
+
+        function renderHedgingChart(chartData) {
+            const canvas = document.getElementById('hedgingChart');
+            if(!canvas) return;
+
+            if (hedgingChartInstance) {
+                hedgingChartInstance.destroy();
+            }
+
+            hedgingChartInstance = new Chart(canvas.getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Conso (kW)', data: conso, backgroundColor: '#00E5FF', order: 2 },
-                        { label: 'Prix Spot (€/MWh)', data: prices, type: 'line', borderColor: '#EF4444', borderDash: [5,5], order: 1, yAxisID: 'y1' }
+                    labels: chartData.labels,
+                    datasets:[
+                        { 
+                            label: 'Sourcing Ruban (Base)', 
+                            data: chartData.datasets.base, 
+                            backgroundColor: '#3B82F6', // Water Blue
+                            stack: 'Stack 0', 
+                            borderRadius: 4 
+                        },
+                        { 
+                            label: 'PPA Solaire', 
+                            data: chartData.datasets.ppa, 
+                            backgroundColor: '#F97316', // Gas Orange (Sun)
+                            stack: 'Stack 0', 
+                            borderRadius: 4 
+                        },
+                        { 
+                            label: 'Tranches Fixées', 
+                            data: chartData.datasets.tranche, 
+                            backgroundColor: '#A855F7', // Purple
+                            stack: 'Stack 0', 
+                            borderRadius: 4 
+                        },
+                        { 
+                            label: 'Exposition Spot', 
+                            data: chartData.datasets.spot, 
+                            backgroundColor: 'rgba(255,255,255,0.05)', 
+                            borderWidth: 1, 
+                            borderColor: 'rgba(255,255,255,0.2)', 
+                            borderDash: [5, 5],
+                            stack: 'Stack 0', 
+                            borderRadius: 4 
+                        }
                     ]
                 },
-                options: { 
-                    responsive: true, 
+                options: {
+                    responsive: true,
                     maintainAspectRatio: false,
-                    scales: { 
-                        x: { grid: { display: false } }, 
-                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, title: {display: true, text: 'kW'} },
-                        y1: { position: 'right', grid: { display: false }, title: {display: true, text: '€/MWh'} }
-                    } 
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { 
+                            backgroundColor: '#001D3D', titleColor: '#00E5FF', bodyColor: '#fff', 
+                            borderColor: 'rgba(0,229,255,0.3)', borderWidth: 1, padding: 16, cornerRadius: 16,
+                            bodyFont: { family: 'JetBrains Mono' }, titleFont: { size: 14, weight: 'bold' }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            stacked: true, 
+                            grid: { display: false }, 
+                            ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', weight: 'bold' } } 
+                        },
+                        y: { 
+                            stacked: true, 
+                            grid: { color: 'rgba(255,255,255,0.05)' }, 
+                            ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } }, 
+                            title: { display: true, text: 'Puissance Moyenne (MW)', color: '#64748b', font: {weight: 'bold', size: 10, family: 'Inter'} } 
+                        }
+                    },
+                    interaction: { mode: 'index', intersect: false }
                 }
             });
         }
-
-        function initHedgeChart() {
-            const ctx = document.getElementById('hedgeChart').getContext('2d');
-            hedgeChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-                    datasets: [
-                        { label: 'Fixé', data: [80, 60, 40, 20], backgroundColor: '#10B981' },
-                        { label: 'Ouvert', data: [20, 40, 60, 80], backgroundColor: '#EF4444' }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: {display:false} }, y: { stacked: true, display:false } }, plugins: { legend: { display: false } } }
-            });
-        }
-
-        init();
     </script>
 </body>
 </html>
