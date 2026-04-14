@@ -92,9 +92,18 @@ class CortexRTE:
             return fallback_data
             
         try:
+            # FIX V13 : On ne demande jamais J+2 à la bourse aveuglément.
+            # L'EPEX SPOT fixe le Day-Ahead (J+1) vers 13h00.
+            now = datetime.now()
+            
+            if now.hour >= 13:
+                end_date = now + timedelta(days=1) # Après 13h, on peut demander demain
+            else:
+                end_date = now # Avant 13h, on ne demande qu'aujourd'hui
+                
+            start_date = now - timedelta(days=15)
+            
             # Formatage strict ISO 8601 avec offset +01:00 exigé par RTE pour Day Ahead
-            end_date = datetime.now() + timedelta(days=2)
-            start_date = datetime.now() - timedelta(days=15)
             start_str = start_date.strftime("%Y-%m-%dT00:00:00+01:00")
             end_str = end_date.strftime("%Y-%m-%dT00:00:00+01:00")
             
