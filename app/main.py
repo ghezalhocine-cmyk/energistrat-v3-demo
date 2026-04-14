@@ -135,6 +135,7 @@ pdf_builder = load_module("cortex_pdf", "pdf_builder", FallbackPDFBuilder())
 ademe_engine = load_module("cortex_ademe", "ademe_engine", MockAdeme())
 ppa_engine = load_module("cortex_ppa", "ppa_engine", MockPPA())
 tertiaire_engine = load_module("cortex_tertiaire", "tertiaire_engine", MockTertiaire())
+settings_engine = load_module("cortex_settings", "settings_engine", None)
 
 app = FastAPI(title="ENERGISTRAT V3", version="EMPIRE-V12.6-SECURE")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -927,6 +928,36 @@ async def api_save_carbon(payload: CarbonSettingsModel, user = Depends(get_curre
     tenant_id = db.get_user_profile(user.get("uid")).get("tenant_id", "DEFAULT") if user else "DEFAULT"
     db.save_setting(f"CARBON_{tenant_id}", payload.dict())
     return JSONResponse({"success": True})
+
+@app.get("/api/settings/magic_fill/{siret}")
+async def api_magic_fill(siret: str, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    if not settings_engine: return JSONResponse({"success": False, "error": "Moteur Settings hors ligne."})
+    return JSONResponse(settings_engine.magic_fill(siret))
+
+@app.get("/api/settings/health_score")
+async def api_health_score(request: Request, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    
+    # Sécurité: Le Back-end vérifie le Tenant (NEXUS God Mode ou Profil réel)
+    tenant_id = request.query_params.get("force_tenant") or db.get_user_profile(user.get("uid")).get("tenant_id")
+    
+    raw_sites = db.get_all_sites()
+    client_sites =[s for s in raw_sites if s.get("identity", {}).get("tenant_id") == tenant_id]
+    
+    return JSONResponse(settings_engine.compute_health_score(client_sites))
+
+@app.get("/api/v4/trading/hedging_data")
+async def api_hedging_data(request: Request, user = Depends(get_current_user)):
+    if not user: return JSONResponse({"error": "Non autorisé"}, 401)
+    
+    tenant_id = request.query_params.get("force_tenant") or db.get_user_profile(user.get("uid")).get("tenant_id")
+    
+    raw_sites = db.get_all_sites()
+    client_sites =[s for s in raw_sites if s.get("identity", {}).get("tenant_id") == tenant_id]
+    
+    # On passe les sites au moteur de calcul (qui intègre le forecast en interne)
+    return JSONResponse(settings_engine.generate_hedging_board(client_sites, forecast_engine=forecast))
 
 @app.get("/api/forecast/simulate/{client_id}")
 async def api_forecast_simulate(client_id: str, user = Depends(get_current_user)):
