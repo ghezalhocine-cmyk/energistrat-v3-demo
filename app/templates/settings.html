@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js pour la Salle de Marchés -->
+    <!-- Chart.js pour la Salle de Marchés (Hedging Condor) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script>
@@ -40,13 +40,11 @@
         .input-edit:focus { border-color: #00E5FF; box-shadow: 0 0 20px rgba(0,229,255,0.2); background: rgba(0,229,255,0.05); }
         .input-mono { font-family: 'JetBrains Mono', monospace; font-weight: bold; color: #00E5FF; }
 
-        /* Custom Toggle Switch */
         .toggle-checkbox:checked { right: 0; border-color: #00E5FF; }
         .toggle-checkbox:checked + .toggle-label { background-color: #00E5FF; box-shadow: 0 0 15px rgba(0,229,255,0.5); }
         .toggle-checkbox { right: 0; z-index: 1; border-color: #e2e8f0; transition: all 0.3s; }
         .toggle-label { background-color: #334155; transition: all 0.3s; border-radius: 9999px; }
 
-        /* Lock Overlay (Cortex Store) */
         .premium-lock { position: absolute; inset: 0; backdrop-filter: blur(8px); background: rgba(0,21,41,0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 3rem; z-index: 10; opacity: 0; transition: opacity 0.3s; cursor: pointer; }
         .premium-card:hover .premium-lock { opacity: 1; }
 
@@ -59,7 +57,6 @@
         
         ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #00E5FF; border-radius: 3px; }
         
-        /* Loading Skeletons */
         .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 9999px; }
         @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     </style>
@@ -73,7 +70,7 @@
     <aside class="w-72 bg-abysse border-r border-cyan/10 flex flex-col flex-shrink-0 z-50 shadow-[10px_0_30px_rgba(0,0,0,0.5)] h-screen">
         <div class="h-24 flex items-center px-8 border-b border-cyan/10 bg-abysse/90 backdrop-blur">
             <div class="w-12 h-12 rounded-[1rem] bg-gradient-to-br from-cyan to-blue-900 flex items-center justify-center text-abysse font-black shadow-[0_0_20px_rgba(0,229,255,0.4)] text-2xl mr-4">
-                <i class="fa-solid fa-layer-group"></i>
+                <i class="fa-solid fa-cube"></i>
             </div>
             <div>
                 <div class="font-black tracking-tight text-white leading-none text-xl">CORTEX<span class="text-cyan">.ERP</span></div>
@@ -125,7 +122,7 @@
             
             <div class="flex items-center gap-6">
                 <!-- DATA HEALTH SCORE -->
-                <div class="bg-card border border-white/10 px-6 py-2 rounded-full flex items-center gap-4 shadow-inner cursor-help" title="Niveau de complétion de votre Base 3D">
+                <div class="bg-card border border-white/10 px-6 py-2 rounded-full flex items-center gap-4 shadow-inner cursor-help" title="Évalué par l'IA Cortex">
                     <div class="text-right">
                         <div class="text-[9px] text-cyan uppercase font-bold tracking-widest mb-0.5">Health Score</div>
                         <div class="text-xs font-bold text-white">Qualité Data</div>
@@ -173,25 +170,20 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Raison Sociale Officielle</label><input type="text" id="gov-name" class="input-edit font-bold text-white bg-white/5 border-dashed" placeholder="Auto-complété..." readonly></div>
                         <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Code NAF</label><input type="text" id="gov-naf" class="input-edit input-mono text-gray-400 bg-white/5" placeholder="Auto-complété..." readonly></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">TVA Intracommunautaire</label><input type="text" id="gov-tva" class="input-edit input-mono text-gray-400 bg-white/5" placeholder="Calcul automatique..." readonly></div>
-                        <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Adresse de l'établissement (Auto ADEME)</label><input type="text" id="gov-address" class="input-edit text-gray-300" placeholder="Auto-complété..."></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">TVA Intracommunautaire</label><input type="text" id="gov-tva" class="input-edit input-mono text-gray-400 bg-white/5" placeholder="Calcul par le backend..." readonly></div>
+                        <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Adresse de l'établissement</label><input type="text" id="gov-address" class="input-edit text-gray-300" placeholder="Auto-complété..."></div>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-8">
-                    <!-- LOI ELAN -->
                     <div class="bento-card p-10 border border-white/5 bg-gradient-to-br from-card to-success/5 shadow-xl text-center flex flex-col justify-center">
                         <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-4 flex items-center justify-center gap-2"><i class="fa-solid fa-leaf text-success text-xl"></i> Année de Référence Carbone</h4>
                         <p class="text-xs text-gray-400 mb-6 leading-relaxed">Figez l'année de référence (Décret Tertiaire / OPERAT) pour calculer la trajectoire des -40% d'économies.</p>
                         <select id="gov-baseline-year" class="bg-abysse border border-success/30 text-success font-bold font-mono text-lg rounded-full px-8 py-4 outline-none cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.2)] text-center appearance-none">
-                            <option value="2010">Année 2010 (Défaut Légal)</option>
-                            <option value="2018">Année 2018</option>
-                            <option value="2019">Année 2019</option>
-                            <option value="2022">Année 2022</option>
+                            <option value="2010">Année 2010 (Défaut Légal)</option><option value="2018">Année 2018</option><option value="2019">Année 2019</option><option value="2022">Année 2022</option>
                         </select>
                     </div>
 
-                    <!-- WORKFLOW DELEGATION -->
                     <div class="bento-card p-10 border border-white/5 shadow-xl">
                         <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-white/10 pb-4"><i class="fa-solid fa-link text-purple text-xl"></i> Délégation de Saisie</h4>
                         <p class="text-xs text-gray-400 mb-6 leading-relaxed">Générez un lien magique sécurisé (sans mot de passe) pour demander à un technicien local de remplir les caractéristiques de son bâtiment.</p>
@@ -201,31 +193,10 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- RBAC -->
-                <div class="bento-card overflow-hidden shadow-2xl border border-white/5">
-                    <div class="p-8 border-b border-white/10 flex justify-between items-center bg-black/20">
-                        <h4 class="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-users-gear text-gray-400 text-xl"></i> Gestion des Rôles (RBAC)</h4>
-                        <button onclick="App.toast('Module en cours d\'activation', 'info')" class="bg-white/10 text-white px-6 py-2 rounded-full text-xs font-bold uppercase hover:bg-white/20 transition"><i class="fa-solid fa-plus mr-2"></i> Ajouter Utilisateur</button>
-                    </div>
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-abysse text-[10px] text-gray-500 uppercase tracking-widest border-b border-white/10">
-                            <tr><th class="p-6">Utilisateur</th><th class="p-6">Périmètre</th><th class="p-6">Rôle</th><th class="p-6 text-right">Action</th></tr>
-                        </thead>
-                        <tbody id="rbac-list" class="divide-y divide-white/5 bg-card/30">
-                            <tr class="hover:bg-white/5 transition">
-                                <td class="p-6 font-bold text-white flex items-center gap-4 text-sm"><div class="w-8 h-8 rounded-full bg-cyan/20 text-cyan flex items-center justify-center text-xs shadow-inner"><i class="fa-solid fa-user"></i></div> Vous (Admin)</td>
-                                <td class="p-6 text-gray-400 font-mono text-xs">Portefeuille Global</td>
-                                <td class="p-6"><span class="bg-success/20 border border-success/30 text-success px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-[0_0_10px_rgba(16,185,129,0.2)]">Propriétaire</span></td>
-                                <td class="p-6 text-right text-gray-600">-</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
             </div>
 
             <!-- ========================================================= -->
-            <!-- ONGLET 2 : L'ARBRE DE PARC 3D (ASSET MANAGEMENT)          -->
+            <!-- ONGLET 2 : L'ARBRE DE PARC 3D (ASSET MANAGEMENT ÉDITEUR)  -->
             <!-- ========================================================= -->
             <div id="view-parc" class="view-section max-w-[1600px] mx-auto space-y-6 h-full">
                 <div class="flex justify-between items-end mb-6">
@@ -238,77 +209,126 @@
                     </button>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[750px]">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[800px]">
                     <!-- ARBRE GAUCHE -->
-                    <div class="col-span-4 bento-card p-0 flex flex-col overflow-hidden shadow-2xl">
+                    <div class="col-span-3 bento-card p-0 flex flex-col overflow-hidden shadow-2xl">
                         <div class="p-6 border-b border-white/10 bg-card/50 rounded-t-[3rem]">
                             <div class="relative w-full">
                                 <i class="fa-solid fa-search absolute left-5 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
-                                <input type="text" id="search-tree" oninput="renderAssetTree()" placeholder="Rechercher (Tag, Site, PDL)..." autocomplete="off" class="w-full bg-abysse border border-white/10 rounded-full py-4 pl-12 pr-4 text-xs text-white focus:border-cyan outline-none transition font-mono shadow-inner">
+                                <input type="text" id="search-tree" oninput="renderAssetTree()" placeholder="Rechercher (Nom, PDL)..." autocomplete="off" class="w-full bg-abysse border border-white/10 rounded-full py-4 pl-12 pr-4 text-xs text-white focus:border-cyan outline-none transition font-mono shadow-inner">
                             </div>
                         </div>
-                        <div class="flex-1 overflow-y-auto p-6 space-y-4 bg-abysse/30 rounded-b-[3rem]" id="asset-tree-container">
-                            <div class="text-center py-10 text-gray-500 font-mono text-xs"><i class="fa-solid fa-spinner fa-spin text-cyan mb-4 text-3xl block"></i> Génération de la grappe...</div>
+                        <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-abysse/30 rounded-b-[3rem]" id="asset-tree-container">
+                            <div class="text-center py-10 text-gray-500 font-mono text-xs"><i class="fa-solid fa-spinner fa-spin text-cyan mb-4 text-3xl block"></i> Chargement...</div>
                         </div>
                     </div>
 
-                    <!-- ÉDITEUR DROITE -->
-                    <div class="col-span-8 bento-card p-10 flex flex-col relative shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-cyan/20">
-                        <!-- OVERLAY VIDE -->
+                    <!-- ÉDITEUR DROITE COMPLET -->
+                    <div class="col-span-9 bento-card p-8 flex flex-col relative shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-cyan/20 overflow-y-auto">
                         <div id="site-editor-overlay" class="absolute inset-0 bg-abysse/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center rounded-[3rem]">
                             <i class="fa-solid fa-sitemap text-8xl text-gray-600 mb-6 opacity-30"></i>
                             <h3 class="text-3xl font-black text-white mb-2">Gestion des Actifs</h3>
-                            <p class="text-sm text-gray-400 mt-2 max-w-sm">Sélectionnez un élément dans l'arbre pour modifier ses caractéristiques.</p>
+                            <p class="text-sm text-gray-400 mt-2 max-w-sm">Sélectionnez un élément dans l'arbre pour modifier ses caractéristiques, contrats et puissances.</p>
                         </div>
 
-                        <div class="flex justify-between items-start border-b border-white/10 pb-6 mb-8">
+                        <div class="flex justify-between items-start border-b border-white/10 pb-4 mb-6">
                             <div>
-                                <h3 class="text-3xl font-black text-white flex items-center gap-3" id="asset-title">Détails de l'Actif</h3>
-                                <div class="text-[10px] text-gray-500 font-mono mt-3 tracking-widest uppercase bg-white/5 inline-block px-3 py-1 rounded-full border border-white/10">Identifiant : <span class="text-cyan font-bold" id="asset-id">--</span></div>
+                                <h3 class="text-2xl font-black text-white flex items-center gap-3" id="asset-title">Détails de l'Actif</h3>
+                                <div class="text-[10px] text-gray-500 font-mono mt-2 tracking-widest uppercase bg-white/5 inline-block px-3 py-1 rounded-full border border-white/10">Identifiant : <span class="text-cyan font-bold" id="asset-id">NEW</span></div>
                             </div>
                             <button onclick="App.toast('Compteur archivé (Soft Delete)', 'success')" class="bg-alert/10 text-alert border border-alert/30 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-alert hover:text-white transition">
                                 <i class="fa-solid fa-box-archive mr-2"></i> Soft Delete
                             </button>
                         </div>
 
-                        <div class="space-y-8 flex-1 overflow-y-auto pr-4">
-                            <!-- Multi Fluides -->
-                            <div>
-                                <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-4 block border-b border-white/5 pb-2">Vecteur Énergétique</label>
-                                <div class="flex flex-wrap gap-4">
-                                    <button onclick="setSiteEnergy('elec')" id="btn-site-elec" class="px-6 py-3 rounded-full border-2 border-cyan bg-cyan/10 text-cyan font-black text-xs flex items-center gap-2 uppercase tracking-widest shadow-[0_0_15px_rgba(0,229,255,0.3)]"><i class="fa-solid fa-bolt"></i> Électricité</button>
-                                    <button onclick="setSiteEnergy('gaz')" id="btn-site-gaz" class="px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest hover:border-gas hover:text-gas transition"><i class="fa-solid fa-fire"></i> Gaz</button>
-                                    <button class="px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest opacity-50 cursor-not-allowed"><i class="fa-solid fa-droplet"></i> Eau</button>
-                                    <button class="px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest opacity-50 cursor-not-allowed"><i class="fa-solid fa-temperature-arrow-up"></i> RCU (Chaleur)</button>
-                                    <button class="px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest opacity-50 cursor-not-allowed"><i class="fa-solid fa-leaf"></i> Biomasse</button>
+                        <div class="bg-abysse/50 p-6 rounded-[2rem] border border-white/5 space-y-4 mb-6 shadow-inner">
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 pb-2 mb-2 flex items-center gap-2"><i class="fa-solid fa-building text-cyan"></i> Identité & Localisation</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-[9px] text-cyan uppercase font-bold tracking-widest pl-4 mb-1 block">Nom du Bâtiment / Site *</label><input type="text" id="site-name" class="input-edit text-white font-bold bg-cyan/5 border-cyan/30" placeholder="Ex: Gymnase Municipal"></div>
+                                <div><label class="text-[9px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-1 block">Entité Parente (Lot)</label><input type="text" id="site-lot" class="input-edit text-gray-300" placeholder="Ex: Zone Nord"></div>
+                                <div class="col-span-2 relative">
+                                    <label class="text-[9px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-1 block">Adresse (Voie)</label>
+                                    <input type="text" id="address-input" class="input-edit w-full" placeholder="Recherche adresse..." autocomplete="off" oninput="searchAddress()">
+                                    <input type="hidden" id="site-insee">
+                                    <div id="address-suggestions" class="suggestions-list hidden"></div>
+                                </div>
+                                <div><label class="text-[9px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-1 block">Code Postal</label><input type="text" id="zip-input" class="input-edit font-mono"></div>
+                                <div><label class="text-[9px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-1 block">Ville</label><input type="text" id="city-input" class="input-edit font-bold"></div>
+                            </div>
+                        </div>
+
+                        <div class="bg-card/80 p-6 rounded-[2.5rem] border-l-4 border-cyan shadow-lg transition-colors duration-500" id="card-energy">
+                            <div class="flex justify-between items-center border-b border-white/10 pb-4 mb-4">
+                                <h4 class="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2"><i class="fa-solid fa-file-signature text-gray-500"></i> Contrat & Tarification</h4>
+                                <div class="flex bg-black/50 p-1 rounded-full border border-white/5">
+                                    <button onclick="setSiteEnergy('elec')" id="btn-site-elec" class="px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest bg-cyan text-abysse transition shadow-md">ÉLEC</button>
+                                    <button onclick="setSiteEnergy('gaz')" id="btn-site-gaz" class="px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition">GAZ</button>
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-2 gap-6">
-                                <div><label id="lbl-primary" class="text-[10px] text-cyan uppercase font-bold tracking-widest pl-4 mb-2 block">Identifiant Unique (PDL/PCE) *</label><input type="text" id="site-pdl" class="input-edit input-mono text-cyan bg-cyan/5 border-cyan/30" placeholder="Ex: 3000..."></div>
-                                <div><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Entité Parente (Lot)</label><input type="text" id="site-lot" class="input-edit text-gray-300" placeholder="Ex: Zone Nord"></div>
-                                <div class="col-span-2"><label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Nom du Bâtiment / Site</label><input type="text" id="site-name" class="input-edit text-white font-bold" placeholder="Ex: Gymnase Municipal"></div>
+                            <div class="grid grid-cols-12 gap-4 mb-6">
+                                <div class="col-span-4"><label id="lbl-primary" class="text-[9px] text-cyan font-bold uppercase tracking-widest mb-1 block pl-2">PDL / PRM (14) *</label><input type="text" id="site-pdl" class="input-edit font-mono text-lg text-cyan border-cyan/30 bg-cyan/5"></div>
+                                <div class="col-span-4"><label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2">Fournisseur</label><input type="text" id="site-provider" class="input-edit"></div>
+                                <div class="col-span-2"><label class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-1 block pl-2">Début Marché</label><input type="date" id="site-start-date" class="input-edit text-gray-400 cursor-pointer" style="color-scheme: dark;"></div>
+                                <div class="col-span-2"><label class="text-[9px] text-alert font-bold uppercase tracking-widest mb-1 block pl-2">Fin de marché</label><input type="date" id="site-end-date" class="input-edit text-white border-alert/50 bg-alert/10 cursor-pointer" style="color-scheme: dark;"></div>
                             </div>
 
-                            <!-- Inputs cachés pour sauvegarde via Jumeau/Marché -->
-                            <input type="hidden" id="address-input"><input type="hidden" id="city-input"><input type="hidden" id="zip-input"><input type="hidden" id="site-insee"><input type="hidden" id="site-surface"><input type="hidden" id="inp-type">
-                            <input type="hidden" id="site-provider"><input type="hidden" id="site-start-date"><input type="hidden" id="site-end-date">
-                            <input type="hidden" id="ps-hph"><input type="hidden" id="ps-hch"><input type="hidden" id="ps-hpe"><input type="hidden" id="ps-hce"><input type="hidden" id="ps-unique">
-                            <input type="hidden" id="px-hph"><input type="hidden" id="px-hch"><input type="hidden" id="px-hpe"><input type="hidden" id="px-hce"><input type="hidden" id="px-unique"><input type="hidden" id="px-fix"><input type="hidden" id="px-tax" value="22.5">
-                            <input type="hidden" id="site-profil-gaz"><input type="hidden" id="ps-gaz-cja"><input type="hidden" id="ps-gaz-car"><input type="hidden" id="px-gaz-mol"><input type="hidden" id="px-gaz-fix"><input type="hidden" id="px-gaz-stock"><input type="hidden" id="px-gaz-tax" value="8.44">
-                            <input type="checkbox" id="quadrant-toggle" class="hidden">
+                            <!-- GRILLE ÉLEC -->
+                            <div id="pricing-elec-grid" class="bg-black/40 p-6 rounded-2xl border border-white/5">
+                                <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
+                                    <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Grille Tarifaire (ÉLEC)</span>
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-[9px] text-gray-500 font-bold uppercase">Tarif Unique</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" id="quadrant-toggle" class="sr-only peer" onchange="toggleQuadrants()">
+                                            <div class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan"></div>
+                                        </label>
+                                        <span class="text-[9px] text-cyan font-bold uppercase">4 Cadrans</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-5 gap-4 mb-4">
+                                    <div class="col-span-5"><span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Puissances Souscrites (kW)</span></div>
+                                    <div class="quad-simple col-span-5"><input type="number" id="ps-unique" placeholder="Puissance (kVA)" class="input-edit font-mono text-cyan w-1/3 text-lg border-cyan/30"></div>
+                                    <div class="quad-advanced"><input type="number" id="ps-hph" placeholder="PS - HPH" class="input-edit font-mono text-center"></div>
+                                    <div class="quad-advanced"><input type="number" id="ps-hch" placeholder="PS - HCH" class="input-edit font-mono text-center"></div>
+                                    <div class="quad-advanced"><input type="number" id="ps-hpe" placeholder="PS - HPE" class="input-edit font-mono text-center border-cyan/30 text-cyan"></div>
+                                    <div class="quad-advanced"><input type="number" id="ps-hce" placeholder="PS - HCE" class="input-edit font-mono text-center"></div>
+                                </div>
 
-                            <!-- Custom Tags -->
-                            <div class="bg-abysse/50 p-6 rounded-[2rem] border border-white/5 shadow-inner">
-                                <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-2 mb-4 block"><i class="fa-solid fa-tags text-purple mr-2"></i> Custom Tags Analytiques (Reportings)</label>
-                                <input type="text" class="input-edit font-mono text-purple mb-4" placeholder="Ajouter un tag (ex: #Zone_Nord) et Entrée...">
-                                <div class="flex gap-2 flex-wrap" id="custom-tags-container">
-                                    <span class="bg-purple/20 text-purple border border-purple/30 px-4 py-2 rounded-full text-xs font-mono font-bold cursor-pointer hover:bg-alert hover:text-white hover:border-alert transition">#Relamping_2025 <i class="fa-solid fa-xmark ml-2"></i></span>
+                                <div class="grid grid-cols-5 gap-4">
+                                    <div class="col-span-5"><span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Prix de l'Énergie (€/MWh HT)</span></div>
+                                    <div class="quad-simple col-span-5"><input type="number" step="0.01" id="px-unique" placeholder="Prix Molécule (€/MWh)" class="input-edit font-mono text-white w-1/3 text-lg border-white/30"></div>
+                                    <div class="quad-advanced"><label class="text-[8px] text-white uppercase block mb-1">HPH</label><input type="number" step="0.01" id="px-hph" class="input-edit font-mono text-center text-white border-white/30"></div>
+                                    <div class="quad-advanced"><label class="text-[8px] text-gray-400 uppercase block mb-1">HCH</label><input type="number" step="0.01" id="px-hch" class="input-edit font-mono text-center"></div>
+                                    <div class="quad-advanced"><label class="text-[8px] text-cyan uppercase block mb-1">HPE</label><input type="number" step="0.01" id="px-hpe" class="input-edit font-mono text-center text-cyan border-cyan/30"></div>
+                                    <div class="quad-advanced"><label class="text-[8px] text-gray-400 uppercase block mb-1">HCE</label><input type="number" step="0.01" id="px-hce" class="input-edit font-mono text-center"></div>
+                                    
+                                    <div class="col-span-5 mt-2 pt-4 border-t border-white/5 grid grid-cols-2 gap-4">
+                                        <div><label class="text-[9px] text-gold uppercase font-bold pl-2 mb-1 block">Abonnement Annuel (€)</label><input type="number" step="0.1" id="px-fix" class="input-edit font-mono text-gold border-gold/30 text-lg w-2/3"></div>
+                                        <div><label class="text-[9px] text-gray-400 uppercase font-bold pl-2 mb-1 block">CSPE / TICFE (€/MWh)</label><input type="number" step="0.1" id="px-tax" class="input-edit font-mono text-gray-400 text-lg w-2/3" value="22.5"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- GRILLE GAZ -->
+                            <div id="pricing-gaz-grid" class="hidden bg-black/40 p-6 rounded-2xl border border-white/5 mt-4 space-y-4">
+                                <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest border-b border-white/10 pb-2 block">Paramètres Gaz Naturel</span>
+                                <div class="grid grid-cols-3 gap-6">
+                                    <div><label class="text-[9px] text-gas font-bold uppercase pl-2 mb-1 block">Profil (Ex: P12)</label><input type="text" id="site-profil-gaz" class="input-edit font-mono text-gas border-gas/30 bg-gas/5 text-center text-lg uppercase"></div>
+                                    <div><label class="text-[9px] text-gray-400 font-bold uppercase pl-2 mb-1 block">CJA (MWh/j)</label><input type="number" step="0.01" id="ps-gaz-cja" class="input-edit font-mono text-center text-lg"></div>
+                                    <div><label class="text-[9px] text-white font-bold uppercase pl-2 mb-1 block">Volume CAR (MWh/an)</label><input type="number" id="ps-gaz-car" class="input-edit font-mono text-center text-lg border-white/30 text-white"></div>
+                                </div>
+                                <div class="grid grid-cols-4 gap-4 pt-4 border-t border-white/5">
+                                    <div><label class="text-[9px] text-white font-bold uppercase pl-2 mb-1 block">Prix Molécule (€/MWh)</label><input type="number" step="0.01" id="px-gaz-mol" class="input-edit font-mono text-center text-xl text-white border-white/50"></div>
+                                    <div><label class="text-[9px] text-gold font-bold uppercase pl-2 mb-1 block">Abonnement /an (€)</label><input type="number" step="0.1" id="px-gaz-fix" class="input-edit font-mono text-center text-lg text-gold border-gold/30"></div>
+                                    <div><label class="text-[9px] text-gray-400 font-bold uppercase pl-2 mb-1 block">Stockage (€/MWh)</label><input type="number" step="0.01" id="px-gaz-stock" class="input-edit font-mono text-center text-lg"></div>
+                                    <div><label class="text-[9px] text-gray-400 font-bold uppercase pl-2 mb-1 block">TICGN (€/MWh)</label><input type="number" step="0.1" id="px-gaz-tax" class="input-edit font-mono text-center text-lg" value="8.44"></div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="mt-6 pt-6 border-t border-white/10 text-right">
+                        <div class="mt-6 text-right">
                             <button onclick="saveSiteData()" id="btn-save-site" class="bg-cyan text-abysse font-black px-10 py-4 rounded-full hover:bg-white transition shadow-[0_0_20px_rgba(0,229,255,0.4)] text-xs uppercase tracking-widest flex items-center gap-2 ml-auto">
                                 <i class="fa-solid fa-cloud-arrow-up text-lg"></i> Sauvegarder Actif
                             </button>
@@ -318,7 +338,7 @@
             </div>
 
             <!-- ========================================================= -->
-            <!-- ONGLET 3 : LE JUMEAU PHYSIQUE (ADEME & TECH)              -->
+            <!-- ONGLET 3 : LE JUMEAU PHYSIQUE (ADEME)                     -->
             <!-- ========================================================= -->
             <div id="view-jumeau" class="view-section max-w-[1200px] mx-auto space-y-8">
                 <div class="text-center mb-10">
@@ -354,24 +374,17 @@
                         <div class="bg-card p-6 rounded-[2rem] border border-white/5 text-center flex flex-col items-center justify-center shadow-inner">
                             <i class="fa-solid fa-temperature-arrow-up text-3xl text-gas mb-4"></i>
                             <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4">Système de Chauffage</div>
-                            <select id="inp-heating" class="w-full bg-abysse border border-white/10 text-white text-xs font-bold rounded-full px-4 py-3 outline-none cursor-pointer text-center appearance-none">
-                                <option value="">Non Renseigné</option><option value="gaz">Gaz Naturel</option><option value="elec">Électrique (PAC)</option><option value="rcu">Réseau de Chaleur</option><option value="fioul">Fioul</option>
-                            </select>
+                            <select id="inp-heating" class="w-full bg-abysse border border-white/10 text-white text-xs font-bold rounded-full px-4 py-3 outline-none cursor-pointer text-center appearance-none"><option value="">Non Renseigné</option><option value="gaz">Gaz Naturel</option><option value="elec">Électrique (PAC)</option><option value="rcu">Réseau de Chaleur</option><option value="fioul">Fioul</option></select>
                         </div>
                         <div class="bg-card p-6 rounded-[2rem] border border-white/5 text-center flex flex-col items-center justify-center shadow-inner">
                             <i class="fa-solid fa-network-wired text-3xl text-cyan mb-4"></i>
                             <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4">Pilotage Centralisé (GTB)</div>
-                            <div class="flex gap-2 w-full">
-                                <button class="flex-1 bg-abysse text-gray-400 border border-white/10 font-bold py-2 rounded-full text-xs hover:text-white transition">OUI</button>
-                                <button class="flex-1 bg-cyan text-abysse font-black py-2 rounded-full text-xs transition shadow-[0_0_10px_rgba(0,229,255,0.3)]">NON</button>
-                            </div>
+                            <div class="flex gap-2 w-full"><button class="flex-1 bg-abysse text-gray-400 border border-white/10 font-bold py-2 rounded-full text-xs hover:text-white transition">OUI</button><button class="flex-1 bg-cyan text-abysse font-black py-2 rounded-full text-xs transition shadow-[0_0_10px_rgba(0,229,255,0.3)]">NON</button></div>
                         </div>
                         <div class="bg-card p-6 rounded-[2rem] border border-white/5 text-center flex flex-col items-center justify-center relative overflow-hidden group hover:border-gold/50 transition shadow-inner">
                             <i class="fa-solid fa-solar-panel text-3xl text-gold mb-4 relative z-10"></i>
                             <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4 relative z-10">Potentiel Solar Studio</div>
-                            <select id="inp-roof" class="w-full bg-abysse border border-gold/30 text-gold text-xs font-bold rounded-full px-4 py-3 outline-none cursor-pointer text-center appearance-none relative z-10">
-                                <option value="">Non Renseigné</option><option value="incline">Toiture Inclinée</option><option value="plat">Toiture Terrasse (Plate)</option><option value="parking">Ombrières Parking</option>
-                            </select>
+                            <select id="inp-roof" class="w-full bg-abysse border border-gold/30 text-gold text-xs font-bold rounded-full px-4 py-3 outline-none cursor-pointer text-center appearance-none relative z-10"><option value="">Non Renseigné</option><option value="incline">Toiture Inclinée</option><option value="plat">Toiture Terrasse (Plate)</option><option value="parking">Ombrières Parking</option></select>
                         </div>
                     </div>
                 </div>
@@ -384,35 +397,10 @@
                 <div class="flex justify-between items-end mb-6">
                     <div>
                         <h3 class="text-3xl font-black text-white italic tracking-tight">Salle de <span class="text-gold">Marchés</span></h3>
-                        <p class="text-sm text-gray-400 mt-2 font-mono">Couverture (Hedging), Tranches et Structuration d'Acheminement (TURPE/ATRD).</p>
+                        <p class="text-sm text-gray-400 mt-2 font-mono">Couverture de Tranches et stratégie d'achat (Sourcing Ruban).</p>
                     </div>
                 </div>
 
-                <div class="bento-card p-8 border-t-4 border-cyan shadow-xl">
-                    <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-white/10 pb-4"><i class="fa-solid fa-tower-cell text-cyan text-xl"></i> Structuration d'Acheminement (Réseau)</h4>
-                    <div class="grid grid-cols-12 gap-8">
-                        <div class="col-span-3">
-                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Segment Technique</label>
-                            <select id="network-segment" class="input-edit text-center font-bold text-cyan border-cyan/30 appearance-none bg-abysse cursor-pointer">
-                                <option value="">-- Sélectionner --</option>
-                                <optgroup label="Électricité"><option value="C1">C1 (HTB)</option><option value="C2">C2 (HTA)</option><option value="C3">C3 (HTA)</option><option value="C4">C4 (BT > 36)</option><option value="C5">C5 (BT < 36)</option></optgroup>
-                                <optgroup label="Gaz Naturel"><option value="T1">T1 (Base)</option><option value="T2">T2 (B2S)</option><option value="T3">T3 (B2M)</option><option value="T4">T4 (Industrie)</option></optgroup>
-                            </select>
-                        </div>
-                        <div class="col-span-3">
-                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-widest pl-4 mb-2 block">Plage d'Utilisation (FTA)</label>
-                            <select id="network-fta" class="input-edit text-center font-bold appearance-none cursor-pointer">
-                                <option value="">--</option><option value="CU">CU (Courte)</option><option value="MU">MU (Moyenne)</option><option value="LU">LU (Longue)</option>
-                            </select>
-                        </div>
-                        <!-- Cadrans intégrés dans le Jumeau / SaveSiteData -->
-                        <div class="col-span-6 flex items-center justify-center border border-dashed border-white/10 rounded-[2rem] bg-black/20">
-                            <span class="text-xs text-gray-500 font-mono">Puissances synchronisées via Base 3D</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- LE DASHBOARD CONDOR (HEDGING & TRANCHES) -->
                 <div class="bento-card overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.4)] border-t-4 border-gold">
                     <div class="p-8 bg-abysse/90 border-b border-white/5 flex justify-between items-center">
                         <h4 class="text-xl font-black text-white uppercase tracking-widest"><i class="fa-solid fa-layer-group text-gold mr-3 text-2xl"></i> Couverture de Tranches (Hedging)</h4>
@@ -426,34 +414,34 @@
                     <div class="grid grid-cols-4 gap-px bg-white/5 border-b border-white/5">
                         <div class="bg-card/80 p-6 text-center shadow-inner">
                             <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 flex items-center justify-center gap-2"><div class="w-2 h-2 rounded-full bg-success"></div> Couverture Moy.</div>
-                            <div class="text-3xl font-black font-mono text-white">72%</div>
+                            <div class="text-3xl font-black font-mono text-white" id="kpi-coverage"><i class="fa-solid fa-spinner fa-spin text-sm"></i></div>
                         </div>
                         <div class="bg-card/80 p-6 text-center shadow-inner">
                             <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 flex items-center justify-center gap-2"><div class="w-2 h-2 rounded-full bg-cyan animate-pulse"></div> Prix Moyen Pondéré</div>
-                            <div class="text-3xl font-black font-mono text-cyan">95.63 €</div>
+                            <div class="text-3xl font-black font-mono text-cyan" id="kpi-blended"><i class="fa-solid fa-spinner fa-spin text-sm"></i></div>
                         </div>
                         <div class="bg-card/80 p-6 text-center shadow-inner">
                             <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 flex items-center justify-center gap-2"><div class="w-2 h-2 rounded-full bg-water"></div> Positions Ouvertes</div>
-                            <div class="text-3xl font-black font-mono text-white">14</div>
+                            <div class="text-3xl font-black font-mono text-white" id="kpi-positions"><i class="fa-solid fa-spinner fa-spin text-sm"></i></div>
                         </div>
                         <div class="bg-card/80 p-6 text-center shadow-inner">
                             <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 flex items-center justify-center gap-2"><div class="w-2 h-2 rounded-full bg-gas"></div> Volume PPA</div>
-                            <div class="text-3xl font-black font-mono text-white">1,240 MWh</div>
+                            <div class="text-3xl font-black font-mono text-white" id="kpi-ppa"><i class="fa-solid fa-spinner fa-spin text-sm"></i></div>
                         </div>
                     </div>
 
                     <!-- GRAPHIQUE & NÉGOCIATION -->
                     <div class="grid grid-cols-12 gap-0 bg-abysse/50">
                         <div class="col-span-8 p-8 border-r border-white/5 relative">
-                            <div class="text-xs text-gray-500 font-bold uppercase tracking-widest mb-6">Prévision de puissance & couverture</div>
+                            <div class="text-xs text-gray-500 font-bold uppercase tracking-widest mb-6">Prévision de puissance & couverture (Basé sur le Forecast)</div>
                             <div class="h-[300px] w-full flex items-center justify-center">
                                 <canvas id="hedgingChart" style="width:100%; height:100%;"></canvas>
                             </div>
                             <div class="flex gap-4 justify-center mt-6">
                                 <span class="text-[9px] text-gray-400 font-mono flex items-center gap-2"><div class="w-3 h-3 bg-gray-700 rounded-sm"></div> Prévision (Spot)</span>
-                                <span class="text-[9px] text-gray-400 font-mono flex items-center gap-2"><div class="w-3 h-3 bg-water rounded-sm"></div> ARENH</span>
+                                <span class="text-[9px] text-gray-400 font-mono flex items-center gap-2"><div class="w-3 h-3 bg-water rounded-sm"></div> Sourcing Ruban</span>
                                 <span class="text-[9px] text-gray-400 font-mono flex items-center gap-2"><div class="w-3 h-3 bg-[#F97316] rounded-sm"></div> PPA Solaire</span>
-                                <span class="text-[9px] text-gray-400 font-mono flex items-center gap-2"><div class="w-3 h-3 bg-purple rounded-sm"></div> CAL 2026</span>
+                                <span class="text-[9px] text-gray-400 font-mono flex items-center gap-2"><div class="w-3 h-3 bg-purple rounded-sm"></div> Tranches Fixées</span>
                             </div>
                         </div>
 
@@ -495,9 +483,9 @@
                 <div class="bento-card p-10 border-t-4 border-purple shadow-[0_20px_50px_rgba(0,0,0,0.4)] flex items-center justify-between bg-gradient-to-r from-card to-purple/10">
                     <div class="max-w-2xl">
                         <h3 class="text-2xl font-black text-white mb-4 flex items-center gap-3"><i class="fa-solid fa-envelope-open-text text-purple"></i> Email Catching (La Pieuvre IA)</h3>
-                        <p class="text-sm text-gray-300 leading-relaxed font-mono mb-6">Donnez cette adresse unique à vos fournisseurs. L'IA CORTEX aspirera, lira et classera automatiquement les factures PDF dans votre coffre-fort, sans aucune action de votre part.</p>
+                        <p class="text-sm text-gray-300 leading-relaxed font-mono mb-6">Donnez cette adresse unique à vos fournisseurs. L'IA CORTEX aspirera, lira et classera automatiquement les factures PDF dans votre coffre-fort.</p>
                         <div class="flex items-center gap-4 bg-abysse border border-purple/50 p-2 rounded-full w-max shadow-inner">
-                            <span class="text-cyan font-mono font-bold pl-6 pr-4 tracking-widest text-sm" id="catch-email">factures-xxxxx@inbox.energistrat.com</span>
+                            <span class="text-cyan font-mono font-bold pl-6 pr-4 tracking-widest text-sm" id="catch-email">...</span>
                             <button onclick="navigator.clipboard.writeText(document.getElementById('catch-email').innerText); App.toast('Email copié !', 'success')" class="bg-purple text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-white hover:text-purple transition shadow-lg"><i class="fa-regular fa-copy"></i></button>
                         </div>
                     </div>
@@ -513,8 +501,8 @@
                     </div>
 
                     <div class="bento-card p-10 border border-white/5 shadow-xl bg-abysse/50">
-                        <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-white/10 pb-4"><i class="fa-solid fa-code text-gold text-xl"></i> Webhooks & API (ERP / GTB)</h4>
-                        <p class="text-xs text-gray-400 mb-8 leading-relaxed">Générez un Token pour connecter ENERGISTRAT à votre ERP (SAP, Sage) ou à vos automates de bâtiment (Siemens, Schneider) en bi-directionnel.</p>
+                        <h4 class="text-sm font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-white/10 pb-4"><i class="fa-solid fa-code text-gold text-xl"></i> Webhooks & API</h4>
+                        <p class="text-xs text-gray-400 mb-8 leading-relaxed">Générez un Token pour connecter ENERGISTRAT à votre ERP (SAP, Sage) ou GTB.</p>
                         <div class="space-y-6">
                             <div>
                                 <label class="text-[10px] text-gold uppercase font-bold tracking-widest pl-4 mb-2 block">Bearer Token (Lecture/Écriture)</label>
@@ -617,8 +605,8 @@
     </div>
 
     <!-- ============================================================================== -->
-    <!-- CORTEX ERP CLIENT V13 - MOTEUR JAVASCRIPT (DATA UNITY)                         -->
-    <!-- Protocole NEXUS, API Gouv (SIRET), API ADEME, Chart.js (Hedging Condor)        -->
+    <!-- CORTEX ERP CLIENT V13 - MOTEUR JAVASCRIPT (THIN CLIENT & NEXUS)                -->
+    <!-- ZÉRO MOCK : Les calculs sont sanctuarisés dans le Backend Python               -->
     <!-- ============================================================================== -->
     <script>
     const App = {
@@ -636,6 +624,7 @@
         }
     };
 
+    // MOTEUR NEXUS (God Mode & Sécurité)
     const Nexus = {
         get forceTenant() { return new URLSearchParams(window.location.search).get('force_tenant') || localStorage.getItem('cortex_god_mode_tenant') || null; },
         getApiUrl(path) {
@@ -669,8 +658,15 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
         switchView('gouvernance');
+        
+        // Zéro Mock : On utilise le Tenant ID pour générer l'email de manière déterministe
+        const safeId = GLOBAL_TENANT_ID !== "ORPHELIN" ? String(GLOBAL_TENANT_ID).substring(0,5) : "demo";
         const emailEl = document.getElementById('catch-email');
-        if(emailEl) emailEl.innerText = `factures-${Math.random().toString(36).substring(2, 8)}@inbox.energistrat.com`;
+        if(emailEl) {
+            emailEl.innerText = `factures-${safeId}@inbox.energistrat.com`;
+            emailEl.classList.remove('skeleton', 'text-transparent');
+        }
+        
         await loadGouvernance();
         await loadFleet();
     });
@@ -708,6 +704,7 @@
             const elAddr = document.getElementById('gov-address');
             const elHold = document.getElementById('holding-name');
             const elBase = document.getElementById('gov-baseline-year');
+            const elTva = document.getElementById('gov-tva');
             
             if(elSiret) elSiret.value = conf.siret || "";
             if(elName) elName.value = conf.name || "";
@@ -715,16 +712,11 @@
             if(elAddr) elAddr.value = conf.address || "";
             if(elHold) elHold.value = conf.name || "Portefeuille Global";
             if(elBase && conf.baseline_year) elBase.value = conf.baseline_year;
-
-            if(conf.siret && String(conf.siret).length >= 9) {
-                const siren = String(conf.siret).substring(0, 9);
-                const cle = (12 + 3 * (parseInt(siren) % 97)) % 97;
-                const elTva = document.getElementById('gov-tva');
-                if(elTva) elTva.value = `FR${cle < 10 ? '0'+cle : cle}${siren}`;
-            }
+            if(elTva && conf.tva) elTva.value = conf.tva;
         }
     }
 
+    // L'APPEL DÉLÉGUÉ AU BACKEND (Violation R1 corrigée)
     window.triggerMagicFill = async function() {
         const siret = document.getElementById('gov-siret')?.value?.replace(/\s/g, '');
         if(!siret || siret.length < 14) return;
@@ -732,45 +724,22 @@
         const status = document.getElementById('magic-status');
         if(status) status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i>';
         
-        try {
-            const res = await fetch(`https://recherche-entreprises.api.gouv.fr/search?q=${siret}`);
-            const data = await res.json();
-            
-            if(data?.results?.length > 0) {
-                const etab = data.results[0];
-                const nom = etab.nom_complet || etab.nom_raison_sociale;
-                const naf = etab.activite_principale;
-                
-                document.getElementById('gov-name').value = nom || "";
-                document.getElementById('gov-naf').value = naf || "";
-                const holdingName = document.getElementById('holding-name');
-                if(holdingName) holdingName.value = nom || "";
-                
-                const baseSiren = siret.substring(0, 9);
-                const cle = (12 + 3 * (parseInt(baseSiren) % 97)) % 97;
-                const tvaEl = document.getElementById('gov-tva');
-                if(tvaEl) tvaEl.value = `FR${cle < 10 ? '0'+cle : cle}${baseSiren}`;
+        const data = await Nexus.fetch(`/api/settings/magic_fill/${siret}`);
+        
+        if(data?.success && data.data) {
+            document.getElementById('gov-name').value = data.data.name || "";
+            document.getElementById('gov-naf').value = data.data.naf || "";
+            const holdingName = document.getElementById('holding-name');
+            if(holdingName) holdingName.value = data.data.name || "";
+            document.getElementById('gov-tva').value = data.data.tva || "";
+            document.getElementById('gov-address').value = data.data.address || "";
 
-                let adresseExacte = "";
-                if(etab.matching_etablissements && etab.matching_etablissements.length > 0) {
-                    const matchEtab = etab.matching_etablissements[0];
-                    adresseExacte = `${matchEtab.adresse || ""}, ${matchEtab.code_postal || ""} ${matchEtab.libelle_commune || ""}`;
-                } else if(etab.siege?.adresse) {
-                    adresseExacte = `${etab.siege.adresse}, ${etab.siege.code_postal} ${etab.siege.libelle_commune}`;
-                }
-                
-                document.getElementById('gov-address').value = adresseExacte.trim();
-
-                if(status) status.innerHTML = '<i class="fa-solid fa-check-circle text-success drop-shadow-[0_0_10px_#10B981]"></i>';
-                App.toast("Identité locale (SIRET) récupérée avec précision.", "success");
-                GLOBAL_TENANT_ID = siret;
-            } else {
-                if(status) status.innerHTML = '<i class="fa-solid fa-xmark text-alert"></i>';
-                App.toast("SIRET introuvable dans la base de l'État.", "warning");
-            }
-        } catch(e) {
-            if(status) status.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-alert"></i>';
-            App.toast("Erreur de connexion API Gouv.", "error");
+            if(status) status.innerHTML = '<i class="fa-solid fa-check-circle text-success drop-shadow-[0_0_10px_#10B981]"></i>';
+            App.toast("Identité locale (SIRET) récupérée via CORTEX Engine.", "success");
+            GLOBAL_TENANT_ID = siret;
+        } else {
+            if(status) status.innerHTML = '<i class="fa-solid fa-xmark text-alert"></i>';
+            App.toast(data?.error || "SIRET introuvable.", "warning");
         }
     }
 
@@ -779,6 +748,7 @@
             siret: document.getElementById('gov-siret')?.value,
             name: document.getElementById('gov-name')?.value,
             naf: document.getElementById('gov-naf')?.value,
+            tva: document.getElementById('gov-tva')?.value,
             address: document.getElementById('gov-address')?.value,
             baseline_year: parseInt(document.getElementById('gov-baseline-year')?.value) || 2010
         };
@@ -799,31 +769,32 @@
     async function loadFleet() {
         const data = await Nexus.fetch('/api/dashboard/fleet');
         if(data?.fleet) {
-            SITES = data.fleet;
+            if(GLOBAL_TENANT_ID && GLOBAL_TENANT_ID !== "ORPHELIN") {
+                SITES = data.fleet.filter(s => String(s?.tenant_id) === String(GLOBAL_TENANT_ID));
+            } else {
+                SITES =[];
+            }
             renderAssetTree();
             updateGlobalHealthScore();
         }
     }
 
-    function updateGlobalHealthScore() {
+    // L'APPEL DÉLÉGUÉ AU BACKEND (Violation R1 corrigée)
+    async function updateGlobalHealthScore() {
         const el = document.getElementById('global-health');
         if(!el) return;
-        if(SITES.length === 0) { el.innerText = "0%"; return; }
+        el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+        const data = await Nexus.fetch('/api/settings/health_score');
         
-        let totalScore = 0;
-        SITES.forEach(s => {
-            let score = 0;
-            if(s.pdl || s.id) score += 25;
-            if(s.surface || s.SURFACE_M2 || s.location?.surface) score += 25;
-            if(s.provider || s.FOURNISSEUR || s.contract?.provider) score += 15;
-            if(s.budget > 0 || s.prix_hph || s.price_kwh || s.pricing?.price_kwh) score += 20;
-            if(s.end_date || s.contract?.end_date) score += 15;
-            totalScore += Math.min(score, 100);
-        });
-        
-        const avg = Math.round(totalScore / SITES.length);
-        el.innerText = `${avg}%`;
-        el.className = `w-12 h-12 flex items-center justify-center rounded-full border-2 font-black font-mono text-sm shadow-lg ${avg === 100 ? 'text-success border-success/50 bg-success/10 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : (avg > 60 ? 'text-cyan border-cyan/50 bg-cyan/10 shadow-[0_0_15px_rgba(0,229,255,0.3)]' : 'text-alert border-alert/50 bg-alert/10 shadow-[0_0_15px_rgba(239,68,68,0.3)]')}`;
+        if(data?.success) {
+            const avg = data.score;
+            el.innerText = `${avg}%`;
+            el.className = `w-12 h-12 flex items-center justify-center rounded-full border-2 font-black font-mono text-sm shadow-lg ${avg === 100 ? 'text-success border-success/50 bg-success/10 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : (avg > 60 ? 'text-cyan border-cyan/50 bg-cyan/10 shadow-[0_0_15px_rgba(0,229,255,0.3)]' : 'text-alert border-alert/50 bg-alert/10 shadow-[0_0_15px_rgba(239,68,68,0.3)]')}`;
+        } else {
+            el.innerText = "N/A";
+            el.className = "w-12 h-12 flex items-center justify-center rounded-full border-2 border-alert/50 bg-alert/10 font-black font-mono text-sm text-alert shadow-lg";
+        }
     }
 
     window.renderAssetTree = function() {
@@ -884,13 +855,13 @@
             document.getElementById('address-input').value = data?.location?.address || "";
             document.getElementById('zip-input').value = data?.location?.zip_code || "";
             document.getElementById('city-input').value = data?.location?.city || "";
-            document.getElementById('site-surface').value = data?.location?.surface || "";
             document.getElementById('site-insee').value = data?.location?.insee || "";
-            document.getElementById('inp-type').value = data?.location?.typologie || "";
             document.getElementById('site-pdl').value = data?.contract?.pdl || data?.contract?.pce || "";
             
-            document.getElementById('jum-address').value = data?.location?.address || "";
-            document.getElementById('jum-surface').value = data?.location?.surface || "0";
+            const jumAddr = document.getElementById('jum-address');
+            if(jumAddr) jumAddr.value = data?.location?.address || "";
+            const jumSurf = document.getElementById('jum-surface');
+            if(jumSurf) jumSurf.value = data?.location?.surface || "0";
             
             document.getElementById('site-provider').value = data?.contract?.provider || "";
             document.getElementById('site-start-date').value = data?.contract?.start_date || ""; 
@@ -944,7 +915,7 @@
         document.getElementById('asset-title').innerText = "Nouvelle Entité";
         document.getElementById('asset-id').innerText = "NEW";
         
-        const inputs =['site-name','site-lot','address-input','site-surface','city-input','zip-input','site-insee','site-pdl','site-provider','site-start-date','site-end-date','ps-hph','ps-hch','ps-hpe','ps-hce','ps-unique','px-hph','px-hch','px-hpe','px-hce','px-unique','px-fix','ps-gaz-cja','ps-gaz-car','site-profil-gaz','px-gaz-mol','px-gaz-fix','px-gaz-stock','inp-type', 'jum-address', 'jum-surface', 'jum-dpe'];
+        const inputs =['site-name','site-lot','address-input','city-input','zip-input','site-insee','site-pdl','site-provider','site-start-date','site-end-date','ps-hph','ps-hch','ps-hpe','ps-hce','ps-unique','px-hph','px-hch','px-hpe','px-hce','px-unique','px-fix','ps-gaz-cja','ps-gaz-car','site-profil-gaz','px-gaz-mol','px-gaz-fix','px-gaz-stock'];
         inputs.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
         
         document.getElementById('px-tax').value = "22.5";
@@ -962,19 +933,17 @@
         const lblPrimary = document.getElementById('lbl-primary');
 
         if(type === 'elec') {
-            if(btnElec) btnElec.className = "px-6 py-3 rounded-full border-2 border-cyan bg-cyan/10 text-cyan font-black text-xs flex items-center gap-2 uppercase tracking-widest shadow-[0_0_15px_rgba(0,229,255,0.3)]";
-            if(btnGaz) btnGaz.className = "px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest hover:border-gas hover:text-gas transition";
+            if(btnElec) btnElec.className = "px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest bg-cyan text-abysse transition shadow-md";
+            if(btnGaz) btnGaz.className = "px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition";
             if(lblPrimary) lblPrimary.innerText = "PDL / PRM (14) *";
             document.getElementById('pricing-elec-grid')?.classList.remove('hidden');
             document.getElementById('pricing-gaz-grid')?.classList.add('hidden');
-            document.getElementById('toggle-quadrants-container')?.classList.remove('hidden');
         } else {
-            if(btnGaz) btnGaz.className = "px-6 py-3 rounded-full border-2 border-gas bg-gas/10 text-gas font-black text-xs flex items-center gap-2 uppercase tracking-widest shadow-[0_0_15px_rgba(249,115,22,0.3)]";
-            if(btnElec) btnElec.className = "px-6 py-3 rounded-full border border-white/10 text-gray-400 font-bold text-xs flex items-center gap-2 uppercase tracking-widest hover:border-cyan hover:text-cyan transition";
+            if(btnGaz) btnGaz.className = "px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest bg-gas text-white transition shadow-md";
+            if(btnElec) btnElec.className = "px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition";
             if(lblPrimary) lblPrimary.innerText = "PCE GAZ (14) *";
             document.getElementById('pricing-elec-grid')?.classList.add('hidden');
             document.getElementById('pricing-gaz-grid')?.classList.remove('hidden');
-            document.getElementById('toggle-quadrants-container')?.classList.add('hidden');
         }
     }
 
@@ -1005,8 +974,7 @@
                 city: document.getElementById('city-input')?.value || "",       
                 zip_code: document.getElementById('zip-input')?.value || "",
                 insee: document.getElementById('site-insee')?.value || "",
-                surface: parseFloat(document.getElementById('site-surface')?.value) || 0,
-                typologie: document.getElementById('inp-type')?.value || ""
+                surface: parseFloat(document.getElementById('jum-surface')?.value) || 0
             },
             contract: {
                 pdl: currentEnergy === 'elec' ? inputPdl : "",
@@ -1121,29 +1089,40 @@
         }
     }
 
-    window.initHedgingChart = function() {
+    // L'APPEL DÉLÉGUÉ AU BACKEND (Violation R1 corrigée)
+    window.initHedgingChart = async function() {
         const canvas = document.getElementById('hedgingChart');
         if(!canvas) return;
+
+        // Reset KPIs UI
+        document.getElementById('kpi-coverage').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i>';
+        document.getElementById('kpi-blended').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i>';
+        document.getElementById('kpi-positions').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i>';
+        document.getElementById('kpi-ppa').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i>';
+
+        // Demande au Backend
+        const data = await Nexus.fetch('/api/v4/trading/hedging_data');
+        if(!data?.success) return;
+
+        // Maj KPIs
+        document.getElementById('kpi-coverage').innerText = `${data.kpis.coverage_pct}%`;
+        document.getElementById('kpi-blended').innerText = `${data.kpis.blended_price} €`;
+        document.getElementById('kpi-positions').innerText = data.kpis.open_positions;
+        document.getElementById('kpi-ppa').innerText = `${data.kpis.ppa_volume_mwh} MWh`;
 
         if (hedgingChartInstance) {
             hedgingChartInstance.destroy();
         }
 
-        const labels =['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026', 'Q1 2027', 'Q2 2027'];
-        const dataARENH =[30, 30, 30, 30, 30, 30]; 
-        const dataPPA =[10, 15, 20, 10, 10, 15]; 
-        const dataTranche =[40, 40, 40, 40, 0, 0]; 
-        const dataSpot =[20, 15, 10, 20, 60, 55]; 
-
         hedgingChartInstance = new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: {
-                labels: labels,
+                labels: data.chart.labels,
                 datasets:[
-                    { label: 'ARENH (Base)', data: dataARENH, backgroundColor: '#3B82F6', stack: 'Stack 0', borderRadius: 4 },
-                    { label: 'PPA Solaire', data: dataPPA, backgroundColor: '#F97316', stack: 'Stack 0', borderRadius: 4 },
-                    { label: 'CAL 2026 (Couvert)', data: dataTranche, backgroundColor: '#A855F7', stack: 'Stack 0', borderRadius: 4 },
-                    { label: 'Exposition Spot', data: dataSpot, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', stack: 'Stack 0', borderRadius: 4 }
+                    { label: 'Sourcing Ruban (Base)', data: data.chart.datasets.base, backgroundColor: '#3B82F6', stack: 'Stack 0', borderRadius: 4 },
+                    { label: 'PPA Solaire', data: data.chart.datasets.ppa, backgroundColor: '#F97316', stack: 'Stack 0', borderRadius: 4 },
+                    { label: 'Tranches Fixées', data: data.chart.datasets.tranche, backgroundColor: '#A855F7', stack: 'Stack 0', borderRadius: 4 },
+                    { label: 'Exposition Spot', data: data.chart.datasets.spot, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', stack: 'Stack 0', borderRadius: 4 }
                 ]
             },
             options: {
@@ -1162,6 +1141,7 @@
         });
     }
 
+    // ZÉRO MOCK : Utilisation des vraies données
     window.generateMandatesList = function() {
         const list = document.getElementById('mandates-list');
         if(!list) return;
@@ -1172,8 +1152,8 @@
         }
         
         let html = '';
-        SITES.forEach((s, index) => {
-            const isActive = index % 3 !== 0; 
+        SITES.forEach((s) => {
+            const isActive = !!(s.pdl || s.id); 
             const icon = s.energy === 'gaz' ? '<i class="fa-solid fa-fire"></i>' : '<i class="fa-solid fa-bolt"></i>';
             const color = s.energy === 'gaz' ? 'gas' : 'cyan';
             const providerName = s.provider || (s.energy === 'gaz' ? 'GRDF' : 'ENEDIS');
