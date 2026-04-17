@@ -17,9 +17,9 @@ except ImportError:
 
 class CortexRTE:
     """
-    SATELLITE CORTEX RTE V13.1 (Haute Résilience)
+    SATELLITE CORTEX RTE V13.2 (Haute Résilience)
     Connecteur officiel à l'Open Data RTE.
-    Tolérant aux pannes, fix heure d'été (UTC) et publication Spot.
+    Tolérant aux pannes, fix Heure d'Été (UTC) et publication Spot.
     """
 
     def __init__(self):
@@ -92,18 +92,18 @@ class CortexRTE:
             return fallback_data
             
         try:
-            # FIX V13.1 : Utilisation stricte de l'UTC (Z) pour le fuseau horaire 
-            # et de la règle des 13h00 (11h UTC) pour éviter l'Erreur 400 du Day-Ahead non publié.
+            # FIX V13.2 : Utilisation stricte de l'UTC (Z) pour le fuseau horaire 
+            # et de la règle des 11h UTC (13h Paris) pour éviter l'Erreur 400 (Day-Ahead non publié).
             now = datetime.utcnow()
             
             if now.hour >= 11:
-                end_date = now + timedelta(days=1) # Après 11h UTC (13h Paris), on peut demander J+1
+                end_date = now + timedelta(days=1) # Après 11h UTC, on peut demander la cotation de demain
             else:
-                end_date = now # Avant 11h UTC, le Day-Ahead de demain n'est pas encore fixé
+                end_date = now # Avant 11h UTC, le Day-Ahead de demain n'est pas encore fixé par l'EPEX
                 
             start_date = now - timedelta(days=15)
             
-            # Formatage strict ISO 8601 en UTC (Z)
+            # Formatage strict ISO 8601 en UTC (Z) -> C'est ce qui corrige le bug d'Heure d'Été
             start_str = start_date.strftime("%Y-%m-%dT00:00:00Z")
             end_str = end_date.strftime("%Y-%m-%dT00:00:00Z")
             
