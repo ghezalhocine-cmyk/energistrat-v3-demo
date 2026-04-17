@@ -712,7 +712,7 @@ async def api_run_sentinel_scan(user = Depends(get_current_user)): return JSONRe
 import re # N'oublie pas de vérifier que "import re" est bien tout en haut de ton main.py (avec les autres imports)
 
 @app.post("/api/ingest/upload")
-async def api_ingest_upload(files: List[UploadFile] = File(...), user = Depends(get_current_user)):
+async def api_ingest_upload(files: List[UploadFile] = File(...), site_id: str = Form(None), user = Depends(get_current_user)):
     """Aiguilleur Smart Ingest (Matrice Globale vs Courbe de Charge ENEDIS/GRDF)"""
     if not user or user.get("role") != "ADMIN":
         return JSONResponse({"error": "Accès refusé. Réservé aux Opérationnels."}, status_code=401)
@@ -727,68 +727,54 @@ async def api_ingest_upload(files: List[UploadFile] = File(...), user = Depends(
             filename_upper = file.filename.upper()
             
             # 1. SMART ROUTER : Détection d'une Courbe de Charge (SGE / ADAM)
-            # On cherche un PDL/PCE (14 chiffres consécutifs) dans le nom du fichier
-            pdl_match = re.search(r'(\d{14})', filename_upper)
-            
-            if pdl_match and ("ENEDIS" in filename_upper or "GRDF" in filename_upper or "CDC" in filename_upper):
-                pdl = pdl_match.group(1)
+            if "ENEDIS" in filename_upper or "GRDF" in filename_upper or "CDC" in filename_upper:
                 
-                # C'est une courbe ! On délègue au moteur Physique
+                # On délègue au moteur Physique
                 df, delta_minutes, meta = ingest.parse_load_curve(content, file.filename)
                 
-                if df is not None and not df.empty:
-                    # Traitement mathématique rapide de la courbe
-                    # Si delta=10 min, on divise par 6 pour avoir des kWh
+                # FIX V13.2 : Recherche Intelligente du PDL
+                pdl = site_id # 1. Priorité au site_id s'il est poussé par la War Room (industry.html)
+                
+                if not pdl: # 2. Sinon, on lit dans le fichier (meta)
+                    pdl = meta.get("pdl") or meta.get("pce")
+                    
+                if not pdl: # 3. En dernier recours, on cherche dans le nom, en évitant les Dates (202X...)
+                    pdl_match = re.search(r'\b(?!202\d)(\d{14})\b', filename_upper)
+                    if pdl_match:
+                        pdl = pdl_match.group(1)
+                
+                if pdl and df is not None and not df.empty:
                     total_kwh = float(df['val'].sum() * (delta_minutes / 60.0))
                     pmax_kw = float(df['val'].max())
                     
-                    # Mise à jour silencieuse dans la Base 3D
+                    # Mise à jour dans la Base 3D
                     site_data = db.get_site(pdl) or {}
                     if 'identity' not in site_data: site_data['identity'] = {'id': pdl, 'site_name': f"Site {pdl}"}
                     if 'contract' not in site_data: site_data['contract'] = {'pdl': pdl if "ENEDIS" in filename_upper else "", 'pce': pdl if "GRDF" in filename_upper else ""}
                     if 'kpis' not in site_data: site_data['kpis'] = {}
                     
-                    # Injection des vraies données SGE
                     site_data['kpis']['volume_mwh'] = round(total_kwh / 1000, 2)
                     site_data['kpis']['pmax_kw'] = round(pmax_kw, 2)
                     site_data['kpis']['has_load_curve'] = True
                     
                     db.save_site(pdl, site_data)
                     
-                    report.append({
-                        "filename": file.filename,
-                        "status": "INGESTED",
-                        "message": f"Courbe SGE ({pdl}) : {round(total_kwh/1000, 2)} MWh et Pmax {round(pmax_kw)} kW injectés."
-                    })
+                    report.append({"filename": file.filename, "status": "INGESTED", "message": f"Courbe SGE ({pdl}) : {round(total_kwh/1000, 2)} MWh et Pmax {round(pmax_kw)} kW injectés."})
                 else:
-                    report.append({
-                        "filename": file.filename,
-                        "status": "ERROR",
-                        "message": "Fichier SGE illisible, corrompu ou vide."
-                    })
+                    report.append({"filename": file.filename, "status": "ERROR", "message": "PDL introuvable ou fichier vide."})
             
-            # 2. SMART ROUTER : Détection d'une Matrice Excel/CSV classique
+            # 2. SMART ROUTER : Matrice Excel de Masse
             else:
                 sites_imported = ingest.parse_mass_import_unified(content)
                 if sites_imported and len(sites_imported) > 0:
-                    report.append({
-                        "filename": file.filename,
-                        "status": "INGESTED",
-                        "message": f"{len(sites_imported)} compteurs synchronisés via la Matrice."
-                    })
+                    report.append({"filename": file.filename, "status": "INGESTED", "message": f"{len(sites_imported)} compteurs synchronisés via la Matrice."})
                 else:
-                    report.append({
-                        "filename": file.filename,
-                        "status": "UNKNOWN_PDL",
-                        "message": "Aucun PDL détecté ni format de matrice reconnu."
-                    })
+                    report.append({"filename": file.filename, "status": "UNKNOWN_PDL", "message": "Aucun PDL détecté ni format reconnu."})
                     
         except Exception as e:
-            report.append({
-                "filename": file.filename,
-                "status": "ERROR",
-                "message": f"Erreur critique: {str(e)}"
-            })
+            report.append({"filename": file.filename, "status": "ERROR", "message": f"Erreur critique: {str(e)}"})
+            
+    return JSONResponse({"success": True, "report": report})
             
     return JSONResponse({"success": True, "report": report})
 @app.get("/api/tools/sniper/market")
