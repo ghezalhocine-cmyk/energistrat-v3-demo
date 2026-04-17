@@ -17,9 +17,9 @@ except ImportError:
 
 class CortexRTE:
     """
-    SATELLITE CORTEX RTE V2.1 (Haute Résilience)
+    SATELLITE CORTEX RTE V13.1 (Haute Résilience)
     Connecteur officiel à l'Open Data RTE.
-    Tolérant aux pannes individuelles d'API.
+    Tolérant aux pannes, fix heure d'été (UTC) et publication Spot.
     """
 
     def __init__(self):
@@ -92,20 +92,20 @@ class CortexRTE:
             return fallback_data
             
         try:
-            # FIX V13 : On ne demande jamais J+2 à la bourse aveuglément.
-            # L'EPEX SPOT fixe le Day-Ahead (J+1) vers 13h00.
-            now = datetime.now()
+            # FIX V13.1 : Utilisation stricte de l'UTC (Z) pour le fuseau horaire 
+            # et de la règle des 13h00 (11h UTC) pour éviter l'Erreur 400 du Day-Ahead non publié.
+            now = datetime.utcnow()
             
-            if now.hour >= 13:
-                end_date = now + timedelta(days=1) # Après 13h, on peut demander demain
+            if now.hour >= 11:
+                end_date = now + timedelta(days=1) # Après 11h UTC (13h Paris), on peut demander J+1
             else:
-                end_date = now # Avant 13h, on ne demande qu'aujourd'hui
+                end_date = now # Avant 11h UTC, le Day-Ahead de demain n'est pas encore fixé
                 
             start_date = now - timedelta(days=15)
             
-            # Formatage strict ISO 8601 avec offset +01:00 exigé par RTE pour Day Ahead
-            start_str = start_date.strftime("%Y-%m-%dT00:00:00+01:00")
-            end_str = end_date.strftime("%Y-%m-%dT00:00:00+01:00")
+            # Formatage strict ISO 8601 en UTC (Z)
+            start_str = start_date.strftime("%Y-%m-%dT00:00:00Z")
+            end_str = end_date.strftime("%Y-%m-%dT00:00:00Z")
             
             data = self._fetch_rte_api(token, f"/wholesale_market/v2/france_day_ahead_prices?start_date={urllib.parse.quote(start_str)}&end_date={urllib.parse.quote(end_str)}")
             
