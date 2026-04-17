@@ -732,13 +732,24 @@ async def api_ingest_upload(files: List[UploadFile] = File(...), site_id: str = 
                 # On délègue au moteur Physique
                 df, delta_minutes, meta = ingest.parse_load_curve(content, file.filename)
                 
-                # FIX V13.2 : Recherche Intelligente du PDL
-                pdl = site_id # 1. Priorité au site_id s'il est poussé par la War Room (industry.html)
+               # ==========================================
+                # CHASSE AU PDL IMPLACABLE (4 NIVEAUX)
+                # ==========================================
+                pdl = site_id # Niveau 1 : Forcé par la War Room
                 
-                if not pdl: # 2. Sinon, on lit dans le fichier (meta)
+                if not pdl and meta: # Niveau 2 : Trouvé par le parseur
                     pdl = meta.get("pdl") or meta.get("pce")
                     
-                if not pdl: # 3. En dernier recours, on cherche dans le nom, en évitant les Dates (202X...)
+                if not pdl: # Niveau 3 (LE VRAI FIX) : Lecture aux Rayons X dans le fichier
+                    try:
+                        head = content[:4000].decode('utf-8', errors='ignore')
+                        matches = re.findall(r'\b(?!202\d)(\d{14})\b', head)
+                        if matches:
+                            pdl = matches[0]
+                    except:
+                        pass
+                        
+                if not pdl: # Niveau 4 : Recherche dans le nom du fichier en dernier recours
                     pdl_match = re.search(r'\b(?!202\d)(\d{14})\b', filename_upper)
                     if pdl_match:
                         pdl = pdl_match.group(1)
