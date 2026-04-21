@@ -711,22 +711,39 @@ async def api_run_sentinel_scan(user = Depends(get_current_user)): return JSONRe
 
 @app.post("/api/ingest/upload")
 async def api_ingest_upload(files: List[UploadFile] = File(...), site_id: str = Form(None), user = Depends(get_current_user)):
-    """Aiguilleur Smart Ingest V13.3 (Délégation Totale au Moteur)"""
-    if not user or user.get("role") != "ADMIN":
-        return JSONResponse({"error": "Accès refusé. Réservé aux Opérationnels."}, status_code=401)
-    
-    if not ingest:
-        return JSONResponse({"error": "Moteur CORTEX INGEST hors ligne."}, status_code=500)
+    """Aiguilleur Smart Ingest V13.4 (Bouclier Anti-500 Intégral)"""
+    try:
+        if not user or user.get("role") != "ADMIN":
+            return JSONResponse({"error": "Accès refusé."}, status_code=401)
         
-    out_list = list()
-    
-    for f in files:
-        raw_bytes = await f.read()
-        # Le moteur cortex_ingest.py fait tout : Extraction ZIP, Rayons X, LTM...
-        result = ingest.process_smart_upload(raw_bytes, f.filename, site_id)
-        out_list.extend(result)
+        if not ingest:
+            return JSONResponse({"success": True, "report":[{"filename": "SYSTEM", "status": "ERROR", "message": "Moteur CORTEX INGEST hors ligne."}]})
+            
+        out_list =[]
         
-    return JSONResponse({"success": True, "report": out_list})
+        for f in files:
+            try:
+                raw_bytes = await f.read()
+                safe_filename = f.filename if f.filename else "fichier_inconnu.zip"
+                
+                # Le moteur cortex_ingest.py fait tout : Extraction ZIP, Rayons X, LTM...
+                result = ingest.process_smart_upload(raw_bytes, safe_filename, site_id)
+                
+                if isinstance(result, list):
+                    out_list.extend(result)
+                else:
+                    out_list.append({"filename": safe_filename, "status": "ERROR", "message": "Erreur interne du moteur d'ingestion."})
+                    
+            except Exception as inner_e:
+                out_list.append({"filename": getattr(f, 'filename', 'unknown'), "status": "ERROR", "message": f"Crash lecture fichier : {str(inner_e)}"})
+                
+        return JSONResponse({"success": True, "report": out_list})
+        
+    except Exception as e:
+        import traceback
+        print(f"🔥 FATAL CRASH INGEST : {traceback.format_exc()}")
+        # Le Bouclier Ultime : On renvoie l'erreur au terminal Front-End au lieu de crasher en 500 !
+        return JSONResponse({"success": True, "report":[{"filename": "SYSTEM_CRASH", "status": "ERROR", "message": f"Erreur critique backend : {str(e)}"}]})
 
 @app.get("/api/tools/sniper/market")
 async def api_sniper_market(user = Depends(get_current_user)):
