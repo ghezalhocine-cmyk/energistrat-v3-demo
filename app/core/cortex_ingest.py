@@ -18,15 +18,16 @@ except ImportError:
         db = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V13_4")
+logger = logging.getLogger("CORTEX_INGEST_V13_5")
 
 class CortexIngest:
     """
-    CORTEX INGEST V13.4 (CORRECTIF FATAL)
-    Ingestion massive de matrices Excel (36 col) et Courbes SGE.
+    CORTEX INGEST V13.5 (FIX "OUTLIER DATES")
+    Ingestion massive, Auto-Extract ZIP, Pas Dynamique.
+    Annualisation basée sur le comptage absolu des blocs (Data Science).
     """
     def __init__(self):
-        self.version = "13.4.0 (Enterprise Data Engine)"
+        self.version = "13.5.0 (Absolute Time Counter)"
         self.COLUMN_MAPPING = {
             "horodate":["HORODATE", "HORODATAGE"],
             "valeur":["VALEUR", "SOUTIRAGE", "PUISSANCE", "ENERGIE"],
@@ -270,12 +271,14 @@ class CortexIngest:
                 pmax_kw = float(df_pa['val'].max())
                 total_kwh_brut = float(df_pa['val'].sum() * (delta_minutes / 60.0))
                 
-                delta_days_dates = (df_pa['date'].iloc[-1] - df_pa['date'].iloc[0]).days
-                delta_days_count = len(df_pa) * delta_minutes / 1440.0
-                days_covered = max(delta_days_dates, delta_days_count, 1.0)
+                # FIX V13.5 : LE COMPTEUR ABSOLU (Immunité aux dates aberrantes)
+                # On calcule les jours stricts en comptant les lignes physiques.
+                days_covered = len(df_pa) * delta_minutes / 1440.0
+                if days_covered < 1: days_covered = 1.0
                 
                 volume_mwh_annuel = (total_kwh_brut / 1000.0)
                 
+                # Annualisation propre basée sur la masse physique de la donnée
                 if abs(days_covered - 365) > 15:
                     volume_mwh_annuel = (volume_mwh_annuel / days_covered) * 365.0
 
@@ -307,7 +310,7 @@ class CortexIngest:
 
                 report.append({
                     "filename": fname, "status": "INGESTED", 
-                    "message": f"Courbe SGE ({pdl}) : {round(volume_mwh_annuel, 1)} MWh (Annualisé), Pmax {round(pmax_kw)} kW"
+                    "message": f"Courbe SGE ({pdl}) : {round(volume_mwh_annuel, 1)} MWh (Annualisé sur {round(days_covered)} j), Pmax {round(pmax_kw)} kW"
                 })
 
             except Exception as e:
