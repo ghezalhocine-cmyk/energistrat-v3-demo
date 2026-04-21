@@ -1,4 +1,3 @@
-```python
 import pandas as pd
 import numpy as np
 import io
@@ -23,19 +22,17 @@ logger = logging.getLogger("CORTEX_INGEST_V13_4")
 
 class CortexIngest:
     """
-    CORTEX INGEST V13.4 (CORRECTIF FATAL "HORODATE")
+    CORTEX INGEST V13.4 (CORRECTIF FATAL)
     Ingestion massive de matrices Excel (36 col) et Courbes SGE.
     """
     def __init__(self):
         self.version = "13.4.0 (Enterprise Data Engine)"
         self.COLUMN_MAPPING = {
-            # FIX V13.4 : Suppression du mot "DATE" pour ne pas accrocher la "Date de début" d'Enedis !
             "horodate":["HORODATE", "HORODATAGE"],
             "valeur":["VALEUR", "SOUTIRAGE", "PUISSANCE", "ENERGIE"],
             "unite":["UNITE", "UNIT", "UNITÃ©", "UNITÉ"],
             "pas":["PAS", "INTERVALLE", "RESOLUTION"],
             "grandeur":["GRANDEUR PHY", "GRANDEUR PHYSIQUE", "NATURE"],
-            # Matrice
             "pdl":["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
             "site_label":["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM"],
             "entity":["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT", "SOCIETE"],
@@ -273,7 +270,6 @@ class CortexIngest:
                 pmax_kw = float(df_pa['val'].max())
                 total_kwh_brut = float(df_pa['val'].sum() * (delta_minutes / 60.0))
                 
-                # FIX V13.4 : Calcul sécurisé des jours (Évite le bug des 545 GWh)
                 delta_days_dates = (df_pa['date'].iloc[-1] - df_pa['date'].iloc[0]).days
                 delta_days_count = len(df_pa) * delta_minutes / 1440.0
                 days_covered = max(delta_days_dates, delta_days_count, 1.0)
