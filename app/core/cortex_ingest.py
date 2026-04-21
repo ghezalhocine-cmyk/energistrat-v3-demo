@@ -1,3 +1,4 @@
+```python
 import pandas as pd
 import numpy as np
 import io
@@ -18,24 +19,23 @@ except ImportError:
         db = None
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CORTEX_INGEST_V13_3")
+logger = logging.getLogger("CORTEX_INGEST_V13_4")
 
 class CortexIngest:
     """
-    CORTEX INGEST V13.3 (LA FUSION ULTIME)
+    CORTEX INGEST V13.4 (CORRECTIF FATAL "HORODATE")
     Ingestion massive de matrices Excel (36 col) et Courbes SGE.
-    Auto-Extract ZIP, Pas Dynamique (PT5M), Calcul Cos Phi et Annualisation (LTM).
     """
     def __init__(self):
-        self.version = "13.3.0 (Enterprise Data Engine)"
+        self.version = "13.4.0 (Enterprise Data Engine)"
         self.COLUMN_MAPPING = {
-            # --- MAPPING COURBES SGE ---
-            "horodate":["HORODATE", "DATE", "TEMPS", "HORODATAGE"],
+            # FIX V13.4 : Suppression du mot "DATE" pour ne pas accrocher la "Date de début" d'Enedis !
+            "horodate":["HORODATE", "HORODATAGE"],
             "valeur":["VALEUR", "SOUTIRAGE", "PUISSANCE", "ENERGIE"],
             "unite":["UNITE", "UNIT", "UNITÃ©", "UNITÉ"],
             "pas":["PAS", "INTERVALLE", "RESOLUTION"],
             "grandeur":["GRANDEUR PHY", "GRANDEUR PHYSIQUE", "NATURE"],
-            # --- MAPPING MATRICE EXCEL (36 COLONNES) ---
+            # Matrice
             "pdl":["PDL", "POINT_DE_LIVRAISON", "PRM", "PCE", "ID_SITE", "REFERENCE", "REF_PDL"],
             "site_label":["NOM_SITE", "LIBELLE_PDL", "NOM_POINT_DE_LIVRAISON", "SITE", "LABEL", "NOM"],
             "entity":["ENTITE", "RAISON_SOCIALE", "CLIENT", "TITULAIRE", "NOM_CLIENT", "SOCIETE"],
@@ -107,7 +107,6 @@ class CortexIngest:
         return s
 
     def extract_files_from_payload(self, file_content: bytes, filename: str):
-        """ Détecte et extrait les ZIP en RAM, ou retourne le fichier CSV/XLSX brut """
         extracted =[]
         if filename.lower().endswith('.zip'):
             try:
@@ -122,9 +121,7 @@ class CortexIngest:
         return extracted
 
     def extract_pdl_xray(self, content_bytes: bytes, filename: str, forced_id: str = None) -> str:
-        """ Rayons X : Cherche le PDL dans la War Room, l'en-tête du fichier ou le titre """
         if forced_id: return forced_id
-        
         try:
             head = content_bytes[:4000].decode('utf-8', errors='ignore')
             sci_match = re.search(r'(3[\.,]00\d{2})E\+13', head, re.IGNORECASE)
@@ -139,9 +136,6 @@ class CortexIngest:
         if pdl_match: return pdl_match.group(1)
         return None
 
-    # =========================================================
-    # 1. ANALYSE DE LA MATRICE EXCEL (L'Héritage)
-    # =========================================================
     def parse_mass_import_unified(self, file_content):
         sites =[]
         df = None
@@ -161,7 +155,6 @@ class CortexIngest:
         
         if not c_pdl and not c_siret: return[]
 
-        # Mapping des 36 colonnes
         c_nom = self._find_col(cols, "site_label")
         c_addr = self._find_col(cols, "adresse")
         c_cp = self._find_col(cols, "cp")
@@ -198,39 +191,32 @@ class CortexIngest:
             except Exception as e: logger.error(f"Erreur Matrice: {e}")
         return sites
 
-    # =========================================================
-    # 2. MOTEUR D'INGESTION GLOBAL (LE TAPIS ROULANT)
-    # =========================================================
     def process_smart_upload(self, file_content: bytes, filename: str, forced_site_id: str = None):
-        """ Déplie les ZIP, aiguille vers Excel ou SGE, calcule le Cos Phi et l'Annualisation """
         files = self.extract_files_from_payload(file_content, filename)
         report =[]
 
         for fname, fcontent in files:
             fname_up = fname.upper()
             
-            # A. MATRICE EXCEL
             if not ("ENEDIS" in fname_up or "GRDF" in fname_up or "CDC" in fname_up):
                 imported = self.parse_mass_import_unified(fcontent)
                 if imported: report.append({"filename": fname, "status": "INGESTED", "message": f"{len(imported)} compteurs synchronisés via Matrice."})
                 else: report.append({"filename": fname, "status": "ERROR", "message": "Matrice Excel/CSV non reconnue ou vide."})
                 continue
 
-            # B. COURBES DE CHARGE SGE / ENEDIS
             try:
                 pdl = self.extract_pdl_xray(fcontent, fname, forced_site_id)
                 if not pdl:
                     report.append({"filename": fname, "status": "ERROR", "message": "PDL (14 chiffres) introuvable dans le fichier ou le titre."})
                     continue
 
-                # Encodage & Parsing
                 enc = 'utf-8'
                 try: enc = chardet.detect(fcontent[:10000])['encoding'] or 'utf-8'
                 except: pass
 
                 df = None
                 buffer = io.BytesIO(fcontent)
-                for sep in [';', '\t', ',']:
+                for sep in[';', '\t', ',']:
                     buffer.seek(0)
                     try:
                         temp_df = pd.read_csv(buffer, sep=sep, encoding=enc, on_bad_lines='skip', engine='python')
@@ -262,7 +248,6 @@ class CortexIngest:
                         is_watt = True
                 if is_watt: df['val'] = df['val'] / 1000.0
 
-                # Séparation Active (PA) vs Réactive (PR)
                 df_pa = df
                 df_pr = pd.DataFrame()
                 if col_grandeur:
@@ -271,13 +256,11 @@ class CortexIngest:
                     df_pr = df[df['grandeur_clean'].str.contains('PR|REACT', na=False)]
                     if df_pa.empty: df_pa = df
 
-                # Time Parsing
                 df_pa['date'] = pd.to_datetime(df_pa['date'], dayfirst=True, errors='coerce', utc=True)
                 df_pa = df_pa.dropna(subset=['date', 'val']).sort_values(by='date')
                 
                 if df_pa.empty: continue
 
-                # DÉTECTION DU PAS DYNAMIQUE (PT5M, PT10M...)
                 delta_minutes = 10.0 
                 if col_pas and not df_pa[col_pas].dropna().empty:
                     pas_match = re.search(r'PT(\d+)M', str(df_pa[col_pas].dropna().iloc[0]).upper())
@@ -287,13 +270,14 @@ class CortexIngest:
                         calc_delta = (df_pa['date'].iloc[1] - df_pa['date'].iloc[0]).total_seconds() / 60.0
                         if calc_delta > 0: delta_minutes = calc_delta
 
-                # CALCULS : Pmax, Volume & Cos Phi
                 pmax_kw = float(df_pa['val'].max())
                 total_kwh_brut = float(df_pa['val'].sum() * (delta_minutes / 60.0))
                 
-                # ANNUALISATION LTM (Pour éviter les 3 GWh sur 2 ans)
-                days_covered = (df_pa['date'].iloc[-1] - df_pa['date'].iloc[0]).days
-                if days_covered < 1: days_covered = 1
+                # FIX V13.4 : Calcul sécurisé des jours (Évite le bug des 545 GWh)
+                delta_days_dates = (df_pa['date'].iloc[-1] - df_pa['date'].iloc[0]).days
+                delta_days_count = len(df_pa) * delta_minutes / 1440.0
+                days_covered = max(delta_days_dates, delta_days_count, 1.0)
+                
                 volume_mwh_annuel = (total_kwh_brut / 1000.0)
                 
                 if abs(days_covered - 365) > 15:
@@ -307,7 +291,6 @@ class CortexIngest:
                     if total_kwh_brut > 0:
                         cos_phi = total_kwh_brut / math.sqrt((total_kwh_brut**2) + (total_kvarh**2))
 
-                # SAUVEGARDE EN BASE 3D (Hot Data)
                 if db:
                     site_data = db.get_site(pdl) or {}
                     if 'identity' not in site_data: site_data['identity'] = {'id': pdl, 'site_name': f"Site {pdl}"}
@@ -321,7 +304,6 @@ class CortexIngest:
                     
                     db.save_site(pdl, site_data)
 
-                    # Cold Data Logic : En V13, les 50000 points bruts vont dans LoadCurves_Archive
                     try:
                         archive_ref = db.db.collection("LoadCurves_Archive").document(pdl)
                         archive_ref.set({"last_update": datetime.now().isoformat(), "days_covered": days_covered, "pas_minutes": delta_minutes}, merge=True)
@@ -329,7 +311,7 @@ class CortexIngest:
 
                 report.append({
                     "filename": fname, "status": "INGESTED", 
-                    "message": f"Courbe SGE ({pdl}) : {round(volume_mwh_annuel, 1)} MWh (Annualisé), Pmax {round(pmax_kw)} kW, CosΦ {round(cos_phi, 2)}"
+                    "message": f"Courbe SGE ({pdl}) : {round(volume_mwh_annuel, 1)} MWh (Annualisé), Pmax {round(pmax_kw)} kW"
                 })
 
             except Exception as e:
